@@ -1,0 +1,16 @@
+{
+  "global": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "baseUrl": null
+  },
+  "experts": {
+    "crucible": null,
+    "writer": null,
+    "director": null,
+    "music": null,
+    "thumbnail": null,
+    "marketing": null,
+    "shorts": null
+  }
+}

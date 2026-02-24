@@ -1,0 +1,41 @@
+# ============================================================
+# Delivery Console - Docker Compose (Dev Mode)
+# ============================================================
+# 设计原则:
+#   1. 单容器运行前后端（同一 package.json，无需拆分）
+#   2. 精确挂载：只暴露必要的目录给容器
+#   3. Projects 目录 rw（后端需写 delivery_store.json）
+#   4. secrets 目录 ro（OAuth credentials 只读）
+# ============================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: delivery-console-dev
+    ports:
+      - "5173:5173" # Vite frontend
+      - "3002:3002" # Express backend
+    volumes:
+      # 源码挂载 - 热更新（VirtioFS 实时同步）
+      - .:/app
+      - /app/node_modules # 隔离容器内的 node_modules（不污染宿主）
+
+      # 项目数据 - 所有内容项目（rw: 后端需写 delivery_store.json）
+      - ${PROJECTS_BASE:-../Projects}:/data/projects:rw
+
+      # Antigravity Skills - 用于同步到 Console（ro: 只读）
+      - ${SKILLS_BASE:-../.agent/skills}:/data/skills:ro
+
+      # OAuth secrets（ro: 只读）
+      - ./secrets:/app/secrets:ro
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+      - PROJECTS_BASE=/data/projects # 容器内的项目根目录
+      - CHOKIDAR_USEPOLLING=true # Docker 文件监听兼容
+      - WATCHPACK_POLLING=true
+    restart: unless-stopped

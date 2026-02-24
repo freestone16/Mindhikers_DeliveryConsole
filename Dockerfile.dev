@@ -1,0 +1,31 @@
+# ============================================================
+# Delivery Console - Unified Dev Container
+# ============================================================
+# Single container running both Vite (frontend) + tsx (backend)
+# via concurrently. Hot-reload via VirtioFS volume mounts.
+# ============================================================
+FROM node:20-alpine
+
+WORKDIR /app
+
+# System deps: tini (signal handling) + python3 (skill execution)
+RUN apk add --no-cache tini python3 py3-pip && \
+    pip3 install --break-system-packages requests
+
+# Copy package files first for layer caching
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm ci
+
+# Source code is mounted via volume (not COPY'd) for hot-reload
+# COPY . .  ← intentionally omitted for dev
+
+# Ports: Vite (5173) + Backend (3002)
+EXPOSE 5173 3002
+
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Default: run both frontend + backend concurrently
+CMD ["npx", "concurrently", "--names", "API,WEB", "--prefix-colors", "blue,green", "npx tsx server/index.ts", "npx vite --host"]

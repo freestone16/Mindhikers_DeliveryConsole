@@ -1,0 +1,267 @@
+export type PhaseState = 'concept' | 'execution';
+
+export interface BaseItem {
+    id: string;
+    name: string;
+    content: string; // The AI generated content
+    comment: string; // User annotation
+    checked: boolean; // User confirmation
+}
+
+export interface ThumbnailVariant {
+    id: string;
+    name: string;
+    content: string; // Core Prompt
+    visualSpecs?: {
+        font: string;
+        layout: string;
+        colorPalette: string[];
+        composition: string;
+    };
+    comment: string;
+    status: 'active' | 'deleted';
+}
+
+export interface MarketingStrategy {
+    seo: {
+        titleCandidates: string[];
+        description: string;
+        keywords: string[];
+        competitorAnalysis: string;
+    };
+    social: {
+        twitterThread: string;
+        redditPost: string;
+    };
+    geo: {
+        locationTags: string[];
+        culturalRelevance: string;
+    };
+}
+
+export interface DirectorModule {
+    phase: 1 | 2;
+    conceptProposal: string;
+    conceptFeedback: string;
+    isConceptApproved: boolean; // NEW: persists submit state
+    items: BaseItem[];
+}
+
+export interface MusicModule {
+    phase: 1 | 2;
+    moodProposal: string;
+    conceptFeedback: string;
+    isConceptApproved: boolean; // NEW: persists submit state
+    items: BaseItem[];
+}
+
+export interface ThumbnailModule {
+    variants: ThumbnailVariant[];
+    selectedVariantId?: string; // NEW: tracks which variant was selected
+}
+
+export interface MarketingModule {
+    strategy: MarketingStrategy;
+    feedback: string;
+    isSubmitted: boolean;
+    items?: never;
+}
+
+export interface ReviewEntry {
+    timestamp: string;
+    stage: 'script' | 'render';
+    action: 'approve' | 'reject';
+    comment: string;
+
+}
+
+export type ShortStatus =
+    | 'draft'           // 脚本已生成
+    | 'linked'          // 已关联视频文件 (v2.1)
+    | 'script_review'   // 脚本审核中
+    | 'rendering'       // Remotion 渲染中
+    | 'render_review'   // 渲染结果审核中
+    | 'approved'        // 审核通过，待排期
+    | 'scheduled'       // 已排期，待上传
+    | 'uploading'       // 上传中
+    | 'published';      // 已发布
+
+export interface ShortItem {
+    id: string;
+    title: string;
+    description: string;
+    tags: string[];
+    scriptPath: string;       // 脚本 markdown 文件路径
+    videoPath?: string;       // 渲染后的 .mp4 路径
+    status: ShortStatus;
+    scheduledDate?: string;   // 预约日期 "2026-02-15"
+    scheduledTime?: string;   // 预约时间 "09:00"
+    youtubeVideoId?: string;  // 上传后的 YouTube ID
+    youtubeUrl?: string;
+    reviewHistory: ReviewEntry[];
+    createdAt: string;
+    updatedAt: string;
+    // v2.2 Metadata
+    categoryId?: string;        // Default: '27' (Education)
+    madeForKids?: boolean;      // Default: false
+    privacyStatus?: 'private' | 'unlisted' | 'public'; // Default: 'private'
+    aiDisclosure?: boolean;     // Default: false
+}
+
+export interface UploadSession {
+    timestamp: string;
+    videoCount: number;
+    successCount: number;
+    failedIds: string[];
+}
+
+export interface ShortsModule {
+    items: ShortItem[];
+    uploadHistory: UploadSession[];
+}
+
+export interface SelectedScript {
+    filename: string;
+    path: string;
+    selectedAt: string;
+}
+
+export type ExpertStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ExpertWork {
+    status: ExpertStatus;
+    startedAt?: string;
+    completedAt?: string;
+    outputPath?: string;
+    outputContent?: string;
+    logs: string[];
+    error?: string;
+}
+
+export interface DeliveryState {
+    projectId: string;
+    lastUpdated?: string;
+    selectedScript?: SelectedScript;
+    activeExpertId?: string;
+    experts?: {
+        [expertId: string]: ExpertWork;
+    };
+    modules: {
+        director: DirectorModule;
+        music: MusicModule;
+        thumbnail: ThumbnailModule;
+        marketing: MarketingModule;
+        shorts: ShortsModule;
+    };
+}
+
+// --- Visual Audit Module (v3.1) ---
+
+export type BgStyle = 'black' | 'stripes' | 'dark-gradient';
+
+export interface CinematicZoomProps {
+    imageUrl: string;
+    bgStyle?: BgStyle;
+    zoomStart?: number;
+    zoomEnd?: number;
+}
+
+export interface VisualScene {
+    id: string;
+    timestamp: string;
+    script_line: string;
+    type: 'remotion' | 'seedance' | 'artlist';
+    // Remotion specific
+    template?: string;
+    props?: Record<string, any>;
+    // Seedance specific
+    mode?: 'T2V' | 'I2V' | 'V2V';
+    resolution?: string;
+    duration?: string;
+    prompt?: string;
+    references?: {
+        images?: string[];
+        videos?: string[];
+        audio?: string[];
+    };
+    // Artlist specific
+    search_keywords?: string[];
+    search_tips?: string;
+
+    // CinematicZoom specific (v3.2)
+    visualPrompt?: string;
+    audioSync?: string;
+
+    // Common
+    sfx?: string;
+    status: 'pending_review' | 'approved' | 'rejected';
+    review_comment?: string | null;
+}
+
+export interface VisualPlan {
+    version: string;
+    project: string;
+    created_at: string;
+    scenes: VisualScene[];
+    metadata: any;
+}
+
+// --- Director Master V2 Types ---
+
+export type BRollType = 'remotion' | 'seedance' | 'artlist';
+
+export interface SceneOption {
+    id: string;
+    type: BRollType;
+    previewUrl?: string;
+    template?: string;
+    props?: Record<string, unknown>;
+    prompt?: string;
+    mode?: 'T2V' | 'I2V' | 'V2V';
+    search_keywords?: string[];
+}
+
+export interface DirectorChapter {
+    chapterId: string;
+    chapterIndex: number;
+    chapterName: string;
+    scriptText: string;
+    options: SceneOption[];
+    selectedOptionId?: string;
+    userComment?: string;
+    isLocked: boolean;
+}
+
+export interface SelectionState {
+    projectId: string;
+    lastUpdated: string;
+    chapters: DirectorChapter[];
+}
+
+export interface DirectorAction {
+    action: 'phase1' | 'phase2_generate' | 'phase2_revise' | 'phase2_select' | 'phase3_render';
+    projectId: string;
+    chapterIndex?: number;
+    userComment?: string;
+    selectedOptions?: BRollType[];
+}
+
+export interface Phase1Concept {
+    projectId: string;
+    createdAt: string;
+    content: string;
+    userFeedback?: string;
+    isApproved: boolean;
+}
+
+export interface RenderJob {
+    jobId: string;
+    projectId: string;
+    chapterId: string;
+    status: 'pending' | 'rendering' | 'completed' | 'failed';
+    progress: number;
+    frame?: number;
+    totalFrames?: number;
+    outputPath?: string;
+    error?: string;
+}
