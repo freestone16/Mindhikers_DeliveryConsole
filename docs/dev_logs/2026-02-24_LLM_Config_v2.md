@@ -72,3 +72,21 @@
 | `server/llm-config.ts` | 支持新配置，真实 API 测试 |
 | `src/hooks/useLLMConfig.ts` | 适配新数据结构 |
 | `src/components/LLMConfigModal.tsx` | 重写 UI，4 个 Tab |
+
+---
+
+## 2026-02-24 下午更新：Volcengine 配置修复
+
+### 问题
+- volcengine 需要 3 个输入框（AK/SK/Project ID）但用户只有 1 个 API Key
+- 保存后自动退出，无法测试
+
+### 修复
+1. 简化 volcengine 配置：`envVars` 改为只读 `VOLCENGINE_ACCESS_KEY`
+2. 修复保存逻辑：移除 `setSelectedProvider(null)`，保存后保持在当前页面
+3. 更新 `server/volcengine.ts`：简化 Bearer Token 方式调用
+4. UI 优化：保存后可立即点击测试
+
+### 相关 Commit
+- 简化 volcengine 配置为单 API Key 模式
+- 修复保存后不退出问题
