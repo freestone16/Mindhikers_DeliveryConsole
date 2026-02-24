@@ -1,4 +1,6 @@
 import process from 'process';
+import fs from 'fs';
+import path from 'path';
 
 interface VolcImageResult {
   task_id?: string;
@@ -9,6 +11,25 @@ interface VolcImageResult {
 
 const VOLC_IMAGE_API = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 
+function getEnvVar(varName: string): string | undefined {
+  if (process.env[varName]) {
+    return process.env[varName];
+  }
+  
+  const envPath = path.join(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    const match = content.match(new RegExp(`^${varName}=(.+)$`, 'm'));
+    if (match && match[1] && match[1].trim()) {
+      const value = match[1].trim();
+      process.env[varName] = value;
+      return value;
+    }
+  }
+  
+  return undefined;
+}
+
 export async function generateImageWithVolc(
   prompt: string,
   options: {
@@ -16,11 +37,11 @@ export async function generateImageWithVolc(
     size?: string;
   } = {}
 ): Promise<VolcImageResult> {
-  const apiKey = process.env.VOLCENGINE_ACCESS_KEY || process.env.VOLCENGINE_API_KEY;
-  const projectId = process.env.VOLCENGINE_PROJECT_ID;
+  const apiKey = getEnvVar('VOLCENGINE_ACCESS_KEY') || getEnvVar('VOLCENGINE_API_KEY');
+  const projectId = getEnvVar('VOLCENGINE_PROJECT_ID');
   
   if (!apiKey) {
-    return { error: 'VOLCENGINE_ACCESS_KEY not configured' };
+    return { error: 'VOLCENGINE_ACCESS_KEY not configured. Please save your API Key in LLM Config.' };
   }
   
   const model = options.model || 'doubao-seedream-4-5';
@@ -70,8 +91,8 @@ export async function generateImageWithVolc(
 }
 
 export async function pollVolcImageResult(taskId: string): Promise<VolcImageResult> {
-  const apiKey = process.env.VOLCENGINE_ACCESS_KEY || process.env.VOLCENGINE_API_KEY;
-  const projectId = process.env.VOLCENGINE_PROJECT_ID;
+  const apiKey = getEnvVar('VOLCENGINE_ACCESS_KEY') || getEnvVar('VOLCENGINE_API_KEY');
+  const projectId = getEnvVar('VOLCENGINE_PROJECT_ID');
   
   if (!apiKey) {
     return { error: 'VOLCENGINE_ACCESS_KEY not configured' };

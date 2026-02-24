@@ -90,3 +90,37 @@
 ### 相关 Commit
 - 简化 volcengine 配置为单 API Key 模式
 - 修复保存后不退出问题
+
+---
+
+## 2026-02-24 晚间更新：ShortsMaster 执行修复
+
+### 问题
+ShortsMaster 执行时报错：
+```
+LLM 调用失败: Failed to parse JSON response
+```
+
+### 根因分析
+1. `executor.py` 统一使用 `chat_with_json()` 方法
+2. `DeepSeekConnector.chat_with_json()` 强制设置 `response_format: {"type": "json_object"}`
+3. ShortsMaster skill 设计为返回 Markdown 格式的《短视频脚本包》
+
+### 修复方案
+**修改 `skills/executor.py`**:
+- 新增 `MARKDOWN_SKILLS` 列表，识别输出 Markdown 的 skill
+- Markdown skill 使用 `chat()` 方法，JSON skill 使用 `chat_with_json()`
+- 根据专家类型生成合适的输出文件名
+
+**修改 `server/index.ts`**:
+- `spawn()` 添加 `env: { ...process.env }` 传递环境变量
+- 解决 Python 子进程无法读取 `.env` 中 API Key 的问题
+
+### 相关文件
+| 文件 | 改动 |
+|------|------|
+| `skills/executor.py` | 区分 Markdown/JSON 输出模式 |
+| `server/index.ts` | spawn 传递环境变量 |
+
+### 遗留问题
+- `server/volcengine.ts` 有未提交的改动（getEnvVar 函数）
