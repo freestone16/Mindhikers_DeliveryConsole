@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
+import { DirectorSection } from './components/DirectorSection';
 import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
@@ -134,6 +135,18 @@ function App() {
                     {activeExpertId === 'VisualAudit' ? (
                         <main className="max-w-7xl mx-auto px-6 py-8">
                             <VisualAuditPage />
+                        </main>
+                    ) : activeExpertId === 'Director' ? (
+                        <main className="max-w-7xl mx-auto px-6 py-8">
+                            <DirectorSection
+                                data={state.modules.director}
+                                projectId={state.projectId}
+                                scriptPath={state.selectedScript?.path || ''}
+                                onUpdate={(newData) => updateState({
+                                    ...state,
+                                    modules: { ...state.modules, director: newData }
+                                })}
+                            />
                         </main>
                     ) : (
                         <main className="max-w-7xl mx-auto px-6 py-8">

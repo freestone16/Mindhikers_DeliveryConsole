@@ -19,6 +19,9 @@ from .connectors import get_connector, get_connector_info
 # Skill 目录（同步后）
 SKILLS_DIR = os.path.dirname(__file__)
 
+# 输出 Markdown 格式的 skill 列表（不强制 JSON）
+MARKDOWN_SKILLS = {'ShortsMaster', 'Writer', 'Editor', 'DialogueWeaver', 'ThreadWeaver'}
+
 
 def load_skill_prompt(expert_id: str) -> Optional[str]:
     """加载 skill 的系统提示词"""
@@ -99,13 +102,25 @@ def execute_skill(
     # 4. 调用 LLM
     try:
         logs.append("正在调用 LLM...")
-        response = llm.chat_with_json(
-            system_prompt=skill_prompt,
-            user_prompt=user_prompt,
-            temperature=0.7,
-            max_tokens=8192
-        )
-        logs.append("LLM 响应已接收")
+        
+        if expert_id in MARKDOWN_SKILLS:
+            response = llm.chat(
+                messages=[
+                    {"role": "system", "content": skill_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=8192
+            )
+            logs.append("LLM 响应已接收 (Markdown 模式)")
+        else:
+            response = llm.chat_with_json(
+                system_prompt=skill_prompt,
+                user_prompt=user_prompt,
+                temperature=0.7,
+                max_tokens=8192
+            )
+            logs.append("LLM 响应已接收 (JSON 模式)")
     except Exception as e:
         return ExpertOutput(
             success=False,
@@ -138,13 +153,23 @@ def execute_skill(
 
         # 根据响应类型处理
         if isinstance(response, dict):
-            # 如果返回的是结构化数据，提取出供人阅读的内容
             output_content = response.get('content') or response.get('markdown') or json.dumps(response, ensure_ascii=False, indent=2)
         else:
             output_content = str(response)
         
-        # 生成文件名
-        filename = f"phase2_分段视觉执行方案_{project_name}.md"
+        # 根据专家类型生成文件名
+        if expert_id == 'ShortsMaster':
+            filename = f"Shorts_Script_{project_name}.md"
+        elif expert_id == 'Director':
+            filename = f"phase2_分段视觉执行方案_{project_name}.md"
+        elif expert_id == 'MarketingMaster':
+            filename = f"Marketing_Plan_{project_name}.md"
+        elif expert_id == 'MusicDirector':
+            filename = f"Music_Plan_{project_name}.md"
+        elif expert_id == 'ThumbnailMaster':
+            filename = f"Thumbnail_Plan_{project_name}.md"
+        else:
+            filename = f"{expert_id}_Output_{project_name}.md"
         filepath = os.path.join(output_dir, filename)
         
         with open(filepath, 'w', encoding='utf-8') as f:

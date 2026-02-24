@@ -13,7 +13,7 @@ import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
 import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview } from './visual-plan';
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
-import { getConfigStatus, saveApiKey, updateConfig, testConnection } from './llm-config';
+import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 
@@ -70,6 +70,7 @@ app.post('/api/visual-plan/scene/review', updateSceneReview);
 
 // LLM Config Routes
 app.get('/api/llm-config/status', getConfigStatus);
+app.get('/api/llm-config/keys', getSavedKeys);
 app.post('/api/llm-config/api-key', saveApiKey);
 app.put('/api/llm-config', updateConfig);
 app.post('/api/llm-config/test', testConnection);
@@ -80,6 +81,8 @@ app.post('/api/director/phase2/start', director.startPhase2);
 app.get('/api/director/phase2/status/:taskId', director.getPhase2Status);
 app.post('/api/director/phase2/select', director.selectOption);
 app.post('/api/director/phase2/lock', director.lockChapter);
+app.post('/api/director/phase2/thumbnail', director.generateThumbnail);
+app.get('/api/director/phase2/thumbnail/:taskKey', director.getThumbnailStatus);
 app.post('/api/director/phase3/render', director.startRender);
 app.get('/api/director/phase3/status/:jobId', director.getRenderStatus);
 
@@ -121,8 +124,8 @@ function ensureDeliveryFile() {
                 MarketingMaster: { status: 'idle', logs: [] }
             },
             modules: {
-                director: { phase: 1, conceptProposal: "等待导演大师的视觉概念提案...", items: [] },
-                music: { phase: 1, moodProposal: "等待音乐总监的听觉定调提案...", items: [] },
+                director: { phase: 1, conceptProposal: "", items: [] },
+                music: { phase: 1, moodProposal: "", items: [] },
                 thumbnail: { variants: [] },
                 marketing: { strategy: { seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' }, social: { twitterThread: '', redditPost: '' }, geo: { locationTags: [], culturalRelevance: '' } }, feedback: '', isSubmitted: false },
                 shorts: { items: [], uploadHistory: [] }
@@ -499,6 +502,15 @@ app.post('/api/projects/switch', (req, res) => {
 
     // Push new data to ALL connected clients
     const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+
+    // Auto-heal mismatched projectId in delivery_store.json
+    if (data.projectId !== currentProjectName) {
+        console.log(`Auto-fixing projectId in ${DELIVERY_FILE}: ${data.projectId} -> ${currentProjectName}`);
+        data.projectId = currentProjectName;
+        data.lastUpdated = new Date().toISOString();
+        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(data, null, 2));
+    }
+
     io.emit('delivery-data', data);
     io.emit('active-project', { name: currentProjectName });
 
@@ -560,7 +572,13 @@ interface ScriptFile {
 
 app.get('/api/scripts', (req, res) => {
     try {
-        const scriptsDir = SCRIPTS_DIR();
+        // Support explicit projectId to avoid race conditions during project switching
+        const requestedProject = req.query.projectId as string | undefined;
+        const projectRoot = requestedProject
+            ? path.resolve(PROJECTS_BASE, requestedProject)
+            : PROJECT_ROOT;
+        const scriptsDir = path.join(projectRoot, '02_Script');
+
         if (!fs.existsSync(scriptsDir)) {
             return res.json({ scripts: [], selected: null, message: '02_Script 目录不存在' });
         }
@@ -615,6 +633,16 @@ app.post('/api/scripts/select', (req, res) => {
                     path: scriptPath,
                     selectedAt: new Date().toISOString()
                 };
+                // Reset phase proposals when a new script is chosen
+                if (deliveryData.modules?.director) {
+                    deliveryData.modules.director.conceptProposal = "";
+                    deliveryData.modules.director.isConceptApproved = false;
+                }
+                if (deliveryData.modules?.music) {
+                    deliveryData.modules.music.moodProposal = "";
+                    deliveryData.modules.music.isConceptApproved = false;
+                }
+
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
                 io.emit('delivery-data', deliveryData);
@@ -624,7 +652,7 @@ app.post('/api/scripts/select', (req, res) => {
         };
         tryUpdate();
 
-        res.json({ success: true, selectedScript: deliveryData.selectedScript });
+        res.json({ success: true, selectedScript: { path: scriptPath } });
     } catch (error: any) {
         console.error('Script Select Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -710,7 +738,7 @@ app.get('/api/skills/status', (req, res) => {
         const python = spawn('python3', [
             path.resolve(__dirname, '../run_skill.py'),
             'status'
-        ], { timeout: 60000 }); // 60s timeout
+        ], { timeout: 60000, env: { ...process.env } }); // 60s timeout
 
         let output = '';
         python.stdout.on('data', (data) => { output += data; });
@@ -769,7 +797,7 @@ app.post('/api/experts/run', (req, res) => {
             expertId,
             currentProjectName,
             outputDir
-        ], { timeout: 600000 });
+        ], { timeout: 600000, env: { ...process.env } });
 
         // Write script content to stdin
         python.stdin.write(scriptContent);

@@ -17,12 +17,13 @@ interface BrollResult {
 interface DirectorSectionProps {
   data: DirectorModule;
   projectId: string;
+  scriptPath: string;
   onUpdate: (newData: DirectorModule) => void;
 }
 
 type Phase = 1 | 2 | 3 | 4;
 
-export const DirectorSection = ({ data, projectId, onUpdate }: DirectorSectionProps) => {
+export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: DirectorSectionProps) => {
   const [phase, setPhase] = useState<Phase>(data.phase === 2 ? 2 : 1);
   const [concept, setConcept] = useState<string | null>(data.conceptProposal);
   const [isGeneratingConcept, setIsGeneratingConcept] = useState(false);
@@ -38,19 +39,87 @@ export const DirectorSection = ({ data, projectId, onUpdate }: DirectorSectionPr
   const [brollPaths, setBrollPaths] = useState<BrollResult[]>([]);
 
   const handleGenerateConcept = async () => {
+    if (!scriptPath) {
+      alert('Please select a script first in the header.');
+      return;
+    }
+
     setIsGeneratingConcept(true);
-    setTimeout(() => {
-      setConcept('# 视觉概念提案\n\n本视频采用理性冷静的深色科技风格...');
+    setConcept('');
+
+    try {
+      const response = await fetch('http://localhost:3002/api/director/phase1/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, scriptPath })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Server error');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      let fullContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const dataStr = line.replace('data: ', '');
+                const jsonData = JSON.parse(dataStr);
+
+                if (jsonData.type === 'content') {
+                  fullContent += jsonData.content;
+                  setConcept(fullContent);
+                } else if (jsonData.type === 'done') {
+                  onUpdate({ ...data, conceptProposal: fullContent });
+                }
+              } catch (e) {
+                // Ignore partial JSON
+              }
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert('Generation failed: ' + e.message);
+    } finally {
       setIsGeneratingConcept(false);
-    }, 2000);
+    }
   };
 
-  const handleReviseConcept = async (_comment: string) => {
+  const handleReviseConcept = async (comment: string) => {
+    if (!comment.trim()) return;
     setIsGeneratingConcept(true);
-    setTimeout(() => {
-      setConcept(prev => prev + '\n\n[已修订]');
+    try {
+      const res = await fetch('http://localhost:3002/api/director/phase2/revise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, userComment: comment })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setConcept(result.data.content);
+        onUpdate({ ...data, conceptProposal: result.data.content });
+      } else {
+        console.error('Failed to revise concept:', result.error);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
       setIsGeneratingConcept(false);
-    }, 1500);
+    }
   };
 
   const handleApproveConcept = () => {
@@ -59,19 +128,73 @@ export const DirectorSection = ({ data, projectId, onUpdate }: DirectorSectionPr
     setPhase(2);
   };
 
-  const handleConfirmBRoll = async (_types: BRollType[]) => {
+  const handleConfirmBRoll = async (types: BRollType[]) => {
+    if (!scriptPath) {
+      alert('Please select a script first');
+      return;
+    }
+
     setIsLoading(true);
-    setLoadingProgress('1/6');
-    setTimeout(() => {
-      setLoadingProgress('2/6');
-      setChapters([
-        { chapterId: 'ch1', chapterIndex: 0, chapterName: 'Intro', scriptText: '开场白：欢迎来到...', options: [], isLocked: false },
-        { chapterId: 'ch2', chapterIndex: 1, chapterName: '第一章', scriptText: '第一部分内容...', options: [], isLocked: false },
-        { chapterId: 'ch3', chapterIndex: 2, chapterName: '第二章', scriptText: '第二部分内容...', options: [], isLocked: false },
-      ]);
-      setLoadingProgress('6/6');
+    setLoadingProgress('0/0');
+    setChapters([]);
+
+    try {
+      const response = await fetch('http://localhost:3002/api/director/phase2/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, scriptPath, brollTypes: types })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Server error');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const allChapters: DirectorChapter[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const dataStr = line.replace('data: ', '');
+              const jsonData = JSON.parse(dataStr);
+
+              if (jsonData.type === 'taskId') {
+                // taskId received for polling if needed
+              } else if (jsonData.type === 'progress') {
+                setLoadingProgress(`${jsonData.current}/${jsonData.total}`);
+              } else if (jsonData.type === 'chapter_ready') {
+                allChapters.push(jsonData.chapter);
+                setChapters([...allChapters]);
+              } else if (jsonData.type === 'done') {
+                setChapters(jsonData.chapters || allChapters);
+                setLoadingProgress('completed');
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert('Generation failed: ' + e.message);
+    } finally {
       setIsLoading(false);
-    }, 3000);
+    }
   };
 
   const handleSelect = (chapterId: string, optionId: string) => {
@@ -168,9 +291,8 @@ export const DirectorSection = ({ data, projectId, onUpdate }: DirectorSectionPr
                 (p === 3 && jobs.length === 0) ||
                 (p === 4 && brollPaths.length === 0)
               }
-              className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${
-                phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-              }`}
+              className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
             >
               P{p}
             </button>

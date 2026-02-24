@@ -45,7 +45,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
 
     const fetchScripts = async () => {
         try {
-            const res = await fetch('http://localhost:3002/api/scripts');
+            const res = await fetch(`http://localhost:3002/api/scripts?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`);
             const data = await res.json();
             setScripts(data.scripts || []);
         } catch (e) {
@@ -161,9 +161,9 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
                                 }}
                                 className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-white transition-colors cursor-pointer group"
                             >
-                                <FolderOpen className="w-4 h-4" />
-                                <span className="text-slate-300 group-hover:text-white">{projectId}</span>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-slate-300 group-hover:text-white max-w-[120px] truncate">{projectId}</span>
+                                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isDropdownOpen && (
@@ -190,7 +190,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
                                                         <Database className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                                                     )}
                                                     {p.isActive && (
-                                                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">ACTIVE</span>
+                                                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded flex-shrink-0">ACTIVE</span>
                                                     )}
                                                 </button>
                                             ))}
@@ -209,9 +209,11 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
                                 }}
                                 className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-emerald-400 transition-colors cursor-pointer group"
                             >
-                                <FileText className="w-4 h-4" />
-                                <span>Script: <span className="text-emerald-400 group-hover:text-emerald-300">{selectedScript?.name || '未选择'}</span></span>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${isScriptDropdownOpen ? 'rotate-180' : ''}`} />
+                                <FileText className="w-4 h-4 flex-shrink-0" />
+                                <span className="flex items-center whitespace-nowrap">
+                                    Script: <span className="text-emerald-400 group-hover:text-emerald-300 ml-1 max-w-[180px] inline-block truncate align-bottom">{selectedScript?.name || '未选择'}</span>
+                                </span>
+                                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isScriptDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isScriptDropdownOpen && (

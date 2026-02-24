@@ -24,13 +24,15 @@ export const Phase1View = ({
 }: Phase1ViewProps) => {
   const [feedback, setFeedback] = useState('');
 
-  if (!concept && !isGenerating) {
+  const isConceptEmpty = !concept || concept.trim() === '' || concept.includes('等待导演大师的视觉概念提案');
+
+  if (isConceptEmpty && !isGenerating) {
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-700 p-8 text-center">
         <Sparkles className="w-12 h-12 text-blue-400 mx-auto mb-4" />
         <h3 className="text-lg font-bold text-white mb-2">Visual Concept Architect</h3>
         <p className="text-slate-400 text-sm mb-6">
-          Generate a visual concept proposal based on your script.
+          Generate a visual concept proposal for project "{projectId}" using script: {scriptPath.split('/').pop()}
         </p>
         <button
           onClick={onGenerate}

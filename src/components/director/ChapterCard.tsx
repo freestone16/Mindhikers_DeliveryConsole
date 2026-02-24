@@ -1,5 +1,6 @@
-import { Check, Lock } from 'lucide-react';
-import type { DirectorChapter } from '../../types';
+import { useState, useEffect } from 'react';
+import { Check, Lock, Loader2, Image } from 'lucide-react';
+import type { DirectorChapter, SceneOption } from '../../types';
 
 interface ChapterCardProps {
   chapter: DirectorChapter;
@@ -14,76 +15,227 @@ const TYPE_COLORS: Record<string, string> = {
   artlist: 'bg-green-500/20 text-green-300',
 };
 
-export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCardProps) => {
+const TYPE_LABELS: Record<string, string> = {
+  remotion: 'Remotion动画',
+  seedance: '文生视频',
+  artlist: 'Artlist实拍',
+};
+
+function getScriptPreview(text: string): string {
+  const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
+  if (sentences.length >= 2) {
+    return sentences.slice(0, 2).join('。') + '。';
+  }
+  return text.slice(0, 150) + (text.length > 150 ? '...' : '');
+}
+
+interface OptionRowProps {
+  chapter: DirectorChapter;
+  option: SceneOption;
+  index: number;
+  onSelect: (chapterId: string, optionId: string) => void;
+  onComment: (chapterId: string, comment: string) => void;
+  onLock: (chapterId: string) => void;
+}
+
+const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: OptionRowProps) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
+  const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
+  const isSelected = chapter.selectedOptionId === option.id;
+  const rowId = `${chapter.chapterIndex + 1}-${index + 1}`;
+  const quoteText = option.quote || getScriptPreview(chapter.scriptText);
+  const taskKey = `${chapter.chapterId}-${option.id}`;
+
+  useEffect(() => {
+    if (option.previewUrl) {
+      setPreviewUrl(option.previewUrl);
+      setThumbStatus('completed');
+    }
+  }, [option.previewUrl]);
+
+  const handleGenerateThumbnail = async () => {
+    if (!option.imagePrompt) return;
+    
+    setThumbStatus('generating');
+    
+    try {
+      const res = await fetch('http://localhost:3002/api/director/phase2/thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: option.imagePrompt,
+          optionId: option.id,
+          chapterId: chapter.chapterId
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success && data.taskId) {
+        pollThumbnail(taskKey);
+      } else if (data.success && data.imageUrl) {
+        setPreviewUrl(data.imageUrl);
+        setThumbStatus('completed');
+      } else {
+        setThumbStatus('failed');
+      }
+    } catch (error) {
+      console.error('Thumbnail generation failed:', error);
+      setThumbStatus('failed');
+    }
+  };
+
+  const pollThumbnail = async (key: string) => {
+    setThumbStatus('processing');
+    
+    const poll = async () => {
+      try {
+        const res = await fetch(`http://localhost:3002/api/director/phase2/thumbnail/${key}`);
+        const data = await res.json();
+        
+        if (data.status === 'completed' && data.imageUrl) {
+          setPreviewUrl(data.imageUrl);
+          setThumbStatus('completed');
+        } else if (data.status === 'failed') {
+          setThumbStatus('failed');
+        } else if (data.status === 'processing' || data.status === 'pending') {
+          setTimeout(poll, 2000);
+        }
+      } catch (error) {
+        setThumbStatus('failed');
+      }
+    };
+    
+    poll();
+  };
+
   return (
-    <div className="grid grid-cols-3 gap-4 bg-slate-900 rounded-lg border border-slate-700 p-4">
-      <div className="bg-slate-800/50 rounded p-3">
-        <div className="text-xs text-slate-500 uppercase font-bold mb-2">
-          {chapter.chapterName}
+    <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${
+      isSelected 
+        ? 'border-blue-500 bg-blue-500/5' 
+        : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
+    } ${chapter.isLocked ? 'opacity-60' : ''}`}>
+      <div className="col-span-1 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
+          {rowId}
         </div>
-        <p className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed line-clamp-8">
-          {chapter.scriptText}
+      </div>
+
+      <div className="col-span-3 flex items-center">
+        <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
+          {quoteText}
         </p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="text-xs text-slate-500 uppercase font-bold mb-1">Visual Options</div>
-        {chapter.options.map((option, idx) => (
-          <button
-            key={option.id}
-            onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
-            disabled={chapter.isLocked}
-            className={`flex items-center gap-3 p-2 rounded border transition-all text-left
-              ${chapter.selectedOptionId === option.id
-                ? 'border-blue-500 bg-blue-500/10'
-                : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'}
-              ${chapter.isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-          >
-            <div className="w-20 h-12 bg-slate-700 rounded flex-shrink-0 overflow-hidden">
-              {option.previewUrl ? (
-                <img src={option.previewUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
-                  {idx + 1}
+      <div className="col-span-4">
+        <button
+          onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
+          disabled={chapter.isLocked}
+          className="w-full text-left"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-24 h-16 bg-slate-700 rounded flex-shrink-0 overflow-hidden relative">
+              {thumbStatus === 'completed' && previewUrl ? (
+                <img src={previewUrl} alt="" className="w-full h-full object-cover" />
+              ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
+                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                  <span className="text-xs text-blue-400 mt-1">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
                 </div>
+              ) : thumbStatus === 'failed' ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-red-400 text-xs">失败</span>
+                </div>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGenerateThumbnail();
+                  }}
+                  disabled={!option.imagePrompt}
+                  className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
+                >
+                  <Image className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs text-slate-500 mt-1">生成预览</span>
+                </button>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-white font-medium">Option {idx + 1}</div>
-              <span className={`inline-block px-1.5 py-0.5 rounded text-xs mt-0.5 ${TYPE_COLORS[option.type]}`}>
-                {option.type}
-              </span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type]}`}>
+                  {TYPE_LABELS[option.type] || option.type}
+                </span>
+                {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+              </div>
+              <p className="text-white text-xs leading-relaxed">
+                {option.prompt || '暂无方案描述'}
+              </p>
             </div>
-            {chapter.selectedOptionId === option.id && (
-              <Check className="w-4 h-4 text-blue-400" />
-            )}
-          </button>
-        ))}
+          </div>
+        </button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="text-xs text-slate-500 uppercase font-bold">Feedback</div>
+      <div className="col-span-3 flex flex-col gap-2">
         <textarea
-          className="flex-1 bg-slate-800/50 border border-slate-700 rounded p-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
-          placeholder="Add feedback..."
+          className="flex-1 bg-slate-800/50 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+          placeholder="反馈意见..."
           defaultValue={chapter.userComment || ''}
           onBlur={(e) => onComment(chapter.chapterId, e.target.value)}
           disabled={chapter.isLocked}
         />
+      </div>
+
+      <div className="col-span-1 flex items-center justify-center">
         <button
           onClick={() => onLock(chapter.chapterId)}
           disabled={chapter.isLocked || !chapter.selectedOptionId}
-          className={`flex items-center justify-center gap-2 px-3 py-2 rounded text-sm font-medium transition-all
+          className={`w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-2 rounded text-xs font-medium transition-all
             ${chapter.isLocked
               ? 'bg-green-600 text-white cursor-default'
               : 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'}`}
         >
           {chapter.isLocked ? (
-            <><Lock className="w-4 h-4" /> Locked</>
+            <><Lock className="w-4 h-4" /><span>已锁定</span></>
           ) : (
-            <><Check className="w-4 h-4" /> Lock Selection</>
+            <><Check className="w-4 h-4" /><span>锁定</span></>
           )}
         </button>
+      </div>
+    </div>
+  );
+};
+
+export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCardProps) => {
+  return (
+    <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
+        <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
+        <span className="text-white font-medium">{chapter.chapterName}</span>
+        {chapter.isLocked && <Lock className="w-4 h-4 text-green-400" />}
+      </div>
+      
+      <div className="p-3">
+        <div className="grid grid-cols-12 gap-3 mb-2 px-1">
+          <div className="col-span-1 text-xs text-slate-500 font-bold">序号</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">原文</div>
+          <div className="col-span-4 text-xs text-slate-500 font-bold">Visual Option (图+文)</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">Feedback</div>
+          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          {chapter.options.map((option, idx) => (
+            <OptionRow
+              key={option.id}
+              chapter={chapter}
+              option={option}
+              index={idx}
+              onSelect={onSelect}
+              onComment={onComment}
+              onLock={onLock}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

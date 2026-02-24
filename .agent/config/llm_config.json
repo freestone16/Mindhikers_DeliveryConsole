@@ -1,13 +1,36 @@
 {
   "global": {
-    "provider": "openai",
+    "provider": "siliconflow",
     "model": "gpt-4o",
     "baseUrl": null
   },
+  "generation": {
+    "imageModel": "doubao-image-01",
+    "videoModel": "doubao-video-01"
+  },
   "experts": {
-    "crucible": null,
-    "writer": null,
-    "director": null,
+    "crucible": {
+      "enabled": true,
+      "llm": null,
+      "imageModel": null,
+      "videoModel": null
+    },
+    "writer": {
+      "enabled": true,
+      "llm": null,
+      "imageModel": null,
+      "videoModel": null
+    },
+    "director": {
+      "enabled": true,
+      "llm": {
+        "provider": "siliconflow",
+        "model": null,
+        "baseUrl": null
+      },
+      "imageModel": "doubao-image-01",
+      "videoModel": "doubao-video-01"
+    },
     "music": null,
     "thumbnail": null,
     "marketing": null,

@@ -217,6 +217,8 @@ export interface SceneOption {
     template?: string;
     props?: Record<string, unknown>;
     prompt?: string;
+    quote?: string;
+    imagePrompt?: string;
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
 }

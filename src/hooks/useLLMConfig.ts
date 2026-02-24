@@ -1,19 +1,45 @@
 import { useState, useEffect } from 'react';
-import type { LLMConfig } from '../schemas/llm-config';
+import type { LLMConfig, ExpertConfig } from '../schemas/llm-config';
 
 interface ConfigStatus {
-  providers: Record<string, { configured: boolean; model: string }>;
+  providers: Record<string, { 
+    configured: boolean; 
+    type: string;
+    name: string;
+    models: string[];
+  }>;
   global: LLMConfig['global'];
-  experts: Record<string, { provider: string | null; model: string | null; inherited: boolean }>;
+  generation: LLMConfig['generation'];
+  experts: Record<string, ExpertConfig | null>;
+  availableModels: {
+    image: { id: string; name: string }[];
+    video: { id: string; name: string }[];
+  };
+}
+
+interface SavedKeys {
+  [provider: string]: { last4: string; configured: boolean };
 }
 
 export const useLLMConfig = () => {
   const [status, setStatus] = useState<ConfigStatus | null>(null);
+  const [savedKeys, setSavedKeys] = useState<SavedKeys>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStatus();
+    fetchSavedKeys();
   }, []);
+
+  const fetchSavedKeys = async () => {
+    try {
+      const res = await fetch('http://localhost:3002/api/llm-config/keys');
+      const data = await res.json();
+      setSavedKeys(data);
+    } catch (err) {
+      console.error('Failed to fetch saved keys:', err);
+    }
+  };
 
   const fetchStatus = async () => {
     try {
@@ -27,18 +53,25 @@ export const useLLMConfig = () => {
     }
   };
 
-  const saveApiKey = async (provider: string, apiKey: string) => {
+  const saveApiKey = async (provider: string, apiKey: string, apiKey2?: string, projectId?: string) => {
     const res = await fetch('http://localhost:3002/api/llm-config/api-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey }),
+      body: JSON.stringify({ provider, apiKey, apiKey2, projectId }),
     });
     const data = await res.json();
-    if (data.success) fetchStatus();
+    if (data.success) {
+      fetchStatus();
+      fetchSavedKeys();
+    }
     return data;
   };
 
-  const updateConfig = async (updates: { global?: Partial<LLMConfig['global']>; experts?: Record<string, any> }) => {
+  const updateConfig = async (updates: { 
+    global?: Partial<LLMConfig['global']>; 
+    generation?: Partial<LLMConfig['generation']>;
+    experts?: Record<string, ExpertConfig | null>;
+  }) => {
     const res = await fetch('http://localhost:3002/api/llm-config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -58,5 +91,5 @@ export const useLLMConfig = () => {
     return res.json();
   };
 
-  return { status, loading, saveApiKey, updateConfig, testConnection, refresh: fetchStatus };
+  return { status, savedKeys, loading, saveApiKey, updateConfig, testConnection, refresh: fetchStatus };
 };

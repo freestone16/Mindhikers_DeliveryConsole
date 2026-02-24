@@ -9,7 +9,8 @@ describe('LLMConfig Schema', () => {
 
   it('should reject invalid provider', () => {
     const config = {
-      global: { provider: 'invalid', model: 'test', baseUrl: null },
+      global: { provider: 'invalid' as any, model: 'test', baseUrl: null },
+      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
       experts: {
         crucible: null,
         writer: null,
@@ -26,7 +27,8 @@ describe('LLMConfig Schema', () => {
 
   it('should allow null expert config (inherit global)', () => {
     const config = {
-      global: { provider: 'openai', model: 'gpt-4o', baseUrl: null },
+      global: { provider: 'siliconflow', model: 'Pro/moonshotai/Kimi-K2.5', baseUrl: 'https://api.siliconflow.cn/v1' },
+      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
       experts: {
         crucible: null,
         writer: null,
@@ -43,11 +45,17 @@ describe('LLMConfig Schema', () => {
 
   it('should allow valid expert override', () => {
     const config = {
-      global: { provider: 'openai', model: 'gpt-4o', baseUrl: null },
+      global: { provider: 'siliconflow', model: 'Pro/moonshotai/Kimi-K2.5', baseUrl: 'https://api.siliconflow.cn/v1' },
+      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
       experts: {
         crucible: null,
         writer: null,
-        director: { provider: 'anthropic', model: 'claude-3-5-sonnet-20241022' },
+        director: { 
+          enabled: true, 
+          llm: { provider: 'siliconflow', model: 'Qwen/Qwen2.5-72B-Instruct', baseUrl: null },
+          imageModel: 'doubao-image-01',
+          videoModel: 'doubao-video-01'
+        },
         music: null,
         thumbnail: null,
         marketing: null,
