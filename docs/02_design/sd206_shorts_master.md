@@ -198,7 +198,23 @@ export interface ShortsModule_V2 {
 
 ---
 
-## 3. Phase 1: 脚本工厂 (Script Factory)
+## 3. Phase 1: 脚本工厂 (Script Factory) — V2 工作流
+
+> **更新日期**: 2026-02-25  
+> **工作流变更**: 从手动输入改为「选择文档 → 智能推荐 → 用户微调」
+
+### 3.0 新工作流概览
+
+```
+选择长文案 → 系统智能推荐(CTA+风格) → 用户微调 → 生成脚本
+```
+
+**核心变更**：
+1. 内容来源从 textarea 手动输入 → 下拉选择 `02_Script/` 目录下的文档
+2. 选择文档后自动触发 LLM 智能推荐 CTA + 风格组合
+3. 每条 Short 单独配置 CTA 和风格（两个下拉菜单）
+4. 新增「补充说明」文本框供用户输入额外要求
+5. 修改数量时自动重新推荐
 
 ### 3.1 前端组件
 
@@ -208,90 +224,179 @@ export interface ShortsModule_V2 {
 ```typescript
 interface ShortsPhase1Props {
   projectId: string;
-  onGenerated: (scripts: ShortScript[]) => void;  // 生成完后回调，直通 Phase 2
+  onGenerated: (scripts: ShortScript[]) => void;
+}
+
+interface RowConfig {
+  cta: CTA;
+  style: string;
 }
 ```
 
 **UI 构成**：
-- 一个表单卡片，包含：
-  - `shorts 数量` (number input, 1-20, 默认 6)
-  - `CTA 分配策略` (一个小表格：为每条 Short 分配 CTA 类型，或一个简化的 select 选择默认策略)
-  - `内容来源/主题` (textarea)
-  - `风格偏好` (select: 悬疑/知识/情绪/对比/叙事)
-  - 【🚀 生成脚本】按钮
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📄 长文案来源                                               │
+│  ┌─────────────────────────────────────────┐ [智能推荐中..]│
+│  │ 02_Script/深度内容_v3.md                ▼│              │
+│  └─────────────────────────────────────────┘              │
+│                                                            │
+│  生成数量: [6] ▼                                           │
+│                                                            │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  #  │  CTA 策略    │  风格偏好                          ││
+│  ├────┼───────────────┼────────────────────────────────────┤│
+│  │  1 │ [follow    ▼] │ [suspense  ▼]                      ││
+│  │  2 │ [share     ▼] │ [knowledge ▼]                      ││
+│  │  ...                                                    ││
+│  └─────────────────────────────────────────────────────────┘│
+│                                                            │
+│  💬 补充说明（可选）                                         │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ 例如：前3条偏科普，后3条偏情绪共鸣...                     ││
+│  └─────────────────────────────────────────────────────────┘│
+│                                                            │
+│                                    [🚀 生成脚本]            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**核心状态**：
+```typescript
+const [scripts, setScripts] = useState<ScriptFile[]>([]);        // 文档列表
+const [selectedScript, setSelectedScript] = useState<string>(''); // 选中文档路径
+const [scriptContent, setScriptContent] = useState<string>('');   // 文档内容
+const [count, setCount] = useState(6);                            // 生成数量
+const [rowConfigs, setRowConfigs] = useState<RowConfig[]>([]);    // 每行配置
+const [userComment, setUserComment] = useState('');               // 补充说明
+const [isRecommending, setIsRecommending] = useState(false);      // 推荐中
+```
 
 **行为**：
-1. 用户点击按钮 → `POST /api/shorts/phase1/generate` (SSE)
-2. SSE 流式收到每条脚本 → 逐条累积到本地 state
-3. SSE 收到 `{ type: 'done' }` → 自动调用 `onGenerated(scripts)` → 父组件切换到 Phase 2
+1. 组件挂载时加载 `02_Script/` 目录下的文档列表
+2. 用户选择文档 → 读取内容 → 自动调用智能推荐 API
+3. 推荐结果填充到表格，用户可手动修改
+4. 修改数量时自动重新推荐
+5. 点击生成 → SSE 流式产出脚本
 
-**SSE 消费模式参照**: `DirectorSection.tsx` 第 41-100 行的 `handleGenerateConcept`。
+### 3.2 新增 API
 
-### 3.2 后端 API
+#### `POST /api/shorts/phase1/recommend` — 智能推荐
+
+**请求**：
+```json
+{
+  "projectId": "CSET-SP3",
+  "content": "长文案完整内容...",
+  "count": 6
+}
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "recommendations": [
+    { "index": 1, "cta": "follow", "style": "suspense" },
+    { "index": 2, "cta": "share", "style": "knowledge" },
+    { "index": 3, "cta": "comment", "style": "emotion" },
+    ...
+  ]
+}
+```
+
+**LLM Prompt**：
+```
+你是一个专业的短视频策略师。分析给定的长文案，为指定数量的短视频推荐最优的 CTA 策略和风格偏好组合。
+
+CTA 类型：follow/share/comment/link/subscribe
+风格偏好：suspense/knowledge/emotion/contrast/narrative
+
+推荐原则：
+1. CTA 要多样化，但 follow/share/comment 应占多数
+2. 开头适合 suspense 或 contrast
+3. 中间适合 knowledge
+4. 结尾适合 emotion 或 narrative
+
+输出纯 JSON 数组。
+```
+
+#### `POST /api/scripts/content` — 获取文档内容
+
+**请求**：
+```json
+{
+  "projectId": "CSET-SP3",
+  "path": "02_Script/深度内容_v3.md"
+}
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "content": "文档完整内容..."
+}
+```
+
+### 3.3 后端 API (已实现)
 
 #### `server/shorts.ts` — `generateScripts`
 
 ```typescript
 export const generateScripts = async (req: Request, res: Response) => {
-  const { projectId, count, ctaDistribution, topic, style } = req.body;
+  const { projectId, count, ctaDistribution, styleDistribution, topic, userComment } = req.body;
   
-  // 1. 参数校验
-  if (!projectId || !count) {
-    return res.status(400).json({ error: 'Missing projectId or count' });
-  }
+  // 新增参数:
+  // - styleDistribution: string[]  // 每条脚本的风格
+  // - userComment: string          // 用户补充说明
   
-  // 2. 设置 SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-  
-  // 3. 构造 LLM Prompt
-  const systemPrompt = SYSTEM_PROMPTS.shortsGenerator;
+  // LLM Prompt 构造时包含风格分布和补充说明
   const userMessage = `
-主题: ${topic}
-风格: ${style}
+长文案内容：
+${topic?.slice(0, 10000) || ''}
+
 生成数量: ${count}
 CTA 分配: ${JSON.stringify(ctaDistribution)}
+每条脚本的风格偏好：${JSON.stringify(styleDistribution)}
+用户补充说明：${userComment}
 
-请生成 ${count} 条短视频脚本。每条控制在 80-150 字。
-输出 JSON 数组格式:
-[{ "index": 1, "scriptText": "...", "cta": "follow", "hookType": "..." }]
+请根据长文案内容，为每条短视频生成脚本...
   `;
   
-  // 4. 调用 LLM (使用 server/llm.ts 的 callLLM)
-  try {
-    const response = await callLLM(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage }
-      ],
-      'deepseek'  // 或从 LLM Config 读取
-    );
-    
-    const scripts: ShortScript[] = JSON.parse(response.content).map(
-      (item: any, i: number) => ({
-        id: `short-${String(i + 1).padStart(3, '0')}`,
-        index: i + 1,
-        scriptText: item.scriptText,
-        cta: item.cta || ctaDistribution[i] || 'follow',
-        hookType: item.hookType || 'generic',
-        status: 'draft' as const,
-      })
-    );
-    
-    // 5. 逐条吐出
-    for (const script of scripts) {
-      res.write(`data: ${JSON.stringify({ type: 'script', script })}\n\n`);
-    }
-    
-    // 6. 持久化到项目目录
-    const projectRoot = getProjectRoot(projectId);
-    const outputDir = path.join(projectRoot, '05_Shorts_Output');
-    ensureDir(outputDir);
-    const statePath = path.join(outputDir, 'shorts_state.json');
-    const state = { phase: 2, scripts, renderUnits: [], generationConfig: req.body };
-    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  // ... SSE 流式输出
+};
+```
+
+### 3.4 路由注册 (server/index.ts)
+
+```typescript
+// 新增路由
+app.post('/api/shorts/phase1/recommend', shorts.recommend);
+app.post('/api/scripts/content', ...);  // 获取文档内容
+
+// 原有路由
+app.post('/api/shorts/phase1/generate', shorts.generateScripts);
+```
+
+---
+
+### 3.x 旧版设计 (已废弃)
+
+<details>
+<summary>点击展开旧版 Phase 1 设计（V1）</summary>
+
+**原 UI 构成**：
+- `shorts 数量` (number input)
+- `CTA 分配策略` (6 个 select)
+- `内容来源/主题` (textarea)
+- `风格偏好` (单个 select)
+
+**原行为**：
+1. 用户手动输入主题/粘贴内容
+2. 用户手动选择每条 Short 的 CTA
+3. 点击生成
+
+</details>
     
     res.write(`data: ${JSON.stringify({ type: 'done', scripts })}\n\n`);
     res.end();
