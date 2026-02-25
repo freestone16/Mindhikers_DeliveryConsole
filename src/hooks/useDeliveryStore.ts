@@ -92,5 +92,5 @@ export const useDeliveryStore = () => {
         }
     };
 
-    return { state, isConnected, updateState, selectScript };
+    return { state, isConnected, updateState, selectScript, socket };
 };

@@ -8,6 +8,8 @@ import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
 import { DistributionQueue } from './components/DistributionQueue';
+import { ChatPanel } from './components/ChatPanel';
+import { ChatToggleButton } from './components/ChatToggleButton';
 import { useDeliveryStore } from './hooks/useDeliveryStore';
 import { Loader2, Users, Send, Clock } from 'lucide-react';
 import { EXPERTS } from './config/experts';
@@ -18,10 +20,11 @@ type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
 
 function App() {
-    const { state, isConnected, selectScript, updateState } = useDeliveryStore();
+    const { state, isConnected, selectScript, updateState, socket } = useDeliveryStore();
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     useEffect(() => {
         if (state.activeExpertId) {
@@ -111,7 +114,7 @@ function App() {
     }
 
     return (
-        <div className="min-h-screen bg-[#060b14] font-sans text-slate-200 pb-20">
+        <div className="h-screen flex flex-col bg-[#060b14] font-sans text-slate-200">
             <Header
                 projectId={state.projectId}
                 selectedScriptPath={state.selectedScript?.path}
@@ -126,55 +129,64 @@ function App() {
                     <p>苏格拉底对话界面与状态机模块即将接入...</p>
                 </main>
             ) : activeModule === 'delivery' ? (
-                <>
-                    <ExpertNav
-                        activeExpertId={activeExpertId}
-                        expertStatuses={expertStatuses}
-                        onSelectExpert={handleSelectExpert}
-                    />
+                <div className="flex-1 flex overflow-hidden relative">
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <ExpertNav
+                            activeExpertId={activeExpertId}
+                            expertStatuses={expertStatuses}
+                            onSelectExpert={handleSelectExpert}
+                        />
 
-                    {activeExpertId === 'VisualAudit' ? (
-                        <main className="max-w-7xl mx-auto px-6 py-8">
-                            <VisualAuditPage />
+                        <main className="flex-1 overflow-y-auto px-6 py-8">
+                            <div className="max-w-7xl mx-auto">
+                                {activeExpertId === 'VisualAudit' ? (
+                                    <VisualAuditPage />
+                                ) : activeExpertId === 'Director' ? (
+                                    <DirectorSection
+                                        data={state.modules.director}
+                                        projectId={state.projectId}
+                                        scriptPath={state.selectedScript?.path || ''}
+                                        onUpdate={(newData) => updateState({
+                                            ...state,
+                                            modules: { ...state.modules, director: newData }
+                                        })}
+                                    />
+                                ) : activeExpertId === 'ShortsMaster' ? (
+                                    <ShortsSection
+                                        data={state.modules.shorts}
+                                        projectId={state.projectId}
+                                        scriptPath={state.selectedScript?.path || ''}
+                                        onUpdate={(newData) => updateState({
+                                            ...state,
+                                            modules: { ...state.modules, shorts: newData }
+                                        })}
+                                    />
+                                ) : (
+                                    <ExpertPage
+                                        expertId={activeExpertId}
+                                        projectId={state.projectId}
+                                        expertWork={currentExpertWork}
+                                        selectedScript={state.selectedScript}
+                                        onStartWork={handleStartWork}
+                                        onCancel={handleCancel}
+                                        onRerun={handleRerun}
+                                    />
+                                )}
+                            </div>
                         </main>
-                    ) : activeExpertId === 'Director' ? (
-                        <main className="max-w-7xl mx-auto px-6 py-8">
-                            <DirectorSection
-                                data={state.modules.director}
-                                projectId={state.projectId}
-                                scriptPath={state.selectedScript?.path || ''}
-                                onUpdate={(newData) => updateState({
-                                    ...state,
-                                    modules: { ...state.modules, director: newData }
-                                })}
-                            />
-                        </main>
-                    ) : activeExpertId === 'ShortsMaster' ? (
-                        <main className="max-w-7xl mx-auto px-6 py-8">
-                            <ShortsSection
-                                data={state.modules.shorts}
-                                projectId={state.projectId}
-                                scriptPath={state.selectedScript?.path || ''}
-                                onUpdate={(newData) => updateState({
-                                    ...state,
-                                    modules: { ...state.modules, shorts: newData }
-                                })}
-                            />
-                        </main>
+                    </div>
+                    {isChatOpen ? (
+                        <ChatPanel
+                            isOpen={isChatOpen}
+                            onToggle={() => setIsChatOpen(false)}
+                            expertId={activeExpertId}
+                            projectId={state.projectId}
+                            socket={socket}
+                        />
                     ) : (
-                        <main className="max-w-7xl mx-auto px-6 py-8">
-                            <ExpertPage
-                                expertId={activeExpertId}
-                                projectId={state.projectId}
-                                expertWork={currentExpertWork}
-                                selectedScript={state.selectedScript}
-                                onStartWork={handleStartWork}
-                                onCancel={handleCancel}
-                                onRerun={handleRerun}
-                            />
-                        </main>
+                        <ChatToggleButton onClick={() => setIsChatOpen(true)} />
                     )}
-                </>
+                </div>
             ) : (
                 <DistributionLayout
                     activePage={activeDistributionPage}

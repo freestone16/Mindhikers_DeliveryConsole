@@ -1,7 +1,7 @@
 {
   "global": {
     "provider": "siliconflow",
-    "model": "gpt-4o",
+    "model": "Pro/moonshotai/Kimi-K2.5",
     "baseUrl": null
   },
   "generation": {

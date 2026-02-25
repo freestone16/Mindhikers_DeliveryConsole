@@ -379,3 +379,87 @@ export interface ShortsModule_V2 {
     headerConfig?: HeaderOverlayConfig;
     generationConfig?: ShortsGenerateRequest;
 }
+
+// ============================================================
+// SD-207: Market Master (TubeBuddy SEO) Types
+// ============================================================
+
+export interface TitleTagSet {
+    id: string;
+    index: number;
+    title: string;
+    tags: string[];
+    source: 'llm' | 'user';
+    status: 'pending' | 'scoring' | 'scored';
+    tubeBuddyScore?: TubeBuddyScore;
+    userComment?: string;
+}
+
+export interface TubeBuddyScore {
+    overallScore: number;
+    weightedScore?: number;
+    metrics: {
+        searchVolume: number;
+        competition: number;
+        optimization: number;
+        relevance: number;
+    };
+    rawMetrics?: {
+        monthlySearches?: number;
+        competitionLevel?: 'low' | 'medium' | 'high';
+    };
+}
+
+export interface MarketModule_V2 {
+    phase: 1 | 2 | 3;
+    selectedScript?: {
+        filename: string;
+        path: string;
+    };
+    titleTagSets: TitleTagSet[];
+    selectedSetId?: string;
+    generationConfig?: {
+        count: number;
+        focusKeywords?: string[];
+        language: 'zh' | 'en';
+    };
+    finalOutput?: {
+        title: string;
+        tags: string[];
+        savedAt: string;
+        savedPath: string;
+    };
+}
+
+// ============================================================
+// SD-207: Chat Panel Types
+// ============================================================
+
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp: string;
+    attachments?: Attachment[];
+}
+
+export interface Attachment {
+    type: 'image';
+    name: string;
+    base64: string;
+    previewUrl: string;
+}
+
+export interface ChatHistory {
+    expertId: string;
+    projectId: string;
+    messages: ChatMessage[];
+    lastUpdated: string;
+}
+
+export interface ExpertContextMap {
+    [expertId: string]: {
+        outputDir: string;
+        keyFiles: string[];
+    };
+}

@@ -12,7 +12,7 @@ const ensureConfigDir = () => {
   }
 };
 
-const loadConfig = (): LLMConfig => {
+export const loadConfig = (): LLMConfig => {
   ensureConfigDir();
   if (!fs.existsSync(CONFIG_PATH)) {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_LLM_CONFIG, null, 2));

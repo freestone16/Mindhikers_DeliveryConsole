@@ -8,14 +8,20 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+import multer from 'multer';
 
 import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
 import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview } from './visual-plan';
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
-import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys } from './llm-config';
+import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
+import * as shorts from './shorts';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import marketRouter from './market';
+
+const upload = multer({ dest: 'uploads/' });
 
 // ESM compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -90,6 +96,29 @@ app.get('/api/director/phase3/status/:jobId', director.getRenderStatus);
 app.post('/api/pipeline/render-brolls', pipeline.renderBrolls);
 app.get('/api/pipeline/render-status/:taskId', pipeline.getRenderStatus);
 app.post('/api/pipeline/weave-timeline', pipeline.weaveTimeline);
+
+// Shorts Master Routes (SD-206)
+app.post('/api/shorts/phase1/recommend', shorts.recommend);
+app.post('/api/shorts/phase1/generate', shorts.generateScripts);
+app.post('/api/shorts/phase2/save-script', shorts.saveScript);
+app.post('/api/shorts/phase2/regenerate', shorts.regenerateScript);
+app.post('/api/shorts/phase2/confirm-all', shorts.confirmAll);
+app.post('/api/shorts/phase3/upload-aroll', upload.single('videoFile'), shorts.uploadAroll);
+app.post('/api/shorts/phase3/generate-brolls', shorts.generateBrolls);
+app.post('/api/shorts/phase3/transcribe', shorts.transcribe);
+app.put('/api/shorts/phase3/subtitle-segments/:shortId', shorts.updateSubtitleSegments);
+app.get('/api/shorts/subtitle-configs', shorts.getSubtitleConfigs);
+app.put('/api/shorts/subtitle-configs/:id', shorts.updateSubtitleConfig);
+app.get('/api/shorts/header-config', shorts.getHeaderConfig);
+app.put('/api/shorts/header-config', upload.fields([
+    { name: 'leftLogo', maxCount: 1 },
+    { name: 'rightLogo', maxCount: 1 }
+]), shorts.updateHeaderConfig);
+app.post('/api/shorts/phase3/render', shorts.renderShort);
+app.get('/api/shorts/phase3/render-status/:jobId', shorts.getRenderStatus);
+
+// Market Master Routes (SD-207)
+app.use('/api/market', marketRouter);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');
@@ -420,6 +449,67 @@ io.on('connection', (socket) => {
 
         socket.emit('render-started', { shortsId, result });
     });
+
+    // --- Chat Panel Socket Events ---
+
+    socket.on('chat-load-context', async ({ expertId, projectId }) => {
+        try {
+            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            const ctx = loadExpertContext(projectRoot, expertId);
+            socket.emit('chat-context-loaded', { expertId, systemPrompt: ctx.systemPrompt });
+        } catch (error: any) {
+            socket.emit('chat-error', { error: error.message, expertId });
+        }
+    });
+
+    socket.on('chat-load-history', ({ expertId, projectId }) => {
+        try {
+            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            const messages = loadChatHistory(projectRoot, expertId);
+            socket.emit('chat-history', { expertId, messages });
+        } catch (error: any) {
+            socket.emit('chat-error', { error: error.message, expertId });
+        }
+    });
+
+    socket.on('chat-stream', async ({ messages, expertId, projectId }) => {
+        try {
+            const config = loadConfig();
+            const { provider, model, baseUrl } = config.global;
+            const projectRoot = getProjectRoot(projectId || currentProjectName);
+
+            const { formatted, warning } = formatMultimodalMessages(messages, provider);
+            
+            if (warning) {
+                socket.emit('chat-warning', { warning, expertId });
+            }
+
+            const context = loadExpertContext(projectRoot, expertId);
+            const messagesWithContext = [
+                { role: 'system' as const, content: context.systemPrompt },
+                ...formatted,
+            ];
+
+            for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl)) {
+                socket.emit('chat-chunk', { chunk, expertId });
+            }
+            socket.emit('chat-done', { expertId });
+
+            saveChatHistory(projectRoot, expertId, messages);
+        } catch (error: any) {
+            console.error('[Chat] Stream error:', error.message);
+            socket.emit('chat-error', { error: error.message, expertId });
+        }
+    });
+
+    socket.on('chat-save', ({ expertId, projectId, messages }) => {
+        try {
+            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            saveChatHistory(projectRoot, expertId, messages);
+        } catch (error: any) {
+            console.error('Chat save error:', error.message);
+        }
+    });
 });
 
 // A-Roll Watcher Disabled
@@ -445,6 +535,31 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 // ============================================================
 // REST API Endpoints
 // ============================================================
+
+// --- Chat Panel (REST fallback) ---
+
+app.post('/api/chat/context', (req, res) => {
+    try {
+        const { expertId, projectId } = req.body;
+        const projectRoot = getProjectRoot(projectId || currentProjectName);
+        const ctx = loadExpertContext(projectRoot, expertId);
+        res.json(ctx);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/chat/history/:expertId', (req, res) => {
+    try {
+        const { expertId } = req.params;
+        const projectId = req.query.projectId as string || currentProjectName;
+        const projectRoot = getProjectRoot(projectId);
+        const messages = loadChatHistory(projectRoot, expertId);
+        res.json({ messages });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // --- Project Management ---
 
@@ -603,6 +718,30 @@ app.get('/api/scripts', (req, res) => {
         res.json({ scripts: files, selected });
     } catch (error: any) {
         console.error('Scripts API Error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/scripts/content', (req, res) => {
+    try {
+        const { projectId, path: scriptPath } = req.body;
+        if (!scriptPath) {
+            return res.status(400).json({ error: 'Missing path' });
+        }
+
+        const projectRoot = projectId
+            ? path.resolve(PROJECTS_BASE, projectId)
+            : PROJECT_ROOT;
+        const fullPath = path.join(projectRoot, scriptPath);
+
+        if (!fs.existsSync(fullPath)) {
+            return res.status(404).json({ error: 'Script file not found' });
+        }
+
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        res.json({ success: true, content });
+    } catch (error: any) {
+        console.error('Script Content API Error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
