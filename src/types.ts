@@ -151,7 +151,7 @@ export interface DeliveryState {
         music: MusicModule;
         thumbnail: ThumbnailModule;
         marketing: MarketingModule;
-        shorts: ShortsModule;
+        shorts: ShortsModule | ShortsModule_V2;
     };
 }
 
@@ -266,4 +266,116 @@ export interface RenderJob {
     totalFrames?: number;
     outputPath?: string;
     error?: string;
+}
+
+// ============================================================
+// SD-206: Shorts Master V2 Types
+// ============================================================
+
+export type CTA = 'follow' | 'share' | 'comment' | 'link' | 'subscribe';
+
+export interface ShortsGenerateRequest {
+    projectId: string;
+    count: number;
+    ctaDistribution: CTA[];
+    topic: string;
+    style: 'suspense' | 'knowledge' | 'emotion' | 'contrast' | 'narrative';
+}
+
+export interface ShortScript {
+    id: string;
+    index: number;
+    scriptText: string;
+    cta: CTA;
+    hookType: string;
+    thumbnailUrl?: string;
+    status: 'draft' | 'editing' | 'regenerating' | 'confirmed';
+    userComment?: string;
+}
+
+export interface ShortBRoll {
+    id: string;
+    timeRange: string;
+    scriptContext: string;
+    type: 'remotion' | 'seedance';
+    thumbnailUrl?: string;
+    confirmed: boolean;
+    userComment?: string;
+    template?: string;
+    props?: Record<string, unknown>;
+    prompt?: string;
+}
+
+export interface WhisperSegment {
+    id: number;
+    start: number;
+    end: number;
+    text: string;
+    confidence: number;
+}
+
+export interface SubtitleConfig {
+    id: string;
+    name: string;
+    fontFamily: string;
+    fontSize: number;
+    fontColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+    position: 'bottom' | 'center' | 'top';
+    animation: 'none' | 'fade' | 'typewriter' | 'karaoke';
+}
+
+export interface HeaderOverlayConfig {
+    enabled: boolean;
+    leftLogo?: string;
+    rightLogo?: string;
+    centerText?: string;
+    textFont?: string;
+    textColor?: string;
+    textSize?: number;
+    bgColor?: string;
+    height?: number;
+}
+
+export interface ShortRenderUnit {
+    id: string;
+    shortScriptId: string;
+    aroll: {
+        originalPath?: string;
+        croppedPath?: string;
+        confirmed: boolean;
+    };
+    brolls: ShortBRoll[];
+    thumbnail: {
+        imageUrl?: string;
+        confirmed: boolean;
+    };
+    subtitle: {
+        srtPath?: string;
+        segments: WhisperSegment[];
+        configId: string;
+        confirmed: boolean;
+    };
+    bgm: {
+        source: 'preset' | 'custom';
+        path?: string;
+        name?: string;
+    };
+    headerOverlay: boolean;
+    renderStatus: 'pending' | 'rendering' | 'completed' | 'failed';
+    outputPaths?: {
+        brollDir: string;
+        fcpxmlPath: string;
+        finalVideoPath?: string;
+    };
+}
+
+export interface ShortsModule_V2 {
+    phase: 1 | 2 | 3;
+    scripts: ShortScript[];
+    renderUnits: ShortRenderUnit[];
+    subtitleConfigs: SubtitleConfig[];
+    headerConfig?: HeaderOverlayConfig;
+    generationConfig?: ShortsGenerateRequest;
 }

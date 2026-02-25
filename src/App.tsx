@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
 import { DirectorSection } from './components/DirectorSection';
+import { ShortsSection } from './components/ShortsSection';
 import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
@@ -145,6 +146,18 @@ function App() {
                                 onUpdate={(newData) => updateState({
                                     ...state,
                                     modules: { ...state.modules, director: newData }
+                                })}
+                            />
+                        </main>
+                    ) : activeExpertId === 'ShortsMaster' ? (
+                        <main className="max-w-7xl mx-auto px-6 py-8">
+                            <ShortsSection
+                                data={state.modules.shorts}
+                                projectId={state.projectId}
+                                scriptPath={state.selectedScript?.path || ''}
+                                onUpdate={(newData) => updateState({
+                                    ...state,
+                                    modules: { ...state.modules, shorts: newData }
                                 })}
                             />
                         </main>

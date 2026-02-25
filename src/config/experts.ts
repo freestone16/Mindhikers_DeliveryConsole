@@ -48,8 +48,8 @@ export const EXPERTS: ExpertConfig[] = [
     },
     {
         id: 'ShortsMaster',
-        name: '短视频操盘手',
-        description: '深度内容转病毒式短视频脚本',
+        name: '短视频大师',
+        description: '端到端竖屏 Shorts 批量生产管线，从脚本到渲染到交付',
         icon: 'Video',
         color: 'cyan',
         skillName: 'ShortsMaster',
