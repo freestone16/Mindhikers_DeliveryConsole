@@ -7,9 +7,10 @@ interface ShortsPhase2Props {
     scripts: ShortScript[];
     onScriptsUpdate: (scripts: ShortScript[]) => void;
     onConfirmAll: () => void;
+    highlightedScriptId?: string | null;
 }
 
-export const ShortsPhase2 = ({ projectId, scripts, onScriptsUpdate, onConfirmAll }: ShortsPhase2Props) => {
+export const ShortsPhase2 = ({ projectId, scripts, onScriptsUpdate, onConfirmAll, highlightedScriptId }: ShortsPhase2Props) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
     const [comments, setComments] = useState<Record<string, string>>({});
@@ -164,7 +165,14 @@ export const ShortsPhase2 = ({ projectId, scripts, onScriptsUpdate, onConfirmAll
                     </thead>
                     <tbody className="divide-y divide-slate-700">
                         {scripts.map((script, index) => (
-                            <tr key={script.id} className="hover:bg-slate-800/50">
+                            <tr 
+                                key={script.id} 
+                                className={`hover:bg-slate-800/50 transition-colors ${
+                                    highlightedScriptId === script.id 
+                                        ? 'bg-cyan-900/30 ring-2 ring-cyan-500/50' 
+                                        : ''
+                                }`}
+                            >
                                 <td className="px-3 py-3 text-sm text-slate-300">{index + 1}</td>
                                 <td className="px-3 py-3">
                                     {editingId === script.id ? (

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Video, Rocket } from 'lucide-react';
 import { ShortsPhase1 } from './shorts/ShortsPhase1';
 import { ShortsPhase2 } from './shorts/ShortsPhase2';
 import { ShortsPhase3 } from './shorts/ShortsPhase3';
-import type { ShortsModule, ShortsModule_V2, ShortScript, ShortRenderUnit } from '../types';
+import type { ShortsModule, ShortsModule_V2, ShortScript, ShortRenderUnit, ExpertDataUpdate } from '../types';
+import { useDeliveryStore } from '../hooks/useDeliveryStore';
 
 interface ShortsSectionProps {
     data: ShortsModule | ShortsModule_V2;
@@ -24,6 +25,63 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
     const [phase, setPhase] = useState<Phase>(initialData.phase);
     const [scripts, setScripts] = useState<ShortScript[]>(initialData.scripts);
     const [renderUnits, setRenderUnits] = useState<ShortRenderUnit[]>(initialData.renderUnits);
+    const [lastModifiedId, setLastModifiedId] = useState<string | null>(null);
+    
+    const { socket } = useDeliveryStore();
+
+    // SD-207.1: 监听来自 Chat Panel 的修改更新
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleExpertUpdate = ({ expertId, action, data: updateData }: ExpertDataUpdate) => {
+            if (expertId !== 'ShortsMaster') return;
+            
+            console.log('[Shorts] Received update from Chat:', action, updateData);
+
+            // 处理单个脚本更新
+            if (updateData.scriptId && updateData.updates) {
+                setScripts(prev => prev.map(s => {
+                    if (s.id === updateData.scriptId) {
+                        const updated = { ...s, ...updateData.updates };
+                        return updated;
+                    }
+                    return s;
+                }));
+                setLastModifiedId(updateData.scriptId);
+                
+                // 3秒后清除高亮
+                setTimeout(() => setLastModifiedId(null), 3000);
+                
+                // 同步到后端
+                onUpdate({
+                    ...initialData,
+                    scripts: scripts.map(s => 
+                        s.id === updateData.scriptId 
+                            ? { ...s, ...updateData.updates }
+                            : s
+                    )
+                });
+            }
+
+            // 处理批量更新
+            if (updateData.scripts && Array.isArray(updateData.scripts)) {
+                setScripts(prev => {
+                    const updated = prev.map(s => {
+                        const change = updateData.scripts!.find((c: any) => c.scriptId === s.id);
+                        return change ? { ...s, ...change.updates } : s;
+                    });
+                    onUpdate({ ...initialData, scripts: updated });
+                    return updated;
+                });
+            }
+        };
+
+        socket.on('expert-data-update', handleExpertUpdate);
+        
+        return () => {
+            socket.off('expert-data-update', handleExpertUpdate);
+        };
+    }, [socket, initialData, scripts, onUpdate]);
 
     const handleGenerated = (newScripts: ShortScript[]) => {
         setScripts(newScripts);
@@ -126,6 +184,7 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
                         scripts={scripts}
                         onScriptsUpdate={handleScriptsUpdate}
                         onConfirmAll={handleConfirmAll}
+                        highlightedScriptId={lastModifiedId}
                     />
                 )}
 

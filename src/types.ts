@@ -463,3 +463,44 @@ export interface ExpertContextMap {
         keyFiles: string[];
     };
 }
+
+// ============================================================
+// SD-207.1: Chat Panel 协作模式类型
+// ============================================================
+
+export type ModifyAction = 
+    | 'update_script_text'
+    | 'update_cta'
+    | 'update_hook'
+    | 'batch_update'
+    | 'regenerate';
+
+export interface ChatIntent {
+    type: 'chat' | 'modify';
+    confidence: number;
+    target?: {
+        expertId: string;
+        action: ModifyAction;
+        targetId?: string;
+        payload?: any;
+    };
+}
+
+export interface ExpertModification {
+    expertId: string;
+    action: ModifyAction;
+    targetId?: string;
+    payload: any;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    timestamp: string;
+}
+
+export interface ExpertDataUpdate {
+    expertId: string;
+    action: ModifyAction;
+    data: {
+        scriptId?: string;
+        updates?: Record<string, any>;
+        [key: string]: any;
+    };
+}

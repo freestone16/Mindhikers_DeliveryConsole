@@ -29,7 +29,9 @@ function saveShortsState(projectRoot: string, state: any) {
     const outputDir = path.join(projectRoot, '05_Shorts_Output');
     ensureDir(outputDir);
     const statePath = path.join(outputDir, 'shorts_state.json');
+    console.log(`[Shorts] Saving state to: ${statePath}`);
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+    console.log(`[Shorts] State saved successfully`);
 }
 
 const SHORTS_SYSTEM_PROMPT = `你是一个专业的短视频脚本策划师。根据用户提供的主题和风格，批量生成竖屏短视频 (Shorts) 脚本。

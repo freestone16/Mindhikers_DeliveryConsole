@@ -18,7 +18,8 @@ import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot, parseIntent, isModificationExpert } from './chat';
+import { executeModification } from './chat-modifications';
 import marketRouter from './market';
 
 const upload = multer({ dest: 'uploads/' });
@@ -478,6 +479,107 @@ io.on('connection', (socket) => {
             const { provider, model, baseUrl } = config.global;
             const projectRoot = getProjectRoot(projectId || currentProjectName);
 
+            // SD-207.1: 意图识别
+            const lastMessage = messages[messages.length - 1]?.content || '';
+            const intent = parseIntent(lastMessage, expertId);
+            
+            console.log(`[Chat] Intent: ${intent.type}, confidence: ${intent.confidence}, expertId: ${expertId}`);
+
+            // 如果是修改请求且专家支持修改
+            if (intent.type === 'modify' && intent.confidence > 0.7 && isModificationExpert(expertId)) {
+                console.log(`[Chat] Modification detected: ${intent.target?.action}`);
+                
+                // 1. 返回简短确认
+                socket.emit('chat-confirmation', {
+                    expertId,
+                    message: '✅ 已收到修改请求，正在处理...'
+                });
+                socket.emit('chat-done', { expertId });
+
+                // 2. 获取当前专家数据
+                let scripts: any[] = [];
+                
+                // ShortsMaster 使用独立的 shorts_state.json
+                if (expertId === 'ShortsMaster') {
+                    const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
+                    if (fs.existsSync(shortsStatePath)) {
+                        try {
+                            const shortsState = JSON.parse(fs.readFileSync(shortsStatePath, 'utf-8'));
+                            scripts = shortsState.scripts || [];
+                            console.log(`[Chat] Loaded ${scripts.length} scripts from ${shortsStatePath}`);
+                        } catch (e) {
+                            console.error('[Chat] Failed to parse shorts_state.json:', e);
+                        }
+                    } else {
+                        console.log(`[Chat] shorts_state.json not found at ${shortsStatePath}`);
+                    }
+                } else {
+                    // 其他专家从 delivery_store.json 读取
+                    const deliveryDataPath = path.join(projectRoot, 'delivery_store.json');
+                    if (fs.existsSync(deliveryDataPath)) {
+                        const deliveryData = JSON.parse(fs.readFileSync(deliveryDataPath, 'utf-8'));
+                        scripts = deliveryData.modules?.shorts?.scripts || 
+                                  deliveryData.modules?.shorts?.items || [];
+                    }
+                }
+
+                // 3. 执行修改
+                const result = await executeModification(intent.target, {
+                    scripts,
+                    projectId: projectId || currentProjectName
+                });
+
+                if (result.success && result.data) {
+                    console.log(`[Chat] Modification success:`, result.data);
+                    
+                    // 4. 保存修改后的数据
+                    if (expertId === 'ShortsMaster' && result.data.scriptId && result.data.updates) {
+                        const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
+                        if (fs.existsSync(shortsStatePath)) {
+                            try {
+                                const shortsState = JSON.parse(fs.readFileSync(shortsStatePath, 'utf-8'));
+                                shortsState.scripts = shortsState.scripts.map((s: any) => 
+                                    s.id === result.data!.scriptId 
+                                        ? { ...s, ...result.data!.updates }
+                                        : s
+                                );
+                                fs.writeFileSync(shortsStatePath, JSON.stringify(shortsState, null, 2));
+                                console.log(`[Chat] Saved modification to ${shortsStatePath}`);
+                            } catch (e) {
+                                console.error('[Chat] Failed to save shorts_state.json:', e);
+                            }
+                        }
+                    }
+                    
+                    // 5. 推送更新到所有客户端
+                    io.emit('expert-data-update', {
+                        expertId,
+                        action: intent.target!.action,
+                        data: result.data
+                    });
+                } else {
+                    console.error('[Chat] Modification failed:', result.error);
+                    socket.emit('chat-error', {
+                        expertId,
+                        error: `修改失败: ${result.error}`
+                    });
+                }
+
+                // 5. 保存对话历史
+                const confirmationMsg = {
+                    id: `msg_${Date.now()}`,
+                    role: 'assistant' as const,
+                    content: result.success 
+                        ? '✅ 修改已完成，请在左侧表格中查看更新结果。' 
+                        : `❌ 修改失败: ${result.error}`,
+                    timestamp: new Date().toISOString()
+                };
+                saveChatHistory(projectRoot, expertId, [...messages, confirmationMsg]);
+                
+                return;
+            }
+
+            // 普通对话模式
             const { formatted, warning } = formatMultimodalMessages(messages, provider);
             
             if (warning) {

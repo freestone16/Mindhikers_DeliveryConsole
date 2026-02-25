@@ -55,22 +55,24 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
 
   const handleGenerateThumbnail = async () => {
     if (!option.imagePrompt) return;
-    
+
     setThumbStatus('generating');
-    
+
     try {
       const res = await fetch('http://localhost:3002/api/director/phase2/thumbnail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: option.imagePrompt,
+          type: option.type,
+          textPrompt: option.prompt, // Pass the Remotion text component description as well
           optionId: option.id,
           chapterId: chapter.chapterId
         })
       });
-      
+
       const data = await res.json();
-      
+
       if (data.success && data.taskId) {
         pollThumbnail(taskKey);
       } else if (data.success && data.imageUrl) {
@@ -87,12 +89,12 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
 
   const pollThumbnail = async (key: string) => {
     setThumbStatus('processing');
-    
+
     const poll = async () => {
       try {
         const res = await fetch(`http://localhost:3002/api/director/phase2/thumbnail/${key}`);
         const data = await res.json();
-        
+
         if (data.status === 'completed' && data.imageUrl) {
           setPreviewUrl(data.imageUrl);
           setThumbStatus('completed');
@@ -105,16 +107,15 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
         setThumbStatus('failed');
       }
     };
-    
+
     poll();
   };
 
   return (
-    <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${
-      isSelected 
-        ? 'border-blue-500 bg-blue-500/5' 
+    <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${isSelected
+        ? 'border-blue-500 bg-blue-500/5'
         : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
-    } ${chapter.isLocked ? 'opacity-60' : ''}`}>
+      } ${chapter.isLocked ? 'opacity-60' : ''}`}>
       <div className="col-span-1 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
           {rowId}
@@ -213,7 +214,7 @@ export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCar
         <span className="text-white font-medium">{chapter.chapterName}</span>
         {chapter.isLocked && <Lock className="w-4 h-4 text-green-400" />}
       </div>
-      
+
       <div className="p-3">
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
           <div className="col-span-1 text-xs text-slate-500 font-bold">序号</div>
@@ -222,7 +223,7 @@ export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCar
           <div className="col-span-3 text-xs text-slate-500 font-bold">Feedback</div>
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
         </div>
-        
+
         <div className="flex flex-col gap-2">
           {chapter.options.map((option, idx) => (
             <OptionRow

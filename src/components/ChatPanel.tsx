@@ -103,12 +103,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setContextLoaded(true);
         };
 
+        const handleChatConfirmation = ({ expertId: msgExpertId, message }: { expertId: string; message: string }) => {
+            if (msgExpertId !== currentExpertIdRef.current) return;
+            
+            // 直接显示确认消息
+            const confirmMessage: ChatMessage = {
+                id: `msg_${Date.now()}`,
+                role: 'assistant',
+                content: message,
+                timestamp: new Date().toISOString(),
+            };
+            setMessages(prev => [...prev, confirmMessage]);
+            setIsStreaming(false);
+        };
+
         socket.on('chat-chunk', handleChatChunk);
         socket.on('chat-done', handleChatDone);
         socket.on('chat-error', handleChatError);
         socket.on('chat-warning', handleChatWarning);
         socket.on('chat-history', handleChatHistory);
         socket.on('chat-context-loaded', handleChatContextLoaded);
+        socket.on('chat-confirmation', handleChatConfirmation);
 
         console.log('Chat socket events registered');
 
@@ -119,6 +134,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.off('chat-warning', handleChatWarning);
             socket.off('chat-history', handleChatHistory);
             socket.off('chat-context-loaded', handleChatContextLoaded);
+            socket.off('chat-confirmation', handleChatConfirmation);
         };
     }, [socket]);
 

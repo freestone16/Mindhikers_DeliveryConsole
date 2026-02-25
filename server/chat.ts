@@ -3,7 +3,7 @@ import path from 'path';
 import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
+const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -317,4 +317,64 @@ export function formatMultimodalMessages(
 
 export function getProjectRoot(projectId: string): string {
     return path.resolve(PROJECTS_BASE, projectId);
+}
+
+// ============================================================
+// SD-207.1: 意图识别
+// ============================================================
+
+import type { ChatIntent, ModifyAction } from '../src/types';
+
+interface ModifyPattern {
+    pattern: RegExp;
+    action: ModifyAction;
+    extractIndex?: boolean;
+}
+
+const MODIFY_PATTERNS: ModifyPattern[] = [
+    { pattern: /第\s*(\d+)\s*个?.*[脚本文案].*[改修短换精]/, action: 'update_script_text', extractIndex: true },
+    { pattern: /第\s*(\d+)\s*个?.*开头.*[短改]/, action: 'update_script_text', extractIndex: true },
+    { pattern: /第\s*(\d+)\s*个?.*结尾.*[改修]/, action: 'update_script_text', extractIndex: true },
+    { pattern: /CTA.*[改修换]/, action: 'update_cta' },
+    { pattern: /行动号召.*[改修]/, action: 'update_cta' },
+    { pattern: /钩子.*[换改]/, action: 'update_hook' },
+    { pattern: /开头.*[换改]/, action: 'update_hook' },
+    { pattern: /全部.*[改修]/, action: 'batch_update' },
+    { pattern: /所有.*[改修]/, action: 'batch_update' },
+    { pattern: /批量.*[改修]/, action: 'batch_update' },
+    { pattern: /重新生成/, action: 'regenerate' },
+    { pattern: /再生.*第\s*(\d+)\s*个/, action: 'regenerate', extractIndex: true },
+];
+
+export function parseIntent(
+    userMessage: string,
+    expertId: string
+): ChatIntent {
+    for (const { pattern, action, extractIndex } of MODIFY_PATTERNS) {
+        const match = userMessage.match(pattern);
+        if (match) {
+            // ShortsMaster 使用 short-001 格式
+            const targetId = extractIndex && match[1] 
+                ? `short-${String(parseInt(match[1])).padStart(3, '0')}`
+                : undefined;
+            
+            return {
+                type: 'modify',
+                confidence: 0.8,
+                target: {
+                    expertId,
+                    action,
+                    targetId,
+                    payload: { userMessage }
+                }
+            };
+        }
+    }
+    
+    return { type: 'chat', confidence: 1.0 };
+}
+
+export function isModificationExpert(expertId: string): boolean {
+    const supportedExperts = ['ShortsMaster', 'Director', 'MarketingMaster', 'Writer'];
+    return supportedExperts.includes(expertId);
 }
