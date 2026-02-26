@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { generateBRollOptions, BRollOption } from './llm';
+import { generateBRollOptions, generateGlobalBRollPlan, generateFallbackOptions, BRollOption, callLLM } from './llm';
 import { generateImageWithVolc, pollVolcImageResult } from './volcengine';
+import { buildDirectorSystemPrompt } from './skill-loader';
 
 const getProjectRoot = (projectId: string): string => {
   const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
@@ -98,6 +99,36 @@ function saveSelectionState(projectRoot: string, state: SelectionState) {
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
+// Helper to extract markdown from Director's enforced JSON output
+function extractMarkdownFromDirectorJson(rawText: string): string {
+  let cleanText = rawText.trim();
+  if (cleanText.startsWith('```json')) {
+    cleanText = cleanText.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+  } else if (cleanText.startsWith('```')) {
+    cleanText = cleanText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+  }
+
+  try {
+    const parsed = JSON.parse(cleanText);
+    if (parsed.concept_proposal) {
+      return parsed.concept_proposal;
+    }
+  } catch {
+    // If it's not valid JSON, it might just be raw markdown
+  }
+
+  // Return original text if parsing fails or no concept_proposal found
+  // Try to clean up JSON brackets if it looks like broken JSON
+  if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
+    const match = cleanText.match(/"concept_proposal"\s*:\s*"([\s\S]*?)"(?=\s*(?:,|}$))/);
+    if (match && match[1]) {
+      return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    }
+  }
+
+  return rawText;
+}
+
 function loadSelectionState(projectRoot: string): SelectionState | null {
   const statePath = path.join(projectRoot, '04_Visuals', 'selection_state.json');
   if (fs.existsSync(statePath)) {
@@ -106,7 +137,7 @@ function loadSelectionState(projectRoot: string): SelectionState | null {
   return null;
 }
 
-export const generatePhase1 = (req: Request, res: Response) => {
+export const generatePhase1 = async (req: Request, res: Response) => {
   const { projectId, scriptPath } = req.body;
 
   if (!projectId || !scriptPath) {
@@ -120,30 +151,87 @@ export const generatePhase1 = (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Script file not found' });
   }
 
+  // 读取用户的真实脚本内容
+  const scriptContent = fs.readFileSync(scriptFullPath, 'utf-8');
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-  const concept = `# 视觉概念提案
+  try {
+    // 从 Antigravity 库加载 Director 方法论
+    const systemPrompt = buildDirectorSystemPrompt('concept');
+    console.log('[Phase1] Generating concept with Director skill knowledge...');
 
-## 整体基调
-本视频采用理性冷静的深色科技风格，配合数据可视化元素...
+    const response = await callLLM([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `以下是视频脚本全文，请为其生成视觉概念提案：\n\n${scriptContent}` }
+    ], 'deepseek');
 
-## 视觉风格
-- 主色调：深蓝 + 金色高亮
-- 动画风格：平滑渐变 + 粒子效果
-- 字体：无衬线，极简
+    const finalContent = extractMarkdownFromDirectorJson(response.content);
 
-## 分镜建议
-- Intro: 震撼开场，数据流动画
-- 第一章: 概念讲解，实拍素材
-- 第二章: 案例分析，图表展示
-- Ending: 总结升华，淡出`;
+    res.write(`data: ${JSON.stringify({ type: 'content', content: finalContent })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+  } catch (error: any) {
+    console.error('[Phase1] Error:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+  }
 
-  res.write(`data: ${JSON.stringify({ type: 'content', content: concept })}\n\n`);
-  res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
   res.end();
 };
+
+// Phase 1: Revise concept based on user feedback
+export const reviseConcept = async (req: Request, res: Response) => {
+  const { projectId, userComment } = req.body;
+
+  if (!projectId || !userComment) {
+    return res.status(400).json({ error: 'Missing projectId or userComment' });
+  }
+
+  try {
+    // Read the existing concept from the delivery store
+    const projectRoot = getProjectRoot(projectId);
+    const deliveryStorePath = path.join(projectRoot, 'delivery_store.json');
+    let existingConcept = '';
+
+    if (fs.existsSync(deliveryStorePath)) {
+      try {
+        const storeData = JSON.parse(fs.readFileSync(deliveryStorePath, 'utf-8'));
+        existingConcept = storeData?.modules?.director?.conceptProposal || '';
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // 从 Antigravity 库加载 Director 方法论
+    const systemPrompt = buildDirectorSystemPrompt('revise');
+    console.log('[Phase1 Revise] Revising with Director skill knowledge...');
+
+    const response = await callLLM([
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: `现有视觉概念提案：\n${existingConcept}\n\n用户反馈意见：\n${userComment}\n\n请根据以上反馈修改提案。`
+      }
+    ], 'deepseek');
+
+    const finalContent = extractMarkdownFromDirectorJson(response.content);
+
+    return res.json({
+      success: true,
+      data: { content: finalContent }
+    });
+  } catch (error: any) {
+    console.error('[Phase1 Revise] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to revise concept'
+    });
+  }
+};
+
+// ... (other imports and helpers)
 
 export const startPhase2 = async (req: Request, res: Response) => {
   const { projectId, scriptPath, brollTypes } = req.body;
@@ -161,6 +249,7 @@ export const startPhase2 = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Script file not found' });
     }
   } else {
+    // ... (script finding logic remains same)
     const possibleDirs = ['03_Scripts', 'Scripts', ''];
     scriptFullPath = '';
 
@@ -209,63 +298,72 @@ export const startPhase2 = async (req: Request, res: Response) => {
   });
 
   res.write(`data: ${JSON.stringify({ type: 'taskId', taskId })}\n\n`);
-  res.write(`data: ${JSON.stringify({ type: 'progress', current: 0, total: totalSteps, message: '开始解析章节...' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'progress', current: 0, total: totalSteps, message: '导演正在全局审片并划分视觉节奏...' })}\n\n`);
 
-  for (let i = 0; i < parsedChapters.length; i++) {
-    const parsed = parsedChapters[i];
-    const chapterId = `ch${i + 1}`;
-
-    res.write(`data: ${JSON.stringify({ type: 'chapter_start', chapterIndex: i, chapterName: parsed.title })}\n\n`);
-
-    const brollOptions = await generateBRollOptions(
-      parsed.title,
-      parsed.text,
+  try {
+    // 上帝视角：一次性生成全局分配方案
+    const globalPlan = await generateGlobalBRollPlan(
+      parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
       brollTypes as ('remotion' | 'generative' | 'artlist')[]
     );
 
-    const chapter: DirectorChapter = {
-      chapterId,
-      chapterIndex: i,
-      chapterName: parsed.title,
-      scriptText: parsed.text.slice(0, 500),
-      options: brollOptions.map((opt, idx) => ({
-        ...opt,
-        id: `${chapterId}-opt${idx + 1}`
-      })),
-      isLocked: false
-    };
+    // 将全局方案分发回各个章节
+    for (let i = 0; i < parsedChapters.length; i++) {
+      const parsed = parsedChapters[i];
+      const chapterId = `ch${i + 1}`;
 
-    chapters.push(chapter);
+      // 匹配方案，如果模型没返回该章节，则 fallback
+      const planForChapter = globalPlan.chapters?.find(c => c.chapterId === chapterId || c.chapterName === parsed.title);
+      const brollOptions = planForChapter?.options || generateFallbackOptions(brollTypes as any, parsed.text);
 
-    const task = taskStorage.get(taskId);
-    if (task) {
-      task.progress.current = (i + 1) * 3;
-      task.chapters = chapters;
+      const chapter: DirectorChapter = {
+        chapterId,
+        chapterIndex: i,
+        chapterName: parsed.title,
+        scriptText: parsed.text.slice(0, 500),
+        options: brollOptions.map((opt: BRollOption, idx: number) => ({
+          ...opt,
+          id: `${chapterId}-opt${idx + 1}`
+        })),
+        isLocked: false
+      };
+
+      chapters.push(chapter);
+
+      const task = taskStorage.get(taskId);
+      if (task) {
+        task.progress.current = (i + 1) * 3;
+        task.chapters = chapters;
+      }
+
+      res.write(`data: ${JSON.stringify({ type: 'chapter_ready', chapter })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'progress', current: (i + 1) * 3, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章` })}\n\n`);
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'chapter_ready', chapter })}\n\n`);
-    res.write(`data: ${JSON.stringify({ type: 'progress', current: (i + 1) * 3, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章` })}\n\n`);
+    const finalState: SelectionState = {
+      projectId,
+      taskId,
+      status: 'completed',
+      lastUpdated: new Date().toISOString(),
+      progress: { current: totalSteps, total: totalSteps },
+      chapters
+    };
+
+    saveSelectionState(projectRoot, finalState);
+
+    const finalTask = taskStorage.get(taskId);
+    if (finalTask) {
+      finalTask.status = 'completed';
+      finalTask.progress.current = totalSteps;
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done', chapters })}\n\n`);
+  } catch (error) {
+    console.error('Phase 2 Global Generation failed:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: '全局生成失败，请重试' })}\n\n`);
+  } finally {
+    res.end();
   }
-
-  const finalState: SelectionState = {
-    projectId,
-    taskId,
-    status: 'completed',
-    lastUpdated: new Date().toISOString(),
-    progress: { current: totalSteps, total: totalSteps },
-    chapters
-  };
-
-  saveSelectionState(projectRoot, finalState);
-
-  const finalTask = taskStorage.get(taskId);
-  if (finalTask) {
-    finalTask.status = 'completed';
-    finalTask.progress.current = totalSteps;
-  }
-
-  res.write(`data: ${JSON.stringify({ type: 'done', chapters })}\n\n`);
-  res.end();
 };
 
 export const getPhase2Status = (req: Request, res: Response) => {
@@ -388,7 +486,7 @@ import { spawn } from 'child_process';
 import os from 'os';
 
 const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
-  path.join(os.homedir(), '.opencode/skills/RemotionStudio');
+  path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio');
 
 export const generateThumbnail = async (req: Request, res: Response) => {
   const { prompt, type, textPrompt, optionId, chapterId } = req.body;
@@ -415,80 +513,95 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       status: 'processing'
     });
 
-    // 2. Spawn Remotion still render in background
+    // 2. Direct API Render in background
     const outputFileName = `thumb_${taskKey}.png`;
-
-    // We'll save the thumbnails into the project's Visuals folder
     const projectId = req.body.projectId || process.env.PROJECT_NAME || 'CSET-SP3';
     const projectRoot = getProjectRoot(projectId);
     const outputDir = path.join(projectRoot, '04_Visuals', 'thumbnails');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
-
     const outputPath = path.join(outputDir, outputFileName);
+    const inputProps = { text: textPrompt || prompt };
 
-    // Minimal props passing the text prompt to the SceneComposer template
-    const propsJson = JSON.stringify({ text: textPrompt || prompt });
+    (async () => {
+      try {
+        const { renderStillWithApi } = require('./remotion-api-renderer');
+        await renderStillWithApi('SceneComposer', outputPath, inputProps);
 
-    const args = [
-      'run', 'still',
-      'SceneComposer', // Assuming SceneComposer is the default template, maybe make this dynamic later
-      outputPath,
-      `--props=${propsJson}`
-    ];
-
-    console.log(`[Remotion Thumbnail] Rendering still -> ${outputPath}`);
-
-    const renderProcess = spawn('npm', args, {
-      cwd: REMOTION_STUDIO_DIR,
-      env: { ...process.env, NODE_ENV: 'production' },
-      shell: true
-    });
-
-    let stderr = '';
-    renderProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    renderProcess.on('close', (code) => {
-      const task = thumbnailTasks.get(taskKey);
-      if (!task) return;
-
-      if (code === 0 && fs.existsSync(outputPath)) {
-        // We serve the local file by relative path accessible to the frontend 
-        // Currently the frontend expects an absolute URL or a path it can load.
-        // Assuming /Projects/... is tricky to serve statically here without a mount,
-        // let's copy it to a public dir or serve it via a dedicated route if needed. 
-        // For now, let's returning the absolute path or a static URL. 
-        // The DeliveryConsole frontend usually accesses local files if they are in public/ 
-        // or through a specific API. 
-        // Wait, standard `delivery_console` `api/files` or direct serving? 
-        // Usually, `getThumbnailStatus` returns the full path and the frontend `<img>` tag loads it via a local path if it's an electron/local app, OR we need to serve it.
-        // Let's use an API route to serve thumbnails or just pass the absolute path if the frontend handles file:/// natively.
-        // Since SD-202 is a web app, we might need a route. BUT the previous AI returned a URL (`task.imageUrl`).
-
-        // Quick fix: Add a route to serve these thumbnails, or base64 encode it since it's just a thumbnail.
-        // Base64 encoding is safest and easiest without adding new mounts.
-        try {
+        const task = thumbnailTasks.get(taskKey);
+        if (task && fs.existsSync(outputPath)) {
           const imageBuffer = fs.readFileSync(outputPath);
           const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
-
           task.status = 'completed';
           task.imageUrl = base64Image;
-          console.log(`[Remotion Thumbnail] Success: ${taskKey}`);
-        } catch (e: any) {
-          task.status = 'failed';
-          task.error = `Failed to read generated thumbnail: ${e.message}`;
+          console.log(`[Remotion API Thumbnail] Success: ${taskKey}`);
         }
-      } else {
-        task.status = 'failed';
-        task.error = `Render failed with code ${code}: ${stderr}`;
-        console.error(`[Remotion Thumbnail Error] ${task.error}`);
+      } catch (err: any) {
+        console.error(`[Remotion API Thumbnail Error] ${err.message}`);
+        const task = thumbnailTasks.get(taskKey);
+        if (task) {
+          task.status = 'failed';
+          task.error = err.message;
+        }
       }
-    });
+    })();
 
     return;
+  }
+
+  // Generative type: use Volcengine as per user's requirement
+  if (type === 'generative' || type === 'seedance') {
+    try {
+      thumbnailTasks.set(taskKey, {
+        taskId: `volc-${Date.now()}`,
+        type: 'volcengine',
+        status: 'processing',
+        createdAt: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        taskId: thumbnailTasks.get(taskKey)!.taskId,
+        taskKey,
+        status: 'processing'
+      });
+
+      // Call Volcengine image generation in background
+      (async () => {
+        try {
+          const result = await generateImageWithVolc(prompt);
+          const task = thumbnailTasks.get(taskKey);
+          if (task) {
+            if (result.image_url) {
+              task.status = 'completed';
+              task.imageUrl = result.image_url;
+              console.log(`[Volcengine Thumbnail] Success: ${taskKey}`);
+            } else if (result.task_id) {
+              // Poll for result if it's an async task
+              task.taskId = result.task_id;
+              task.status = 'pending';
+              // Note: The frontend usually polls getThumbnailStatus, 
+              // but we can also poll internally to update the cache
+            } else {
+              task.status = 'failed';
+              task.error = result.error || 'Unknown Volcengine error';
+            }
+          }
+        } catch (err: any) {
+          const task = thumbnailTasks.get(taskKey);
+          if (task) {
+            task.status = 'failed';
+            task.error = err.message;
+          }
+          console.error(`[Volcengine Thumbnail Error] ${err.message}`);
+        }
+      })();
+
+      return;
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
   }
 
   // Fallback to Volcengine

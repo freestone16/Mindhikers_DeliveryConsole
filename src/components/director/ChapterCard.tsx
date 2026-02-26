@@ -4,6 +4,7 @@ import type { DirectorChapter, SceneOption } from '../../types';
 
 interface ChapterCardProps {
   chapter: DirectorChapter;
+  projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
   onComment: (chapterId: string, comment: string) => void;
   onLock: (chapterId: string) => void;
@@ -12,14 +13,19 @@ interface ChapterCardProps {
 const TYPE_COLORS: Record<string, string> = {
   remotion: 'bg-blue-500/20 text-blue-300',
   seedance: 'bg-purple-500/20 text-purple-300',
+  generative: 'bg-purple-500/20 text-purple-300',
   artlist: 'bg-green-500/20 text-green-300',
 };
 
 const TYPE_LABELS: Record<string, string> = {
   remotion: 'Remotion动画',
   seedance: '文生视频',
+  generative: 'AI生成',
   artlist: 'Artlist实拍',
 };
+
+// Artlist 不需要 AI 预览，只需展示关键词搜索方向
+const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance'];
 
 function getScriptPreview(text: string): string {
   const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
@@ -33,12 +39,13 @@ interface OptionRowProps {
   chapter: DirectorChapter;
   option: SceneOption;
   index: number;
+  projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
   onComment: (chapterId: string, comment: string) => void;
   onLock: (chapterId: string) => void;
 }
 
-const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: OptionRowProps) => {
+const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onLock }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
   const isSelected = chapter.selectedOptionId === option.id;
@@ -67,7 +74,8 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
           type: option.type,
           textPrompt: option.prompt, // Pass the Remotion text component description as well
           optionId: option.id,
-          chapterId: chapter.chapterId
+          chapterId: chapter.chapterId,
+          projectId: projectId
         })
       });
 
@@ -113,8 +121,8 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
 
   return (
     <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${isSelected
-        ? 'border-blue-500 bg-blue-500/5'
-        : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
+      ? 'border-blue-500 bg-blue-500/5'
+      : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
       } ${chapter.isLocked ? 'opacity-60' : ''}`}>
       <div className="col-span-1 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
@@ -147,6 +155,11 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-red-400 text-xs">失败</span>
                 </div>
+              ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50">
+                  <span className="text-green-400 text-xs">🎬 实拍素材</span>
+                  <span className="text-slate-500 text-[10px] mt-0.5">无需预览</span>
+                </div>
               ) : (
                 <button
                   onClick={(e) => {
@@ -171,6 +184,11 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
               <p className="text-white text-xs leading-relaxed">
                 {option.prompt || '暂无方案描述'}
               </p>
+              {(option as any).rationale && (
+                <p className="text-slate-500 text-[10px] mt-1 italic">
+                  💡 {(option as any).rationale}
+                </p>
+              )}
             </div>
           </div>
         </button>
@@ -206,7 +224,7 @@ const OptionRow = ({ chapter, option, index, onSelect, onComment, onLock }: Opti
   );
 };
 
-export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCardProps) => {
+export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }: ChapterCardProps) => {
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
       <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
@@ -231,6 +249,7 @@ export const ChapterCard = ({ chapter, onSelect, onComment, onLock }: ChapterCar
               chapter={chapter}
               option={option}
               index={idx}
+              projectId={projectId}
               onSelect={onSelect}
               onComment={onComment}
               onLock={onLock}

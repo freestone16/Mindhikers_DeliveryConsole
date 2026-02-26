@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export const LLMProviderSchema = z.enum([
-  'openai', 
-  'anthropic', 
-  'google', 
-  'deepseek', 
+  'openai',
+  'anthropic',
+  'google',
+  'deepseek',
   'zhipu',
   'siliconflow',
   'volcengine'
@@ -138,18 +138,23 @@ export const PROVIDER_INFO: Record<string, {
     type: 'generation',
     envVars: ['VOLCENGINE_ACCESS_KEY'],
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    models: ['doubao-seedream-4-5', 'doubao-seedance-pro'],
+    models: ['doubao-seedream-5.0-litenew', 'doubao-seedream-4-5-251128', 'doubao-seedance-1-5-pro'],
   },
 };
 
 export const IMAGE_MODELS = [
-  { id: 'doubao-image-01', name: '豆包图片生成 (doubao-image-01)' },
+  { id: 'doubao-seedream-5.0-litenew', name: '豆包 Seedream 5.0 Lite (推荐)' },
+  { id: 'doubao-seedream-4-5-251128', name: '豆包 Seedream 4.5' },
+  { id: 'doubao-seedream-4-0-250828', name: '豆包 Seedream 4.0' },
+  { id: 'doubao-seedream-3-0-t2i-250415', name: '豆包 Seedream 3.0 T2I' },
   { id: 'kolors', name: 'Kolors (SiliconFlow)' },
   { id: 'stable-diffusion-xl', name: 'Stable Diffusion XL' },
 ];
 
 export const VIDEO_MODELS = [
-  { id: 'doubao-video-01', name: '豆包视频生成 (doubao-video-01)' },
+  { id: 'doubao-seedance-1-5-pro', name: '豆包 Seedance 1.5 Pro (推荐)' },
+  { id: 'doubao-seedance-1-0-pro', name: '豆包 Seedance 1.0 Pro' },
+  { id: 'doubao-seedance-1-0-lite', name: '豆包 Seedance 1.0 Lite' },
   { id: 'wan2.1-t2v-14b', name: 'Wan2.1 T2V 14B' },
 ];
 

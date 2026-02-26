@@ -44,8 +44,8 @@ export const Phase2View = ({
         <h3 className="text-sm text-slate-400 uppercase font-bold mb-3">
           Select B-Roll Types
         </h3>
-        <BRollSelector 
-          selected={brollSelections} 
+        <BRollSelector
+          selected={brollSelections}
           onChange={setBrollSelections}
           disabled={brollConfirmed}
         />
@@ -76,6 +76,7 @@ export const Phase2View = ({
             <ChapterCard
               key={chapter.chapterId}
               chapter={chapter}
+              projectId={projectId}
               onSelect={onSelect}
               onComment={onComment}
               onLock={onLock}

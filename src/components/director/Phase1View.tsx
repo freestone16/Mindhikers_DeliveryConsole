@@ -1,6 +1,54 @@
 import { useState } from 'react';
 import { Sparkles, RefreshCw, CheckCircle } from 'lucide-react';
 
+const SimpleMarkdown = ({ text }: { text: string }) => {
+  if (!text) return null;
+  // Replace literal '\n' strings with actual newlines in case it's escaped
+  const normalizedText = text.replace(/\\n/g, '\n');
+  const lines = normalizedText.split('\n');
+
+  return (
+    <div className="space-y-1">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        // Headers
+        if (trimmed.startsWith('#### ')) return <h5 key={i} className="text-md font-bold text-white mt-4 mb-2">{parseInline(trimmed.replace('#### ', ''))}</h5>;
+        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-lg font-bold text-white mt-4 mb-2">{parseInline(trimmed.replace('### ', ''))}</h4>;
+        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-xl font-bold text-white mt-6 mb-3">{parseInline(trimmed.replace('## ', ''))}</h3>;
+        if (trimmed.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold text-blue-400 mt-6 mb-4">{parseInline(trimmed.replace('# ', ''))}</h2>;
+
+        // Blockquotes
+        if (trimmed.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-1 my-4 text-slate-300 italic bg-blue-500/10 rounded-r">{parseInline(trimmed.replace('> ', ''))}</blockquote>;
+
+        // Lists
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) return <li key={i} className="ml-6 list-disc text-slate-300 my-1 pb-1">{parseInline(trimmed.replace(/^(\*|-)\s+/, ''))}</li>;
+        if (trimmed.match(/^\d+\.\s/)) return <li key={i} className="ml-6 list-decimal text-slate-300 my-1 pb-1">{parseInline(trimmed.replace(/^\d+\.\s+/, ''))}</li>;
+
+        // Empty lines
+        if (trimmed === '') return <div key={i} className="h-2"></div>;
+
+        // Normal text
+        return <p key={i} className="text-slate-300 mb-1 leading-relaxed">{parseInline(trimmed)}</p>;
+      })}
+    </div>
+  );
+};
+
+const parseInline = (text: string) => {
+  if (!text) return text;
+  // Simple parser for **bold** and `code`
+  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+  return <>{parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-bold text-blue-100">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="bg-slate-800 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono">{part.slice(1, -1)}</code>;
+    }
+    return <span key={i}>{part}</span>;
+  })}</>;
+};
+
 interface Phase1ViewProps {
   projectId: string;
   scriptPath: string;
@@ -70,8 +118,8 @@ export const Phase1View = ({
       </div>
 
       <div className="p-6">
-        <div className="prose prose-invert max-w-none text-slate-300 whitespace-pre-wrap">
-          {concept}
+        <div className="prose prose-invert max-w-none text-slate-300">
+          <SimpleMarkdown text={concept || ''} />
         </div>
       </div>
 

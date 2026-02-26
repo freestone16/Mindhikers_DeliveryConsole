@@ -84,6 +84,7 @@ app.post('/api/llm-config/test', testConnection);
 
 // Director Phase 1-3 Routes
 app.post('/api/director/phase1/generate', director.generatePhase1);
+app.post('/api/director/phase1/revise', director.reviseConcept);
 app.post('/api/director/phase2/start', director.startPhase2);
 app.get('/api/director/phase2/status/:taskId', director.getPhase2Status);
 app.post('/api/director/phase2/select', director.selectOption);
@@ -482,13 +483,13 @@ io.on('connection', (socket) => {
             // SD-207.1: 意图识别
             const lastMessage = messages[messages.length - 1]?.content || '';
             const intent = parseIntent(lastMessage, expertId);
-            
+
             console.log(`[Chat] Intent: ${intent.type}, confidence: ${intent.confidence}, expertId: ${expertId}`);
 
             // 如果是修改请求且专家支持修改
             if (intent.type === 'modify' && intent.confidence > 0.7 && isModificationExpert(expertId)) {
                 console.log(`[Chat] Modification detected: ${intent.target?.action}`);
-                
+
                 // 1. 返回简短确认
                 socket.emit('chat-confirmation', {
                     expertId,
@@ -498,7 +499,7 @@ io.on('connection', (socket) => {
 
                 // 2. 获取当前专家数据
                 let scripts: any[] = [];
-                
+
                 // ShortsMaster 使用独立的 shorts_state.json
                 if (expertId === 'ShortsMaster') {
                     const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
@@ -518,8 +519,8 @@ io.on('connection', (socket) => {
                     const deliveryDataPath = path.join(projectRoot, 'delivery_store.json');
                     if (fs.existsSync(deliveryDataPath)) {
                         const deliveryData = JSON.parse(fs.readFileSync(deliveryDataPath, 'utf-8'));
-                        scripts = deliveryData.modules?.shorts?.scripts || 
-                                  deliveryData.modules?.shorts?.items || [];
+                        scripts = deliveryData.modules?.shorts?.scripts ||
+                            deliveryData.modules?.shorts?.items || [];
                     }
                 }
 
@@ -531,15 +532,15 @@ io.on('connection', (socket) => {
 
                 if (result.success && result.data) {
                     console.log(`[Chat] Modification success:`, result.data);
-                    
+
                     // 4. 保存修改后的数据
                     if (expertId === 'ShortsMaster' && result.data.scriptId && result.data.updates) {
                         const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
                         if (fs.existsSync(shortsStatePath)) {
                             try {
                                 const shortsState = JSON.parse(fs.readFileSync(shortsStatePath, 'utf-8'));
-                                shortsState.scripts = shortsState.scripts.map((s: any) => 
-                                    s.id === result.data!.scriptId 
+                                shortsState.scripts = shortsState.scripts.map((s: any) =>
+                                    s.id === result.data!.scriptId
                                         ? { ...s, ...result.data!.updates }
                                         : s
                                 );
@@ -550,7 +551,7 @@ io.on('connection', (socket) => {
                             }
                         }
                     }
-                    
+
                     // 5. 推送更新到所有客户端
                     io.emit('expert-data-update', {
                         expertId,
@@ -569,19 +570,19 @@ io.on('connection', (socket) => {
                 const confirmationMsg = {
                     id: `msg_${Date.now()}`,
                     role: 'assistant' as const,
-                    content: result.success 
-                        ? '✅ 修改已完成，请在左侧表格中查看更新结果。' 
+                    content: result.success
+                        ? '✅ 修改已完成，请在左侧表格中查看更新结果。'
                         : `❌ 修改失败: ${result.error}`,
                     timestamp: new Date().toISOString()
                 };
                 saveChatHistory(projectRoot, expertId, [...messages, confirmationMsg]);
-                
+
                 return;
             }
 
             // 普通对话模式
             const { formatted, warning } = formatMultimodalMessages(messages, provider);
-            
+
             if (warning) {
                 socket.emit('chat-warning', { warning, expertId });
             }

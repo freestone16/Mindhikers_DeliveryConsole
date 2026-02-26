@@ -208,7 +208,7 @@ export interface VisualPlan {
 
 // --- Director Master V2 Types ---
 
-export type BRollType = 'remotion' | 'seedance' | 'artlist';
+export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist';
 
 export interface SceneOption {
     id: string;
@@ -219,6 +219,7 @@ export interface SceneOption {
     prompt?: string;
     quote?: string;
     imagePrompt?: string;
+    rationale?: string;
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
 }
@@ -468,7 +469,7 @@ export interface ExpertContextMap {
 // SD-207.1: Chat Panel 协作模式类型
 // ============================================================
 
-export type ModifyAction = 
+export type ModifyAction =
     | 'update_script_text'
     | 'update_cta'
     | 'update_hook'

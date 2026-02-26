@@ -103,7 +103,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     if (!comment.trim()) return;
     setIsGeneratingConcept(true);
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase2/revise', {
+      const res = await fetch('http://localhost:3002/api/director/phase1/revise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, userComment: comment })

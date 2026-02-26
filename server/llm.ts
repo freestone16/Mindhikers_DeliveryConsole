@@ -125,42 +125,10 @@ export async function callLLM(
   }
 }
 
+// System prompts are now dynamically generated via skill-loader.ts
+// keeping this export for backward compatibility if other modules reference it
 export const SYSTEM_PROMPTS = {
-  brollGenerator: `你是一个专业的视频分镜策划助手。根据给定的章节脚本内容，为该章节生成恰好3个B-Roll视觉方案。
-
-要求：
-- 必须生成恰好3个方案，全部为remotion类型
-- 每个方案必须包含：
-  1. name: 方案名称（如"粒子动画"、"数据图表"、"渐变背景"）
-  2. type: "remotion"（固定）
-  3. quote: 从原文中提取的1-2句话，作为此B-roll对应的原文定位
-  4. prompt: 详细的视觉描述，用于生成Remotion动画的简述方案，需说明具体动画效果、颜色、元素
-  5. imagePrompt: 用于生成缩略图的英文提示词，应该是一个简洁的静态画面描述，适合作为视频关键帧
-
-请以JSON数组格式输出，不要有其他内容。格式如下：
-[
-  {
-    "name": "粒子汇聚动画",
-    "type": "remotion",
-    "quote": "当AI可以用一句话生成大片的时候，真正被改变的不光是影视和相关行业",
-    "prompt": "蓝色粒子从画面四周向中心汇聚，逐渐形成文字标题，粒子有光晕效果",
-    "imagePrompt": "Futuristic data particles converging into text, blue glowing particles, dark background, cinematic lighting"
-  },
-  {
-    "name": "动态数据图表",
-    "type": "remotion", 
-    "quote": "内容领域将迎来史无前例的通货膨胀",
-    "prompt": "折线图从左到右动态生长，数据点有脉冲动画，背景为深色渐变",
-    "imagePrompt": "Dynamic line chart growing from left to right, data points with pulse effect, dark blue gradient background"
-  },
-  {
-    "name": "光效渐变背景",
-    "type": "remotion",
-    "quote": "真正被改变的是我们每个人和'意义'之间的关系",
-    "prompt": "柔和的蓝紫渐变背景，光晕缓慢移动，营造沉浸氛围",
-    "imagePrompt": "Soft purple gradient background with slowly moving light orbs, immersive atmosphere, minimalist"
-  }
-]`,
+  brollGenerator: '' // deprecated: use buildDirectorSystemPrompt('broll') instead
 };
 
 export interface BRollOption {
@@ -169,6 +137,93 @@ export interface BRollOption {
   quote: string;
   prompt: string;
   imagePrompt?: string;
+  rationale?: string;
+}
+
+export interface GlobalBRollProposal {
+  chapters: {
+    chapterId: string;
+    chapterName: string;
+    options: BRollOption[];
+  }[];
+}
+
+import { buildDirectorSystemPrompt } from './skill-loader';
+
+/**
+ * 全局 B-roll 规划生成器 (上帝视角)
+ * 一次性处理所有章节，实现智能分配与节奏控制
+ */
+export async function generateGlobalBRollPlan(
+  chapters: { id: string; name: string; text: string }[],
+  brollTypes: ('remotion' | 'generative' | 'artlist')[],
+  provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
+): Promise<GlobalBRollProposal> {
+  const systemPrompt = buildDirectorSystemPrompt('broll');
+
+  const userMessage = `请作为导演，为以下完整视频剧本进行全局 B-roll 视觉规划。
+你必须基于全局视角进行“排兵布阵”，决定哪些章节需要密集的视觉冲击（多几个方案），哪些章节适合保持克制。
+
+可用的 B-roll 类型：${brollTypes.join(', ')}
+
+剧本章节列表：
+${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n${ch.text}`).join('\n\n')}
+
+输出要求：
+1. 请输出一个 JSON 对象，结构如下：
+{
+  "chapters": [
+    {
+      "chapterId": "章节ID",
+      "chapterName": "章节名称",
+      "options": [
+        {
+          "name": "方案名",
+          "type": "类型",
+          "quote": "精准锚定章节中的1-2句原文（请确保引用文字完全匹配原文）",
+          "prompt": "具体的视觉描述",
+          "imagePrompt": "英文缩略图提示词",
+          "rationale": "选择该类型的业务理由"
+        }
+      ]
+    }
+  ]
+}
+2. 每一个章节必须至少有 1 个方案（即使是普通叙事），高潮章节建议 3-5 个方案。
+3. 严禁均分！请根据内容深度和情感起伏智能分配类型。
+4. 确保 quote 字段精准指向该章节内的具体行。
+`;
+
+  try {
+    const response = await callLLM(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      provider,
+      provider === 'deepseek' ? 'deepseek-chat' : undefined
+    );
+
+    let content = response.content.trim();
+    if (content.startsWith('```json')) {
+      content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+    } else if (content.startsWith('```')) {
+      content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
+    }
+
+    const parsed = JSON.parse(content);
+    return parsed as GlobalBRollProposal;
+  } catch (error) {
+    console.error('Global LLM generation failed:', error);
+    // Fallback logic
+    return {
+      chapters: chapters.map(ch => ({
+        chapterId: ch.id,
+        chapterName: ch.name,
+        options: generateFallbackOptions(brollTypes, ch.text)
+      }))
+    };
+  }
 }
 
 export async function generateBRollOptions(
@@ -178,24 +233,35 @@ export async function generateBRollOptions(
   provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
 ): Promise<BRollOption[]> {
   const options: BRollOption[] = [];
-  
+
+  // 使用 skill-loader 注入 Director 方法论
+  const systemPrompt = buildDirectorSystemPrompt('broll');
+
   const userMessage = `章节名称：${chapterName}
 章节内容：${scriptText}
 
-需要生成的类型：${brollTypes.join(', ')}
+可用的 B-roll 类型：${brollTypes.join(', ')}
 
-请为这个章节生成 B-Roll 视觉方案。`;
+请根据章节内容的特点，智能选择最合适的 B-roll 类型（不必平均分配），为这个章节生成 B-Roll 视觉方案。`;
 
   try {
     const response = await callLLM(
       [
-        { role: 'system', content: SYSTEM_PROMPTS.brollGenerator },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
       provider
     );
 
-    const parsed = JSON.parse(response.content);
+    // 清理 LLM 返回的 markdown code block wrapper
+    let content = response.content.trim();
+    if (content.startsWith('```json')) {
+      content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+    } else if (content.startsWith('```')) {
+      content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
+    }
+
+    const parsed = JSON.parse(content);
     if (Array.isArray(parsed)) {
       options.push(...parsed);
     }
@@ -204,22 +270,14 @@ export async function generateBRollOptions(
     return generateFallbackOptions(brollTypes, scriptText);
   }
 
-  const remotionOptions = options.filter(o => o.type === 'remotion');
-  if (remotionOptions.length < 3) {
-    const fallback = generateFallbackOptions(['remotion', 'remotion', 'remotion'], scriptText);
-    const existingNames = new Set(options.map(o => o.name));
-    for (const f of fallback) {
-      if (!existingNames.has(f.name)) {
-        options.push(f);
-      }
-      if (options.filter(o => o.type === 'remotion').length >= 3) break;
-    }
+  if (options.length < 1) {
+    return generateFallbackOptions(brollTypes, scriptText);
   }
 
   return options;
 }
 
-function generateFallbackOptions(
+export function generateFallbackOptions(
   types: ('remotion' | 'generative' | 'artlist')[],
   scriptText: string = ''
 ): BRollOption[] {
@@ -230,5 +288,7 @@ function generateFallbackOptions(
     quote,
     prompt: `为该章节内容生成相关的 ${type} 风格视觉素材`,
     imagePrompt: `Abstract ${type} visual background, dark theme, minimal`,
+    rationale: '兜底方案（LLM 生成失败）',
   }));
 }
+

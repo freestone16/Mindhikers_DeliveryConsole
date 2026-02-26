@@ -20,7 +20,7 @@ export const loadConfig = (): LLMConfig => {
   }
   const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
   const parsed = JSON.parse(content);
-  
+
   const merged = {
     ...DEFAULT_LLM_CONFIG,
     ...parsed,
@@ -28,7 +28,7 @@ export const loadConfig = (): LLMConfig => {
     global: parsed.global || DEFAULT_LLM_CONFIG.global,
     experts: parsed.experts || DEFAULT_LLM_CONFIG.experts,
   };
-  
+
   return LLMConfigSchema.parse(merged);
 };
 
@@ -44,7 +44,7 @@ const PROVIDER_ENV_MAP: Record<string, string[]> = {
   deepseek: ['DEEPSEEK_API_KEY'],
   zhipu: ['ZHIPU_API_KEY'],
   siliconflow: ['SILICONFLOW_API_KEY'],
-  volcengine: ['VOLCENGINE_ACCESS_KEY', 'VOLCENGINE_SECRET_KEY', 'VOLCENGINE_PROJECT_ID'],
+  volcengine: ['VOLCENGINE_ACCESS_KEY'],
 };
 
 const getDefaultModel = (provider: string): string => {
@@ -54,7 +54,7 @@ const getDefaultModel = (provider: string): string => {
 
 export const getConfigStatus = (req: Request, res: Response) => {
   const config = loadConfig();
-  
+
   const providers = Object.keys(PROVIDER_INFO).reduce((acc, provider) => {
     const info = PROVIDER_INFO[provider];
     const allConfigured = info.envVars.every(v => process.env[v]);
@@ -81,7 +81,7 @@ export const getConfigStatus = (req: Request, res: Response) => {
 
 export const saveApiKey = (req: Request, res: Response) => {
   const { provider, apiKey, apiKey2, projectId } = req.body;
-  
+
   if (!provider || !apiKey) {
     return res.status(400).json({ error: 'Missing provider or apiKey' });
   }
@@ -93,13 +93,13 @@ export const saveApiKey = (req: Request, res: Response) => {
 
   const envPath = path.join(process.cwd(), '.env');
   let envContent = '';
-  
+
   if (fs.existsSync(envPath)) {
     envContent = fs.readFileSync(envPath, 'utf-8');
   }
 
   const lines = envContent.split('\n');
-  
+
   const updateLine = (envVar: string, value: string) => {
     const existingIndex = lines.findIndex(l => l.startsWith(`${envVar}=`));
     if (existingIndex >= 0) {
@@ -109,7 +109,7 @@ export const saveApiKey = (req: Request, res: Response) => {
     }
     if (value) process.env[envVar] = value;
   };
-  
+
   updateLine(envVars[0], apiKey);
 
   fs.writeFileSync(envPath, lines.join('\n'));
@@ -149,7 +149,7 @@ export const updateConfig = (req: Request, res: Response) => {
 
 export const testConnection = async (req: Request, res: Response) => {
   const { provider } = req.body;
-  
+
   const info = PROVIDER_INFO[provider];
   if (!info) {
     return res.json({ success: false, error: 'Unknown provider' });
@@ -163,37 +163,54 @@ export const testConnection = async (req: Request, res: Response) => {
   }
 
   const start = Date.now();
-  
+
   try {
-    let url = info.baseUrl;
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env[envVars[0]]}`,
     };
-    
-    if (provider === 'volcengine') {
-      headers['Authorization'] = `Bearer ${process.env[envVars[0]]}`;
-    } else {
-      headers['Authorization'] = `Bearer ${process.env[envVars[0]]}`;
+
+    // 火山引擎 (generation provider) 不走 /chat/completions，走 /images/generations
+    if (info.type === 'generation') {
+      // 火山引擎方舟必须使用推理接入点 ID (endpoint ID)
+      const endpointId = process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
+      const response = await fetch(`${info.baseUrl}/images/generations`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: endpointId,
+          prompt: 'a simple blue circle on white background',
+          size: '256x256',
+          num_images: 1,
+        }),
+      });
+
+      const latency = Date.now() - start;
+
+      if (response.ok) {
+        res.json({ success: true, latency });
+      } else {
+        const error = await response.text();
+        res.json({ success: false, error: `API Error: ${error.slice(0, 200)}` });
+      }
+      return;
     }
-    
+
+    // LLM providers: use /chat/completions
     const body: Record<string, unknown> = {
       model: info.models[0],
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 5,
     };
-    
-    if (provider === 'volcengine' && envVars[2]) {
-      body['extra_body'] = { project_id: process.env[envVars[2]] };
-    }
 
-    const response = await fetch(`${url}/chat/completions`, {
+    const response = await fetch(`${info.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
     });
 
     const latency = Date.now() - start;
-    
+
     if (response.ok) {
       res.json({ success: true, latency });
     } else {
@@ -208,7 +225,7 @@ export const testConnection = async (req: Request, res: Response) => {
 export const getSavedKeys = (req: Request, res: Response) => {
   const envPath = path.join(process.cwd(), '.env');
   const savedKeys: Record<string, { last4: string; configured: boolean }> = {};
-  
+
   for (const [provider, info] of Object.entries(PROVIDER_INFO)) {
     const envVars = info.envVars;
     const allConfigured = envVars.every(v => {
@@ -217,7 +234,7 @@ export const getSavedKeys = (req: Request, res: Response) => {
       const match = envContent.match(new RegExp(`${v}=(.+)`));
       return match && match[1] && match[1].trim();
     });
-    
+
     const firstEnvVar = envVars[0];
     if (fs.existsSync(envPath)) {
       const envContent = fs.readFileSync(envPath, 'utf-8');
@@ -234,6 +251,6 @@ export const getSavedKeys = (req: Request, res: Response) => {
       savedKeys[provider] = { last4: '', configured: false };
     }
   }
-  
+
   res.json(savedKeys);
 };
