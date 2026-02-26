@@ -173,7 +173,7 @@ export const testConnection = async (req: Request, res: Response) => {
     // 火山引擎 (generation provider) 不走 /chat/completions，走 /images/generations
     if (info.type === 'generation') {
       // 火山引擎方舟必须使用推理接入点 ID (endpoint ID)
-      const endpointId = process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
+      const endpointId = process.env['VOLCENGINE_ENDPOINT_ID_IMAGE'] || process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
       const response = await fetch(`${info.baseUrl}/images/generations`, {
         method: 'POST',
         headers,

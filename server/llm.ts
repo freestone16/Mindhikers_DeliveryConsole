@@ -108,9 +108,72 @@ async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'):
   };
 }
 
+async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshotai/Kimi-K2.5'): Promise<LLMResponse> {
+  const apiKey = process.env.SILICONFLOW_API_KEY;
+  if (!apiKey) {
+    throw new Error('SILICONFLOW_API_KEY not configured');
+  }
+
+  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`SiliconFlow API error: ${error}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data.choices[0].message.content,
+    usage: data.usage,
+  };
+}
+
+async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): Promise<LLMResponse> {
+  const apiKey = process.env.KIMI_API_KEY;
+  if (!apiKey) {
+    throw new Error('KIMI_API_KEY not configured');
+  }
+
+  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 4096,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Kimi API error: ${error}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data.choices[0].message.content,
+    usage: data.usage,
+  };
+}
+
 export async function callLLM(
   messages: LLMMessage[],
-  provider: 'zhipu' | 'openai' | 'deepseek' | 'anthropic' = 'deepseek',
+  provider: 'zhipu' | 'openai' | 'deepseek' | 'anthropic' | 'siliconflow' | 'kimi' = 'deepseek',
   model?: string
 ): Promise<LLMResponse> {
   switch (provider) {
@@ -120,6 +183,10 @@ export async function callLLM(
       return callOpenAILLM(messages, model || 'gpt-4o');
     case 'deepseek':
       return callDeepSeekLLM(messages, model || 'deepseek-chat');
+    case 'siliconflow':
+      return callSiliconFlowLLM(messages, model || 'Pro/moonshotai/Kimi-K2.5');
+    case 'kimi':
+      return callKimiLLM(messages, model || 'moonshot-v1-128k');
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
@@ -157,7 +224,8 @@ import { buildDirectorSystemPrompt } from './skill-loader';
 export async function generateGlobalBRollPlan(
   chapters: { id: string; name: string; text: string }[],
   brollTypes: ('remotion' | 'generative' | 'artlist')[],
-  provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
+  provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'kimi' = 'deepseek',
+  model?: string
 ): Promise<GlobalBRollProposal> {
   const systemPrompt = buildDirectorSystemPrompt('broll');
 
@@ -200,21 +268,25 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      provider,
-      provider === 'deepseek' ? 'deepseek-chat' : undefined
+      provider as any,
+      model || (provider === 'deepseek' ? 'deepseek-chat' : undefined)
     );
 
     let content = response.content.trim();
-    if (content.startsWith('```json')) {
-      content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
-    } else if (content.startsWith('```')) {
-      content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
+    // 更鲁棒的 JSON 提取：找到第一个 { 和最后一个 }
+    const startIndex = content.indexOf('{');
+    const endIndex = content.lastIndexOf('}');
+
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      content = content.substring(startIndex, endIndex + 1);
+    } else {
+      throw new Error('未在模型输出中找到有效的 JSON 结构');
     }
 
     const parsed = JSON.parse(content);
     return parsed as GlobalBRollProposal;
-  } catch (error) {
-    console.error('Global LLM generation failed:', error);
+  } catch (error: any) {
+    console.error('[llm.ts] Global LLM generation failed:', error.message || error);
     // Fallback logic
     return {
       chapters: chapters.map(ch => ({
@@ -265,8 +337,8 @@ export async function generateBRollOptions(
     if (Array.isArray(parsed)) {
       options.push(...parsed);
     }
-  } catch (error) {
-    console.error('LLM generation failed, using fallback:', error);
+  } catch (error: any) {
+    console.error('[llm.ts] LLM generation failed, using fallback:', error.message || error);
     return generateFallbackOptions(brollTypes, scriptText);
   }
 

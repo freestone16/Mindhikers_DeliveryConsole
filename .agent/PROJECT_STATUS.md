@@ -6,10 +6,10 @@
 
 ## 📅 最新状态快照 (Latest Checkpoint)
 
-- **主线模块**: SD-202 (导演大师 Phase 2) - **🔧 预览故障排查**
-- **最新记录**: `docs/dev_logs/2026-02-26_SD202_DirectorPhase2_ErrorReport.md`
+- **主线模块**: SD-202 (导演大师 Phase 2) - **🔧 B-roll 视觉提取策略优化**
+- **最新记录**: `docs/dev_logs/2026-02-26_SD202_KimiBroll_Fix.md`
 - **当前 Git Branch**: `main`
-- **最新 Commit**: (即将提交) - fix(SD-202): 修复 Remotion 预览 projectId 透传问题，定位 DNS 故障
+- **最新 Commit**: (即将提交) - fix(SD-202): 还原导演系统提示词设计约束，恢复Kimi 2.5模型设定
 - **最后活动时间**: 2026-02-26
 
 ---
@@ -34,16 +34,13 @@
 
 ## 🚀 当前活跃目标 (Active Context)
 
-**SD-207.1 Chat Panel 协作模式开发中**，包含：
-- ✅ 意图识别 (parseIntent) - 识别修改脚本/CTA/钩子
-- ✅ 修改执行器 (executeModification) - LLM 生成修改内容
-- ✅ Socket 事件 - chat-confirmation, expert-data-update
-- ✅ 前端监听 - ShortsSection 高亮更新
+**SD-202 Director Phase 2 B-roll JSON 生成策略修复**
+- ✅ **模型回滚与指正**: 将 `test-director.ts` 的模型选型从 `moonshot-v1-128k` 修改为官方推荐最新基座 `kimi-k2.5`。
+- ✅ **反刻板印象剥离**: 重写 `server/skill-loader.ts` 中的系统提示词，强制要求极度微观的艺术调度，破除 `remotion` 等同于图表等机械映射。
+- ✅ **生成呈现结构重做**: 改进 `test-director.ts` 中的格式化函数，转为五列式对照 Markdown Table。
+- ❌ **阻塞问题 (Blocker)**: 终端层全局代理/DNS 受到污染断流 (`ENOTFOUND`)，导致 `npm` 及直连请求皆不通，本次的生成测试未能走完最终环境验证。
 
-**❌ 待修复问题：projectId 路径不一致**
-- 现象：前端显示 CSET-SP3，数据保存到 CSET-Seedance2
-- 原因：`server/shorts.ts` 的 `getProjectRoot()` 使用 `process.cwd()` 而非环境变量
-- 下一步：检查 `state.projectId` 值，统一 getProjectRoot 实现
+*附注: 遗留的 SD-207.1 Chat Panel 跨项目传参 Bug 仍在排期修复中。*
 
 ---
 

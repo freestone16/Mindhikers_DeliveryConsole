@@ -43,7 +43,7 @@ export async function renderStillWithApi(
         await renderStill({
             composition,
             outputLocation: outputPath,
-            bundleLocation,
+            serveUrl: bundleLocation,
             frame: 0,
             inputProps,
             imageFormat: 'png',

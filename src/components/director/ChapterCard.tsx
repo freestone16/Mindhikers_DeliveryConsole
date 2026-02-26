@@ -136,67 +136,67 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         </p>
       </div>
 
-      <div className="col-span-4">
-        <button
-          onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
-          disabled={chapter.isLocked}
-          className="w-full text-left"
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-24 h-16 bg-slate-700 rounded flex-shrink-0 overflow-hidden relative">
-              {thumbStatus === 'completed' && previewUrl ? (
-                <img src={previewUrl} alt="" className="w-full h-full object-cover" />
-              ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
-                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                  <span className="text-xs text-blue-400 mt-1">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
-                </div>
-              ) : thumbStatus === 'failed' ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-red-400 text-xs">失败</span>
-                </div>
-              ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/50">
-                  <span className="text-green-400 text-xs">🎬 实拍素材</span>
-                  <span className="text-slate-500 text-[10px] mt-0.5">无需预览</span>
-                </div>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleGenerateThumbnail();
-                  }}
-                  disabled={!option.imagePrompt}
-                  className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
-                >
-                  <Image className="w-5 h-5 text-slate-400" />
-                  <span className="text-xs text-slate-500 mt-1">生成预览</span>
-                </button>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type]}`}>
-                  {TYPE_LABELS[option.type] || option.type}
-                </span>
-                {isSelected && <Check className="w-4 h-4 text-blue-400" />}
-              </div>
-              <p className="text-white text-xs leading-relaxed">
-                {option.prompt || '暂无方案描述'}
-              </p>
-              {(option as any).rationale && (
-                <p className="text-slate-500 text-[10px] mt-1 italic">
-                  💡 {(option as any).rationale}
-                </p>
-              )}
-            </div>
-          </div>
-        </button>
+      {/* 方案描述/提示词 (col 3) */}
+      <div
+        className="col-span-3 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
+        onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type]}`}>
+            {TYPE_LABELS[option.type] || option.type}
+          </span>
+          {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+        </div>
+        <p className="text-white text-xs leading-relaxed">
+          {option.prompt || '暂无方案描述'}
+        </p>
+        {(option as any).rationale && (
+          <p className="text-slate-500 text-[10px] italic mt-1">
+            💡 {(option as any).rationale}
+          </p>
+        )}
       </div>
 
-      <div className="col-span-3 flex flex-col gap-2">
+      {/* 缩略图预览 (col 2) */}
+      <div className="col-span-2 flex items-center justify-center">
+        <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
+          {thumbStatus === 'completed' && previewUrl ? (
+            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+          ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
+              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <span className="text-[10px] text-blue-400 mt-2">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
+            </div>
+          ) : thumbStatus === 'failed' ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
+              <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">失败</span>
+              <button onClick={(e) => { e.stopPropagation(); handleGenerateThumbnail(); }} className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2">重试生成</button>
+            </div>
+          ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80">
+              <span className="text-green-400 text-xs font-medium mb-1">🎬 实拍素材</span>
+              <span className="text-slate-500 text-[10px]">无需预览</span>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGenerateThumbnail();
+              }}
+              disabled={!option.imagePrompt && !option.prompt}
+              className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
+            >
+              <Image className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors mb-2" />
+              <span className="text-[10px] text-slate-400 group-hover:text-slate-200 font-medium">生成预览</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 反馈 (col 2) */}
+      <div className="col-span-2 flex items-stretch">
         <textarea
-          className="flex-1 bg-slate-800/50 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+          className="flex-1 w-full bg-slate-800/50 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-colors resize-none"
           placeholder="反馈意见..."
           defaultValue={chapter.userComment || ''}
           onBlur={(e) => onComment(chapter.chapterId, e.target.value)}
@@ -235,10 +235,11 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }:
 
       <div className="p-3">
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
-          <div className="col-span-1 text-xs text-slate-500 font-bold">序号</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">原文</div>
-          <div className="col-span-4 text-xs text-slate-500 font-bold">Visual Option (图+文)</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">Feedback</div>
+          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">原文一句话</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
+          <div className="col-span-2 text-xs text-slate-500 font-bold text-center">缩略图预览</div>
+          <div className="col-span-2 text-xs text-slate-500 font-bold">反馈意见</div>
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
         </div>
 

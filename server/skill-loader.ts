@@ -71,9 +71,18 @@ export function loadMultipleSkills(skillNames: string[]): string {
  */
 export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revise'): string {
     const directorKnowledge = loadSkillKnowledge('RemotionStudio');
-    // 如果有独立的 Director skill，也加载它
-    const directorSkill = loadSkillKnowledge('Director');
-
+    let directorSkill = '';
+    const customPromptPath = path.join(process.cwd(), 'Prompts/director/director-20250226.md');
+    try {
+        if (fs.existsSync(customPromptPath)) {
+            directorSkill = fs.readFileSync(customPromptPath, 'utf-8');
+            console.log(`[SkillLoader] ✅ Loaded original director prompt from ${customPromptPath}`);
+        } else {
+            directorSkill = loadSkillKnowledge('Director');
+        }
+    } catch (err) {
+        console.warn('Failed to load custom director prompt', err);
+    }
     const baseContext = directorSkill || directorKnowledge;
 
     const taskPrompts: Record<string, string> = {
@@ -93,28 +102,34 @@ ${baseContext}
 
 直接输出提案内容，不要有多余说明。`,
 
-        broll: `你是 MindHikers 的首席影视导演大师。你掌握以下专业方法论：
+        broll: `\${baseContext}
 
-${baseContext}
+================================
 
-你的任务是：根据章节脚本内容和用户选择的 B-roll 素材类型，为每个章节智能分配最合适的 B-roll 方案。
+【系统级数据绑定要求】
+前面是你的导演大师本命人设和工作流。对于本次任务，你必须输出能够被底层框架拦截解析的 JSON 数组结构。
+你无需像往常一样在聊天窗口中回答，而是**只吐出一个完全符合以下规范的 JSON 对象**：
 
-分配策略：
-- 数据密集型内容 → 优先 remotion（程序化数据可视化动画）
-- 情感叙事/人文关怀 → 优先 artlist（实拍空镜头）
-- 抽象概念/未来想象 → 优先 seedance（AI 生成意象）
-- 同一视频中应避免连续多章使用同一类型，形成视觉节奏变化
-- 每章的方案数量不必平均分配，应根据章节内容密度灵活调整
+{
+  "chapters": [
+     {
+        "chapterId": "章节ID(如 ch1)",
+        "chapterName": "章节名称",
+        "options": [
+           {
+              "name": "方案名称（体现你的电影工业质感命名）",
+              "type": "remotion 或是 seedance 或是 artlist",
+              "quote": "精确提取触发该视觉的一段原文，一字不差",
+              "prompt": "具体的视觉执行指令（如果使用artlist，必须符合上面的官方词库协议）",
+              "imagePrompt": "提炼给 AI 出图的极致核心英文 tag（仅限名词/形容词堆叠）",
+              "rationale": "用一句话解释为什么选择这类镜头、符合怎样的人设意图"
+           }
+        ]
+     }
+  ]
+}
 
-每个方案必须包含：
-1. name: 方案名称
-2. type: "remotion" | "seedance" | "artlist"
-3. quote: 从原文提取的1-2句定位引用
-4. prompt: 详细的视觉描述
-5. imagePrompt: 用于生成缩略图的英文提示词
-6. rationale: 一句话解释为什么选择这个类型（中文）
-
-请以 JSON 数组格式输出，不要有其他内容。`,
+严禁：不允许任何 Markdown (\`\`\`) 包裹，不要有多余的客套话或开头结尾，只返回花括号闭合的 JSON 对象本身！！！！`,
 
         revise: `你是 MindHikers 的首席影视导演大师。你掌握以下专业方法论：
 

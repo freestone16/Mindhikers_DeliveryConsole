@@ -38,7 +38,7 @@ export async function generateImageWithVolc(
   } = {}
 ): Promise<VolcImageResult> {
   const apiKey = getEnvVar('VOLCENGINE_ACCESS_KEY') || getEnvVar('VOLCENGINE_API_KEY');
-  const endpointId = getEnvVar('VOLCENGINE_ENDPOINT_ID');
+  const endpointId = getEnvVar('VOLCENGINE_ENDPOINT_ID_IMAGE') || getEnvVar('VOLCENGINE_ENDPOINT_ID');
 
   if (!apiKey) {
     return { error: 'VOLCENGINE_ACCESS_KEY not configured. Please save your API Key in LLM Config.' };

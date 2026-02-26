@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { generateBRollOptions, generateGlobalBRollPlan, generateFallbackOptions, BRollOption, callLLM } from './llm';
 import { generateImageWithVolc, pollVolcImageResult } from './volcengine';
+import { loadConfig } from './llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
 
 const getProjectRoot = (projectId: string): string => {
@@ -44,7 +45,7 @@ interface TaskRecord {
 
 const taskStorage = new Map<string, TaskRecord>();
 
-function parseMarkdownChapters(content: string): { title: string; text: string }[] {
+export function parseMarkdownChapters(content: string): { title: string; text: string }[] {
   const chapters: { title: string; text: string }[] = [];
   const lines = content.split('\n');
 
@@ -164,10 +165,13 @@ export const generatePhase1 = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('concept');
     console.log('[Phase1] Generating concept with Director skill knowledge...');
 
+    const config = loadConfig();
+    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
+
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `以下是视频脚本全文，请为其生成视觉概念提案：\n\n${scriptContent}` }
-    ], 'deepseek');
+    ], globalConfig.provider as any, globalConfig.model);
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
 
@@ -301,11 +305,38 @@ export const startPhase2 = async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({ type: 'progress', current: 0, total: totalSteps, message: '导演正在全局审片并划分视觉节奏...' })}\n\n`);
 
   try {
+    const config = loadConfig();
+    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
+
     // 上帝视角：一次性生成全局分配方案
     const globalPlan = await generateGlobalBRollPlan(
       parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
-      brollTypes as ('remotion' | 'generative' | 'artlist')[]
+      brollTypes as ('remotion' | 'generative' | 'artlist')[],
+      globalConfig.provider as any,
+      globalConfig.model
     );
+
+    // [新增] 将生成的方案落盘为 Markdown
+    const visualsDir = path.join(projectRoot, '04_Visuals');
+    ensureDir(visualsDir);
+    const mdOutputPath = path.join(visualsDir, `phase2_分段视觉执行方案_${projectId}.md`);
+
+    let mdContent = `# ${projectId} - 分段视觉执行方案 (Phase 2)\\n\\n`;
+    globalPlan.chapters?.forEach(ch => {
+      mdContent += `## ${ch.chapterName} (ID: ${ch.chapterId})\\n\\n`;
+      ch.options?.forEach((opt, idx) => {
+        mdContent += `### 方案 ${idx + 1}: [${opt.type}] ${opt.name}\\n`;
+        mdContent += `- **匹配原文**: "${opt.quote}"\\n`;
+        mdContent += `- **视觉描述**: ${opt.prompt}\\n`;
+        if (opt.imagePrompt) mdContent += `- **缩略图提示词**: ${opt.imagePrompt}\\n`;
+        if (opt.rationale) mdContent += `- **💡 导演意图**: *${opt.rationale}*\\n`;
+        mdContent += `\\n`;
+      });
+      mdContent += `---\\n\\n`;
+    });
+
+    fs.writeFileSync(mdOutputPath, mdContent, 'utf-8');
+    console.log(`[Phase2] Generated Markdown plan saved to: ${mdOutputPath}`);
 
     // 将全局方案分发回各个章节
     for (let i = 0; i < parsedChapters.length; i++) {
@@ -522,7 +553,11 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       fs.mkdirSync(outputDir, { recursive: true });
     }
     const outputPath = path.join(outputDir, outputFileName);
-    const inputProps = { text: textPrompt || prompt };
+    const inputProps = {
+      title: "Remotion 视觉预览",
+      subtitle: textPrompt || prompt,
+      layers: []
+    };
 
     (async () => {
       try {
