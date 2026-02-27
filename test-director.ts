@@ -100,23 +100,22 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\\
     }
     const mdOutputPath = path.join(visualsDir, `phase2_分段视觉执行方案_${PROJECT_ID}.md`);
 
-    let mdContent = `# ${PROJECT_ID} - 导演大师分段视觉执行方案 (Phase 2)\\n\\n`;
+    let mdContent = `# ${PROJECT_ID} - 导演大师分段视觉执行方案 (Phase 2)\n\n`;
     parsed.chapters?.forEach((ch: any) => {
-      mdContent += `## 📑 章节: ${ch.chapterName} (ID: ${ch.chapterId})\\n\\n`;
-      mdContent += `| 📌 匹配原文 (Quote) | 🎬 方案类型与名称 | 📝 视觉描述/微距调度 (Prompt) | 🖼️ 缩略图提词 (Image Prompt) | 💡 导演意图 |\\n`;
-      mdContent += `| :--- | :--- | :--- | :--- | :--- |\\n`;
+      mdContent += `## 📑 章节: ${ch.chapterName} (ID: ${ch.chapterId})\n\n`;
+      mdContent += `| 📌 匹配原文 (Quote) | 🎬 方案类型与名称 | 📝 视觉描述/微距调度 (Prompt) | 🖼️ 缩略图提词 (Image Prompt) | 💡 导演意图 |\n`;
+      mdContent += `| :--- | :--- | :--- | :--- | :--- |\n`;
 
       ch.options?.forEach((opt: any) => {
-        // Handle markdown table escaping for newlines/pipes
-        const sanitize = (str: string) => (str || '').replace(/\\n/g, '<br>').replace(/\\|/g, '、');
+        const sanitize = (str: string) => (str || '').replace(/\n/g, '<br>').replace(/\|/g, '、');
 
-        mdContent += `| **"${sanitize(opt.quote)}"** | **[${opt.type}]**<br>${sanitize(opt.name)} | ${sanitize(opt.prompt)} | *${sanitize(opt.imagePrompt)}* | ${sanitize(opt.rationale)} |\\n`;
+        mdContent += `| **"${sanitize(opt.quote)}"** | **[${opt.type}]**<br>${sanitize(opt.name)} | ${sanitize(opt.prompt)} | *${sanitize(opt.imagePrompt)}* | ${sanitize(opt.rationale)} |\n`;
       });
-      mdContent += `\\n---\\n\\n`;
+      mdContent += `\n---\n\n`;
     });
 
     fs.writeFileSync(mdOutputPath, mdContent, 'utf-8');
-    console.log(`\\n✅ Successfully saved director plan to ${mdOutputPath}`);
+    console.log(`\n✅ Successfully saved director plan to ${mdOutputPath}`);
 
   } catch (error: any) {
     console.error('❌ Failed:', error.message || error);

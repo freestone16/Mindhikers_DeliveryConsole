@@ -145,6 +145,10 @@ async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): 
     throw new Error('KIMI_API_KEY not configured');
   }
 
+  // Kimi K2.5 只允许 temperature = 1，旧版 moonshot 系列支持 0.7
+  const isKimiK25 = model.includes('kimi-k2') || model.includes('k2.5');
+  const temperature = isKimiK25 ? 1 : 0.7;
+
   const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -154,8 +158,8 @@ async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): 
     body: JSON.stringify({
       model,
       messages,
-      temperature: 0.7,
-      max_tokens: 4096,
+      temperature,
+      max_tokens: 16384,
     }),
   });
 

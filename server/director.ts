@@ -316,23 +316,22 @@ export const startPhase2 = async (req: Request, res: Response) => {
       globalConfig.model
     );
 
-    // [新增] 将生成的方案落盘为 Markdown
+    // [新增] 将生成的方案落盘为 Markdown (五列表格排版)
     const visualsDir = path.join(projectRoot, '04_Visuals');
     ensureDir(visualsDir);
     const mdOutputPath = path.join(visualsDir, `phase2_分段视觉执行方案_${projectId}.md`);
 
-    let mdContent = `# ${projectId} - 分段视觉执行方案 (Phase 2)\\n\\n`;
+    let mdContent = `# ${projectId} - 导演大师分段视觉执行方案 (Phase 2)\n\n`;
     globalPlan.chapters?.forEach(ch => {
-      mdContent += `## ${ch.chapterName} (ID: ${ch.chapterId})\\n\\n`;
-      ch.options?.forEach((opt, idx) => {
-        mdContent += `### 方案 ${idx + 1}: [${opt.type}] ${opt.name}\\n`;
-        mdContent += `- **匹配原文**: "${opt.quote}"\\n`;
-        mdContent += `- **视觉描述**: ${opt.prompt}\\n`;
-        if (opt.imagePrompt) mdContent += `- **缩略图提示词**: ${opt.imagePrompt}\\n`;
-        if (opt.rationale) mdContent += `- **💡 导演意图**: *${opt.rationale}*\\n`;
-        mdContent += `\\n`;
+      mdContent += `## 📑 章节: ${ch.chapterName} (ID: ${ch.chapterId})\n\n`;
+      mdContent += `| 📌 匹配原文 | 🎬 方案类型与名称 | 📝 视觉描述/微距调度 | 🖼️ 缩略图提词 | 💡 导演意图 |\n`;
+      mdContent += `| :--- | :--- | :--- | :--- | :--- |\n`;
+
+      ch.options?.forEach(opt => {
+        const sanitize = (str: string) => (str || '').replace(/\n/g, '<br>').replace(/\|/g, '、');
+        mdContent += `| **"${sanitize(opt.quote)}"** | **[${opt.type}]**<br>${sanitize(opt.name)} | ${sanitize(opt.prompt)} | *${sanitize(opt.imagePrompt || '')}* | ${sanitize(opt.rationale || '')} |\n`;
       });
-      mdContent += `---\\n\\n`;
+      mdContent += `\n---\n\n`;
     });
 
     fs.writeFileSync(mdOutputPath, mdContent, 'utf-8');
