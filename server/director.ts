@@ -518,21 +518,110 @@ import os from 'os';
 const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
   path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio');
 
-export const generateThumbnail = async (req: Request, res: Response) => {
-  const { prompt, type, textPrompt, optionId, chapterId } = req.body;
+interface RemotionLayer {
+  id: string;
+  type: 'text';
+  text: string;
+  x: number;
+  y: number;
+  animation: 'fade-in' | 'slide-up' | 'scale-in';
+  startFrame: number;
+  endFrame: number;
+  fontSize: number;
+  color: string;
+  zIndex?: number;
+}
 
-  if (!prompt || !optionId || !chapterId) {
-    return res.status(400).json({ error: 'Missing required fields' });
+interface RemotionInputProps {
+  title: string;
+  subtitle: string;
+  layers: RemotionLayer[];
+}
+
+const MAX_TEXT_LEN = 180;
+const truncate = (str: string, max: number): string => {
+  if (!str) return '';
+  const cleaned = str.replace(/\n/g, ' ').trim();
+  return cleaned.length > max ? cleaned.slice(0, max) + '...' : cleaned;
+};
+
+function buildRemotionPreview(option: {
+  name?: string;
+  prompt?: string;
+  imagePrompt?: string;
+  rationale?: string;
+}): RemotionInputProps {
+  const layers: RemotionLayer[] = [];
+
+  if (option.prompt) {
+    layers.push({
+      id: 'visual-desc',
+      type: 'text',
+      text: truncate(option.prompt, MAX_TEXT_LEN),
+      x: 100,
+      y: 350,
+      animation: 'fade-in',
+      startFrame: 10,
+      endFrame: 40,
+      fontSize: 32,
+      color: '#ffffff',
+      zIndex: 10,
+    });
   }
 
-  const taskKey = `${chapterId}-${optionId}`;
+  if (option.imagePrompt) {
+    layers.push({
+      id: 'image-prompt',
+      type: 'text',
+      text: truncate(option.imagePrompt, MAX_TEXT_LEN),
+      x: 100,
+      y: 650,
+      animation: 'slide-up',
+      startFrame: 25,
+      endFrame: 55,
+      fontSize: 18,
+      color: '#888888',
+      zIndex: 5,
+    });
+  }
 
-  if (type === 'remotion') {
-    // 1. Mark task as pending
+  if (option.rationale) {
+    layers.push({
+      id: 'rationale',
+      type: 'text',
+      text: `💡 ${truncate(option.rationale, 100)}`,
+      x: 100,
+      y: 900,
+      animation: 'fade-in',
+      startFrame: 40,
+      endFrame: 70,
+      fontSize: 20,
+      color: '#ffd700',
+      zIndex: 8,
+    });
+  }
+
+  return {
+    title: option.name || '视觉方案预览',
+    subtitle: option.rationale ? truncate(option.rationale, 80) : '',
+    layers,
+  };
+}
+
+export const generateThumbnail = async (req: Request, res: Response) => {
+  const { option, chapterId } = req.body;
+
+  if (!option || !option.id || !chapterId) {
+    return res.status(400).json({ error: 'Missing required fields: option or chapterId' });
+  }
+
+  const taskKey = `${chapterId}-${option.id}`;
+
+  if (option.type === 'remotion') {
     thumbnailTasks.set(taskKey, {
       taskId: `remotion-${Date.now()}`,
       type: 'remotion',
-      status: 'processing', // We can skip pending and go straight to processing
+      status: 'processing',
       createdAt: new Date().toISOString()
     });
 
@@ -543,7 +632,6 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       status: 'processing'
     });
 
-    // 2. Direct API Render in background
     const outputFileName = `thumb_${taskKey}.png`;
     const projectId = req.body.projectId || process.env.PROJECT_NAME || 'CSET-SP3';
     const projectRoot = getProjectRoot(projectId);
@@ -552,11 +640,8 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       fs.mkdirSync(outputDir, { recursive: true });
     }
     const outputPath = path.join(outputDir, outputFileName);
-    const inputProps = {
-      title: "Remotion 视觉预览",
-      subtitle: textPrompt || prompt,
-      layers: []
-    };
+
+    const inputProps = buildRemotionPreview(option);
 
     (async () => {
       try {
@@ -584,8 +669,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     return;
   }
 
-  // Generative type: use Volcengine as per user's requirement
-  if (type === 'generative' || type === 'seedance') {
+  if (option.type === 'generative' || option.type === 'seedance') {
     try {
       thumbnailTasks.set(taskKey, {
         taskId: `volc-${Date.now()}`,
@@ -601,10 +685,9 @@ export const generateThumbnail = async (req: Request, res: Response) => {
         status: 'processing'
       });
 
-      // Call Volcengine image generation in background
       (async () => {
         try {
-          const result = await generateImageWithVolc(prompt);
+          const result = await generateImageWithVolc(option.imagePrompt || option.prompt || '');
           const task = thumbnailTasks.get(taskKey);
           if (task) {
             if (result.image_url) {
@@ -612,11 +695,8 @@ export const generateThumbnail = async (req: Request, res: Response) => {
               task.imageUrl = result.image_url;
               console.log(`[Volcengine Thumbnail] Success: ${taskKey}`);
             } else if (result.task_id) {
-              // Poll for result if it's an async task
               task.taskId = result.task_id;
               task.status = 'pending';
-              // Note: The frontend usually polls getThumbnailStatus, 
-              // but we can also poll internally to update the cache
             } else {
               task.status = 'failed';
               task.error = result.error || 'Unknown Volcengine error';
@@ -638,16 +718,14 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     }
   }
 
-  // Fallback to Volcengine
   try {
-    const result = await generateImageWithVolc(prompt);
+    const result = await generateImageWithVolc(option.imagePrompt || option.prompt || '');
 
     if (result.error) {
       return res.status(500).json({ error: result.error });
     }
 
     if (result.task_id) {
-      const taskKey = `${chapterId}-${optionId}`;
       thumbnailTasks.set(taskKey, {
         taskId: result.task_id,
         type: 'volcengine',
@@ -664,7 +742,6 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     }
 
     if (result.image_url) {
-      const taskKey = `${chapterId}-${optionId}`;
       thumbnailTasks.set(taskKey, {
         taskId: '',
         type: 'volcengine',

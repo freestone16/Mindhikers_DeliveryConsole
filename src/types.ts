@@ -213,6 +213,7 @@ export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist';
 export interface SceneOption {
     id: string;
     type: BRollType;
+    name?: string;
     previewUrl?: string;
     template?: string;
     props?: Record<string, unknown>;

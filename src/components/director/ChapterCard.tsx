@@ -61,7 +61,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
   }, [option.previewUrl]);
 
   const handleGenerateThumbnail = async () => {
-    if (!option.imagePrompt) return;
+    if (!option.imagePrompt && !option.prompt) return;
 
     setThumbStatus('generating');
 
@@ -70,10 +70,14 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: option.imagePrompt,
-          type: option.type,
-          textPrompt: option.prompt, // Pass the Remotion text component description as well
-          optionId: option.id,
+          option: {
+            id: option.id,
+            type: option.type,
+            name: option.name,
+            prompt: option.prompt,
+            imagePrompt: option.imagePrompt,
+            rationale: option.rationale,
+          },
           chapterId: chapter.chapterId,
           projectId: projectId
         })
