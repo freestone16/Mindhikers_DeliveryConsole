@@ -769,7 +769,7 @@ export const getThumbnailStatus = async (req: Request, res: Response) => {
 
   const task = thumbnailTasks.get(taskKey);
   if (!task) {
-    return res.status(404).json({ error: 'Task not found' });
+    return res.json({ status: 'failed', error: 'Task not found or expired. Please regenerate.' });
   }
 
   if (task.status === 'completed') {
@@ -780,36 +780,5 @@ export const getThumbnailStatus = async (req: Request, res: Response) => {
     return res.json({ status: 'failed', error: task.error });
   }
 
-  if (task.type === 'remotion') {
-    // For remotion, status is updated by the spawn process callbacks in generateThumbnail
-    return res.json({ status: task.status });
-  }
-
-  // Volcengine Polling Logic
-  if (task.taskId) {
-    try {
-      const result = await pollVolcImageResult(task.taskId);
-
-      if (result.image_url) {
-        task.status = 'completed';
-        task.imageUrl = result.image_url;
-        return res.json({ status: 'completed', imageUrl: result.image_url });
-      }
-
-      if (result.error) {
-        task.status = 'failed';
-        task.error = result.error;
-        return res.json({ status: 'failed', error: result.error });
-      }
-
-      task.status = 'processing';
-      return res.json({ status: 'processing' });
-    } catch (error: any) {
-      task.status = 'failed';
-      task.error = error.message;
-      return res.json({ status: 'failed', error: error.message });
-    }
-  }
-
-  res.json({ status: task.status });
+  return res.json({ status: task.status });
 };
