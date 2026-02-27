@@ -1,57 +1,68 @@
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import { spawn } from 'child_process';
 
 const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
     path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio');
 
-/**
- * 直接调用 Remotion Node API 进行渲染，绕过 npx CLI 的端口绑定限制 (EPERM)
- */
 export async function renderStillWithApi(
     compositionId: string,
     outputPath: string,
     inputProps: any
-) {
-    try {
-        // 动态加载 Remotion 渲染器 (从 Studio 目录的 node_modules 中读取)
-        const rendererPath = path.join(REMOTION_STUDIO_DIR, 'node_modules/@remotion/renderer');
-        const bundlerPath = path.join(REMOTION_STUDIO_DIR, 'node_modules/@remotion/bundler');
+): Promise<{ success: boolean; outputPath: string; size?: number }> {
+    const tmpPropsPath = `/tmp/remotion-props-${Date.now()}.json`;
+    fs.writeFileSync(tmpPropsPath, JSON.stringify(inputProps), 'utf-8');
 
-        if (!fs.existsSync(rendererPath) || !fs.existsSync(bundlerPath)) {
-            throw new Error('Remotion dependencies not found in Studio directory');
-        }
+    return new Promise((resolve, reject) => {
+        const args = [
+            'remotion', 'still',
+            'src/index.tsx',
+            compositionId,
+            outputPath,
+            '--frame=0',
+            `--props-file=${tmpPropsPath}`
+        ];
 
-        // 动态 require
-        const { renderStill, getCompositions } = require(rendererPath);
-        const { bundle } = require(bundlerPath);
-
-        console.log(`[Remotion API] Bundling ${REMOTION_STUDIO_DIR}...`);
-        const bundleLocation = await bundle({
-            entryPoint: path.join(REMOTION_STUDIO_DIR, 'src/index.tsx'),
+        console.log(`[Remotion CLI] Running in ${REMOTION_STUDIO_DIR}`);
+        
+        const proc = spawn('npx', args, {
+            cwd: REMOTION_STUDIO_DIR,
+            shell: true,
+            env: { ...process.env, NODE_ENV: 'production' }
         });
 
-        console.log(`[Remotion API] Fetching compositions...`);
-        const comps = await getCompositions(bundleLocation, { inputProps });
-        const composition = comps.find((c: any) => c.id === compositionId);
+        let stderr = '';
 
-        if (!composition) {
-            throw new Error(`Composition ${compositionId} not found`);
-        }
-
-        console.log(`[Remotion API] Rendering still to ${outputPath}...`);
-        await renderStill({
-            composition,
-            outputLocation: outputPath,
-            serveUrl: bundleLocation,
-            frame: 0,
-            inputProps,
-            imageFormat: 'png',
+        proc.stdout.on('data', (data) => {
+            console.log(`[Remotion] ${data.toString().trim()}`);
         });
 
-        return { success: true, outputPath };
-    } catch (error: any) {
-        console.error('[Remotion API Error]', error);
-        throw error;
-    }
+        proc.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+
+        proc.on('close', (code) => {
+            fs.unlinkSync(tmpPropsPath);
+
+            if (code !== 0) {
+                reject(new Error(`Remotion exited with code ${code}: ${stderr}`));
+                return;
+            }
+
+            if (!fs.existsSync(outputPath)) {
+                reject(new Error(`Render completed but file not found`));
+                return;
+            }
+
+            const stats = fs.statSync(outputPath);
+            console.log(`[Remotion CLI] Success: ${outputPath} (${stats.size} bytes)`);
+            resolve({ success: true, outputPath, size: stats.size });
+        });
+
+        proc.on('error', (err) => {
+            fs.unlinkSync(tmpPropsPath);
+            reject(new Error(`Failed to spawn: ${err.message}`));
+        });
+    });
 }
