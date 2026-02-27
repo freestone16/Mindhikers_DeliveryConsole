@@ -63,6 +63,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
   const handleGenerateThumbnail = async () => {
     if (!option.imagePrompt && !option.prompt) return;
 
+    console.log('[Thumbnail] Starting generation for:', option.id, option.type);
     setThumbStatus('generating');
 
     try {
@@ -84,13 +85,17 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
       });
 
       const data = await res.json();
+      console.log('[Thumbnail] Response:', { success: data.success, hasImageUrl: !!data.imageUrl, hasTaskId: !!data.taskId, status: data.status });
 
-      if (data.success && data.taskId) {
-        pollThumbnail(taskKey);
-      } else if (data.success && data.imageUrl) {
+      if (data.success && data.imageUrl) {
+        // 同步直出 (Remotion)
         setPreviewUrl(data.imageUrl);
         setThumbStatus('completed');
+      } else if (data.success && data.taskId) {
+        // 异步轮询 (Volcengine)
+        pollThumbnail(taskKey);
       } else {
+        console.error('[Thumbnail] Failed:', data.error || data);
         setThumbStatus('failed');
       }
     } catch (error) {
@@ -140,9 +145,9 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         </p>
       </div>
 
-      {/* 方案描述/提示词 (col 3) */}
+      {/* 方案描述/提示词 (col 2) */}
       <div
-        className="col-span-3 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
+        className="col-span-2 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
         onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
       >
         <div className="flex items-center gap-2 mb-1">
@@ -161,8 +166,8 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         )}
       </div>
 
-      {/* 缩略图预览 (col 2) */}
-      <div className="col-span-2 flex items-center justify-center">
+      {/* 缩略图预览 (col 3 = 150%) */}
+      <div className="col-span-3 flex items-center justify-center">
         <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
           {thumbStatus === 'completed' && previewUrl ? (
             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -241,8 +246,8 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }:
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
           <div className="col-span-3 text-xs text-slate-500 font-bold">原文一句话</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
-          <div className="col-span-2 text-xs text-slate-500 font-bold text-center">缩略图预览</div>
+          <div className="col-span-2 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold text-center">缩略图预览</div>
           <div className="col-span-2 text-xs text-slate-500 font-bold">反馈意见</div>
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
         </div>

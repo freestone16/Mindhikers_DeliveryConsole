@@ -538,7 +538,7 @@ interface RemotionInputProps {
   layers: RemotionLayer[];
 }
 
-const MAX_TEXT_LEN = 180;
+const MAX_TEXT_LEN = 40;
 const truncate = (str: string, max: number): string => {
   if (!str) return '';
   const cleaned = str.replace(/\n/g, ' ').trim();
@@ -559,11 +559,11 @@ function buildRemotionPreview(option: {
       type: 'text',
       text: truncate(option.prompt, MAX_TEXT_LEN),
       x: 100,
-      y: 350,
+      y: 260,
       animation: 'fade-in',
       startFrame: 10,
       endFrame: 40,
-      fontSize: 32,
+      fontSize: 48,
       color: '#ffffff',
       zIndex: 10,
     });
@@ -575,12 +575,12 @@ function buildRemotionPreview(option: {
       type: 'text',
       text: truncate(option.imagePrompt, MAX_TEXT_LEN),
       x: 100,
-      y: 650,
+      y: 560,
       animation: 'slide-up',
       startFrame: 25,
       endFrame: 55,
-      fontSize: 18,
-      color: '#888888',
+      fontSize: 28,
+      color: '#aaaaaa',
       zIndex: 5,
     });
   }
@@ -589,13 +589,13 @@ function buildRemotionPreview(option: {
     layers.push({
       id: 'rationale',
       type: 'text',
-      text: `💡 ${truncate(option.rationale, 100)}`,
+      text: `💡 ${truncate(option.rationale, 35)}`,
       x: 100,
-      y: 900,
+      y: 780,
       animation: 'fade-in',
       startFrame: 40,
       endFrame: 70,
-      fontSize: 20,
+      fontSize: 32,
       color: '#ffd700',
       zIndex: 8,
     });
@@ -603,7 +603,7 @@ function buildRemotionPreview(option: {
 
   return {
     title: option.name || '视觉方案预览',
-    subtitle: option.rationale ? truncate(option.rationale, 80) : '',
+    subtitle: option.rationale ? truncate(option.rationale, 50) : '',
     layers,
   };
 }
@@ -618,20 +618,6 @@ export const generateThumbnail = async (req: Request, res: Response) => {
   const taskKey = `${chapterId}-${option.id}`;
 
   if (option.type === 'remotion') {
-    thumbnailTasks.set(taskKey, {
-      taskId: `remotion-${Date.now()}`,
-      type: 'remotion',
-      status: 'processing',
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({
-      success: true,
-      taskId: thumbnailTasks.get(taskKey)!.taskId,
-      taskKey,
-      status: 'processing'
-    });
-
     const outputFileName = `thumb_${taskKey}.png`;
     const projectId = req.body.projectId || process.env.PROJECT_NAME || 'CSET-SP3';
     const projectRoot = getProjectRoot(projectId);
@@ -643,30 +629,24 @@ export const generateThumbnail = async (req: Request, res: Response) => {
 
     const inputProps = buildRemotionPreview(option);
 
-    (async () => {
-      try {
-        const { renderStillWithApi } = require('./remotion-api-renderer');
-        await renderStillWithApi('SceneComposer', outputPath, inputProps);
+    try {
+      console.log(`[Remotion Thumbnail] Starting sync render: ${taskKey}`);
+      const { renderStillWithApi } = require('./remotion-api-renderer');
+      await renderStillWithApi('SceneComposer', outputPath, inputProps);
 
-        const task = thumbnailTasks.get(taskKey);
-        if (task && fs.existsSync(outputPath)) {
-          const imageBuffer = fs.readFileSync(outputPath);
-          const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
-          task.status = 'completed';
-          task.imageUrl = base64Image;
-          console.log(`[Remotion API Thumbnail] Success: ${taskKey}`);
-        }
-      } catch (err: any) {
-        console.error(`[Remotion API Thumbnail Error] ${err.message}`);
-        const task = thumbnailTasks.get(taskKey);
-        if (task) {
-          task.status = 'failed';
-          task.error = err.message;
-        }
+      if (fs.existsSync(outputPath)) {
+        const imageBuffer = fs.readFileSync(outputPath);
+        const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+        console.log(`[Remotion Thumbnail] Success: ${taskKey} (${(imageBuffer.length / 1024).toFixed(1)}KB)`);
+        return res.json({ success: true, imageUrl: base64Image, status: 'completed' });
+      } else {
+        console.error(`[Remotion Thumbnail] File not found after render: ${outputPath}`);
+        return res.status(500).json({ success: false, error: 'Render completed but file not found' });
       }
-    })();
-
-    return;
+    } catch (err: any) {
+      console.error(`[Remotion Thumbnail Error] ${err.message}`);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
 
   if (option.type === 'generative' || option.type === 'seedance') {

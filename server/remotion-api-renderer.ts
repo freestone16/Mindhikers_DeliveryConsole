@@ -15,18 +15,19 @@ export async function renderStillWithApi(
     fs.writeFileSync(tmpPropsPath, JSON.stringify(inputProps), 'utf-8');
 
     return new Promise((resolve, reject) => {
+        const remotionBin = path.join(REMOTION_STUDIO_DIR, 'node_modules', '.bin', 'remotion');
         const args = [
-            'remotion', 'still',
+            'still',
             'src/index.tsx',
             compositionId,
             outputPath,
-            '--frame=0',
-            `--props-file=${tmpPropsPath}`
+            '--frame=75',
+            `--props=${tmpPropsPath}`
         ];
 
         console.log(`[Remotion CLI] Running in ${REMOTION_STUDIO_DIR}`);
-        
-        const proc = spawn('npx', args, {
+
+        const proc = spawn(remotionBin, args, {
             cwd: REMOTION_STUDIO_DIR,
             shell: true,
             env: { ...process.env, NODE_ENV: 'production' }
