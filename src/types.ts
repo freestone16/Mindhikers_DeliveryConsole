@@ -208,15 +208,15 @@ export interface VisualPlan {
 
 // --- Director Master V2 Types ---
 
-export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist';
+export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture';
 
 export interface SceneOption {
     id: string;
     type: BRollType;
+    template?: string;
+    props?: Record<string, any>;
     name?: string;
     previewUrl?: string;
-    template?: string;
-    props?: Record<string, unknown>;
     prompt?: string;
     quote?: string;
     imagePrompt?: string;

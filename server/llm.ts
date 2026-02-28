@@ -204,7 +204,9 @@ export const SYSTEM_PROMPTS = {
 
 export interface BRollOption {
   name: string;
-  type: 'remotion' | 'generative' | 'artlist';
+  type: 'remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture';
+  template?: string;
+  props?: Record<string, any>;
   quote: string;
   prompt: string;
   imagePrompt?: string;
@@ -227,13 +229,26 @@ import { buildDirectorSystemPrompt } from './skill-loader';
  */
 export async function generateGlobalBRollPlan(
   chapters: { id: string; name: string; text: string }[],
-  brollTypes: ('remotion' | 'generative' | 'artlist')[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
   provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'kimi' = 'deepseek',
   model?: string
 ): Promise<GlobalBRollProposal> {
+  return generateGlobalBRollPlanWithRetry(chapters, brollTypes, provider, model, 0);
+}
+
+const MAX_RETRIES = 2;
+
+async function generateGlobalBRollPlanWithRetry(
+  chapters: { id: string; name: string; text: string }[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+  provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'kimi' = 'deepseek',
+  model?: string,
+  retryCount: number = 0,
+  overrideUserMessage?: string
+): Promise<GlobalBRollProposal> {
   const systemPrompt = buildDirectorSystemPrompt('broll');
 
-  const userMessage = `请作为导演，为以下完整视频剧本进行全局 B-roll 视觉规划。
+  const userMessage = overrideUserMessage || `请作为导演，为以下完整视频剧本进行全局 B-roll 视觉规划。
 你必须基于全局视角进行“排兵布阵”，决定哪些章节需要密集的视觉冲击（多几个方案），哪些章节适合保持克制。
 
 可用的 B-roll 类型：${brollTypes.join(', ')}
@@ -252,6 +267,8 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
         {
           "name": "方案名",
           "type": "类型",
+          "template": "可选，取决于 type",
+          "props": "可选对象，取决于 template",
           "quote": "精准锚定章节中的1-2句原文（请确保引用文字完全匹配原文）",
           "prompt": "具体的视觉描述",
           "imagePrompt": "英文缩略图提示词",
@@ -288,9 +305,50 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
     }
 
     const parsed = JSON.parse(content);
+
+    // Schema Validator for Remotion options
+    const validationErrors: string[] = [];
+    if (parsed.chapters && Array.isArray(parsed.chapters)) {
+      parsed.chapters.forEach((ch: any) => {
+        if (ch.options && Array.isArray(ch.options)) {
+          ch.options.forEach((opt: any) => {
+            if (opt.type === 'remotion' && opt.template) {
+              if (opt.template === 'ConceptChain') {
+                if (!opt.props?.nodes || !Array.isArray(opt.props.nodes) || opt.props.nodes.length < 2) {
+                  validationErrors.push(`ConceptChain 模板需要 props.nodes 数组(至少2项)，当前选项【${opt.name}】不符合。`);
+                }
+              } else if (opt.template === 'DataChartQuadrant') {
+                if (!opt.props?.quadrants || !Array.isArray(opt.props.quadrants) || opt.props.quadrants.length !== 4) {
+                  validationErrors.push(`DataChartQuadrant 模板需要 props.quadrants 数组(严格4项)，当前选项【${opt.name}】不符合。`);
+                }
+              }
+            }
+          });
+        }
+      });
+    }
+
+    if (validationErrors.length > 0) {
+      console.warn(`[llm.ts] Schema validation failed: ${validationErrors.join(' | ')}`);
+      throw new Error(`VALIDATION_FAILED: ${validationErrors.join(' | ')}`);
+    }
+
     return parsed as GlobalBRollProposal;
   } catch (error: any) {
-    console.error('[llm.ts] Global LLM generation failed:', error.message || error);
+    const isValidationError = error.message?.startsWith('VALIDATION_FAILED:');
+    if (retryCount < MAX_RETRIES) {
+      console.log(`[llm.ts] Generation failed, retrying (${retryCount + 1}/${MAX_RETRIES}). Reason: ${error.message}`);
+
+      let retryPrompt = userMessage;
+      if (isValidationError) {
+        retryPrompt += `\n\n【注意！上次生成失败原因】\n你上次生成的数据结构有误，请修正：\n${error.message.replace('VALIDATION_FAILED: ', '')}`;
+      }
+
+      // Internal recursive retry wrapper
+      return generateGlobalBRollPlanWithRetry(chapters, brollTypes, provider, model, retryCount + 1, retryPrompt);
+    }
+
+    console.error('[llm.ts] Global LLM generation failed after retries:', error.message || error);
     // Fallback logic
     return {
       chapters: chapters.map(ch => ({
@@ -305,7 +363,7 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
 export async function generateBRollOptions(
   chapterName: string,
   scriptText: string,
-  brollTypes: ('remotion' | 'generative' | 'artlist')[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
   provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
 ): Promise<BRollOption[]> {
   const options: BRollOption[] = [];
@@ -354,12 +412,13 @@ export async function generateBRollOptions(
 }
 
 export function generateFallbackOptions(
-  types: ('remotion' | 'generative' | 'artlist')[],
+  types: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
   scriptText: string = ''
 ): BRollOption[] {
   const quote = scriptText.split(/[。！？\n]/).filter(s => s.trim()).slice(0, 2).join('。') || '原文引用';
+  const typeLabels: Record<string, string> = { remotion: '数据可视化', generative: '概念意象', artlist: '空镜', 'internet-clip': '互联网素材', 'user-capture': '截图录屏' };
   return types.map((type, index) => ({
-    name: `${type === 'remotion' ? '数据可视化' : type === 'generative' ? '概念意象' : '空镜'}-方案${index + 1}`,
+    name: `${typeLabels[type] || type}-方案${index + 1}`,
     type,
     quote,
     prompt: `为该章节内容生成相关的 ${type} 风格视觉素材`,

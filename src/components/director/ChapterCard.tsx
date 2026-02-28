@@ -15,6 +15,8 @@ const TYPE_COLORS: Record<string, string> = {
   seedance: 'bg-purple-500/20 text-purple-300',
   generative: 'bg-purple-500/20 text-purple-300',
   artlist: 'bg-green-500/20 text-green-300',
+  'internet-clip': 'bg-orange-500/20 text-orange-300',
+  'user-capture': 'bg-cyan-500/20 text-cyan-300',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -22,9 +24,11 @@ const TYPE_LABELS: Record<string, string> = {
   seedance: '文生视频',
   generative: 'AI生成',
   artlist: 'Artlist实拍',
+  'internet-clip': '🌐 互联网素材',
+  'user-capture': '📸 用户截图/录屏',
 };
 
-// Artlist 不需要 AI 预览，只需展示关键词搜索方向
+// Artlist 和互联网/用户截图不需要 AI 预览
 const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance'];
 
 function getScriptPreview(text: string): string {
@@ -74,6 +78,8 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
           option: {
             id: option.id,
             type: option.type,
+            template: option.template,
+            props: option.props,
             name: option.name,
             prompt: option.prompt,
             imagePrompt: option.imagePrompt,
@@ -183,8 +189,10 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
             </div>
           ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80">
-              <span className="text-green-400 text-xs font-medium mb-1">🎬 实拍素材</span>
-              <span className="text-slate-500 text-[10px]">无需预览</span>
+              <span className={`text-xs font-medium mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'user-capture' ? 'text-cyan-400' : 'text-green-400'}`}>
+                {option.type === 'internet-clip' ? '🌐 互联网素材建议' : option.type === 'user-capture' ? '📸 截图/录屏建议' : '🎬 实拍素材'}
+              </span>
+              <span className="text-slate-500 text-[10px]">用户自行采集</span>
             </div>
           ) : (
             <button

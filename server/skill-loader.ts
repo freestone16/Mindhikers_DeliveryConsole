@@ -119,8 +119,10 @@ ${baseContext}
            {
               "name": "方案名称（体现你的电影工业质感命名）",
               "type": "remotion 或是 seedance 或是 artlist",
+              "template": "如果 type 是 remotion，必须从以下模板中选择一个填入",
+              "props": "如果 type 是 remotion，必须根据选定的 template 填入对应的 JSON 数据参数",
               "quote": "精确提取触发该视觉的一段原文，一字不差",
-              "prompt": "具体的视觉执行指令（如果使用artlist，必须符合上面的官方词库协议）",
+              "prompt": "具体的视觉描述（如果使用artlist，必须符合上面的官方词库协议）",
               "imagePrompt": "提炼给 AI 出图的极致核心英文 tag（仅限名词/形容词堆叠）",
               "rationale": "用一句话解释为什么选择这类镜头、符合怎样的人设意图"
            }
@@ -128,6 +130,27 @@ ${baseContext}
      }
   ]
 }
+
+【Remotion 模板菜单指南】
+当你的方案类型是 "remotion" 时，请从以下菜单中分配最合适的模板：
+1. **ConceptChain**：适用于需要展示“A→B→C”这种递进关系或因果链条的认知模型。
+   所需 props：\`{ "title": "大标题", "subtitle": "副标题", "conclusion": "一句金句总结", "nodes": [{"id":"xxx", "label":"节点名", "desc":"短描述", "icon":"Emoji图标", "color":"#hex色值"}] }\` (至少2个，最多5个 node)。
+2. **DataChartQuadrant**：适用于二元对比、象限图、分布图分析。
+   所需 props：\`{ "title": "大标题", "xAxisLabel": "右箭头X轴名", "yAxisLabel": "上箭头Y轴名", "quadrants": [{"id":"xxx", "label":"象限名", "subLabel":"副名", "x":1或0, "y":1或0, "emoji":"Emoji", "color":"#hex色值"}] }\` (必须4个 quadrant)。
+3. **CinematicZoom**：适用于单张大图的氛围感电影级缓慢拉伸镜头。
+   所需 props：\`{ "imagePrompt": "你想要的画面英文提示词", "bgStyle": "black", "zoomStart": 1, "zoomEnd": 1.1 }\`
+4. **SceneComposer**：万能排版工具。当你觉得上述模板都不适合，仅需要使用深色背景+文字大字报时使用。
+   所需 props：空对象 \`{}\` 即可。
+
+【各 B-roll 类型适用场景指南】
+作为导演大师，你应该根据内容本身的最佳视觉方案来自由选择最合适的 type，而非机械地均分。以下是各类型的核心适用场景：
+- **remotion**：适合信息图、认知模型、数据可视化、框架对比等需要图表/动画的内容。必须指定 template 和 props。
+- **seedance**：适合情绪叙事、人物特写、意境画面、比喻场景等需要 AI 生成实景视频的内容。
+- **artlist**：适合需要自然环境空镜、城市场景、通用氛围画面的内容，从实拍素材库检索。
+- **internet-clip**：适合内容中提及了真实存在的互联网素材（如某个游戏预告片、某次新闻事件、某个知名视频/截图）。你应该在 prompt 字段明确写出建议用户去哪里找什么素材，例如"建议在B站搜索'游科 黑神话悟空 实机演示'获取该片段"。
+- **user-capture**：适合需要展示真实软件界面、App 操作流程、网站截图、代码演示等内容。你应该在 prompt 字段明确告诉用户应该截哪个界面或录哪段操作。
+
+注意：internet-clip 和 user-capture 类型是"建议"性质的，用户可以采纳也可以跳过。你的职责是给出最专业、最贴近实际的建议。
 
 严禁：不允许任何 Markdown (\`\`\`) 包裹，不要有多余的客套话或开头结尾，只返回花括号闭合的 JSON 对象本身！！！！`,
 

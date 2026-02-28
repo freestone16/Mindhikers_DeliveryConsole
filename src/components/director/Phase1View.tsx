@@ -72,21 +72,35 @@ export const Phase1View = ({
 }: Phase1ViewProps) => {
   const [feedback, setFeedback] = useState('');
 
-  const isConceptEmpty = !concept || concept.trim() === '' || concept.includes('等待导演大师的视觉概念提案');
+  // A concept is considered empty if it's null, empty string, or just the default placeholder text.
+  // It is NOT empty if it contains actual generated content (usually > 50 chars).
+  const isConceptEmpty = !concept || concept.trim() === '' ||
+    (concept.includes('等待导演大师的视觉概念提案') && concept.length < 100);
 
   if (isConceptEmpty && !isGenerating) {
+    if (!projectId || projectId === '' || !scriptPath || scriptPath === '') {
+      return (
+        <div className="bg-slate-900 rounded-xl border border-slate-700 p-12 text-center h-[200px] flex flex-col items-center justify-center">
+          <h3 className="text-xl font-bold text-slate-400">欢迎使用影视导演，请先在顶部面板选择项目和视频剧本。</h3>
+        </div>
+      );
+    }
+
+    // Safety check: if scriptPath is weirdly long, it might be a bug from old state
+    const displayPath = scriptPath.length > 100 ? "当前剧本" : scriptPath.split('/').pop();
+
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-700 p-8 text-center">
         <Sparkles className="w-12 h-12 text-blue-400 mx-auto mb-4" />
         <h3 className="text-lg font-bold text-white mb-2">Visual Concept Architect</h3>
         <p className="text-slate-400 text-sm mb-6">
-          Generate a visual concept proposal for project "{projectId}" using script: {scriptPath.split('/').pop()}
+          准备为当前剧本<strong className="text-blue-300">「{displayPath}」</strong>进行概念提案...
         </p>
         <button
           onClick={onGenerate}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
         >
-          Generate Concept
+          开始头脑风暴并生成概念提案
         </button>
       </div>
     );

@@ -547,10 +547,35 @@ const truncate = (str: string, max: number): string => {
 
 function buildRemotionPreview(option: {
   name?: string;
+  template?: string;
+  props?: Record<string, any>;
   prompt?: string;
   imagePrompt?: string;
   rationale?: string;
-}): RemotionInputProps {
+}): { compositionId: string; props: any } {
+  // 1. 如果有明确的 template 并且有 props，尝试直接返回（除了 CinematicZoom 特殊拦截）
+  if (option.template && option.template !== 'SceneComposer') {
+    if (option.template === 'CinematicZoom') {
+      // 特殊逻辑：CinematicZoom 需要 imageUrl，但我们还没有火山 API 出图
+      // 先用 logo 或 default 作为底图
+      return {
+        compositionId: 'CinematicZoom',
+        props: {
+          ...(option.props || {}),
+          imageUrl: 'http://localhost:3002/mindhikers-logo.png', // Fallback URL
+          bgStyle: option.props?.bgStyle || 'dark-gradient'
+        }
+      };
+    }
+
+    // ConceptChain / DataChartQuadrant / 其他
+    return {
+      compositionId: option.template,
+      props: option.props || {}
+    };
+  }
+
+  // 2. 兜底降级：转换为文字大字报 SceneComposer
   const layers: RemotionLayer[] = [];
 
   if (option.prompt) {
@@ -602,9 +627,12 @@ function buildRemotionPreview(option: {
   }
 
   return {
-    title: option.name || '视觉方案预览',
-    subtitle: option.rationale ? truncate(option.rationale, 50) : '',
-    layers,
+    compositionId: 'SceneComposer',
+    props: {
+      title: option.name || '视觉方案预览',
+      subtitle: option.rationale ? truncate(option.rationale, 50) : '',
+      layers,
+    }
   };
 }
 
@@ -627,12 +655,12 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     }
     const outputPath = path.join(outputDir, outputFileName);
 
-    const inputProps = buildRemotionPreview(option);
+    const { compositionId, props } = buildRemotionPreview(option);
 
     try {
-      console.log(`[Remotion Thumbnail] Starting sync render: ${taskKey}`);
+      console.log(`[Remotion Thumbnail] Starting sync render: ${taskKey} with template ${compositionId}`);
       const { renderStillWithApi } = require('./remotion-api-renderer');
-      await renderStillWithApi('SceneComposer', outputPath, inputProps);
+      await renderStillWithApi(compositionId, outputPath, props);
 
       if (fs.existsSync(outputPath)) {
         const imageBuffer = fs.readFileSync(outputPath);

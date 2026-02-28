@@ -10,7 +10,7 @@ import { PublishComposer } from './components/PublishComposer';
 import { DistributionQueue } from './components/DistributionQueue';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggleButton } from './components/ChatToggleButton';
-import { useDeliveryStore } from './hooks/useDeliveryStore';
+import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import { Loader2, Users, Send, Clock } from 'lucide-react';
 import { EXPERTS } from './config/experts';
 import type { ExpertStatus } from './types';
@@ -20,11 +20,23 @@ type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
 
 function App() {
-    const { state, isConnected, selectScript, updateState, socket } = useDeliveryStore();
+    const { state, isConnected, selectScript, updateState, socket, setState } = useDeliveryStore();
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
     const [isChatOpen, setIsChatOpen] = useState(false);
+
+    const handleSelectProject = (projectId: string) => {
+        // Optimistically clear the state so we don't show the previous project's data
+        setState({
+            ...INITIAL_STATE,
+            projectId: projectId,
+            lastUpdated: new Date().toISOString()
+        });
+        if (socket) {
+            socket.emit('select-project', projectId);
+        }
+    };
 
     useEffect(() => {
         if (state.activeExpertId) {
@@ -102,7 +114,7 @@ function App() {
 
     const currentExpertWork = state.experts?.[activeExpertId];
 
-    if (!isConnected && !state.projectId) {
+    if (!isConnected) {
         return (
             <div className="bg-[#0b1529] min-h-screen flex items-center justify-center text-white">
                 <div className="flex flex-col items-center gap-4">
@@ -118,6 +130,7 @@ function App() {
             <Header
                 projectId={state.projectId}
                 selectedScriptPath={state.selectedScript?.path}
+                onSelectProject={handleSelectProject}
                 onSelectScript={selectScript}
                 activeModule={activeModule}
                 onModuleChange={setActiveModule}

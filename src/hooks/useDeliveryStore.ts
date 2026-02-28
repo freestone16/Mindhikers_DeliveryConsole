@@ -5,8 +5,10 @@ import type { DeliveryState, SelectedScript } from '../types';
 const SOCKET_URL = 'http://127.0.0.1:3002';
 const API_URL = 'http://localhost:3002';
 
-const INITIAL_STATE: DeliveryState = {
+export const INITIAL_STATE: DeliveryState = {
     projectId: '',
+    lastUpdated: new Date().toISOString(),
+    experts: {},
     modules: {
         director: { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [] },
         music: { phase: 1, moodProposal: '', conceptFeedback: '', isConceptApproved: false, items: [] },
@@ -78,12 +80,12 @@ export const useDeliveryStore = () => {
         }
     };
 
-    const selectScript = async (scriptPath: string): Promise<boolean> => {
+    const selectScript = async (projectId: string, scriptPath: string): Promise<boolean> => {
         try {
             const res = await fetch(`${API_URL}/api/scripts/select`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: scriptPath })
+                body: JSON.stringify({ projectId, path: scriptPath })
             });
             return res.ok;
         } catch (err) {
@@ -92,5 +94,5 @@ export const useDeliveryStore = () => {
         }
     };
 
-    return { state, isConnected, updateState, selectScript, socket };
+    return { state, isConnected, updateState, selectScript, socket, setState };
 };

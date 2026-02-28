@@ -42,16 +42,18 @@ const io = new Server(httpServer, {
 // --- Project Context (Mutable - supports runtime switching) ---
 // Docker: PROJECTS_BASE=/data/projects  |  Local: fallback to ../../Projects
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
-let currentProjectName = process.env.PROJECT_NAME || 'CSET-SP3';
-let PROJECT_ROOT = path.resolve(PROJECTS_BASE, currentProjectName);
-let DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
-let SHORTS_AROLL_DIR = path.join(PROJECT_ROOT, '09_shorts_aroll');
+// No longer globally hardcoded. Projects are specified per request.
+let currentProjectName: string | null = null; // Track active project for server-side operations
+// let PROJECT_ROOT = getProjectRoot(currentProjectName);
+// let DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
+// let SHORTS_AROLL_DIR = path.join(PROJECT_ROOT, '09_shorts_aroll');
 
-if (!fs.existsSync(PROJECT_ROOT)) {
-    console.error(`❌ 项目目录不存在: ${PROJECT_ROOT}`);
-    console.error(`   请确认 Projects/${currentProjectName} 文件夹存在`);
-    process.exit(1);
-}
+// This initial check is no longer relevant as PROJECT_ROOT is dynamic
+// if (!fs.existsSync(PROJECT_ROOT)) {
+//     console.error(`❌ 项目目录不存在: ${PROJECT_ROOT}`);
+//     console.error(`   请确认 Projects/${currentProjectName} 文件夹存在`);
+//     process.exit(1);
+// }
 
 // --- Experts Configuration ---
 const EXPERTS_CONFIG = [
@@ -140,34 +142,38 @@ function matchARollToShorts(filename: string, shortsList: any[]): string | null 
 }
 */
 
-function ensureDeliveryFile() {
-    if (!fs.existsSync(DELIVERY_FILE)) {
-        console.log(`Creating new delivery_store.json for ${currentProjectName}`);
-        const initialState = {
-            projectId: currentProjectName,
-            lastUpdated: new Date().toISOString(),
-            activeExpertId: 'Director',
-            experts: {
-                Director: { status: 'idle', logs: [] },
-                MusicDirector: { status: 'idle', logs: [] },
-                ThumbnailMaster: { status: 'idle', logs: [] },
-                ShortsMaster: { status: 'idle', logs: [] },
-                MarketingMaster: { status: 'idle', logs: [] }
-            },
-            modules: {
-                director: { phase: 1, conceptProposal: "", items: [] },
-                music: { phase: 1, moodProposal: "", items: [] },
-                thumbnail: { variants: [] },
-                marketing: { strategy: { seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' }, social: { twitterThread: '', redditPost: '' }, geo: { locationTags: [], culturalRelevance: '' } }, feedback: '', isSubmitted: false },
-                shorts: { items: [], uploadHistory: [] }
-            }
-        };
-        if (!fs.existsSync(PROJECT_ROOT)) {
-            fs.mkdirSync(PROJECT_ROOT, { recursive: true });
+function ensureDeliveryFile(projectId: string) {
+    const projectRoot = getProjectRoot(projectId);
+    const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+
+    const initialState = {
+        projectId: projectId,
+        lastUpdated: new Date().toISOString(),
+        activeExpertId: 'Director',
+        experts: {
+            Director: { status: 'idle', logs: [] },
+            MusicDirector: { status: 'idle', logs: [] },
+            ThumbnailMaster: { status: 'idle', logs: [] },
+            ShortsMaster: { status: 'idle', logs: [] },
+            MarketingMaster: { status: 'idle', logs: [] }
+        },
+        modules: {
+            director: { phase: 1, conceptProposal: "", items: [] },
+            music: { phase: 1, moodProposal: "", items: [] },
+            thumbnail: { variants: [] },
+            marketing: { strategy: { seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' }, social: { twitterThread: '', redditPost: '' }, geo: { locationTags: [], culturalRelleance: '' } }, feedback: '', isSubmitted: false },
+            shorts: { items: [], uploadHistory: [] }
         }
-        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(initialState, null, 2));
+    };
+
+    if (!fs.existsSync(deliveryFile)) {
+        console.log(`Creating new delivery_store.json for ${projectId}`);
+        if (!fs.existsSync(projectRoot)) {
+            fs.mkdirSync(projectRoot, { recursive: true });
+        }
+        fs.writeFileSync(deliveryFile, JSON.stringify(initialState, null, 2));
     } else {
-        const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+        const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
         if (!data.modules.shorts || Array.isArray(data.modules.shorts.shorts)) {
             // Migration or initialization
             console.log('Migrating/Initializing shorts module to v2 Structure');
@@ -185,7 +191,14 @@ function ensureDeliveryFile() {
                 })),
                 uploadHistory: []
             };
-            fs.writeFileSync(DELIVERY_FILE, JSON.stringify(data, null, 2));
+            fs.writeFileSync(deliveryFile, JSON.stringify(data, null, 2));
+        }
+        // Auto-heal mismatched projectId in delivery_store.json
+        if (data.projectId !== projectId) {
+            console.log(`Auto-fixing projectId in ${deliveryFile}: ${data.projectId} -> ${projectId}`);
+            data.projectId = projectId;
+            data.lastUpdated = new Date().toISOString();
+            fs.writeFileSync(deliveryFile, JSON.stringify(data, null, 2));
         }
     }
 }
@@ -290,24 +303,40 @@ function startRender(shortsId: string, projectRoot: string, callback: (progress:
 let deliveryWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let expertWatchers: ReturnType<typeof chokidar.watch>[] = [];
 
-function setupProjectWatcher() {
+function setupProjectWatcher(projectId: string) {
     if (deliveryWatcher) {
         deliveryWatcher.close();
     }
-    deliveryWatcher = chokidar.watch(DELIVERY_FILE);
+    const deliveryFile = path.join(getProjectRoot(projectId), 'delivery_store.json');
+    deliveryWatcher = chokidar.watch(deliveryFile, {
+        persistent: true,
+        ignoreInitial: true,
+        awaitWriteFinish: {
+            stabilityThreshold: 500,
+            pollInterval: 100
+        }
+    });
+
     deliveryWatcher.on('change', () => {
-        console.log('delivery_store.json changed on disk, broadcasting...');
-        const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
-        io.emit('delivery-data', data);
+        try {
+            console.log(`delivery_store.json changed for project ${projectId}, broadcasting...`);
+            const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+            io.emit('delivery-data', data);
+        } catch (e) {
+            console.error('Error reading delivery file on change:', e);
+        }
     });
 }
 
-function setupExpertWatchers() {
+function setupExpertWatchers(projectId: string) {
     expertWatchers.forEach(w => w.close());
     expertWatchers = [];
 
+    const projectRoot = getProjectRoot(projectId);
+    const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+
     EXPERTS_CONFIG.forEach(expert => {
-        const outputDir = path.join(PROJECT_ROOT, expert.outputDir);
+        const outputDir = path.join(projectRoot, expert.outputDir);
         if (!fs.existsSync(outputDir)) {
             return;
         }
@@ -315,9 +344,9 @@ function setupExpertWatchers() {
         // Scan existing files on startup
         const existingFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.md'));
         if (existingFiles.length > 0) {
-            console.log(`📂 [${expert.id}] Found ${existingFiles.length} existing files in ${expert.outputDir}`);
+            console.log(`📂 [${expert.id}] Found ${existingFiles.length} existing files in ${expert.outputDir} for project ${projectId}`);
 
-            const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+            const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
             if (!deliveryData.experts) {
                 deliveryData.experts = {};
             }
@@ -343,7 +372,7 @@ function setupExpertWatchers() {
                     logs: [...(expertWork.logs || []), `检测到已存在文件: ${latestFile}`, '任务完成（自动识别）']
                 };
                 deliveryData.lastUpdated = new Date().toISOString();
-                fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+                fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                 io.emit('delivery-data', deliveryData);
             }
         }
@@ -355,9 +384,9 @@ function setupExpertWatchers() {
 
         watcher.on('add', (filePath) => {
             if (!filePath.endsWith('.md')) return;
-            console.log(`📄 New output detected: ${filePath} for ${expert.id}`);
+            console.log(`📄 New output detected: ${filePath} for ${expert.id} in project ${projectId}`);
 
-            const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+            const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
             if (!deliveryData.experts) {
                 deliveryData.experts = {};
             }
@@ -380,7 +409,7 @@ function setupExpertWatchers() {
                     logs: [...(expertWork.logs || []), `检测到输出文件: ${path.basename(filePath)}`, '任务完成']
                 };
                 deliveryData.lastUpdated = new Date().toISOString();
-                fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+                fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                 io.emit('delivery-data', deliveryData);
             }
         });
@@ -388,46 +417,82 @@ function setupExpertWatchers() {
         expertWatchers.push(watcher);
     });
 
-    console.log(`👁️ Watching ${expertWatchers.length} expert output directories`);
+    console.log(`👁️ Watching ${expertWatchers.length} expert output directories for project ${projectId}`);
 }
 
-ensureDeliveryFile();
-setupProjectWatcher();
-setupExpertWatchers();
-setupVisualPlanWatcher(io, PROJECT_ROOT);
+// Initial setup is now deferred until a project connects
+// ensureDeliveryFile();
+// setupProjectWatcher();
+// setupExpertWatchers();
+// setupVisualPlanWatcher(io, PROJECT_ROOT);
 
 // Initial Skill Sync
 syncSkills(io);
 
 io.on('connection', (socket) => {
     console.log('Client connected');
-    // Send current project data
-    if (fs.existsSync(DELIVERY_FILE)) {
-        const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
-        socket.emit('delivery-data', data);
-    }
-    // Also send active project name
+    // Send current project data (if any is active on server, though now it's client-driven)
+    // if (fs.existsSync(DELIVERY_FILE)) {
+    //     const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+    //     socket.emit('delivery-data', data);
+    // }
+    // Also send active project name (if any)
     socket.emit('active-project', { name: currentProjectName });
 
     // Send skill sync status to newly connected client
     sendSyncStatusToSocket(socket);
 
+    socket.on('select-project', (projectId) => {
+        console.log(`Client selected project: ${projectId}`);
+        currentProjectName = projectId; // Update server's active project
+        // 1. Ensure file exists for this project
+        ensureDeliveryFile(projectId);
+
+        // 2. Set up watchers for this specific project
+        setupProjectWatcher(projectId);
+        const projectRoot = getProjectRoot(projectId);
+        setupExpertWatchers(projectId); // Needs refactor to take projectRoot if needed globally
+        setupVisualPlanWatcher(io, projectRoot);
+
+        // 3. Send the current data to the client
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+        try {
+            const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+            socket.emit('delivery-data', data);
+            socket.emit('active-project', { name: projectId }); // Confirm active project to client
+        } catch (e) {
+            console.error('Failed to read delivery file:', e);
+        }
+    });
+
     socket.on('update-data', (newData) => {
-        console.log('Received update from client');
+        if (!newData.projectId) {
+            console.error('Received update-data without projectId');
+            return;
+        }
+        const deliveryFile = path.join(getProjectRoot(newData.projectId), 'delivery_store.json');
+        console.log(`Received update from client for ${newData.projectId}`);
         newData.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(newData, null, 2));
-        socket.broadcast.emit('delivery-data', newData);
+        fs.writeFileSync(deliveryFile, JSON.stringify(newData, null, 2));
+        socket.broadcast.emit('delivery-data', newData); // Broadcast to other clients
     });
 
     socket.on('start-render', (data) => {
-        const { shortsId } = data;
-        console.log(`Starting render for Shorts${shortsId}`);
+        const { shortsId, projectId } = data;
+        if (!projectId) {
+            console.error('start-render called without projectId');
+            return;
+        }
+        const projectRoot = getProjectRoot(projectId);
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
-        const result = startRender(shortsId, PROJECT_ROOT, (progress) => {
+        console.log(`Starting render for Shorts${shortsId} in project ${projectId}`);
+
+        const result = startRender(shortsId, projectRoot, (progress) => {
             socket.emit('render-progress', progress);
 
             if (progress.type === 'completed' || progress.type === 'failed') {
-                const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+                const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
                 const shortsItem = deliveryData.modules.shorts.items.find(
                     (s: any) => s.id === shortsId
                 );
@@ -443,7 +508,7 @@ io.on('connection', (socket) => {
                     }
 
                     deliveryData.lastUpdated = new Date().toISOString();
-                    fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+                    fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                     io.emit('delivery-data', deliveryData);
                 }
             }
@@ -456,7 +521,8 @@ io.on('connection', (socket) => {
 
     socket.on('chat-load-context', async ({ expertId, projectId }) => {
         try {
-            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            if (!projectId) throw new Error('projectId is required for chat-load-context');
+            const projectRoot = getProjectRoot(projectId);
             const ctx = loadExpertContext(projectRoot, expertId);
             socket.emit('chat-context-loaded', { expertId, systemPrompt: ctx.systemPrompt });
         } catch (error: any) {
@@ -466,7 +532,8 @@ io.on('connection', (socket) => {
 
     socket.on('chat-load-history', ({ expertId, projectId }) => {
         try {
-            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            if (!projectId) throw new Error('projectId is required for chat-load-history');
+            const projectRoot = getProjectRoot(projectId);
             const messages = loadChatHistory(projectRoot, expertId);
             socket.emit('chat-history', { expertId, messages });
         } catch (error: any) {
@@ -476,9 +543,10 @@ io.on('connection', (socket) => {
 
     socket.on('chat-stream', async ({ messages, expertId, projectId }) => {
         try {
+            if (!projectId) throw new Error('projectId is required for chat-stream');
             const config = loadConfig();
             const { provider, model, baseUrl } = config.global;
-            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            const projectRoot = getProjectRoot(projectId);
 
             // SD-207.1: 意图识别
             const lastMessage = messages[messages.length - 1]?.content || '';
@@ -527,7 +595,7 @@ io.on('connection', (socket) => {
                 // 3. 执行修改
                 const result = await executeModification(intent.target, {
                     scripts,
-                    projectId: projectId || currentProjectName
+                    projectId: projectId
                 });
 
                 if (result.success && result.data) {
@@ -607,7 +675,8 @@ io.on('connection', (socket) => {
 
     socket.on('chat-save', ({ expertId, projectId, messages }) => {
         try {
-            const projectRoot = getProjectRoot(projectId || currentProjectName);
+            if (!projectId) throw new Error('projectId is required for chat-save');
+            const projectRoot = getProjectRoot(projectId);
             saveChatHistory(projectRoot, expertId, messages);
         } catch (error: any) {
             console.error('Chat save error:', error.message);
@@ -644,7 +713,8 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 app.post('/api/chat/context', (req, res) => {
     try {
         const { expertId, projectId } = req.body;
-        const projectRoot = getProjectRoot(projectId || currentProjectName);
+        if (!projectId) throw new Error('projectId is required');
+        const projectRoot = getProjectRoot(projectId);
         const ctx = loadExpertContext(projectRoot, expertId);
         res.json(ctx);
     } catch (error: any) {
@@ -655,7 +725,8 @@ app.post('/api/chat/context', (req, res) => {
 app.get('/api/chat/history/:expertId', (req, res) => {
     try {
         const { expertId } = req.params;
-        const projectId = req.query.projectId as string || currentProjectName;
+        const projectId = req.query.projectId as string;
+        if (!projectId) throw new Error('projectId is required');
         const projectRoot = getProjectRoot(projectId);
         const messages = loadChatHistory(projectRoot, expertId);
         res.json({ messages });
@@ -702,37 +773,30 @@ app.post('/api/projects/switch', (req, res) => {
 
     // Update mutable project context
     currentProjectName = projectName;
-    PROJECT_ROOT = newRoot;
-    DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
-    SHORTS_AROLL_DIR = path.join(PROJECT_ROOT, '09_shorts_aroll');
+    // PROJECT_ROOT = newRoot; // No longer global
+    // DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json'); // No longer global
+    // SHORTS_AROLL_DIR = path.join(PROJECT_ROOT, '09_shorts_aroll'); // No longer global
 
     // Also update process.env so youtube-auth.ts picks it up
     process.env.PROJECT_NAME = projectName;
 
     console.log(`🔀 Switched to project: ${currentProjectName}`);
-    console.log(`📂 Project: ${PROJECT_ROOT}`);
+    console.log(`📂 Project: ${newRoot}`);
 
     // Re-init delivery file & watchers
-    ensureDeliveryFile();
-    setupProjectWatcher();
-    setupExpertWatchers();
-    setupVisualPlanWatcher(io, PROJECT_ROOT);
+    ensureDeliveryFile(projectName);
+    setupProjectWatcher(projectName);
+    setupExpertWatchers(projectName);
+    setupVisualPlanWatcher(io, newRoot);
 
     // Push new data to ALL connected clients
-    const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
-
-    // Auto-heal mismatched projectId in delivery_store.json
-    if (data.projectId !== currentProjectName) {
-        console.log(`Auto-fixing projectId in ${DELIVERY_FILE}: ${data.projectId} -> ${currentProjectName}`);
-        data.projectId = currentProjectName;
-        data.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(data, null, 2));
-    }
+    const deliveryFile = path.join(newRoot, 'delivery_store.json');
+    const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
 
     io.emit('delivery-data', data);
     io.emit('active-project', { name: currentProjectName });
 
-    res.json({ success: true, project: currentProjectName, projectRoot: PROJECT_ROOT });
+    res.json({ success: true, project: currentProjectName, projectRoot: newRoot });
 });
 
 // --- File Browser ---
@@ -779,7 +843,7 @@ app.get('/api/files', async (req, res) => {
 });
 
 // --- Script Selector ---
-const SCRIPTS_DIR = () => path.join(PROJECT_ROOT, '02_Script');
+// const SCRIPTS_DIR = () => path.join(PROJECT_ROOT, '02_Script'); // No longer global
 
 interface ScriptFile {
     name: string;
@@ -791,11 +855,13 @@ interface ScriptFile {
 app.get('/api/scripts', (req, res) => {
     try {
         // Support explicit projectId to avoid race conditions during project switching
-        const requestedProject = req.query.projectId as string | undefined;
-        const projectRoot = requestedProject
-            ? path.resolve(PROJECTS_BASE, requestedProject)
-            : PROJECT_ROOT;
+        const requestedProject = req.query.projectId as string;
+        if (!requestedProject) {
+            return res.status(400).json({ error: 'projectId is required' });
+        }
+        const projectRoot = getProjectRoot(requestedProject);
         const scriptsDir = path.join(projectRoot, '02_Script');
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
         if (!fs.existsSync(scriptsDir)) {
             return res.json({ scripts: [], selected: null, message: '02_Script 目录不存在' });
@@ -815,7 +881,7 @@ app.get('/api/scripts', (req, res) => {
             })
             .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 
-        const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+        const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
         const selected = deliveryData.selectedScript?.path || null;
 
         res.json({ scripts: files, selected });
@@ -828,13 +894,11 @@ app.get('/api/scripts', (req, res) => {
 app.post('/api/scripts/content', (req, res) => {
     try {
         const { projectId, path: scriptPath } = req.body;
-        if (!scriptPath) {
-            return res.status(400).json({ error: 'Missing path' });
+        if (!scriptPath || !projectId) {
+            return res.status(400).json({ error: 'Missing projectId or path' });
         }
 
-        const projectRoot = projectId
-            ? path.resolve(PROJECTS_BASE, projectId)
-            : PROJECT_ROOT;
+        const projectRoot = getProjectRoot(projectId);
         const fullPath = path.join(projectRoot, scriptPath);
 
         if (!fs.existsSync(fullPath)) {
@@ -851,12 +915,15 @@ app.post('/api/scripts/content', (req, res) => {
 
 app.post('/api/scripts/select', (req, res) => {
     try {
-        const { path: scriptPath } = req.body;
-        if (!scriptPath) {
-            return res.status(400).json({ error: 'Missing path' });
+        const { projectId, path: scriptPath } = req.body;
+        if (!scriptPath || !projectId) {
+            return res.status(400).json({ error: 'Missing projectId or path' });
         }
 
-        const fullPath = path.join(PROJECT_ROOT, scriptPath);
+        const projectRoot = getProjectRoot(projectId);
+        const fullPath = path.join(projectRoot, scriptPath);
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+
         if (!fs.existsSync(fullPath)) {
             return res.status(404).json({ error: 'Script file not found' });
         }
@@ -869,7 +936,7 @@ app.post('/api/scripts/select', (req, res) => {
             }
             isStoreLocked = true;
             try {
-                const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+                const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
                 deliveryData.selectedScript = {
                     filename: path.basename(scriptPath),
                     path: scriptPath,
@@ -886,7 +953,7 @@ app.post('/api/scripts/select', (req, res) => {
                 }
 
                 deliveryData.lastUpdated = new Date().toISOString();
-                fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+                fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                 io.emit('delivery-data', deliveryData);
             } finally {
                 isStoreLocked = false;
@@ -903,7 +970,7 @@ app.post('/api/scripts/select', (req, res) => {
 
 // --- Expert APIs ---
 
-const TASKS_DIR = () => path.join(PROJECT_ROOT, '.tasks');
+// const TASKS_DIR = () => path.join(PROJECT_ROOT, '.tasks'); // No longer global
 
 app.get('/api/experts', (req, res) => {
     res.json({ experts: EXPERTS_CONFIG });
@@ -911,9 +978,9 @@ app.get('/api/experts', (req, res) => {
 
 app.post('/api/experts/start', (req, res) => {
     try {
-        const { expertId, scriptPath } = req.body;
-        if (!expertId || !scriptPath) {
-            return res.status(400).json({ error: 'Missing expertId or scriptPath' });
+        const { expertId, scriptPath, projectId } = req.body;
+        if (!expertId || !scriptPath || !projectId) {
+            return res.status(400).json({ error: 'Missing expertId, scriptPath, or projectId' });
         }
 
         const expert = EXPERTS_CONFIG.find(e => e.id === expertId);
@@ -921,7 +988,10 @@ app.post('/api/experts/start', (req, res) => {
             return res.status(404).json({ error: 'Expert not found' });
         }
 
-        const tasksDir = TASKS_DIR();
+        const projectRoot = getProjectRoot(projectId);
+        const tasksDir = path.join(projectRoot, '.tasks');
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+
         if (!fs.existsSync(tasksDir)) {
             fs.mkdirSync(tasksDir, { recursive: true });
         }
@@ -935,7 +1005,7 @@ app.post('/api/experts/start', (req, res) => {
             type: 'expert',
             expertId,
             skillName: expert.skillName,
-            project: currentProjectName,
+            project: projectId,
             input: {
                 scriptPath
             },
@@ -945,9 +1015,9 @@ app.post('/api/experts/start', (req, res) => {
         };
 
         fs.writeFileSync(taskFile, JSON.stringify(taskData, null, 2));
-        console.log(`📝 Task created: ${taskId}`);
+        console.log(`📝 Task created: ${taskId} for project ${projectId}`);
 
-        const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+        const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
         if (!deliveryData.experts) {
             deliveryData.experts = {};
         }
@@ -957,7 +1027,7 @@ app.post('/api/experts/start', (req, res) => {
             logs: [`任务已创建: ${taskId}`, `等待在 Antigravity 中执行 ${expert.skillName} skill`]
         };
         deliveryData.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+        fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
 
         io.emit('delivery-data', deliveryData);
 
@@ -999,9 +1069,9 @@ app.get('/api/skills/status', (req, res) => {
 // Execute Skill (NEW - Auto mode)
 app.post('/api/experts/run', (req, res) => {
     try {
-        const { expertId, scriptPath } = req.body;
-        if (!expertId || !scriptPath) {
-            return res.status(400).json({ error: 'Missing expertId or scriptPath' });
+        const { expertId, scriptPath, projectId } = req.body;
+        if (!expertId || !scriptPath || !projectId) {
+            return res.status(400).json({ error: 'Missing expertId, scriptPath, or projectId' });
         }
 
         const expert = EXPERTS_CONFIG.find(e => e.id === expertId);
@@ -1010,16 +1080,18 @@ app.post('/api/experts/run', (req, res) => {
         }
 
         // Read script content
-        const scriptFullPath = path.join(PROJECT_ROOT, scriptPath);
+        const projectRoot = getProjectRoot(projectId);
+        const scriptFullPath = path.join(projectRoot, scriptPath);
         if (!fs.existsSync(scriptFullPath)) {
             return res.status(404).json({ error: 'Script file not found' });
         }
 
         const scriptContent = fs.readFileSync(scriptFullPath, 'utf-8');
-        const outputDir = path.join(PROJECT_ROOT, expert.outputDir);
+        const outputDir = path.join(projectRoot, expert.outputDir);
+        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
         // Update status to running
-        const deliveryData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+        const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
         if (!deliveryData.experts) {
             deliveryData.experts = {};
         }
@@ -1029,7 +1101,7 @@ app.post('/api/experts/run', (req, res) => {
             logs: ['正在执行 Skill...']
         };
         deliveryData.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(DELIVERY_FILE, JSON.stringify(deliveryData, null, 2));
+        fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
         io.emit('delivery-data', deliveryData);
 
         // Execute Python skill (pass script content via stdin) with timeout 10 mins
@@ -1037,7 +1109,7 @@ app.post('/api/experts/run', (req, res) => {
             path.resolve(__dirname, '../run_skill.py'),
             'execute',
             expertId,
-            currentProjectName,
+            projectId,
             outputDir
         ], { timeout: 600000, env: { ...process.env } });
 
@@ -1064,7 +1136,7 @@ app.post('/api/experts/run', (req, res) => {
 
                 if (result.success) {
                     // Update status to completed
-                    const updatedData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+                    const updatedData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
                     updatedData.experts[expertId] = {
                         status: 'completed',
                         startedAt: deliveryData.experts[expertId].startedAt,
@@ -1074,7 +1146,7 @@ app.post('/api/experts/run', (req, res) => {
                         logs: result.logs
                     };
                     updatedData.lastUpdated = new Date().toISOString();
-                    fs.writeFileSync(DELIVERY_FILE, JSON.stringify(updatedData, null, 2));
+                    fs.writeFileSync(deliveryFile, JSON.stringify(updatedData, null, 2));
                     io.emit('delivery-data', updatedData);
 
                     res.json({
@@ -1084,7 +1156,7 @@ app.post('/api/experts/run', (req, res) => {
                     });
                 } else {
                     // Update status to failed
-                    const updatedData = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
+                    const updatedData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
                     updatedData.experts[expertId] = {
                         status: 'failed',
                         startedAt: deliveryData.experts[expertId].startedAt,
@@ -1092,7 +1164,7 @@ app.post('/api/experts/run', (req, res) => {
                         logs: result.logs
                     };
                     updatedData.lastUpdated = new Date().toISOString();
-                    fs.writeFileSync(DELIVERY_FILE, JSON.stringify(updatedData, null, 2));
+                    fs.writeFileSync(deliveryFile, JSON.stringify(updatedData, null, 2));
                     io.emit('delivery-data', updatedData);
 
                     res.status(500).json({
@@ -1115,7 +1187,17 @@ app.post('/api/experts/run', (req, res) => {
 // Start Server
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🔒 Server running on http://0.0.0.0:${PORT} (Docker Friendly)`);
-    console.log(`📂 Project: ${PROJECT_ROOT}`);
-    console.log(`📄 Data file: ${DELIVERY_FILE}`);
+    console.log(`📂 Projects Base: ${PROJECTS_BASE}`);
     //    console.log(`🎬 A-roll dir: ${SHORTS_AROLL_DIR}`);
+});
+
+// --- Global Error Handlers (prevent server crashes from unhandled async errors) ---
+process.on('uncaughtException', (err) => {
+    console.error('🔴 [UNCAUGHT EXCEPTION] Server survived:', err.message);
+    console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+    console.error('🟡 [UNHANDLED REJECTION] Server survived:', reason?.message || reason);
+    if (reason?.stack) console.error(reason.stack);
 });

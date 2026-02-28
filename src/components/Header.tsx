@@ -18,12 +18,13 @@ interface ScriptFile {
 interface HeaderProps {
     projectId: string;
     selectedScriptPath?: string;
-    onSelectScript: (path: string) => Promise<boolean>;
+    onSelectProject: (projectId: string) => void;
+    onSelectScript: (projectId: string, path: string) => Promise<boolean>;
     activeModule: 'crucible' | 'delivery' | 'distribution';
     onModuleChange: (module: 'crucible' | 'delivery' | 'distribution') => void;
 }
 
-export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeModule, onModuleChange }: HeaderProps) => {
+export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelectScript, activeModule, onModuleChange }: HeaderProps) => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [scripts, setScripts] = useState<ScriptFile[]>([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -44,6 +45,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
     };
 
     const fetchScripts = async () => {
+        if (!projectId) return;
         try {
             const res = await fetch(`http://localhost:3002/api/scripts?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`);
             const data = await res.json();
@@ -56,7 +58,11 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
 
     useEffect(() => {
         fetchProjects();
-        fetchScripts();
+        if (projectId) {
+            fetchScripts();
+        } else {
+            setScripts([]);
+        }
     }, [projectId]);
 
     // ... (event listeners remain same)
@@ -73,34 +79,19 @@ export const Header = ({ projectId, selectedScriptPath, onSelectScript, activeMo
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleSwitch = async (projectName: string) => {
-        // ... (implementation same as before)
+    const handleSwitch = (projectName: string) => {
         if (projectName === projectId) {
             setIsDropdownOpen(false);
             return;
         }
 
-        try {
-            const res = await fetch('http://localhost:3002/api/projects/switch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ projectName })
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                alert(`切换失败: ${err.error}`);
-            }
-        } catch (e) {
-            alert('切换项目失败，请检查后端是否运行');
-        } finally {
-            setIsDropdownOpen(false);
-        }
+        onSelectProject(projectName);
+        setIsDropdownOpen(false);
     };
 
     const handleScriptSelect = async (scriptPath: string) => {
         setIsScriptDropdownOpen(false);
-        await onSelectScript(scriptPath);
+        await onSelectScript(projectId, scriptPath);
     };
 
     const selectedScript = scripts.find(s => s.path === selectedScriptPath);

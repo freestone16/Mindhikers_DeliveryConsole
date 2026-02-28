@@ -36,6 +36,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [isBatchRendering, setIsBatchRendering] = useState(false);
 
+  const [brollSelections, setBrollSelections] = useState<BRollType[]>(['remotion', 'seedance', 'artlist', 'internet-clip', 'user-capture']);
   const [brollPaths, setBrollPaths] = useState<BrollResult[]>([]);
 
   const handleGenerateConcept = async () => {
@@ -304,7 +305,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
         {phase === 1 && (
           <Phase1View
             projectId={projectId}
-            scriptPath={data.conceptProposal}
+            scriptPath={scriptPath}
             concept={concept}
             isGenerating={isGeneratingConcept}
             isApproved={conceptApproved}
