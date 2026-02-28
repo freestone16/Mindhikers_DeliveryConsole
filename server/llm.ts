@@ -321,6 +321,22 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
                 if (!opt.props?.quadrants || !Array.isArray(opt.props.quadrants) || opt.props.quadrants.length !== 4) {
                   validationErrors.push(`DataChartQuadrant 模板需要 props.quadrants 数组(严格4项)，当前选项【${opt.name}】不符合。`);
                 }
+              } else if (opt.template === 'TimelineFlow') {
+                if (!opt.props?.nodes || !Array.isArray(opt.props.nodes) || opt.props.nodes.length < 2) {
+                  validationErrors.push(`TimelineFlow 模板需要 props.nodes 数组(至少2个包含 year 和 event 的节点)，当前选项【${opt.name}】不符合。`);
+                }
+              } else if (opt.template === 'TextReveal') {
+                if (typeof opt.props?.text !== 'string' || opt.props.text.length === 0) {
+                  validationErrors.push(`TextReveal 模板需要 props.text 为有效字符串，当前选项【${opt.name}】不符合。`);
+                }
+              } else if (opt.template === 'NumberCounter') {
+                if (typeof opt.props?.endNumber !== 'number') {
+                  validationErrors.push(`NumberCounter 模板需要 props.endNumber 为数值，当前选项【${opt.name}】不符合。`);
+                }
+              } else if (opt.template === 'ComparisonSplit') {
+                if (!opt.props?.leftTitle || !opt.props?.rightTitle) {
+                  validationErrors.push(`ComparisonSplit 模板需要 props.leftTitle 和 rightTitle，当前选项【${opt.name}】不符合。`);
+                }
               }
             }
           });

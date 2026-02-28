@@ -568,11 +568,18 @@ function buildRemotionPreview(option: {
       };
     }
 
-    // ConceptChain / DataChartQuadrant / 其他
-    return {
-      compositionId: option.template,
-      props: option.props || {}
-    };
+    // 处理新增的模板们，透传给 remotion cli 进行渲染
+    const supportedCoreTemplates = [
+      'ConceptChain', 'DataChartQuadrant',
+      'TextReveal', 'NumberCounter', 'ComparisonSplit', 'TimelineFlow'
+    ];
+
+    if (supportedCoreTemplates.includes(option.template)) {
+      return {
+        compositionId: option.template,
+        props: option.props || {}
+      };
+    }
   }
 
   // 2. 兜底降级：转换为文字大字报 SceneComposer

@@ -132,14 +132,22 @@ ${baseContext}
 }
 
 【Remotion 模板菜单指南】
-当你的方案类型是 "remotion" 时，请从以下菜单中分配最合适的模板：
-1. **ConceptChain**：适用于需要展示“A→B→C”这种递进关系或因果链条的认知模型。
+当你的方案类型是 "remotion" 时，请从以下模板中分配最合适的：
+1. **ConceptChain**：展示“A→B→C”这种递进关系或因果链条的认知模型。
    所需 props：\`{ "title": "大标题", "subtitle": "副标题", "conclusion": "一句金句总结", "nodes": [{"id":"xxx", "label":"节点名", "desc":"短描述", "icon":"Emoji图标", "color":"#hex色值"}] }\` (至少2个，最多5个 node)。
 2. **DataChartQuadrant**：适用于二元对比、象限图、分布图分析。
    所需 props：\`{ "title": "大标题", "xAxisLabel": "右箭头X轴名", "yAxisLabel": "上箭头Y轴名", "quadrants": [{"id":"xxx", "label":"象限名", "subLabel":"副名", "x":1或0, "y":1或0, "emoji":"Emoji", "color":"#hex色值"}] }\` (必须4个 quadrant)。
 3. **CinematicZoom**：适用于单张大图的氛围感电影级缓慢拉伸镜头。
    所需 props：\`{ "imagePrompt": "你想要的画面英文提示词", "bgStyle": "black", "zoomStart": 1, "zoomEnd": 1.1 }\`
-4. **SceneComposer**：万能排版工具。当你觉得上述模板都不适合，仅需要使用深色背景+文字大字报时使用。
+4. **TextReveal**：适用于标题出场、金句展示的文字逐字/逐词揭示动画。
+   所需 props：\`{ "text": "要揭示的文字金句", "textColor": "#ffffff" }\`
+5. **NumberCounter**：适用于大数字展示（如统计数据）的数字跑动动画。
+   所需 props：\`{ "title": "数字上方的标题", "endNumber": 12345, "prefix": "¥", "suffix": "人" }\`
+6. **ComparisonSplit**：适用于左右或者上下分屏对比的场景（A vs B、传统 vs 觉醒）。
+   所需 props：\`{ "leftTitle": "左标题", "leftContent": "左文案", "rightTitle": "右标题", "rightContent": "右文案" }\`
+7. **TimelineFlow**：适用于历史进程、演化编年史、路线图的时间线节点流。
+   所需 props：\`{ "title": "时间线大标题", "nodes": [{"year":"2020", "event":"事件短描述"}, {"year":"2024", "event":"事件短描述"}] }\` (至少2个node)。
+8. **SceneComposer**：万能排版工具。当你觉得上述所有的具体模板都不适合，完全可以用纯文本加特效打底时使用。
    所需 props：空对象 \`{}\` 即可。
 
 【各 B-roll 类型适用场景指南】
