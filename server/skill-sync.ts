@@ -9,9 +9,16 @@ const __dirname = path.dirname(__filename);
 
 const EXPERTS = ['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster'];
 
-// Docker: /data/skills (挂载自 SKILLS_BASE)
-// Local: SKILLS_BASE 或 ../../.agent/skills
-const SOURCE_ROOT = process.env.DOCKER_ENV ? '/data/skills' : (process.env.SKILLS_BASE || path.resolve(__dirname, '../../.agent/skills'));
+// Lazy evaluation: SOURCE_ROOT must be resolved after dotenv.config() runs
+const getSourceRoot = () => {
+    if (process.env.DOCKER_ENV) return '/data/skills';
+    if (process.env.SKILLS_BASE) {
+        return path.isAbsolute(process.env.SKILLS_BASE)
+            ? process.env.SKILLS_BASE
+            : path.resolve(__dirname, '..', process.env.SKILLS_BASE);
+    }
+    return path.resolve(__dirname, '..', 'skills');
+};
 const TARGET_ROOT = path.resolve(__dirname, '../skills');
 
 // Store last sync status
@@ -27,10 +34,30 @@ export const sendSyncStatusToSocket = (socket: Socket) => {
 
 export const syncSkills = async (io: Server) => {
     console.log('🔄 Starting Skill Sync...');
+    const SOURCE_ROOT = getSourceRoot();
+    const sourceResolved = path.resolve(SOURCE_ROOT);
+    const targetResolved = path.resolve(TARGET_ROOT);
 
+    // If source and target resolve to the same directory, skip copy
+    if (sourceResolved === targetResolved) {
+        const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
+        lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
+        console.log(`✅ Skills in-place. Available: ${available.length}/${EXPERTS.length}`);
+        io.emit('skill-sync-status', lastSyncStatus);
+        return;
+    }
+
+    // If source doesn't exist, fall back to target if it has skills
     if (!fs.existsSync(SOURCE_ROOT)) {
-        console.warn(`⚠️ Source skills directory not found: ${SOURCE_ROOT}`);
-        lastSyncStatus = { status: 'error', message: 'Source not found' };
+        if (fs.existsSync(TARGET_ROOT)) {
+            const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
+            lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
+            console.log(`ℹ️ Using local skills. Available: ${available.length}/${EXPERTS.length}`);
+            io.emit('skill-sync-status', lastSyncStatus);
+            return;
+        }
+        console.warn(`⚠️ No skills found at: ${SOURCE_ROOT}`);
+        lastSyncStatus = { status: 'error', message: 'No skills directory found' };
         io.emit('skill-sync-status', lastSyncStatus);
         return;
     }
@@ -40,31 +67,20 @@ export const syncSkills = async (io: Server) => {
     }
 
     const syncedSkills: string[] = [];
-
     for (const expert of EXPERTS) {
         const srcDir = path.join(SOURCE_ROOT, expert);
         const destDir = path.join(TARGET_ROOT, expert);
-
         if (fs.existsSync(srcDir)) {
-            // Recursive copy
             try {
                 fs.cpSync(srcDir, destDir, { recursive: true, force: true });
                 syncedSkills.push(expert);
-                // console.log(`✅ Synced ${expert}`);
             } catch (err: any) {
                 console.error(`❌ Failed to sync ${expert}:`, err.message);
             }
         }
     }
 
-    console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}`);
-
-    lastSyncStatus = {
-        status: 'done',
-        synced: syncedSkills,
-        count: syncedSkills.length,
-        timestamp: new Date().toISOString()
-    };
-
+    console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${EXPERTS.length}`);
+    lastSyncStatus = { status: 'done', synced: syncedSkills, count: syncedSkills.length, timestamp: new Date().toISOString() };
     io.emit('skill-sync-status', lastSyncStatus);
 };
