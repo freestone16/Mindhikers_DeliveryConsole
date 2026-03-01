@@ -1,13 +1,5 @@
-import { Eye, Music, Image, Video, Megaphone, AlertTriangle, RotateCcw } from 'lucide-react';
-import { EXPERTS, getExpertColorClass } from '../../config/experts';
-
-const iconMap: Record<string, React.ElementType> = {
-    Eye,
-    Music,
-    Image,
-    Video,
-    Megaphone
-};
+import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { EXPERTS } from '../../config/experts';
 
 interface FailedStateProps {
     expertId: string;
@@ -19,9 +11,6 @@ interface FailedStateProps {
 export const FailedState = ({ expertId, error, logs, onRerun }: FailedStateProps) => {
     const expert = EXPERTS.find(e => e.id === expertId);
     if (!expert) return null;
-
-    const Icon = iconMap[expert.icon] || Eye;
-    const colorClass = getExpertColorClass(expert.color);
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] py-16">

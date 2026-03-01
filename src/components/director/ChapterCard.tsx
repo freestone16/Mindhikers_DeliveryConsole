@@ -214,9 +214,15 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
       <div className="col-span-2 flex items-stretch">
         <textarea
           className="flex-1 w-full bg-slate-800/50 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-colors resize-none"
-          placeholder="反馈意见..."
+          placeholder="反馈意见... (Ctrl+Enter 提交)"
           defaultValue={chapter.userComment || ''}
           onBlur={(e) => onComment(chapter.chapterId, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+              e.preventDefault();
+              onComment(chapter.chapterId, (e.target as HTMLTextAreaElement).value);
+            }
+          }}
           disabled={chapter.isLocked}
         />
       </div>
@@ -242,11 +248,18 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
 };
 
 export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }: ChapterCardProps) => {
+  // 如果章节名中已包含"第X章"前缀，去掉它以避免重复
+  let cleanChapterName = chapter.chapterName;
+  const prefixMatch = chapter.chapterName.match(/^第\d+章\s+(.+)$/);
+  if (prefixMatch) {
+    cleanChapterName = prefixMatch[1]; // 只保留"第X章"后面的部分
+  }
+
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
       <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
         <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
-        <span className="text-white font-medium">{chapter.chapterName}</span>
+        <span className="text-white font-medium">{cleanChapterName}</span>
         {chapter.isLocked && <Lock className="w-4 h-4 text-green-400" />}
       </div>
 
@@ -255,7 +268,7 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }:
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
           <div className="col-span-3 text-xs text-slate-500 font-bold">原文一句话</div>
           <div className="col-span-2 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold text-center">缩略图预览</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold text-center">预览图</div>
           <div className="col-span-2 text-xs text-slate-500 font-bold">反馈意见</div>
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
         </div>

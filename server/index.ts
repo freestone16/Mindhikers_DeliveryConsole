@@ -96,6 +96,18 @@ app.get('/api/director/phase2/thumbnail/:taskKey', director.getThumbnailStatus);
 app.post('/api/director/phase3/render', director.startRender);
 app.get('/api/director/phase3/status/:jobId', director.getRenderStatus);
 
+// Director Phase 2/3 Refactor Routes (SD-202)
+app.post('/api/director/phase2/review', director.phase2Review);
+app.post('/api/director/phase2/select', director.phase2Select);
+app.get('/api/director/phase2/ready', director.phase2Ready);
+app.post('/api/director/phase3/start-render', director.phase3StartRender);
+app.get('/api/director/phase3/render-status/:jobId', director.phase3RenderStatus);
+app.post('/api/director/phase3/rerender', director.phase3Rerender);
+app.post('/api/director/phase3/approve', director.phase3Approve);
+app.post('/api/director/phase3/load-asset', upload.single('videoFile'), director.phase3LoadAsset);
+app.get('/api/director/phase3/assets', director.phase3GetAssets);
+app.post('/api/director/phase3/generate-xml', director.phase3GenerateXML);
+
 // Pipeline Engine Routes (Phase 3 & Phase 4)
 app.post('/api/pipeline/render-brolls', pipeline.renderBrolls);
 app.get('/api/pipeline/render-status/:taskId', pipeline.getRenderStatus);

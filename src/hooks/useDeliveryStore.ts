@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
-import type { DeliveryState, SelectedScript } from '../types';
+import type { DeliveryState } from '../types';
 
 const SOCKET_URL = 'http://127.0.0.1:3002';
 const API_URL = 'http://localhost:3002';

@@ -1,14 +1,7 @@
-import { Eye, Music, Image, Video, Megaphone, Clock, FileText, Loader2 } from 'lucide-react';
+import { Clock, FileText, Loader2 } from 'lucide-react';
 import { EXPERTS, getExpertColorClass } from '../../config/experts';
 import type { SelectedScript } from '../../types';
 
-const iconMap: Record<string, React.ElementType> = {
-    Eye,
-    Music,
-    Image,
-    Video,
-    Megaphone
-};
 
 interface PendingStateProps {
     expertId: string;
@@ -23,7 +16,6 @@ export const PendingState = ({ expertId, projectId, selectedScript, startedAt, l
     const expert = EXPERTS.find(e => e.id === expertId);
     if (!expert) return null;
 
-    const Icon = iconMap[expert.icon] || Eye;
     const colorClass = getExpertColorClass(expert.color);
 
     const formatTime = (iso: string) => {

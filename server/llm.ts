@@ -238,6 +238,20 @@ export async function generateGlobalBRollPlan(
 
 const MAX_RETRIES = 2;
 
+// 智能模板推荐函数 - 根据内容推荐合适的模板
+function suggestTemplateFromContent(prompt: string, quote: string): string {
+  const content = (prompt + quote).toLowerCase();
+
+  if (content.match(/金句|名言|观点|quote|生命目标|涌现|核心|要旨|精髓/)) return 'TextReveal';
+  if (content.match(/\d+[万千亿百万]|增长|统计|数据|指标|14.5万|0.839/)) return 'NumberCounter';
+  if (content.match(/对比|vs|传统|觉醒|otto|inga|归因|涌现|分屏|对立|区别/)) return 'ComparisonSplit';
+  if (content.match(/\d{4}|年份|年代|从.*到|演化|历史|时间线|编年|路线/)) return 'TimelineFlow';
+  if (content.match(/象限|坐标|四象限|分布|矩阵/)) return 'DataChartQuadrant';
+  if (content.match(/照片|图片|背景图|缩放|电影|氛围/)) return 'CinematicZoom';
+
+  return 'ConceptChain'; // 兜底
+}
+
 async function generateGlobalBRollPlanWithRetry(
   chapters: { id: string; name: string; text: string }[],
   brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
@@ -278,9 +292,42 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
     }
   ]
 }
-2. 每一个章节必须至少有 1 个方案（即使是普通叙事），高潮章节建议 3-5 个方案。
-3. 严禁均分！请根据内容深度和情感起伏智能分配类型。
-4. 确保 quote 字段精准指向该章节内的具体行。
+2. ⚠️ 最少要求：每一个章节必须至少生成 3 个 B-roll 方案！即使内容很简单，也必须提供 3 个不同视角/类型的方案。
+3. 灵活分配：重点章节或高潮章节可以生成 4-8 个方案以增强视觉冲击力。
+4. 严禁均分！请根据内容深度和情感起伏智能分配数量和类型。
+5. 确保 quote 字段精准指向该章节内的具体行。
+
+【输出格式示例】
+{
+  "chapters": [
+    {
+      "chapterId": "ch1",
+      "chapterName": "章节名称",
+      "options": [
+        {
+          "name": "金句展示",
+          "type": "remotion",
+          "template": "TextReveal",
+          "props": { "text": "生命目标是涌现的", "textColor": "#ffffff" },
+          "quote": "生命目标是涌现的",
+          "prompt": "黑底金字缓缓浮现",
+          "imagePrompt": "golden text on black background",
+          "rationale": "使用 TextReveal 突出核心金句"
+        },
+        {
+          "name": "数据冲击",
+          "type": "remotion",
+          "template": "NumberCounter",
+          "props": { "title": "GitHub 星标", "endNumber": 145000, "suffix": "颗" },
+          "quote": "14.5万星标",
+          "prompt": "数字从0跑动到14.5万",
+          "imagePrompt": "number counting animation",
+          "rationale": "使用 NumberCounter 展示数据冲击力"
+        }
+      ]
+    }
+  ]
+}
 `;
 
   try {
@@ -312,7 +359,13 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
       parsed.chapters.forEach((ch: any) => {
         if (ch.options && Array.isArray(ch.options)) {
           ch.options.forEach((opt: any) => {
-            if (opt.type === 'remotion' && opt.template) {
+            if (opt.type === 'remotion') {
+              // 强制要求 template 字段
+              if (!opt.template || typeof opt.template !== 'string' || opt.template.trim() === '') {
+                validationErrors.push(`remotion 类型的方案必须指定 template 字段（从以下选择：ConceptChain, DataChartQuadrant, TextReveal, NumberCounter, ComparisonSplit, TimelineFlow, CinematicZoom），当前选项【${opt.name}】缺少 template 字段。`);
+              }
+
+              // 原有模板验证逻辑
               if (opt.template === 'ConceptChain') {
                 if (!opt.props?.nodes || !Array.isArray(opt.props.nodes) || opt.props.nodes.length < 2) {
                   validationErrors.push(`ConceptChain 模板需要 props.nodes 数组(至少2项)，当前选项【${opt.name}】不符合。`);
@@ -358,6 +411,11 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
       let retryPrompt = userMessage;
       if (isValidationError) {
         retryPrompt += `\n\n【注意！上次生成失败原因】\n你上次生成的数据结构有误，请修正：\n${error.message.replace('VALIDATION_FAILED: ', '')}`;
+
+        // 如果是缺少 template 字段的错误，添加智能模板推荐
+        if (error.message.includes('缺少 template 字段')) {
+          retryPrompt += `\n\n【智能模板推荐指南】\n- 金句/名言/观点 → TextReveal\n- 数字/统计/数据 → NumberCounter\n- 对比/A vs B → ComparisonSplit\n- 历史/演化/时间线 → TimelineFlow\n- 象限/坐标分布 → DataChartQuadrant\n- 氛围/照片/缩放 → CinematicZoom\n`;
+        }
       }
 
       // Internal recursive retry wrapper

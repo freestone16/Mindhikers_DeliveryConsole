@@ -45,6 +45,51 @@ interface TaskRecord {
 
 const taskStorage = new Map<string, TaskRecord>();
 
+// Phase 2 预审状态管理
+interface Phase2ReviewState {
+    projectId: string;
+    lastUpdated: string;
+    chapters: {
+        chapterId: string;
+        reviewStatus: 'pending' | 'approved' | 'skipped';
+        selectedOptionId?: string;
+        userComment?: string;
+    }[];
+}
+
+// Phase 3 渲染状态管理
+interface Phase3RenderState {
+    projectId: string;
+    lastUpdated: string;
+    renderJobs: {
+        jobId: string;
+        chapterId: string;
+        optionId: string;
+        type: 'remotion' | 'seedance';
+        status: 'waiting' | 'rendering' | 'completed' | 'failed';
+        progress: number;
+        frame?: number;
+        totalFrames?: number;
+        outputPath?: string;
+        error?: string;
+        startedAt?: string;
+        completedAt?: string;
+        retryCount?: number;
+    }[];
+    externalAssets: {
+        assetId: string;
+        chapterId: string;
+        type: 'artlist' | 'internet-clip' | 'user-capture';
+        sourcePath: string;
+        targetPath: string;
+        loadedAt: string;
+    }[];
+    xmlGenerated: boolean;
+    xmlPath?: string;
+}
+
+const renderJobStorage = new Map<string, Phase3RenderState>();
+
 export function parseMarkdownChapters(content: string): { title: string; text: string }[] {
   const chapters: { title: string; text: string }[] = [];
   const lines = content.split('\n');
@@ -136,6 +181,36 @@ function loadSelectionState(projectRoot: string): SelectionState | null {
     return JSON.parse(fs.readFileSync(statePath, 'utf-8'));
   }
   return null;
+}
+
+// Phase 2 预审状态管理辅助函数
+function loadPhase2ReviewState(projectRoot: string): Phase2ReviewState | null {
+  const statePath = path.join(projectRoot, '04_Visuals', 'phase2_review_state.json');
+  if (fs.existsSync(statePath)) {
+    return JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+  }
+  return null;
+}
+
+function savePhase2ReviewState(projectRoot: string, state: Phase2ReviewState) {
+  const statePath = path.join(projectRoot, '04_Visuals', 'phase2_review_state.json');
+  ensureDir(path.dirname(statePath));
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
+// Phase 3 渲染状态管理辅助函数
+function loadPhase3RenderState(projectRoot: string): Phase3RenderState | null {
+  const statePath = path.join(projectRoot, '04_Visuals', 'phase3_render_state.json');
+  if (fs.existsSync(statePath)) {
+    return JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+  }
+  return null;
+}
+
+function savePhase3RenderState(projectRoot: string, state: Phase3RenderState) {
+  const statePath = path.join(projectRoot, '04_Visuals', 'phase3_render_state.json');
+  ensureDir(path.dirname(statePath));
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
 export const generatePhase1 = async (req: Request, res: Response) => {
@@ -289,20 +364,21 @@ export const startPhase2 = async (req: Request, res: Response) => {
   const scriptContent = fs.readFileSync(scriptFullPath, 'utf-8');
   const parsedChapters = parseMarkdownChapters(scriptContent);
 
-  const totalSteps = parsedChapters.length * 3;
   const chapters: DirectorChapter[] = [];
 
+  // 先初始化一个临时任务，totalSteps 稍后会根据实际生成的 options 数量动态计算
   taskStorage.set(taskId, {
     taskId,
     projectId,
     status: 'running',
-    progress: { current: 0, total: totalSteps },
+    progress: { current: 0, total: 0 },  // total 先设为0，生成完 globalPlan 后更新
     chapters: [],
     createdAt: new Date().toISOString()
   });
 
   res.write(`data: ${JSON.stringify({ type: 'taskId', taskId })}\n\n`);
-  res.write(`data: ${JSON.stringify({ type: 'progress', current: 0, total: totalSteps, message: '导演正在全局审片并划分视觉节奏...' })}\n\n`);
+  // 初始阶段只发送消息，不发送进度数字（避免显示"0/0"无意义）
+  // 等globalPlan生成完后再发送实际方案数
 
   try {
     const config = loadConfig();
@@ -311,10 +387,26 @@ export const startPhase2 = async (req: Request, res: Response) => {
     // 上帝视角：一次性生成全局分配方案
     const globalPlan = await generateGlobalBRollPlan(
       parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
-      brollTypes as ('remotion' | 'generative' | 'artlist')[],
+      brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
       globalConfig.provider as any,
       globalConfig.model
     );
+
+    // 调试：打印每章生成的 options 数量
+    globalPlan.chapters?.forEach(ch => {
+      console.log(`[Phase2] 章节 ${ch.chapterName}: ${ch.options?.length || 0} 个方案`);
+    });
+
+    // 计算实际生成的总 options 数量作为 totalSteps
+    const totalSteps = globalPlan.chapters?.reduce((sum, ch) => sum + (ch.options?.length || 0), 0) || parsedChapters.length * 3;
+    console.log(`[Phase2] 总共生成 ${totalSteps} 个 B-roll 方案`);
+
+    // 更新任务的 totalSteps
+    const task = taskStorage.get(taskId);
+    if (task) {
+      task.progress.total = totalSteps;
+    }
+    res.write(`data: ${JSON.stringify({ type: 'progress', current: 0, total: totalSteps, message: `开始生成 B-roll 方案 (共 ${totalSteps} 个)` })}\n\n`);
 
     // [新增] 将生成的方案落盘为 Markdown (五列表格排版)
     const visualsDir = path.join(projectRoot, '04_Visuals');
@@ -337,7 +429,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
     fs.writeFileSync(mdOutputPath, mdContent, 'utf-8');
     console.log(`[Phase2] Generated Markdown plan saved to: ${mdOutputPath}`);
 
-    // 将全局方案分发回各个章节
+    // 将全局方案分发回各个章节，并累计实际生成的 options 数量
+    let currentOptionsCount = 0;
     for (let i = 0; i < parsedChapters.length; i++) {
       const parsed = parsedChapters[i];
       const chapterId = `ch${i + 1}`;
@@ -360,14 +453,17 @@ export const startPhase2 = async (req: Request, res: Response) => {
 
       chapters.push(chapter);
 
-      const task = taskStorage.get(taskId);
-      if (task) {
-        task.progress.current = (i + 1) * 3;
-        task.chapters = chapters;
+      // 累计当前 options 数量
+      currentOptionsCount += chapter.options.length;
+
+      const updatedTask = taskStorage.get(taskId);
+      if (updatedTask) {
+        updatedTask.progress.current = currentOptionsCount;
+        updatedTask.chapters = chapters;
       }
 
       res.write(`data: ${JSON.stringify({ type: 'chapter_ready', chapter })}\n\n`);
-      res.write(`data: ${JSON.stringify({ type: 'progress', current: (i + 1) * 3, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'progress', current: currentOptionsCount, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章 (${currentOptionsCount}/${totalSteps} 个方案)` })}\n\n`);
     }
 
     const finalState: SelectionState = {
@@ -562,7 +658,7 @@ function buildRemotionPreview(option: {
         compositionId: 'CinematicZoom',
         props: {
           ...(option.props || {}),
-          imageUrl: 'http://localhost:3002/mindhikers-logo.png', // Fallback URL
+          imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1920&q=80', // Unsplash 占位图
           bgStyle: option.props?.bgStyle || 'dark-gradient'
         }
       };
@@ -796,4 +892,715 @@ export const getThumbnailStatus = async (req: Request, res: Response) => {
   }
 
   return res.json({ status: task.status });
+};
+
+// ============================================================
+// Phase 2 预审 API（重构后）
+// ============================================================
+
+/**
+ * 用户批注审阅结果
+ * POST /api/director/phase2/review
+ */
+export const phase2Review = async (req: Request, res: Response) => {
+  const { projectId, chapterId, reviewStatus, userComment } = req.body;
+
+  if (!projectId || !chapterId || !reviewStatus) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (!['approved', 'skipped'].includes(reviewStatus)) {
+    return res.status(400).json({ error: 'Invalid reviewStatus, must be "approved" or "skipped"' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    let reviewState = loadPhase2ReviewState(projectRoot);
+
+    if (!reviewState) {
+      reviewState = {
+        projectId,
+        lastUpdated: new Date().toISOString(),
+        chapters: []
+      };
+    }
+
+    // 查找或创建章节审阅记录
+    const chapterReview = reviewState.chapters.find(c => c.chapterId === chapterId);
+    if (chapterReview) {
+      chapterReview.reviewStatus = reviewStatus;
+      if (userComment) {
+        chapterReview.userComment = userComment;
+      }
+    } else {
+      reviewState.chapters.push({
+        chapterId,
+        reviewStatus: reviewStatus as 'approved' | 'skipped',
+        userComment
+      });
+    }
+
+    reviewState.lastUpdated = new Date().toISOString();
+    savePhase2ReviewState(projectRoot, reviewState);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Phase2 Review] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to save review' });
+  }
+};
+
+/**
+ * 选择指定方案（仅 approved 状态有效）
+ * POST /api/director/phase2/select
+ */
+export const phase2Select = async (req: Request, res: Response) => {
+  const { projectId, chapterId, optionId } = req.body;
+
+  if (!projectId || !chapterId || !optionId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    let reviewState = loadPhase2ReviewState(projectRoot);
+
+    if (!reviewState) {
+      return res.status(404).json({ error: 'Review state not found, please start Phase 2 first' });
+    }
+
+    // 查找章节审阅记录
+    const chapterReview = reviewState.chapters.find(c => c.chapterId === chapterId);
+    if (!chapterReview) {
+      return res.status(404).json({ error: 'Chapter review not found' });
+    }
+
+    if (chapterReview.reviewStatus !== 'approved') {
+      return res.status(400).json({ error: 'Cannot select option for skipped chapter' });
+    }
+
+    // 更新选中的方案 ID
+    chapterReview.selectedOptionId = optionId;
+    reviewState.lastUpdated = new Date().toISOString();
+    savePhase2ReviewState(projectRoot, reviewState);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Phase2 Select] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to select option' });
+  }
+};
+
+/**
+ * 检查是否所有条目都已批注
+ * GET /api/director/phase2/ready
+ */
+export const phase2Ready = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing projectId' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
+    const selectionState = loadSelectionState(projectRoot);
+    const reviewState = loadPhase2ReviewState(projectRoot);
+
+    if (!selectionState || !selectionState.chapters) {
+      return res.json({ ready: false, pendingCount: 0 });
+    }
+
+    if (!reviewState || !reviewState.chapters) {
+      return res.json({ ready: false, pendingCount: selectionState.chapters.length });
+    }
+
+    // 检查所有章节是否都已批注
+    const pendingCount = selectionState.chapters.filter(
+      ch => !reviewState.chapters.some(rc => rc.chapterId === ch.chapterId)
+    ).length;
+
+    const ready = pendingCount === 0;
+
+    res.json({ ready, pendingCount, total: selectionState.chapters.length });
+  } catch (error: any) {
+    console.error('[Phase2 Ready] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to check ready status' });
+  }
+};
+
+// ============================================================
+// Phase 3 渲染及二审 API
+// ============================================================
+
+/**
+ * 启动 Remotion 和文生视频渲染
+ * POST /api/director/phase3/start-render
+ */
+export const phase3StartRender = async (req: Request, res: Response) => {
+  const { projectId } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing projectId' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+
+    // 读取 Phase 2 审阅状态
+    const reviewState = loadPhase2ReviewState(projectRoot);
+    if (!reviewState) {
+      return res.status(404).json({ error: 'Review state not found, please complete Phase 2 first' });
+    }
+
+    // 读取选择状态，获取章节详情
+    const selectionState = loadSelectionState(projectRoot);
+    if (!selectionState) {
+      return res.status(404).json({ error: 'Selection state not found' });
+    }
+
+    // 初始化 Phase 3 渲染状态
+    let renderState = loadPhase3RenderState(projectRoot);
+    if (!renderState) {
+      renderState = {
+        projectId,
+        lastUpdated: new Date().toISOString(),
+        renderJobs: [],
+        externalAssets: [],
+        xmlGenerated: false,
+        xmlPath: undefined
+      };
+    }
+
+    // 创建渲染任务
+    const renderJobs = [];
+
+    for (const chapter of selectionState.chapters) {
+      const chapterReview = reviewState.chapters.find(rc => rc.chapterId === chapter.chapterId);
+      if (!chapterReview || chapterReview.reviewStatus !== 'approved') {
+        continue;
+      }
+
+      if (!chapterReview.selectedOptionId) {
+        continue;
+      }
+
+      const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
+      if (!selectedOption) {
+        continue;
+      }
+
+      // 仅渲染 remotion 和 seedance 类型
+      if (selectedOption.type === 'remotion' || selectedOption.type === 'seedance') {
+        const jobId = `render-${chapter.chapterId}-${selectedOption.id}-${Date.now()}`;
+
+        const renderJob = {
+          jobId,
+          chapterId: chapter.chapterId,
+          optionId: selectedOption.id,
+          type: selectedOption.type as 'remotion' | 'seedance',
+          status: 'waiting' as const,
+          progress: 0,
+          startedAt: undefined,
+          completedAt: undefined,
+          retryCount: 0
+        };
+
+        renderJobs.push(renderJob);
+        renderState.renderJobs.push(renderJob);
+      }
+    }
+
+    renderState.lastUpdated = new Date().toISOString();
+    savePhase3RenderState(projectRoot, renderState);
+
+    // 实际启动渲染任务
+    await startRenderJobs(renderState, projectRoot, selectionState, reviewState);
+
+    res.json({ success: true, renderJobs });
+  } catch (error: any) {
+    console.error('[Phase3 Start Render] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start render' });
+  }
+};
+
+/**
+ * 启动渲染任务（Remotion 和文生视频）
+ */
+async function startRenderJobs(
+  renderState: Phase3RenderState,
+  projectRoot: string,
+  selectionState: SelectionState,
+  reviewState: Phase2ReviewState
+) {
+  const brollDir = path.join(projectRoot, '06_Video_Broll');
+  ensureDir(brollDir);
+
+  // 串行渲染（避免性能问题）
+  for (const renderJob of renderState.renderJobs) {
+    if (renderJob.type === 'remotion') {
+      await renderRemotionJob(renderJob, projectRoot, selectionState, reviewState);
+    } else if (renderJob.type === 'seedance') {
+      await renderSeedanceJob(renderJob, projectRoot, selectionState, reviewState);
+    }
+
+    // 更新渲染状态
+    const updatedState = loadPhase3RenderState(projectRoot);
+    if (updatedState) {
+      const jobIndex = updatedState.renderJobs.findIndex(j => j.jobId === renderJob.jobId);
+      if (jobIndex >= 0) {
+        updatedState.renderJobs[jobIndex] = renderJob;
+        savePhase3RenderState(projectRoot, updatedState);
+      }
+    }
+  }
+}
+
+/**
+ * 渲染 Remotion 任务
+ */
+async function renderRemotionJob(
+  renderJob: any,
+  projectRoot: string,
+  selectionState: SelectionState,
+  reviewState: Phase2ReviewState
+) {
+  try {
+    // 更新状态为渲染中
+    renderJob.status = 'rendering';
+    renderJob.startedAt = new Date().toISOString();
+    renderJob.progress = 0;
+
+    // 获取章节和选项详情
+    const chapter = selectionState.chapters.find(c => c.chapterId === renderJob.chapterId);
+    const chapterReview = reviewState.chapters.find(rc => rc.chapterId === renderJob.chapterId);
+
+    if (!chapter || !chapterReview) {
+      throw new Error('Chapter or review not found');
+    }
+
+    const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
+    if (!selectedOption) {
+      throw new Error('Selected option not found');
+    }
+
+    // 生成输出文件名
+    const fileName = `${renderJob.chapterId}_remotion.mp4`;
+    const outputPath = path.join(projectRoot, '06_Video_Broll', fileName);
+
+    // 构建 Remotion 渲染参数
+    const { buildRemotionPreview } = await import('./remotion-api-renderer');
+    const { compositionId, props } = buildRemotionPreview(selectedOption);
+
+    // 调用 Remotion 渲染（使用 remotion 命令行工具）
+    await renderRemotionVideo(compositionId, outputPath, props);
+
+    // 更新状态为完成
+    renderJob.status = 'completed';
+    renderJob.progress = 100;
+    renderJob.completedAt = new Date().toISOString();
+    renderJob.outputPath = outputPath;
+
+    console.log(`[Remotion Render] Success: ${renderJob.jobId} -> ${outputPath}`);
+  } catch (error: any) {
+    console.error(`[Remotion Render] Failed: ${renderJob.jobId}`, error);
+    renderJob.status = 'failed';
+    renderJob.error = error.message || 'Render failed';
+  }
+}
+
+/**
+ * 渲染文生视频任务
+ */
+async function renderSeedanceJob(
+  renderJob: any,
+  projectRoot: string,
+  selectionState: SelectionState,
+  reviewState: Phase2ReviewState
+) {
+  try {
+    // 更新状态为渲染中
+    renderJob.status = 'rendering';
+    renderJob.startedAt = new Date().toISOString();
+    renderJob.progress = 0;
+
+    // 获取章节和选项详情
+    const chapter = selectionState.chapters.find(c => c.chapterId === renderJob.chapterId);
+    const chapterReview = reviewState.chapters.find(rc => rc.chapterId === renderJob.chapterId);
+
+    if (!chapter || !chapterReview) {
+      throw new Error('Chapter or review not found');
+    }
+
+    const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
+    if (!selectedOption) {
+      throw new Error('Selected option not found');
+    }
+
+    // 生成输出文件名
+    const fileName = `${renderJob.chapterId}_seedance.mp4`;
+    const outputPath = path.join(projectRoot, '06_Video_Broll', fileName);
+
+    // 调用火山引擎生成视频
+    await renderVolcVideo(selectedOption.imagePrompt || selectedOption.prompt || '', outputPath);
+
+    // 更新状态为完成
+    renderJob.status = 'completed';
+    renderJob.progress = 100;
+    renderJob.completedAt = new Date().toISOString();
+    renderJob.outputPath = outputPath;
+
+    console.log(`[Seedance Render] Success: ${renderJob.jobId} -> ${outputPath}`);
+  } catch (error: any) {
+    console.error(`[Seedance Render] Failed: ${renderJob.jobId}`, error);
+    renderJob.status = 'failed';
+    renderJob.error = error.message || 'Render failed';
+  }
+}
+
+/**
+ * 使用 Remotion CLI 渲染视频
+ */
+async function renderRemotionVideo(
+  compositionId: string,
+  outputPath: string,
+  inputProps: any
+): Promise<void> {
+  const os = await import('os');
+  const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
+    path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio');
+
+  const { spawn } = await import('child_process');
+
+  const tmpPropsPath = `/tmp/remotion-props-${Date.now()}.json`;
+  fs.writeFileSync(tmpPropsPath, JSON.stringify(inputProps), 'utf-8');
+
+  return new Promise((resolve, reject) => {
+    const remotionBin = path.join(REMOTION_STUDIO_DIR, 'node_modules', '.bin', 'remotion');
+    const args = [
+      'render',
+      'src/index.tsx',
+      compositionId,
+      outputPath,
+      '--jpeg-quality=80',
+      '--frames=all',
+      `--props=${tmpPropsPath}`
+    ];
+
+    console.log(`[Remotion Render] Running: ${remotionBin} ${args.join(' ')}`);
+
+    const proc = spawn(remotionBin, args, {
+      cwd: REMOTION_STUDIO_DIR,
+      shell: true,
+      env: { ...process.env, NODE_ENV: 'production' }
+    });
+
+    let stderr = '';
+
+    proc.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(`[Remotion] ${output.trim()}`);
+    });
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (fs.existsSync(tmpPropsPath)) {
+        fs.unlinkSync(tmpPropsPath);
+      }
+
+      if (code !== 0) {
+        reject(new Error(`Remotion exited with code ${code}: ${stderr}`));
+        return;
+      }
+
+      if (!fs.existsSync(outputPath)) {
+        reject(new Error(`Render completed but file not found: ${outputPath}`));
+        return;
+      }
+
+      resolve();
+    });
+
+    proc.on('error', (err) => {
+      if (fs.existsSync(tmpPropsPath)) {
+        fs.unlinkSync(tmpPropsPath);
+      }
+      reject(new Error(`Failed to spawn: ${err.message}`));
+    });
+  });
+}
+
+/**
+ * 使用火山引擎生成视频
+ */
+async function renderVolcVideo(prompt: string, outputPath: string): Promise<void> {
+  // 这里需要实现火山引擎的视频生成 API 调用
+  // 暂时先返回占位符
+  console.log(`[VolcEngine] Rendering video with prompt: ${prompt}`);
+  throw new Error('VolcEngine video rendering not implemented yet');
+}
+
+/**
+ * 获取渲染进度
+ * GET /api/director/phase3/render-status/:jobId
+ */
+export const phase3RenderStatus = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const { projectId } = req.query;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing projectId' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
+    const renderState = loadPhase3RenderState(projectRoot);
+
+    if (!renderState) {
+      return res.json({ status: 'not_found' });
+    }
+
+    const renderJob = renderState.renderJobs.find(job => job.jobId === jobId);
+    if (!renderJob) {
+      return res.json({ status: 'not_found' });
+    }
+
+    res.json({
+      jobId: renderJob.jobId,
+      status: renderJob.status,
+      progress: renderJob.progress,
+      frame: renderJob.frame,
+      totalFrames: renderJob.totalFrames,
+      outputPath: renderJob.outputPath,
+      error: renderJob.error,
+      startedAt: renderJob.startedAt,
+      completedAt: renderJob.completedAt
+    });
+  } catch (error: any) {
+    console.error('[Phase3 Render Status] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get render status' });
+  }
+};
+
+/**
+ * 重新渲染
+ * POST /api/director/phase3/rerender
+ */
+export const phase3Rerender = async (req: Request, res: Response) => {
+  const { projectId, chapterId, optionId } = req.body;
+
+  if (!projectId || !chapterId || !optionId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    let renderState = loadPhase3RenderState(projectRoot);
+
+    if (!renderState) {
+      return res.status(404).json({ error: 'Render state not found' });
+    }
+
+    // 查找现有的渲染任务
+    const existingJob = renderState.renderJobs.find(
+      job => job.chapterId === chapterId && job.optionId === optionId
+    );
+
+    if (existingJob) {
+      // 删除旧的视频文件
+      if (existingJob.outputPath && fs.existsSync(existingJob.outputPath)) {
+        fs.unlinkSync(existingJob.outputPath);
+      }
+
+      // 更新渲染任务状态
+      existingJob.status = 'waiting';
+      existingJob.progress = 0;
+      existingJob.outputPath = undefined;
+      existingJob.error = undefined;
+      existingJob.startedAt = undefined;
+      existingJob.completedAt = undefined;
+      existingJob.retryCount = (existingJob.retryCount || 0) + 1;
+    }
+
+    renderState.lastUpdated = new Date().toISOString();
+    savePhase3RenderState(projectRoot, renderState);
+
+    // TODO: 实际启动重新渲染任务
+
+    res.json({ success: true, jobId: existingJob?.jobId });
+  } catch (error: any) {
+    console.error('[Phase3 Rerender] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to rerender' });
+  }
+};
+
+/**
+ * 二审通过，视频落盘
+ * POST /api/director/phase3/approve
+ */
+export const phase3Approve = async (req: Request, res: Response) => {
+  const { projectId, chapterId } = req.body;
+
+  if (!projectId || !chapterId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    let renderState = loadPhase3RenderState(projectRoot);
+
+    if (!renderState) {
+      return res.status(404).json({ error: 'Render state not found' });
+    }
+
+    // 查找渲染任务
+    const renderJob = renderState.renderJobs.find(job => job.chapterId === chapterId);
+    if (!renderJob) {
+      return res.status(404).json({ error: 'Render job not found' });
+    }
+
+    if (renderJob.status !== 'completed') {
+      return res.status(400).json({ error: 'Cannot approve incomplete render' });
+    }
+
+    // 视频已经落盘，只需更新状态
+    renderJob.status = 'completed';
+    renderState.lastUpdated = new Date().toISOString();
+    savePhase3RenderState(projectRoot, renderState);
+
+    res.json({ success: true, outputPath: renderJob.outputPath });
+  } catch (error: any) {
+    console.error('[Phase3 Approve] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to approve render' });
+  }
+};
+
+// ============================================================
+// Phase 3 外部素材 API
+// ============================================================
+
+/**
+ * 加载外部素材，复制到项目目录
+ * POST /api/director/phase3/load-asset
+ */
+export const phase3LoadAsset = async (req: Request, res: Response) => {
+  const { projectId, chapterId, type, sourcePath } = req.body;
+  const file = req.file as any;
+
+  if (!projectId || !chapterId || !type) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (!['artlist', 'internet-clip', 'user-capture'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid type, must be "artlist", "internet-clip", or "user-capture"' });
+  }
+
+  if (!file && !sourcePath) {
+    return res.status(400).json({ error: 'Missing file or sourcePath' });
+  }
+
+  try {
+    const { loadExternalAsset, handleUploadedFile } = require('./assets');
+    let asset;
+
+    if (file) {
+      // 处理上传的文件
+      asset = await handleUploadedFile(
+        projectId,
+        chapterId,
+        type as 'artlist' | 'internet-clip' | 'user-capture',
+        file
+      );
+    } else {
+      // 处理本地文件路径
+      asset = await loadExternalAsset(
+        projectId,
+        chapterId,
+        type as 'artlist' | 'internet-clip' | 'user-capture',
+        sourcePath
+      );
+    }
+
+    // 更新渲染状态
+    const projectRoot = getProjectRoot(projectId);
+    let renderState = loadPhase3RenderState(projectRoot);
+    if (!renderState) {
+      renderState = {
+        projectId,
+        lastUpdated: new Date().toISOString(),
+        renderJobs: [],
+        externalAssets: [],
+        xmlGenerated: false,
+        xmlPath: undefined
+      };
+    }
+
+    renderState.externalAssets.push(asset);
+    renderState.lastUpdated = new Date().toISOString();
+    savePhase3RenderState(projectRoot, renderState);
+
+    res.json({ success: true, assetId: asset.assetId, targetPath: asset.targetPath });
+  } catch (error: any) {
+    console.error('[Phase3 Load Asset] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to load asset' });
+  }
+};
+
+/**
+ * 获取已加载的外部素材
+ * GET /api/director/phase3/assets
+ */
+export const phase3GetAssets = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing projectId' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
+    const renderState = loadPhase3RenderState(projectRoot);
+
+    if (!renderState) {
+      return res.json({ assets: [] });
+    }
+
+    res.json({ assets: renderState.externalAssets || [] });
+  } catch (error: any) {
+    console.error('[Phase3 Get Assets] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get assets' });
+  }
+};
+
+// ============================================================
+// Phase 3 XML 生成 API
+// ============================================================
+
+/**
+ * 生成 Final Cut Pro XML 文件
+ * POST /api/director/phase3/generate-xml
+ */
+export const phase3GenerateXML = async (req: Request, res: Response) => {
+  const { projectId } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing projectId' });
+  }
+
+  try {
+    const { generateFCPXML } = require('./xml-generator');
+    const { xmlPath, success } = await generateFCPXML(projectId);
+
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to generate XML' });
+    }
+
+    res.json({ success: true, xmlPath });
+  } catch (error: any) {
+    console.error('[Phase3 Generate XML] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate XML' });
+  }
 };

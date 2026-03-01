@@ -6,14 +6,6 @@ import { Phase3View } from './director/Phase3View';
 import { Phase4View } from './director/Phase4View';
 import type { DirectorModule, DirectorChapter, RenderJob, BRollType } from '../types';
 
-interface BrollResult {
-  sceneId: string;
-  success: boolean;
-  outputPath?: string;
-  gifPath?: string;
-  error?: string;
-}
-
 interface DirectorSectionProps {
   data: DirectorModule;
   projectId: string;
@@ -31,13 +23,10 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
 
   const [chapters, setChapters] = useState<DirectorChapter[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState('0/0');
+  const [loadingProgress, setLoadingProgress] = useState('');
 
   const [jobs, setJobs] = useState<RenderJob[]>([]);
-  const [isBatchRendering, setIsBatchRendering] = useState(false);
-
-  const [brollSelections, setBrollSelections] = useState<BRollType[]>(['remotion', 'seedance', 'artlist', 'internet-clip', 'user-capture']);
-  const [brollPaths, setBrollPaths] = useState<BrollResult[]>([]);
+  const [brollPaths] = useState<any[]>([]);
 
   const handleGenerateConcept = async () => {
     if (!scriptPath) {
@@ -198,21 +187,21 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     }
   };
 
-  const handleSelect = (chapterId: string, optionId: string) => {
-    setChapters(prev => prev.map(c =>
-      c.chapterId === chapterId ? { ...c, selectedOptionId: optionId } : c
+  const handleSelectOption = (chapterId: string, optionId: string) => {
+    setChapters(prev => prev.map(ch =>
+      ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId } : ch
     ));
   };
 
   const handleComment = (chapterId: string, comment: string) => {
-    setChapters(prev => prev.map(c =>
-      c.chapterId === chapterId ? { ...c, userComment: comment } : c
+    setChapters(prev => prev.map(ch =>
+      ch.chapterId === chapterId ? { ...ch, userComment: comment } : ch
     ));
   };
 
   const handleLock = (chapterId: string) => {
-    setChapters(prev => prev.map(c =>
-      c.chapterId === chapterId ? { ...c, isLocked: true } : c
+    setChapters(prev => prev.map(ch =>
+      ch.chapterId === chapterId ? { ...ch, isLocked: true } : ch
     ));
   };
 
@@ -225,27 +214,6 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
       progress: 0,
     })));
     setPhase(3);
-  };
-
-  const handleRenderOne = (_chapterId: string) => {
-  };
-
-  const handleRenderAll = async () => {
-    setIsBatchRendering(true);
-    for (const job of jobs) {
-      setJobs(prev => prev.map(j =>
-        j.chapterId === job.chapterId ? { ...j, status: 'rendering' as const, progress: 50, frame: 45, totalFrames: 90 } : j
-      ));
-      await new Promise(r => setTimeout(r, 1000));
-      setJobs(prev => prev.map(j =>
-        j.chapterId === job.chapterId ? { ...j, status: 'completed' as const, progress: 100 } : j
-      ));
-    }
-    setIsBatchRendering(false);
-  };
-
-  const handleRemotionRenderComplete = (results: BrollResult[]) => {
-    setBrollPaths(results.filter(r => r.success && r.outputPath));
   };
 
   const phaseLabels: Record<Phase, string> = {
@@ -322,7 +290,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             isLoading={isLoading}
             loadingProgress={loadingProgress}
             onConfirmBRoll={handleConfirmBRoll}
-            onSelect={handleSelect}
+            onSelect={handleSelectOption}
             onComment={handleComment}
             onLock={handleLock}
             onProceed={handleProceed}
@@ -333,11 +301,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
           <Phase3View
             projectId={projectId}
             chapters={chapters}
-            jobs={jobs}
-            isBatchRendering={isBatchRendering}
-            onRenderOne={handleRenderOne}
-            onRenderAll={handleRenderAll}
-            onRemotionRenderComplete={handleRemotionRenderComplete}
+            onProceed={handleProceed}
           />
         )}
 

@@ -271,6 +271,67 @@ export interface RenderJob {
 }
 
 // ============================================================
+// SD-202: Director Master Phase 2/3 Refactor Types
+// ============================================================
+
+// B-roll 预审状态
+export type BRollReviewStatus = 'pending' | 'approved' | 'skipped';
+
+// B-roll 渲染状态
+export type BRollRenderStatus = 'waiting' | 'rendering' | 'completed' | 'failed';
+
+// Phase 3 渲染任务
+export interface RenderJob_V2 {
+    jobId: string;
+    chapterId: string;
+    optionId: string;
+    type: 'remotion' | 'seedance';
+    status: BRollRenderStatus;
+    progress: number; // 0-100
+    frame?: number;
+    totalFrames?: number;
+    outputPath?: string;
+    error?: string;
+    startedAt?: string;
+    completedAt?: string;
+    retryCount?: number;
+}
+
+// 外部素材加载记录
+export interface ExternalAsset {
+    assetId: string;
+    chapterId: string;
+    type: 'artlist' | 'internet-clip' | 'user-capture';
+    sourcePath: string; // 原始文件路径
+    targetPath: string; // 复制后路径
+    loadedAt: string;
+}
+
+// 扩展的 DirectorChapter（支持 Phase 2/3）
+export interface DirectorChapter_V2 extends DirectorChapter {
+    // Phase 2 预审数据
+    reviewStatus: BRollReviewStatus; // 'pending' | 'approved' | 'skipped'
+
+    // Phase 3 渲染数据
+    renderStatus?: BRollRenderStatus;
+    renderProgress?: number; // 0-100
+    outputPath?: string; // 渲染后视频路径
+    retryCount?: number; // 重试次数
+}
+
+// 扩展的 BRollOption（支持 Phase 2 预审）
+export interface BRollOption_V2 {
+    optionId: string;
+    type: 'remotion' | 'seedance' | 'artlist' | 'internet-clip' | 'user-capture';
+    description: string; // 导演大师生成的文案
+    previewPath?: string; // 预览图路径 (remotion/seedance)
+    props?: Record<string, any>; // Remotion 模板参数
+    prompt?: string; // 文生视频提示词
+    searchKeywords?: string[]; // Artlist/互联网搜索关键词
+    searchTips?: string; // 搜索提示
+}
+
+// ============================================================
 // SD-206: Shorts Master V2 Types
 // ============================================================
 

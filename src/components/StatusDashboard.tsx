@@ -8,15 +8,15 @@ interface StatusDashboardProps {
 export const StatusDashboard = ({ state }: StatusDashboardProps) => {
 
     const directorTotal = state.modules.director.items.length;
-    const directorDone = state.modules.director.items.reduce((acc, i) => acc + (i.checked ? 1 : 0), 0);
+    const directorDone = state.modules.director.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
 
     const musicTotal = state.modules.music.items.length;
-    const musicDone = state.modules.music.items.reduce((acc, i) => acc + (i.checked ? 1 : 0), 0);
+    const musicDone = state.modules.music.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
 
     const marketingSubmitted = state.modules.marketing.isSubmitted;
 
-    const shortsTotal = state.modules.shorts?.items.length || 0;
-    const shortsDone = state.modules.shorts?.items.filter(s => s.status === 'published').length || 0;
+    const shortsTotal = (state.modules.shorts as any)?.items?.length || (state.modules.shorts as any)?.scripts?.length || 0;
+    const shortsDone = (state.modules.shorts as any)?.items?.filter((s: any) => s.status === 'published').length || 0;
 
     const totalTasks = directorTotal + musicTotal + 1 + shortsTotal;
     const totalDone = directorDone + musicDone + (marketingSubmitted ? 1 : 0) + shortsDone;
