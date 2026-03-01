@@ -1,6 +1,6 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-01 22:30 CST
+> **更新日期**: 2026-03-01 CST
 
 ---
 
@@ -16,6 +16,7 @@
 | v3.1 | 2026-02-28 | **Remotion 新模板赋能** - 强制 template 字段 + 4 个新模板可用 |
 | v3.2 | 2026-02-28 | **导演大师 Phase 2/3 重构** - 预审流程 + 渲染二审 + XML 生成 |
 | v3.3 | 2026-03-01 | **Phase2/3 细节优化** - 进度显示、评论提交、列表头、章节名、预览图质量 |
+| v3.4 | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
 
 ---
 
@@ -362,3 +363,30 @@
 ---
 
 ## 12. 文件变更日志（v3.3）
+
+---
+
+### ✅ v3.4 已完成功能（2026-03-01）
+
+#### Worktree 环境修复
+- [x] **launch.json 路径修复** - 在 worktree 环境下通过 `env` 字段注入正确的 `PROJECTS_BASE` 和 `SKILLS_BASE`，解决 Projects 路径指向 worktree 内部错误位置的问题
+- [x] **Sync Failed 修复** - Skills Synced (6) 正常，项目列表正常加载
+- [x] **昨日进度抢救提交** - 1799行未提交修改（21个文件）全部 commit 保存，包含 Phase2/3 重构、管线引擎、新设计文档
+
+#### 开发者体验
+- [x] **Claude Code 用量监控** - 为 Pro 订阅用户配置 statusline，终端底部实时显示 `Context: XX% used`
+
+#### 待办（v3.5 下一步）
+- [ ] 验证 Remotion 预览图生成（四个新模板：TextReveal、NumberCounter、ComparisonSplit、TimelineFlow）
+- [ ] 修复 Remotion 预览图生成失败问题
+- [ ] 预览图内容升级：从文字卡片升级为真实 Composition 渲染帧
+- [ ] 火山引擎 AI 图像接入（seedance/generative 类型）
+- [ ] 改造剩余4个Remotion模板应用 fitText
+
+## 13. 文件变更日志（v3.4）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `.claude/launch.json` | **修改** | 注入 `PROJECTS_BASE`/`SKILLS_BASE` env 变量，修复 worktree 路径问题 |
+| `~/.claude/settings.json` | **修改** | 配置 statusline 显示 Context 用量百分比 |
+
