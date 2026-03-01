@@ -289,7 +289,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
   const scriptContent = fs.readFileSync(scriptFullPath, 'utf-8');
   const parsedChapters = parseMarkdownChapters(scriptContent);
 
-  const totalSteps = parsedChapters.length * 3;
+  // totalSteps = chapter count; actual options per chapter are AI-decided (1~5)
+  const totalSteps = parsedChapters.length;
   const chapters: DirectorChapter[] = [];
 
   taskStorage.set(taskId, {
@@ -362,12 +363,12 @@ export const startPhase2 = async (req: Request, res: Response) => {
 
       const task = taskStorage.get(taskId);
       if (task) {
-        task.progress.current = (i + 1) * 3;
+        task.progress.current = i + 1;
         task.chapters = chapters;
       }
 
       res.write(`data: ${JSON.stringify({ type: 'chapter_ready', chapter })}\n\n`);
-      res.write(`data: ${JSON.stringify({ type: 'progress', current: (i + 1) * 3, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'progress', current: i + 1, total: totalSteps, message: `已完成 ${i + 1}/${parsedChapters.length} 章` })}\n\n`);
     }
 
     const finalState: SelectionState = {
