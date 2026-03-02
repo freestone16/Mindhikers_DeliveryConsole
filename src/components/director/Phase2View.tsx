@@ -65,7 +65,6 @@ export const Phase2View = ({
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
             <span className="text-white">Generating previews...</span>
-            <span className="text-blue-400 font-mono">{loadingProgress}</span>
           </div>
         </div>
       )}
