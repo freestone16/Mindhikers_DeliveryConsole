@@ -102,7 +102,7 @@ ${baseContext}
 
 直接输出提案内容，不要有多余说明。`,
 
-        broll: `\${baseContext}
+        broll: `${baseContext}
 
 ================================
 
