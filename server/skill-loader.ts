@@ -131,46 +131,104 @@ ${baseContext}
   ]
 }
 
-【Remotion 模板菜单指南 - 优先级排序】
+【Remotion 组件速查表 - 严格 Props 契约】
 
-🌟 **优先推荐（新模板 - 数据驱动）**：
+⚠️ 以下是每个 Remotion 组件的合法 Props 规范。type 为 "remotion" 时，你的 props 字段必须严格符合对应模板的结构，字段名不得错写，否则渲染会直接失败。
 
-1. **TextReveal** - 文字揭示动画
-   适用场景：金句、名言、观点、标题出场
-   所需 props：{ “text”: “文字内容”, “textColor”: “#ffffff” }
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-2. **NumberCounter** - 数字跑动动画
-   适用场景：统计数据、增长数字（如 14.5万、0.839）、重要指标
-   所需 props：{ “title”: “标题”, “endNumber”: 数字, “suffix”: “单位” }
+🌟 **优先推荐（数据驱动型）**：
 
-3. **ComparisonSplit** - 分屏对比
-   适用场景：A vs B、传统 vs 觉醒、Otto vs Inga、归因 vs 涌现
-   所需 props：{ “leftTitle”: “左标题”, “leftContent”: “左文案”, “rightTitle”: “右标题”, “rightContent”: “右文案” }
+**1. TextReveal** — 文字揭示动画
+适用：金句、名言、观点、标题出场
+\`\`\`json
+{ "text": "未来的终极形态，始于今日的构想。", "textColor": "#ffffff" }
+\`\`\`
+字段说明：\`text\`(必填，字符串)，\`textColor\`(选填，默认#fff)
 
-4. **TimelineFlow** - 时间线编年史
-   适用场景：历史进程、演化路线图、从...到...的发展
-   所需 props：{ “title”: “标题”, “nodes”: [{“year”: “年份”, “event”: “事件”}] }
+**2. NumberCounter** — 数字滚动计数器
+适用：统计数据、增长数字、重要指标
+\`\`\`json
+{ "title": "全球已突破", "endNumber": 2500000, "suffix": "人" }
+\`\`\`
+字段说明：\`title\`(必填)，\`endNumber\`(必填，纯数字，不要带单位)，\`suffix\`(选填，单位字符串)
 
-📊 **标准模板（已有）**：
+**3. ComparisonSplit** — 左右分屏对比
+适用：A vs B、传统 vs 觉醒、归因 vs 涌现
+\`\`\`json
+{ "leftTitle": "传统模式", "leftContent": "线性思考，孤岛式运作", "rightTitle": "觉醒模式", "rightContent": "网状连接，指数级涌现" }
+\`\`\`
+字段说明：4个字段全部必填，每个控制对应半屏内容
 
-5. **ConceptChain**：展示”A→B→C”这种递进关系或因果链条的认知模型。
-   所需 props：\`{ “title”: “大标题”, “subtitle”: “副标题”, “conclusion”: “一句金句总结”, “nodes”: [{“id”:”xxx”, “label”:”节点名”, “desc”:”短描述”, “icon”:”Emoji图标”, “color”:”#hex色值”}] }\` (至少2个，最多5个 node)。
+**4. TimelineFlow** — 时间轴演化图
+适用：历史进程、从...到...的发展路线
+\`\`\`json
+{ "title": "进化编年史", "nodes": [{"year": "2015", "event": "萌芽探索期"}, {"year": "2020", "event": "技术验证期"}, {"year": "2024", "event": "爆发增长期"}]}
+\`\`\`
+字段说明：\`title\`(必填)，\`nodes\`数组每项含\`year\`和\`event\`两个字符串字段
 
-6. **DataChartQuadrant**：适用于二元对比、象限图、分布图分析。
-   所需 props：\`{ “title”: “大标题”, “xAxisLabel”: “右箭头X轴名”, “yAxisLabel”: “上箭头Y轴名”, “quadrants”: [{“id”:”xxx”, “label”:”象限名”, “subLabel”:”副名”, “x”:1或0, “y”:1或0, “emoji”:”Emoji”, “color”:”#hex色值”}] }\` (必须4个 quadrant)。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-7. **CinematicZoom**：适用于单张大图的氛围感电影级缓慢拉伸镜头。
-   所需 props：\`{ “imagePrompt”: “你想要的画面英文提示词”, “bgStyle”: “black”, “zoomStart”: 1, “zoomEnd”: 1.1 }\`
+📊 **标准模板**：
+
+**5. ConceptChain** — 概念链条（A→B→C递进模型）
+适用：因果链、认知框架、递进逻辑
+\`\`\`json
+{
+  "title": "认知演化链条",
+  "subtitle": "核心模型：递进与连接",
+  "conclusion": "说不清的孩子，注定守不住",
+  "nodes": [
+    {"id": "express", "label": "精准表达", "icon": "💬", "color": "#3498db", "desc": "用语言定义思想"},
+    {"id": "think",   "label": "清晰思维", "icon": "🧠", "color": "#9b59b6", "desc": "逻辑与结构能力"},
+    {"id": "ethics",  "label": "伦理判断", "icon": "⚖️", "color": "#e74c3c", "desc": "道德与价值观"}
+  ]
+}
+\`\`\`
+字段说明：\`nodes\`数组每项必须含\`id\`(唯一字符串)、\`label\`(节点名)、\`icon\`(Emoji)、\`color\`(#hex)、\`desc\`(短描述)
+🚨 **硬性约束：nodes 最少 2 个，最多 5 个。超过 5 个请改用 TimelineFlow。**
+
+**6. DataChartQuadrant** — 四象限分布图
+适用：二元对比、决策矩阵、象限分析
+\`\`\`json
+{
+  "title": "认知密度象限图",
+  "xAxisLabel": "屏幕时长 →",
+  "yAxisLabel": "互动密度 →",
+  "quadrants": [
+    {"id": "zombie", "label": "僵尸区", "subLabel": "高时长+低互动", "x": 1, "y": 0, "emoji": "🧟", "color": "#ff4757"},
+    {"id": "evolve", "label": "进化脑", "subLabel": "高时长+高互动", "x": 1, "y": 1, "emoji": "🧠", "color": "#2ed573"},
+    {"id": "passive","label": "被动区", "subLabel": "低时长+低互动", "x": 0, "y": 0, "emoji": "😴", "color": "#ffa502"},
+    {"id": "active", "label": "主动区", "subLabel": "低时长+高互动", "x": 0, "y": 1, "emoji": "⚡", "color": "#3742fa"}
+  ]
+}
+\`\`\`
+字段说明：\`quadrants\`必须**恰好4个**，\`x\`和\`y\`只能填0或1
+
+**7. CinematicZoom** — 电影级单图Ken Burns推镜
+适用：大图氛围感、哲思风格、单帧展示
+\`\`\`json
+{ "bgStyle": "dark-gradient", "zoomStart": 1, "zoomEnd": 1.08 }
+\`\`\`
+字段说明：\`bgStyle\`可选值为 "black" | "dark-gradient" | "stripes"；\`zoomStart\`和\`zoomEnd\`控制推拉幅度(建议1.0~1.15之间)
+注意：实际底图由火山引擎根据 imagePrompt 生成后自动传入，你不需要填 imageUrl。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎨 **兜底模板**：
 
-8. **SceneComposer**：万能排版工具。仅当上述模板都不适用时使用。
-   所需 props：空对象 \`{}\` 即可。
+**8. SceneComposer** — 万能文字排版（仅当所有模板都不适用时降级使用）
+\`\`\`json
+{}
+\`\`\`
 
-【⚠️ 必须遵守的规则】
-- 所有 type 为 'remotion' 的选项**必须**指定 template 字段
-- 不要遗漏 template 和 props 字段
-- props 必须包含模板所需的参数
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【🚨 严格执行规则】
+- type 为 "remotion" 时，**template 和 props 字段都不可缺失**
+- props 的字段名必须完全匹配上方规范，**不可拼错、不可省略必填字段**
+- ConceptChain 的 nodes 超过 5 个时，**必须改用 TimelineFlow**
+- DataChartQuadrant 的 quadrants **必须恰好是 4 个**，不多不少
 
 【各 B-roll 类型适用场景指南】
 作为导演大师，你应该根据内容本身的最佳视觉方案来自由选择最合适的 type，而非机械地均分。以下是各类型的核心适用场景：
