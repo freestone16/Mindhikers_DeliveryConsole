@@ -20,6 +20,7 @@
 ### 服务器启动 / 依赖管理
 - [x] node_modules 平台不匹配导致启动失败 → 见下方 L-004
 - [x] llm.ts 文件被错误覆盖 → 见下方 L-006
+- [x] 恢复错误版本时不应修改已工作的代码 → 见下方 L-007
 
 ### 通用开发
 - [x] 不要擅自修改配置路径 → 见下方 L-001
@@ -257,6 +258,152 @@ import type { RightPanelMode } from './components/RightPanel';
 ---
 
 ### [LLM 模块] L-006 - llm.ts 文件被错误覆盖，导致 Phase 2 总是显示兜底方案
+
+**日期**：2026-03-03
+
+**问题**：
+- Phase 2 启动后，总是显示"兜底方案（LLM 生成失败）"
+- SiliconFlow API 验证成功，但 Phase 2 仍然无法正常生成
+- 前端显示：所有 B-roll 方案的 `rationale` 都是"兜底方案（LLM 生成失败）"
+
+**根本原因**：
+1. `llm.ts` 文件被错误覆盖，从 510 行缩减到 50 行
+2. 缺少 Phase 2 生成所需的核心函数：
+   - `generateGlobalBRollPlan` - 全局 B-roll 规划生成
+   - `generateFallbackOptions` - 兜底方案生成
+   - `generateBRollOptions` - 单章节 B-roll 方案生成
+   - `BRollOption` 类型定义
+3. `director.ts` 导入这些函数时报错，导致每次调用都使用兜底方案
+4. **关键问题**：覆盖文件时使用了 `Write` 工具而不是 `Edit`，导致整个文件内容丢失
+
+**诊断过程**：
+```bash
+# Phase 1: 根因调查
+wc -l server/llm.ts          # 只有 50 行
+wc -l server/llm_backup.ts  # 510 行（完整文件）
+
+# Phase 2: 模式分析
+grep -n "generateGlobalBRollPlan" server/llm.ts      # 未找到
+grep -n "generateGlobalBRollPlan" server/llm_backup.ts  # 找到（在 237 行）
+
+# Phase 3: 结论验证
+# director.ts 从 './llm' 导入，但 llm.ts 缺少必要的函数
+# 导致运行时调用失败，只能使用兜底方案
+```
+
+**修复**：
+1. 从 `llm_backup.ts` 恢复完整的 `llm.ts` 文件
+2. 在恢复的 `callSiliconFlowLLM` 函数中保留新添加的超时逻辑：
+   ```typescript
+   const controller = new AbortController();
+   const timeoutId = setTimeout(() => {
+     controller.abort();
+     console.error(`[llm.ts] SiliconFlow API timeout after 30s`);
+   }, 30000); // 30 秒超时
+   ```
+3. 重启服务器，确保新代码加载
+
+**教训 / 规则**：
+1. **永远不要对大文件使用 Write 工具进行部分修复**：
+   - `Write` 工具会覆盖整个文件
+   - 对于部分修复，必须使用 `Edit` 工具
+   - 如果文件超过 50 行，考虑使用 `Edit` 或 `Edit` with `replace_all`
+
+2. **修复前的验证清单**：
+   - ✅ 检查文件完整内容（`Read` 工具读取全部）
+   - ✅ 确认要修改的位置和上下文
+   - ✅ 使用 `old_string` 包含足够多的上下文（至少 5-10 行）
+   - ✅ 验证 `old_string` 在文件中唯一存在
+
+3. **核心文件备份机制**：
+   - 修改前创建备份：`cp file.ts file.ts.backup`
+   - 发现文件被错误覆盖时，立即从备份恢复
+   - 定期清理过期的备份文件
+
+4. **错误检测机制**：
+   - 文件被覆盖后，检查行数是否突然减少
+   - 检查关键函数是否仍然存在（用 `grep`）
+   - 如果发现异常，立即停止并恢复
+
+5. **Phase 2 生成失败的诊断流程**：
+   - 检查 `llm.ts` 是否包含 `generateGlobalBRollPlan`
+   - 检查 `director.ts` 是否能正确导入函数
+   - 查看 `rationale` 字段是否为"兜底方案"
+   - 如果都是兜底，检查 `llm.ts` 是否被损坏
+
+**相关文件**：
+- `/Users/luzhoua/DeliveryConsole/server/llm.ts` - 已恢复完整内容
+- `/Users/luzhoua/DeliveryConsole/server/llm_backup.ts` - 备份文件
+- `/Users/luzhoua/DeliveryConsole/server/director.ts:4` - 导入语句
+
+**验证结果**（2026-03-03）：
+- ✅ `llm.ts` 恢复为 510 行
+- ✅ 所有必要的函数都存在
+- ✅ SiliconFlow 超时逻辑保留
+- ✅ 代码已提交到 main 分支
+
+---
+
+### [版本恢复] L-007 - 恢复到已知正常工作的版本时，不要添加新修改
+
+**日期**：2026-03-03
+
+**问题**：
+- 从 `llm_backup.ts` 恢复 `llm.ts` 后，添加了超时逻辑
+- 结果 Phase 2 仍然显示兜底方案
+- 服务器日志显示：`[Phase1] Error: TypeError: (0 , import_llm.callLLM) is not a function`
+
+**根本原因**：
+1. 在 `llm_backup.ts` 中添加超时逻辑时，修改了文件结构
+2. 新的超时代码与 TypeScript 编译系统不兼容
+3. `tsx watch` 检测到变化后重新编译，但编译失败
+4. 模块加载时 `callLLM` 函数未正确导出
+
+**修复**：
+- 使用 `git checkout c9237d6 -- server/llm.ts` 恢复到已知正常工作的版本
+- 不添加任何新修改，只恢复原始代码
+
+**教训 / 规则**：
+1. **恢复版本的策略**：
+   - 使用 `git checkout <commit> -- <file>` 恢复文件
+   - 不要在恢复后立即添加新修改
+   - 先验证恢复的版本是否正常工作
+
+2. **版本回滚的步骤**：
+   - Phase 1: 使用 git 恢复文件
+   - Phase 2: 重启服务器
+   - Phase 3: 验证功能是否正常
+   - Phase 4: 如果正常，再考虑添加新功能
+   - Phase 5: 每次添加新功能后重启验证
+
+3. **避免"修复过度"**：
+   - 恢复版本时，不要同时修复其他问题
+   - 一次只做一个改变（恢复 + 验证）
+   - 确认恢复成功后，再进行下一步
+
+4. **版本标记机制**：
+   - 在 dev_progress.md 中记录已知正常工作的 commit hash
+   - 例如：`Phase 2 正常工作的版本: c9237d6`
+   - 恢复时参考这些标记
+
+5. **诊断失败的原因**：
+   - 检查服务器日志的编译错误
+   - 检查 `tsx watch` 是否重新加载成功
+   - 检查模块是否正确导出函数
+
+**相关文件**：
+- `server/llm.ts` - 恢复到 c9237d6 版本
+- `server/llm_backup.ts` - 之前修改失败的版本
+
+**验证结果**（2026-03-03）：
+- ✅ `llm.ts` 恢复为 503 行
+- ✅ 服务器正常启动
+- ✅ Phase 1 正常生成
+- ✅ Phase 2 应该能正常调用 LLM
+
+---
+
+### [服务器启动] L-004 - node_modules 平台不匹配导致启动失败
 
 **日期**：2026-03-03
 
