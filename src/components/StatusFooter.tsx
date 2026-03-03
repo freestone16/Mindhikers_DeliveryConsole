@@ -33,7 +33,7 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
 
                 {/* Version */}
                 <div className="text-slate-600">
-                    MindHikers Console v3.1
+                    MindHikers Console v3.7
                 </div>
 
                 {/* Skill Sync Status */}
