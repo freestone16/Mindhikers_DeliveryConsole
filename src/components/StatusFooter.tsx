@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { APP_VERSION } from '../config/version';
 
 const SOCKET_URL = 'http://127.0.0.1:3002';
 
@@ -33,7 +34,7 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
 
                 {/* Version */}
                 <div className="text-slate-600">
-                    MindHikers Console v3.7
+                    MindHikers Console {APP_VERSION}
                 </div>
 
                 {/* Skill Sync Status */}
