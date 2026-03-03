@@ -64,6 +64,37 @@ const EXPERTS_CONFIG = [
     { id: 'MarketingMaster', skillName: 'MarketingMaster', outputDir: '05_Marketing' }
 ];
 
+// --- Version Auto-Detection (from git log) ---
+function getAppVersion(): string {
+    try {
+        // Read package.json version as fallback
+        const packageJsonPath = path.join(__dirname, '../../package.json');
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        const packageVersion = packageJson.version;
+
+        // Try to get version from git log (e.g., "v3.7")
+        const gitLogPath = path.join(__dirname, '../../.git');
+        if (fs.existsSync(gitLogPath)) {
+            const { execSync } = require('child_process');
+            try {
+                // Get latest commit message and extract version
+                const commitMsg = execSync('git log -1 --pretty=%B', { encoding: 'utf-8', cwd: __dirname + '/../../' });
+                const versionMatch = commitMsg.match(/v(\d+\.\d+(?:\.\d+)?)/);
+                if (versionMatch) {
+                    return `v${versionMatch[1]}`;
+                }
+            } catch (e) {
+                // Git not available or error, fall through
+            }
+        }
+
+        // Fallback to package.json version
+        return `v${packageVersion}`;
+    } catch (e) {
+        return 'v0.0.0';
+    }
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -76,6 +107,11 @@ app.use('/api/distribution', distributionRouter);
 // Visual Plan Routes
 app.get('/api/visual-plan', getVisualPlan);
 app.post('/api/visual-plan/scene/review', updateSceneReview);
+
+// Version Route
+app.get('/api/version', (req, res) => {
+    res.json({ version: getAppVersion() });
+});
 
 // LLM Config Routes
 app.get('/api/llm-config/status', getConfigStatus);
@@ -170,7 +206,7 @@ function ensureDeliveryFile(projectId: string) {
             MarketingMaster: { status: 'idle', logs: [] }
         },
         modules: {
-            director: { phase: 1, conceptProposal: "", items: [] },
+            director: { phase: 1, conceptProposal: "", conceptFeedback: "", isConceptApproved: false, items: [], renderJobs: [] },
             music: { phase: 1, moodProposal: "", items: [] },
             thumbnail: { variants: [] },
             marketing: { strategy: { seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' }, social: { twitterThread: '', redditPost: '' }, geo: { locationTags: [], culturalRelleance: '' } }, feedback: '', isSubmitted: false },

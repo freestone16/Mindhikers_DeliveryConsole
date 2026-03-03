@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { APP_VERSION } from '../config/version';
 
 const SOCKET_URL = 'http://127.0.0.1:3002';
 
 export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
     const [syncStatus, setSyncStatus] = useState<any>(null);
+    const [version, setVersion] = useState<string>('Loading...');
 
     useEffect(() => {
         const socket = io(SOCKET_URL);
@@ -19,6 +19,18 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
         return () => {
             socket.close();
         };
+    }, []);
+
+    // Fetch version from backend
+    useEffect(() => {
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => {
+                if (data.version) {
+                    setVersion(data.version);
+                }
+            })
+            .catch(console.error);
     }, []);
 
     return (
@@ -34,7 +46,7 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
 
                 {/* Version */}
                 <div className="text-slate-600">
-                    MindHikers Console {APP_VERSION}
+                    MindHikers Console {version}
                 </div>
 
                 {/* Skill Sync Status */}

@@ -40,11 +40,12 @@ export interface MarketingStrategy {
 }
 
 export interface DirectorModule {
-    phase: 1 | 2;
+    phase: number;
     conceptProposal: string;
     conceptFeedback: string;
-    isConceptApproved: boolean; // NEW: persists submit state
-    items: BaseItem[];
+    isConceptApproved: boolean;
+    items: any[]; // Using any[] here to avoid circular/forward refs for now, will cast to DirectorChapter[] in component
+    renderJobs?: any[]; // Using any[] to avoid forward refs to RenderJob
 }
 
 export interface MusicModule {

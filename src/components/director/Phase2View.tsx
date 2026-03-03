@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Play, Loader2 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
@@ -8,7 +8,7 @@ interface Phase2ViewProps {
   projectId: string;
   chapters: DirectorChapter[];
   isLoading: boolean;
-  loadingProgress: string;
+  startTime: number | null;
   onConfirmBRoll: (types: BRollType[]) => void;
   onSelect: (chapterId: string, optionId: string) => void;
   onComment: (chapterId: string, comment: string) => void;
@@ -20,7 +20,7 @@ export const Phase2View = ({
   projectId,
   chapters,
   isLoading,
-  loadingProgress,
+  startTime,
   onConfirmBRoll,
   onSelect,
   onComment,
@@ -29,6 +29,26 @@ export const Phase2View = ({
 }: Phase2ViewProps) => {
   const [brollSelections, setBrollSelections] = useState<BRollType[]>(['remotion', 'seedance', 'artlist']);
   const [brollConfirmed, setBrollConfirmed] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Update timer every second when loading
+  useEffect(() => {
+    let interval: number;
+    if (isLoading && startTime) {
+      interval = window.setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => window.clearInterval(interval);
+  }, [isLoading, startTime]);
+
+  const formatElapsed = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   const allLocked = chapters.length > 0 && chapters.every(c => c.isLocked);
 
@@ -64,8 +84,8 @@ export const Phase2View = ({
         <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-            <span className="text-white">Generating previews...</span>
-            <span className="text-blue-400 font-mono">{loadingProgress}</span>
+            <span className="text-white">正在为你的剧本生成视觉方案...</span>
+            <span className="text-slate-400 font-mono text-sm">⏱ 已用时 {formatElapsed(elapsedSeconds)}</span>
           </div>
         </div>
       )}

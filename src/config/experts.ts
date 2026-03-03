@@ -10,15 +10,7 @@ export interface ExpertConfig {
 }
 
 export const EXPERTS: ExpertConfig[] = [
-    {
-        id: 'Writer',
-        name: '写作大师',
-        description: '承接黄金坩埚产出的 Mini 论文进行深度扩写',
-        icon: 'PenTool',
-        color: 'slate',
-        skillName: 'Writer',
-        outputDir: '02_Script'
-    },
+
     {
         id: 'Director',
         name: '影视导演',
