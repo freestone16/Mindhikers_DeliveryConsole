@@ -495,3 +495,46 @@
 - [x] 强调 Lessons 机制的重要性
 - [x] 优先级：CLAUDE.md 项目约定 > OldYang 通用规则
 
+---
+
+## 15. 文件变更日志（v3.7.1）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `server/index.ts` | **修改** | 新增 `getAppVersion()` 函数，自动从 git log 提取版本号；新增 `/api/version` 接口 |
+| `src/components/StatusFooter.tsx` | **修改** | 版本号改为动态获取，启动时调用 `/api/version` |
+| `src/config/version.ts` | **删除** | 不再需要手动配置版本号 |
+
+### ✅ v3.7.1 已完成功能（2026-03-03）
+
+#### 版本号自动化
+- [x] **自动版本检测** - 后端从 git log 提取最新版本号（如 v3.7）
+- [x] **API 接口** - 新增 `/api/version` 接口返回当前版本
+- [x] **前端动态获取** - 启动时调用 API 自动显示版本号
+- [x] **无需手动配置** - 删除手动配置文件 `src/config/version.ts`
+
+#### Phase 2 SSE 错误处理修复
+- [x] **前端错误处理** - StatusFooter 添加 `type: 'error'` SSE 消息处理
+- [x] **后端错误增强** - 详细错误日志，用户友好提示
+- [x] **文档记录** - 更新 lessons.md (L-003)
+
+---
+
+## 16. 最新状态（2026-03-03）
+
+### 当前版本
+- **主分支版本**: v3.7.1
+- **最新提交**:
+  - `db270f6` - refactor: 版本号改为从git log自动获取，无需手动配置
+  - `7898265` - fix: 修复 Phase 2 SSE 错误消息被前端吞噬的问题
+
+### 已验证功能
+- ✅ Phase 2 B-roll 方案生成（错误处理已修复）
+- ✅ 版本号自动显示（无需手动配置）
+- ✅ SSE 错误消息正确传递到前端
+
+### 下一步建议
+1. **验证 Phase 2/3 完整流程** - 测试从方案生成到 XML 生成的完整流程
+2. **Remotion 预览图优化** - 从文字卡片升级为真实 Composition 渲染帧
+3. **改造剩余4个Remotion模板** - NumberCounter, TimelineFlow, DataChartQuadrant, CinematicZoom 应用 fitText
+
