@@ -114,50 +114,29 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
     throw new Error('SILICONFLOW_API_KEY not configured');
   }
 
-  const baseUrl = process.env.SILICONFLOW_BASE_URL || 'https://api.siliconflow.cn/v1';
+  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+    }),
+  });
 
-  console.log(`[llm.ts] callSiliconFlowLLM: baseUrl=${baseUrl}, model=${model || 'Pro/moonshotai/Kimi-K2.5'}`);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    console.error(`[llm.ts] SiliconFlow API timeout after 30s`);
-  }, 30000); // 30 秒超时
-
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model || 'Pro/moonshotai/Kimi-K2.5',
-        messages,
-        temperature: 0.7,
-        signal: controller.signal,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error(`[llm.ts] SiliconFlow API error (${response.status}):`, error);
-      throw new Error(`SiliconFlow API error: ${error}`);
-    }
-
-    const data = await response.json();
-    clearTimeout(timeoutId);
-    console.log(`[llm.ts] SiliconFlow API response:`, data.usage);
-
-    return {
-      content: data.choices[0].message.content,
-      usage: data.usage,
-    };
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.error(`[llm.ts] SiliconFlow API failed:`, error.message);
-    throw new Error(`SiliconFlow API failed: ${error.message}`);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`SiliconFlow API error: ${error}`);
   }
+
+  const data = await response.json();
+  return {
+    content: data.choices[0].message.content,
+    usage: data.usage,
+  };
 }
 
 async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): Promise<LLMResponse> {
@@ -284,7 +263,7 @@ async function generateGlobalBRollPlanWithRetry(
   const systemPrompt = buildDirectorSystemPrompt('broll');
 
   const userMessage = overrideUserMessage || `请作为导演，为以下完整视频剧本进行全局 B-roll 视觉规划。
-你必须基于全局视角进行"排兵布阵"，决定哪些章节需要密集的视觉冲击（多几个方案），哪些章节适合保持克制。
+你必须基于全局视角进行“排兵布阵”，决定哪些章节需要密集的视觉冲击（多几个方案），哪些章节适合保持克制。
 
 可用的 B-roll 类型：${brollTypes.join(', ')}
 
@@ -521,3 +500,4 @@ export function generateFallbackOptions(
     rationale: '兜底方案（LLM 生成失败）',
   }));
 }
+
