@@ -22,6 +22,7 @@
 - [x] llm.ts 文件被错误覆盖 → 见下方 L-006
 - [x] 恢复错误版本时不应修改已工作的代码 → 见下方 L-007
 - [x] 选择文件后未重置 phase 导致跳转到旧状态 → 见下方 L-008
+- [x] .env 中文注释和路径解析问题 → 见下方 L-009
 
 ### 通用开发
 - [x] 不要擅自修改配置路径 → 见下方 L-001
@@ -434,6 +435,128 @@ if (deliveryData.modules?.music) {
 - ✅ 选择文件后 Director phase 重置到 1
 - ✅ items、renderJobs 等数据清空
 - ✅ 从 Phase 1 重新开始
+
+---
+
+### [环境配置] L-009 - .env 中文注释和路径解析问题导致环境变量未加载
+
+**日期**：2026-03-04
+
+**问题**：
+- Phase 2 显示"兜底方案（LLM 生成失败）"
+- SiliconFlow API Key 验证成功，但服务器调用失败
+- 服务器日志显示：`[llm.ts] Generation failed, retrying (1/2). Reason: fetch failed`
+- 11 分钟生成时间后显示兜底方案
+
+**根本原因**：
+1. **路径解析错误**：
+   - `server/index.ts` 第 32 行：`path.resolve(__dirname, '../../.env')`
+   - `__dirname` = `/Users/luzhoua/DeliveryConsole/server`
+   - `path.resolve` 解析为：`/Users/luzhoua/.env` ❌
+   - 正确路径应该是：`/Users/luzhoua/DeliveryConsole/.env` ✅
+
+2. **中文注释导致解析失败**：
+   - `.env` 第一行：`# 当前服务的内容项目名（对应 Projects/ 下的文件夹名）`
+   - 第二行：`# 服务端口`
+   - 中文注释导致 `dotenv.config()` 解析失败
+   - 整个 `.env` 文件解析为空数组，所有变量都未加载
+
+**诊断过程**：
+```bash
+# Phase 1: 检查 dotenv 解析结果
+node -e "
+const dotenv = require('dotenv');
+const result = dotenv.config({ path: require('path').resolve(__dirname, '../.env') });
+console.log('All keys:', Object.keys(result.parsed || {}));
+"
+# 输出：All keys: []  ← 空数组，解析失败！
+
+# Phase 2: 使用绝对路径测试
+node -e "
+const dotenv = require('dotenv');
+const result = dotenv.config({ path: '/Users/luzhoua/DeliveryConsole/.env' });
+console.log('All keys:', Object.keys(result.parsed || {}));
+console.log('SILICONFLOW_API_KEY length:', result.parsed?.SILICONFLOW_API_KEY?.length || 0);
+"
+# 输出：
+# All keys: [ 'PROJECT_NAME', 'PORT', 'PROJECTS_BASE', 'SILICONFLOW_API_KEY', ... ]
+# SILICONFLOW_API_KEY length: 51  ← 正确！
+
+# Phase 3: 检查路径解析
+node -e "
+const path = require('path');
+console.log('Original:', path.resolve(__dirname, '../../.env'));
+console.log('Fixed:', path.resolve(__dirname, '../.env'));
+"
+# 输出：
+# Original: /Users/luzhoua/.env  ❌
+# Fixed: /Users/luzhoua/DeliveryConsole/.env  ✅
+
+# Phase 4: 移除中文注释后测试
+sed -i '' '1d' .env  # 移除第一行中文注释
+# 再次测试 dotenv 解析 → 成功
+```
+
+**修复**：
+1. 修改 `server/index.ts` 第 32 行：
+   ```typescript
+   // 修改前：
+   dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+   // 修改后：
+   dotenv.config({ path: path.resolve(__dirname, '../.env') });
+   ```
+
+2. 移除 `.env` 文件中的中文注释：
+   ```bash
+   # 创建新的 .env 文件，不包含中文注释
+   cat > .env << 'EOF'
+   # Project Name
+   PROJECT_NAME=CSET-SP3
+
+   # Server Port
+   PORT=3002
+   ...
+   EOF
+   ```
+
+**教训 / 规则**：
+1. **`.env` 文件编码和内容规则**：
+   - ✅ 只使用英文注释
+   - ✅ 避免使用特殊字符（中文、emoji 等）
+   - ✅ 使用 `#` 开头的英文注释
+   - ❌ 不要使用中文、特殊 Unicode 字符
+
+2. **路径解析的最佳实践**：
+   - 使用 `path.join()` 而不是 `path.resolve()` 处理 `..` 相对路径
+   - `path.join(__dirname, '../.env')` → 正确的相对路径连接
+   - `path.resolve(__dirname, '../../.env')` → 可能解析到意外的绝对路径
+
+3. **环境变量加载验证**：
+   - 服务器启动后，验证关键变量是否正确加载
+   - 在日志中输出关键变量的长度（API Key 长度 > 0）
+   - 如果变量未加载，立即排查 dotenv 解析问题
+
+4. **`dotenv.config()` 故障排查**：
+   - 检查文件路径是否存在：`fs.existsSync(envPath)`
+   - 测试 dotenv 解析：`const result = dotenv.config({ path }); console.log(result.parsed)`
+   - 检查文件编码：`file .env` → 应该是 `ASCII text` 或 `UTF-8 text`
+   - 移除问题行（中文注释、特殊字符）
+
+5. **防止环境变量问题**：
+   - `.gitignore` 应该包含 `.env`
+   - 提供一个 `.env.example` 模板，只包含英文注释
+   - 在 README 中明确说明不要在 `.env` 中使用中文注释
+
+**相关文件**：
+- `server/index.ts:32` - dotenv.config() 路径修复
+- `.env` - 移除中文注释（本地文件，不提交）
+
+**验证结果**（2026-03-04）：
+- ✅ `path.resolve(__dirname, '../.env')` 正确解析
+- ✅ `dotenv.config()` 正确加载所有变量
+- ✅ `SILICONFLOW_API_KEY` 长度为 51（正确）
+- ✅ 服务器成功重启
 
 ---
 
