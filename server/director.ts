@@ -47,45 +47,45 @@ const taskStorage = new Map<string, TaskRecord>();
 
 // Phase 2 预审状态管理
 interface Phase2ReviewState {
-    projectId: string;
-    lastUpdated: string;
-    chapters: {
-        chapterId: string;
-        reviewStatus: 'pending' | 'approved' | 'skipped';
-        selectedOptionId?: string;
-        userComment?: string;
-    }[];
+  projectId: string;
+  lastUpdated: string;
+  chapters: {
+    chapterId: string;
+    reviewStatus: 'pending' | 'approved' | 'skipped';
+    selectedOptionId?: string;
+    userComment?: string;
+  }[];
 }
 
 // Phase 3 渲染状态管理
 interface Phase3RenderState {
-    projectId: string;
-    lastUpdated: string;
-    renderJobs: {
-        jobId: string;
-        chapterId: string;
-        optionId: string;
-        type: 'remotion' | 'seedance';
-        status: 'waiting' | 'rendering' | 'completed' | 'failed';
-        progress: number;
-        frame?: number;
-        totalFrames?: number;
-        outputPath?: string;
-        error?: string;
-        startedAt?: string;
-        completedAt?: string;
-        retryCount?: number;
-    }[];
-    externalAssets: {
-        assetId: string;
-        chapterId: string;
-        type: 'artlist' | 'internet-clip' | 'user-capture';
-        sourcePath: string;
-        targetPath: string;
-        loadedAt: string;
-    }[];
-    xmlGenerated: boolean;
-    xmlPath?: string;
+  projectId: string;
+  lastUpdated: string;
+  renderJobs: {
+    jobId: string;
+    chapterId: string;
+    optionId: string;
+    type: 'remotion' | 'seedance';
+    status: 'waiting' | 'rendering' | 'completed' | 'failed';
+    progress: number;
+    frame?: number;
+    totalFrames?: number;
+    outputPath?: string;
+    error?: string;
+    startedAt?: string;
+    completedAt?: string;
+    retryCount?: number;
+  }[];
+  externalAssets: {
+    assetId: string;
+    chapterId: string;
+    type: 'artlist' | 'internet-clip' | 'user-capture';
+    sourcePath: string;
+    targetPath: string;
+    loadedAt: string;
+  }[];
+  xmlGenerated: boolean;
+  xmlPath?: string;
 }
 
 const renderJobStorage = new Map<string, Phase3RenderState>();
@@ -667,7 +667,8 @@ function buildRemotionPreview(option: {
     // 处理新增的模板们，透传给 remotion cli 进行渲染
     const supportedCoreTemplates = [
       'ConceptChain', 'DataChartQuadrant',
-      'TextReveal', 'NumberCounter', 'ComparisonSplit', 'TimelineFlow'
+      'TextReveal', 'NumberCounter', 'ComparisonSplit', 'TimelineFlow',
+      'SegmentCounter', 'TerminalTyping'
     ];
 
     if (supportedCoreTemplates.includes(option.template)) {
@@ -1338,51 +1339,51 @@ async function renderRemotionVideo(
  */
 async function renderVolcVideo(prompt: string, outputPath: string): Promise<void> {
   console.log(`[VolcEngine Video] Starting video generation with prompt: ${prompt.slice(0, 100)}...`);
-  
+
   const result = await generateVideoWithVolc(prompt);
-  
+
   if (result.error) {
     throw new Error(`VolcEngine video generation failed: ${result.error}`);
   }
-  
+
   const taskId = result.task_id;
   if (!taskId) {
     throw new Error('No task_id returned from VolcEngine');
   }
-  
+
   console.log(`[VolcEngine Video] Task submitted: ${taskId}, polling for result...`);
-  
+
   const maxPolls = 120;
   const pollInterval = 5000;
-  
+
   for (let i = 0; i < maxPolls; i++) {
     await new Promise(resolve => setTimeout(resolve, pollInterval));
-    
+
     const pollResult = await pollVolcVideoResult(taskId);
-    
+
     if (pollResult.error) {
       throw new Error(`Poll error: ${pollResult.error}`);
     }
-    
+
     if (pollResult.status === 'completed' && pollResult.video_url) {
       console.log(`[VolcEngine Video] Task completed, downloading video...`);
-      
+
       const downloadResult = await downloadVideo(pollResult.video_url, outputPath);
       if (!downloadResult.success) {
         throw new Error(`Download failed: ${downloadResult.error}`);
       }
-      
+
       console.log(`[VolcEngine Video] Video saved to: ${outputPath}`);
       return;
     }
-    
+
     if (pollResult.status === 'failed') {
       throw new Error(`Video generation failed: ${pollResult.error || 'Unknown error'}`);
     }
-    
+
     console.log(`[VolcEngine Video] Polling... (${i + 1}/${maxPolls}) status: ${pollResult.status}`);
   }
-  
+
   throw new Error('Video generation timeout (10 minutes)');
 }
 

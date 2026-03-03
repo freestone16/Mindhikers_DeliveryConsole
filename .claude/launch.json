@@ -18,6 +18,18 @@
       "runtimeExecutable": "tsx",
       "runtimeArgs": ["watch", "server/index.ts"],
       "port": 3002
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3002
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "vite", "--", "--host"],
+      "port": 5173
     }
   ]
 }

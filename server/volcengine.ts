@@ -46,7 +46,10 @@ export async function generateImageWithVolc(
 
   // 火山引擎方舟平台必须使用推理接入点 ID (endpoint ID)，不能直接用模型名
   const model = endpointId || options.model || 'ep-20260226142759-xqc82';
-  const size = options.size || '1024x1024';
+  // 火山引擎要求图片尺寸至少 3686400 像素（约 4K）
+  // 影视导演使用 16:9 横向分辨率
+  // 2560x1440 (2K, 3,686,400 像素) - 满足火山引擎要求，适合 16:9 视频
+  const size = options.size || '2560x1440';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -79,6 +82,12 @@ export async function generateImageWithVolc(
       return { task_id: data.task_id, status: 'pending' };
     }
 
+    // 火山引擎返回结构：{ data: [ { url: "..." } ] }
+    if (data.data?.[0]?.url) {
+      return { image_url: data.data[0].url };
+    }
+
+    // 兼容旧格式（如果有的话）
     if (data.data?.images?.[0]?.url) {
       return { image_url: data.data.images[0].url };
     }

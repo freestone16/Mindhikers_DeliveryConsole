@@ -138,6 +138,56 @@ globs: /MindHikers/Projects/**/*
 # 8. 音效设计协议
 (保持不变)
 
-# 9. 执行指令 (Final Command)
+# 9. Remotion Studio 模板选择协议 (Template Selection Protocol)
 
-**导演大师 v3.1 已加载 Seedance 2.0 引擎与 Visual Audit 协议。请根据上述输入，生成对应的 JSON 视觉设计方案。**
+> **参考**: [remotion-shared-components.md](remotion-shared-components.md) (外部文件)
+> **用途**: 当 `type: "remotion"` 时，必须根据场景类型选择合适的模板和动画配置
+
+### 模板选择决策树
+```
+场景类型？
+├── 文字为主 → TextReveal (引用型) / FadeIn (其他)
+│   ├── 问句? → QuoteCard01Premium + QuestionMark pulse
+│   └── 对比? → QuoteCard02Contrast + StrikeThrough
+│
+├── 图像/视频为主 → FadeIn / SlideUp
+│
+└── CTA/强调 → SlideUp + Bounce easing
+```
+
+### 必须输出的动画配置
+当 `type: "remotion"` 时，`visual_plan.json` 必须包含完整的动画配置：
+
+```json
+{
+  "type": "remotion",
+  "template": "QuoteCard01Premium",
+  "props": {
+    "animation": {
+      "entry": "FadeIn",
+      "durationInFrames": 30,
+      "direction": "up",
+      "easing": "smooth"
+    }
+  }
+}
+```
+
+**可用动画组件**:
+- **FadeIn**: 通用淡入，支持 4 方向 + 5 种 easing
+- **SlideUp**: 滑入 + 淡入组合，适合强调
+- **TextReveal**: clip-path 揭示，适合引用型
+
+**可用 Easing 函数**:
+- `smooth`: 平滑缓出（默认）
+- `bounce`: 弹性回弹（CTA）
+- `linear`: 线性
+- `inOut`: 慢入慢出
+- `sharp`: 急促缓出
+- `elastic`: 橡皮筋
+
+---
+
+# 10. 执行指令 (Final Command)
+
+**导演大师 v3.1 已加载 Seedance 2.0 引擎、Visual Audit 协议和 Remotion Studio 模板选择协议。请根据上述输入，生成对应的 JSON 视觉设计方案。**

@@ -133,7 +133,7 @@ ${baseContext}
 
 【Remotion 组件速查表 - 严格 Props 契约】
 
-⚠️ 以下是每个 Remotion 组件的合法 Props 规范。type 为 "remotion" 时，你的 props 字段必须严格符合对应模板的结构，字段名不得错写，否则渲染会直接失败。
+⚠️ 以下是每个 Remotion 组件的合法 Props 规范。所有组件均支持可选的基础参数 \`theme\` (可选值: \`deep-space\`, \`warm-gold\`, \`sci-fi-purple\`, \`forest-green\`, \`crimson-red\`)，不再需要额外写 backgroundColor。type 为 "remotion" 时，你的 props 字段必须严格符合对应模板的结构，字段名不得错写，否则渲染会直接失败。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -153,6 +153,13 @@ ${baseContext}
 \`\`\`
 字段说明：\`title\`(必填)，\`endNumber\`(必填，纯数字，不要带单位)，\`suffix\`(选填，单位字符串)
 
+**2A. SegmentCounter** — 赛博/LCD风格数字计数器
+适用：科技风格、代码提交、资产数字等有极客感的展示
+\`\`\`json
+{ "label": "TOTAL COMMIT", "value": 9999, "prefix": "#" }
+\`\`\`
+字段说明：\`value\`(纯数字，必填)，\`label\`(顶部标签标题，必填)，\`prefix\`/\`suffix\`(前缀后缀，选填)
+
 **3. ComparisonSplit** — 左右分屏对比
 适用：A vs B、传统 vs 觉醒、归因 vs 涌现
 \`\`\`json
@@ -166,6 +173,13 @@ ${baseContext}
 { "title": "进化编年史", "nodes": [{"year": "2015", "event": "萌芽探索期"}, {"year": "2020", "event": "技术验证期"}, {"year": "2024", "event": "爆发增长期"}]}
 \`\`\`
 字段说明：\`title\`(必填)，\`nodes\`数组每项含\`year\`和\`event\`两个字符串字段
+
+**4A. TerminalTyping** — 终端代码打字机
+适用：命令行交互、AI 对话模拟、硬核执行过程
+\`\`\`json
+{ "lines": ["npm run init", "System updated."], "prefix": "$ " }
+\`\`\`
+字段说明：\`lines\`(必填，多行字符串数组)，\`prefix\`(提示符，选填)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

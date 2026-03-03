@@ -33,7 +33,6 @@ export async function renderStillWithApi(
 
         const proc = spawn(remotionBin, args, {
             cwd: REMOTION_STUDIO_DIR,
-            shell: true,
             env: { ...process.env, NODE_ENV: 'production' }
         });
 

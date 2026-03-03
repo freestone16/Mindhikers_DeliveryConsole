@@ -20,6 +20,9 @@
 ### 通用开发
 - [x] 不要擅自修改配置路径 → 见下方 L-001
 
+### 火山引擎集成
+- [x] 文生图预览图生成失败 → 见下方 L-002
+
 ---
 
 ## ✅ 已记录 Lessons
@@ -47,6 +50,61 @@
 - `/Users/luzhoua/DeliveryConsole/.env` — PROJECTS_BASE 正确值
 - `/Users/luzhoua/DeliveryConsole/server/index.ts:44` — fallback 逻辑
 - `.claude/worktrees/*/focused-darwin/.env` — worktree 启动需要的 .env 副本
+
+---
+
+### [火山引擎集成] L-002 - 文生图预览图生成失败的两个问题
+
+**日期**：2026-03-03
+
+**问题**：
+- 文生视频预览图生成失败，API 返回错误 `image size must be at least 3686400 pixels`
+- 修复尺寸问题后，虽然任务成功但状态显示 `failed`，错误信息为 `No task_id or image returned`
+
+**根本原因**：
+1. **尺寸问题**：默认使用 `1024x1024`（104万像素），但火山引擎要求至少 368 万像素
+   - 2048x2048 = 419 万像素 ✓
+   - 1920x1080 = 207 万像素 ✗
+2. **数据路径问题**：火山引擎 API 返回 `{ data: [ { url: "..." } ] }`，但代码检查的是 `data.data?.images?.[0]?.url`
+
+**教训 / 规则**：
+1. **火山引擎图片生成必须使用高分辨率**：
+   - 最小像素数：3686400（约 4K）
+   - **影视导演（Director）使用 16:9**：2560x1440 (2K, 3,686,400 像素)
+   - **短视频大师（Shorts）使用 9:16**：1440x2560 (2K, 3,686,400 像素)
+   - 不要使用 1024x1024 或 1920x1080（像素数不够）
+   - 不要使用 1:1 正方形（2048x2048），不符合视频比例
+2. **分辨率比例必须匹配视频类型**：
+   - 横向视频 → 16:9
+   - 竖向视频 → 9:16
+3. **API 响应解析必须验证实际返回结构**：
+   - 先查看完整 API 响应，再写解析逻辑
+   - 不要假设数据结构，用 `console.log` 验证
+4. **兼容性写法**：支持多种可能的数据路径，提高鲁棒性
+
+**修复代码**：
+```typescript
+// volcengine.ts
+// 影视导演（Director）使用 16:9 横向分辨率
+const size = options.size || '2560x1440';  // 2K, 3,686,400 像素
+
+// 响应解析：兼容多种数据路径
+if (data.data?.[0]?.url) {
+  return { image_url: data.data[0].url };
+}
+if (data.data?.images?.[0]?.url) {
+  return { image_url: data.data.images[0].url };
+}
+```
+
+**相关文件**：
+- `/Users/luzhoua/DeliveryConsole/server/volcengine.ts:51` - 尺寸参数（2560x1440）
+- `/Users/luzhoua/DeliveryConsole/server/volcengine.ts:83-91` - 响应解析逻辑
+
+**更新说明**（2026-03-03）：
+- 用户指出 1:1 正方形（2048x2048）不适合影视导演
+- 修正为 16:9 横向分辨率（2560x1440）
+- 补充分辨率比例匹配规则：影视导演用 16:9，短视频大师用 9:16
 
 ---
 
