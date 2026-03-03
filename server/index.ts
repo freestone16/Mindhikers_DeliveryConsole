@@ -1030,12 +1030,21 @@ app.post('/api/scripts/select', (req, res) => {
                 };
                 // Reset phase proposals when a new script is chosen
                 if (deliveryData.modules?.director) {
+                    // 重置 Director 到 Phase 1，清空所有缓存数据
+                    deliveryData.modules.director.phase = 1;
                     deliveryData.modules.director.conceptProposal = "";
+                    deliveryData.modules.director.conceptFeedback = "";
                     deliveryData.modules.director.isConceptApproved = false;
+                    deliveryData.modules.director.items = [];
+                    deliveryData.modules.director.renderJobs = [];
                 }
                 if (deliveryData.modules?.music) {
+                    // 重置 Music 到 Phase 1，清空所有缓存数据
+                    deliveryData.modules.music.phase = 1;
                     deliveryData.modules.music.moodProposal = "";
+                    deliveryData.modules.music.conceptFeedback = "";
                     deliveryData.modules.music.isConceptApproved = false;
+                    deliveryData.modules.music.items = [];
                 }
 
                 deliveryData.lastUpdated = new Date().toISOString();
