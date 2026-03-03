@@ -19,6 +19,7 @@
 | v3.4 | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
 | v3.5 | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新 |
 | v3.6 | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析 |
+| v3.7 | 2026-03-03 | **Remotion 扩展 v3.7** - 多主题皮肤系统 + SegmentCounter + TerminalTyping + ConceptChain 溢出修复 |
 
 ---
 
@@ -306,6 +307,48 @@
 - [x] **兼容性写法** - 支持多种数据路径，提高鲁棒性
 - [x] **分辨率比例修正** - 从 1:1 正方形（2048x2048）改为 16:9 横向（2560x1440），符合影视导演需求
 - [x] **验证成功** - 测试生成成功，状态正确显示 `completed`
+
+---
+
+## 14. 文件变更日志（v3.7）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `skills/RemotionStudio/src/BrollTemplates/ConceptChain.tsx` | **修改** | 溢出防爆修复：nodes 硬上限截断、标签折行、描述截断、Zod 约束 |
+| `skills/RemotionStudio/src/BrollTemplates/SegmentCounter.tsx` | **新建** | 赛博朋克/LCD 质感数字翻页器（前后缀、光晕特效） |
+| `skills/RemotionStudio/src/BrollTemplates/TerminalTyping.tsx` | **新建** | MacOS 风格黑客终端框，真实代码逐字敲打效果 |
+| `skills/RemotionStudio/src/shared/theme.ts` | **新建** | 多主题皮肤系统（5 大渐变主题：deep-space/warm-gold/sci-fi-purple/forest-green/crimson-red） |
+| `skills/RemotionStudio/src/index.tsx` | **修改** | 新组件渲染端挂载 |
+| `skills/RemotionStudio/src/schemas/index.ts` | **修改** | 新增 segmentCounterSchema 和 terminalTypingSchema |
+| `server/skill-loader.ts` | **修改** | Director Prompt 注入新组件契约指南和 Theme 控制器 |
+| `server/director.ts` | **修改** | SegmentCounter 和 TerminalTyping 加入 supportedCoreTemplates 白名单 |
+| `docs/dev_logs/2026-03-03_SD202_Remotion_Extension_v3.7.md` | **新建** | Remotion 扩展 v3.7 完整开发日志 |
+
+### ✅ v3.7 已完成功能
+
+#### Remotion 组件扩展 v3.7
+- [x] **ConceptChain 溢出防爆修复** (Module 0)：
+  - 强制设置 `nodes.slice(0, 5)` 硬上限截断
+  - 标签启用折行 (`whiteSpace: normal`) 并增加 `maxWidth` 约束
+  - 超过 18 字的 `desc` 强制执行截断补省略号
+  - Zod Schema 添加 `.min(2).max(5)` 强校验
+- [x] **多主题皮肤系统基建** (Module 1A)：
+  - 新建 `src/shared/theme.ts`，支持 5 大精选渐变主题
+  - 10 个核心 B-roll 组件全面引入 `theme` 参数
+  - 自动适配 `currentTheme.bg`、`currentTheme.text`、`currentTheme.accent` 等属性
+- [x] **SegmentCounter 新组件** (Module 2A)：
+  - 赛博朋克 / LCD 质感的数字翻页器
+  - 支持前后缀 (`prefix`, `suffix`)
+  - 带有 `textShadow` 的光晕特效
+- [x] **TerminalTyping 新组件** (Module 2B)：
+  - MacOS 风格的黑客终端框
+  - 实现真实的代码逐字敲打效果
+  - 可调节参数与光标闪烁逻辑
+- [x] **Director 后端全链路集成** (Module D)：
+  - 组件暴露：在 `src/index.tsx` 和 `BrollTemplates/index.ts` 完成渲染端挂载
+  - Zod Schema：新增 `segmentCounterSchema` 与 `terminalTypingSchema`
+  - Director Prompt：在 `server/skill-loader.ts` 中详细注入新组件的契约指南和 Theme 控制器
+  - 白名单联通：成功将 `SegmentCounter` 与 `TerminalTyping` 追加至 `supportedCoreTemplates` 白名单
 
 ---
 
