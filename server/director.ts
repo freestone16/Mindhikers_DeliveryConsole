@@ -484,9 +484,24 @@ export const startPhase2 = async (req: Request, res: Response) => {
     }
 
     res.write(`data: ${JSON.stringify({ type: 'done', chapters })}\n\n`);
-  } catch (error) {
-    console.error('Phase 2 Global Generation failed:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: '全局生成失败，请重试' })}\n\n`);
+  } catch (error: any) {
+    console.error('[Phase 2] Global Generation failed:', error);
+    const errorMsg = error?.message || error?.toString() || '未知错误';
+    console.error('[Phase 2] Error details:', errorMsg);
+
+    // 提取更有用的错误信息
+    let userFacingError = '全局生成失败，请重试';
+    if (errorMsg.includes('ECONNREFUSED')) {
+      userFacingError = '无法连接到 LLM 服务，请检查网络或 API 配置';
+    } else if (errorMsg.includes('VALIDATION_FAILED')) {
+      userFacingError = 'LLM 生成的数据格式不正确，已尝试自动修复但失败';
+    } else if (errorMsg.includes('JSON')) {
+      userFacingError = 'LLM 返回的不是有效的 JSON 格式';
+    } else if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+      userFacingError = '请求超时，请检查网络连接';
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'error', error: userFacingError, details: errorMsg })}\n\n`);
   } finally {
     res.end();
   }

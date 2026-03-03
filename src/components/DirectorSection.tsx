@@ -16,16 +16,23 @@ interface DirectorSectionProps {
 type Phase = 1 | 2 | 3 | 4;
 
 export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: DirectorSectionProps) => {
-  const [phase, setPhase] = useState<Phase>(data.phase === 2 ? 2 : 1);
-  const [concept, setConcept] = useState<string | null>(data.conceptProposal);
+  const phase = (data.phase || 1) as Phase;
+  const conceptApproved = data.isConceptApproved || false;
+  const chapters = (data.items || []) as DirectorChapter[];
+  const jobs = (data.renderJobs || []) as RenderJob[];
+
+  // Local state for streaming to avoid overwhelming the file system / socket
   const [isGeneratingConcept, setIsGeneratingConcept] = useState(false);
-  const [conceptApproved, setConceptApproved] = useState(data.isConceptApproved);
+  const [streamingConcept, setStreamingConcept] = useState<string | null>(null);
+  const concept = isGeneratingConcept ? streamingConcept : data.conceptProposal;
 
-  const [chapters, setChapters] = useState<DirectorChapter[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState('');
+  const [localChapters, setLocalChapters] = useState<DirectorChapter[] | null>(null);
+  const displayedChapters = localChapters || chapters;
 
-  const [jobs, setJobs] = useState<RenderJob[]>([]);
+  // Feature 2: elapsed time tracking
+  const [startTime, setStartTime] = useState<number | null>(null);
+
   const [brollPaths] = useState<any[]>([]);
 
   const handleGenerateConcept = async () => {
@@ -35,7 +42,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     }
 
     setIsGeneratingConcept(true);
-    setConcept('');
+    setStreamingConcept('');
 
     try {
       const response = await fetch('http://localhost:3002/api/director/phase1/generate', {
@@ -70,9 +77,10 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
 
                 if (jsonData.type === 'content') {
                   fullContent += jsonData.content;
-                  setConcept(fullContent);
+                  setStreamingConcept(fullContent);
                 } else if (jsonData.type === 'done') {
                   onUpdate({ ...data, conceptProposal: fullContent });
+                  setStreamingConcept(null);
                 }
               } catch (e) {
                 // Ignore partial JSON
@@ -100,7 +108,6 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
       });
       const result = await res.json();
       if (result.success) {
-        setConcept(result.data.content);
         onUpdate({ ...data, conceptProposal: result.data.content });
       } else {
         console.error('Failed to revise concept:', result.error);
@@ -113,9 +120,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   };
 
   const handleApproveConcept = () => {
-    setConceptApproved(true);
-    onUpdate({ ...data, isConceptApproved: true });
-    setPhase(2);
+    onUpdate({ ...data, isConceptApproved: true, phase: 2 });
   };
 
   const handleConfirmBRoll = async (types: BRollType[]) => {
@@ -125,8 +130,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     }
 
     setIsLoading(true);
-    setLoadingProgress('0/0');
-    setChapters([]);
+    setStartTime(Date.now());
+    setLocalChapters([]);
 
     try {
       const response = await fetch('http://localhost:3002/api/director/phase2/start', {
@@ -165,16 +170,24 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
               if (jsonData.type === 'taskId') {
                 // taskId received for polling if needed
               } else if (jsonData.type === 'progress') {
-                setLoadingProgress(`${jsonData.current}/${jsonData.total}`);
+                // Ignore numeric progress UI updates
               } else if (jsonData.type === 'chapter_ready') {
                 allChapters.push(jsonData.chapter);
-                setChapters([...allChapters]);
+                setLocalChapters([...allChapters]);
               } else if (jsonData.type === 'done') {
-                setChapters(jsonData.chapters || allChapters);
-                setLoadingProgress('completed');
+                onUpdate({ ...data, items: jsonData.chapters || allChapters, phase: 2 });
+                setLocalChapters(null);
+                setStartTime(null);
+              } else if (jsonData.type === 'error') {
+                throw new Error(jsonData.error || 'Unknown error');
               }
-            } catch (e) {
-              // Ignore parse errors
+            } catch (e: any) {
+              // Don't ignore errors - log them for debugging
+              console.error('[SSE Parse Error]', e, 'Raw data:', line);
+              // If this is a real error from server, propagate it
+              if (line.includes('"type":"error"')) {
+                throw new Error('Server error: ' + line);
+              }
             }
           }
         }
@@ -188,32 +201,35 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   };
 
   const handleSelectOption = (chapterId: string, optionId: string) => {
-    setChapters(prev => prev.map(ch =>
-      ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId } : ch
-    ));
+    onUpdate({
+      ...data,
+      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId } : ch)
+    });
   };
 
   const handleComment = (chapterId: string, comment: string) => {
-    setChapters(prev => prev.map(ch =>
-      ch.chapterId === chapterId ? { ...ch, userComment: comment } : ch
-    ));
+    onUpdate({
+      ...data,
+      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, userComment: comment } : ch)
+    });
   };
 
   const handleLock = (chapterId: string) => {
-    setChapters(prev => prev.map(ch =>
-      ch.chapterId === chapterId ? { ...ch, isLocked: true } : ch
-    ));
+    onUpdate({
+      ...data,
+      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, isLocked: true } : ch)
+    });
   };
 
   const handleProceed = () => {
-    setJobs(chapters.map(c => ({
+    const newJobs = chapters.map(c => ({
       jobId: `job-${c.chapterId}`,
       projectId,
       chapterId: c.chapterId,
       status: 'pending' as const,
       progress: 0,
-    })));
-    setPhase(3);
+    }));
+    onUpdate({ ...data, renderJobs: newJobs, phase: 3 });
   };
 
   const phaseLabels: Record<Phase, string> = {
@@ -250,10 +266,10 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             <button
               key={p}
               onClick={() => {
-                if (p === 1) setPhase(1);
-                else if (p === 2 && conceptApproved) setPhase(2);
-                else if (p === 3 && jobs.length > 0) setPhase(3);
-                else if (p === 4 && brollPaths.length > 0) setPhase(4);
+                if (p === 1) onUpdate({ ...data, phase: 1 });
+                else if (p === 2 && conceptApproved) onUpdate({ ...data, phase: 2 });
+                else if (p === 3 && jobs.length > 0) onUpdate({ ...data, phase: 3 });
+                else if (p === 4 && brollPaths.length > 0) onUpdate({ ...data, phase: 4 });
               }}
               disabled={
                 (p === 2 && !conceptApproved) ||
@@ -286,9 +302,9 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
         {phase === 2 && (
           <Phase2View
             projectId={projectId}
-            chapters={chapters}
+            chapters={displayedChapters}
             isLoading={isLoading}
-            loadingProgress={loadingProgress}
+            startTime={startTime}
             onConfirmBRoll={handleConfirmBRoll}
             onSelect={handleSelectOption}
             onComment={handleComment}
