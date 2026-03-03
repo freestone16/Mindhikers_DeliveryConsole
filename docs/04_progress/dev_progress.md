@@ -1,6 +1,6 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-01 CST
+> **更新日期**: 2026-03-03 CST
 
 ---
 
@@ -17,6 +17,7 @@
 | v3.2 | 2026-02-28 | **导演大师 Phase 2/3 重构** - 预审流程 + 渲染二审 + XML 生成 |
 | v3.3 | 2026-03-01 | **Phase2/3 细节优化** - 进度显示、评论提交、列表头、章节名、预览图质量 |
 | v3.4 | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
+| v3.5 | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新 |
 
 ---
 
@@ -149,7 +150,7 @@
 | L-5 | A-Roll 扫描逻辑（已注释）                        | v2.0 切换到 Script-First 后禁用，待决定是否复用       |
 | L-6 | 后台服务常驻方案                                 | LaunchAgent 开机自启 + Web 状态栏显示，搁置待定       |
 | L-7 | Antigravity ↔ Web 通信桥梁                       | 文件触发方案（.tasks/*.json），需新建任务监听器       |
-| L-8 | 火山引擎文生视频集成                             | `renderVolcVideo` 函数需要实现实际的 API 调用         |
+| L-8 | ~~火山引擎文生视频集成~~ | ✅ v3.5 已完成：`renderVolcVideo` 函数已实现完整的 API 调用 |
 | L-9 | 前端文件上传实现                                 | Phase3View 中的文件选择对话框需要完整实现              |
 | L-10 | 可视化时间线编辑器                               | Phase 3 可以考虑添加时间线编辑器，让用户手动调整 B-roll 时间码 |
 | L-11 | 批量操作优化                                     | 可以考虑添加批量 Pass/Skip、批量重新渲染等操作        |
@@ -380,7 +381,7 @@
 - [ ] 验证 Remotion 预览图生成（四个新模板：TextReveal、NumberCounter、ComparisonSplit、TimelineFlow）
 - [ ] 修复 Remotion 预览图生成失败问题
 - [ ] 预览图内容升级：从文字卡片升级为真实 Composition 渲染帧
-- [ ] 火山引擎 AI 图像接入（seedance/generative 类型）
+- [x] ~~火山引擎 AI 图像接入（seedance/generative 类型）~~ ✅ v3.5 已完成
 - [ ] 改造剩余4个Remotion模板应用 fitText
 
 ## 13. 文件变更日志（v3.4）
@@ -389,4 +390,39 @@
 | --- | --- | --- |
 | `.claude/launch.json` | **修改** | 注入 `PROJECTS_BASE`/`SKILLS_BASE` env 变量，修复 worktree 路径问题 |
 | `~/.claude/settings.json` | **修改** | 配置 statusline 显示 Context 用量百分比 |
+
+---
+
+## 14. 文件变更日志（v3.5）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `server/volcengine.ts` | **修改** | 新增视频生成 API（generateVideoWithVolc, pollVolcVideoResult, downloadVideo） |
+| `server/director.ts` | **修改** | renderVolcVideo 实现真正的火山引擎视频生成调用 |
+| `~/.config/opencode/skills/OldYang/SKILL.md` | **修改** | 新增 §7 项目协议遵循，引用 CLAUDE.md 工作流约定 |
+
+### ✅ v3.5 已完成功能（2026-03-03）
+
+#### 火山引擎视频生成集成
+- [x] **generateVideoWithVolc** - 提交视频生成任务到火山引擎 API
+- [x] **pollVolcVideoResult** - 轮询视频生成任务状态
+- [x] **downloadVideo** - 下载生成的视频到本地
+- [x] **renderVolcVideo** - 完整的视频生成流程（提交→轮询→下载）
+- [x] **预览图策略** - seedance 类型使用文生图作为预览（非视频抽帧）
+
+#### API 端点
+- 视频生成: `POST /api/v3/contents/generations/tasks`
+- 状态查询: `GET /api/v3/contents/generations/tasks/{taskId}`
+
+#### 待办（v3.6 下一步）
+- [ ] 验证 Remotion 预览图生成（四个新模板）
+- [ ] 修复 Remotion 预览图生成失败问题
+- [ ] 预览图内容升级：从文字卡片升级为真实 Composition 渲染帧
+- [ ] 改造剩余4个Remotion模板应用 fitText
+- [x] ~~修复 node_modules 平台不匹配问题~~ ✅ 已完成（`rm -rf node_modules && npm install`）
+
+#### OldYang Skill 更新
+- [x] 新增 §7 项目协议遵循 - 检测并遵循项目根目录 `CLAUDE.md`
+- [x] 强调 Lessons 机制的重要性
+- [x] 优先级：CLAUDE.md 项目约定 > OldYang 通用规则
 

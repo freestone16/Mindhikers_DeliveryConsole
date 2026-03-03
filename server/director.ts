@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { generateBRollOptions, generateGlobalBRollPlan, generateFallbackOptions, BRollOption, callLLM } from './llm';
-import { generateImageWithVolc, pollVolcImageResult } from './volcengine';
+import { generateImageWithVolc, pollVolcImageResult, generateVideoWithVolc, pollVolcVideoResult, downloadVideo } from './volcengine';
 import { loadConfig } from './llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
 
@@ -1337,16 +1337,55 @@ async function renderRemotionVideo(
  * 使用火山引擎生成视频
  */
 async function renderVolcVideo(prompt: string, outputPath: string): Promise<void> {
-  // 这里需要实现火山引擎的视频生成 API 调用
-  // 暂时先返回占位符
-  console.log(`[VolcEngine] Rendering video with prompt: ${prompt}`);
-  throw new Error('VolcEngine video rendering not implemented yet');
+  console.log(`[VolcEngine Video] Starting video generation with prompt: ${prompt.slice(0, 100)}...`);
+  
+  const result = await generateVideoWithVolc(prompt);
+  
+  if (result.error) {
+    throw new Error(`VolcEngine video generation failed: ${result.error}`);
+  }
+  
+  const taskId = result.task_id;
+  if (!taskId) {
+    throw new Error('No task_id returned from VolcEngine');
+  }
+  
+  console.log(`[VolcEngine Video] Task submitted: ${taskId}, polling for result...`);
+  
+  const maxPolls = 120;
+  const pollInterval = 5000;
+  
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    
+    const pollResult = await pollVolcVideoResult(taskId);
+    
+    if (pollResult.error) {
+      throw new Error(`Poll error: ${pollResult.error}`);
+    }
+    
+    if (pollResult.status === 'completed' && pollResult.video_url) {
+      console.log(`[VolcEngine Video] Task completed, downloading video...`);
+      
+      const downloadResult = await downloadVideo(pollResult.video_url, outputPath);
+      if (!downloadResult.success) {
+        throw new Error(`Download failed: ${downloadResult.error}`);
+      }
+      
+      console.log(`[VolcEngine Video] Video saved to: ${outputPath}`);
+      return;
+    }
+    
+    if (pollResult.status === 'failed') {
+      throw new Error(`Video generation failed: ${pollResult.error || 'Unknown error'}`);
+    }
+    
+    console.log(`[VolcEngine Video] Polling... (${i + 1}/${maxPolls}) status: ${pollResult.status}`);
+  }
+  
+  throw new Error('Video generation timeout (10 minutes)');
 }
 
-/**
- * 获取渲染进度
- * GET /api/director/phase3/render-status/:jobId
- */
 export const phase3RenderStatus = async (req: Request, res: Response) => {
   const { jobId } = req.params;
   const { projectId } = req.query;
