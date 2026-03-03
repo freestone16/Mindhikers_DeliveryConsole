@@ -15,7 +15,10 @@
 - [ ] 待记录...
 
 ### 前端开发
-- [ ] 待记录...
+- [x] 类型导入必须使用 import type → 见下方 L-005
+
+### 服务器启动 / 依赖管理
+- [x] node_modules 平台不匹配导致启动失败 → 见下方 L-004
 
 ### 通用开发
 - [x] 不要擅自修改配置路径 → 见下方 L-001
@@ -211,6 +214,128 @@ for (const line of lines) {
 
 ---
 
+### [前端开发] L-005 - 类型导入必须使用 import type
+
+**日期**：2026-03-03
+
+**问题**：
+- 页面白屏，浏览器控制台报错：`The requested module '/src/components/RightPanel.tsx' does not provide an export named 'RightPanelMode'`
+- App.tsx 第 19 行：`import { RightPanel, RightPanelMode } from './components/RightPanel';`
+
+**根本原因**：
+- `RightPanelMode` 在 `RightPanel.tsx` 中是使用 `export type` 导出的类型
+- 但 App.tsx 使用了普通导入语句 `import { RightPanelMode }`，而不是 `import type { RightPanelMode }`
+- Vite 处理模块导入时，类型导出需要使用 `import type` 语法
+
+**修复**：
+```typescript
+// App.tsx
+import { RightPanel } from './components/RightPanel';
+import type { RightPanelMode } from './components/RightPanel';
+```
+
+**教训 / 规则**：
+1. **TypeScript 类型导入必须使用 `import type`**：
+   - 如果是从一个文件中导入 `type`（如 `export type RightPanelMode`），必须使用 `import type`
+   - 不要混合类型导入和值导入：分开写 `import { Component }` 和 `import type { Type }`
+2. **遇到模块导出错误时检查导出方式**：
+   - 看导出的是 `export type`、`export interface` 还是普通 `export`
+   - 如果是类型导出，必须使用 `import type`
+3. **TypeScript 编译器不会捕获这种运行时错误**：
+   - `tsc --noEmit` 会通过，但浏览器运行时会报错
+   - 需要查看浏览器控制台的实际错误信息
+4. **Vite 的模块处理机制**：
+   - Vite 会移除 `import type` 导出（仅用于类型检查）
+   - 普通导入会被打包到运行时代码中
+   - 类型导入错误只在运行时暴露
+
+**相关文件**：
+- `/Users/luzhoua/DeliveryConsole/src/App.tsx:19` - 类型导入修复
+- `/Users/luzhoua/DeliveryConsole/src/components/RightPanel.tsx:4` - 类型导出
+
+---
+
+### [服务器启动] L-004 - node_modules 平台不匹配导致启动失败
+
+**日期**：2026-03-03
+
+**问题**：
+- 运行 `npm run dev` 时服务器无法启动
+- 错误 1：`Cannot find module '@rollup/rollup-darwin-arm64'`
+- 错误 2：`You installed esbuild for another platform than the one you're currently using`
+- 多个残留的 `tsx watch` 和 `vite` 进程占用端口
+
+**根本原因**：
+1. **node_modules 平台不匹配**：
+   - node_modules 是在错误的平台/架构上安装的（可能是 x86_64，而当前是 ARM64 Mac）
+   - 导致原生二进制包（rollup, esbuild）无法找到正确的版本
+2. **进程累积**：
+   - 多次启动 `npm run dev` 但没有正确清理
+   - concurrently 启动的子进程没有被正确终止
+   - 发现 6+ 个残留的 `tsx watch` 进程
+
+**诊断步骤**（系统性调试）：
+1. **Phase 1: 根因调查**
+   - 运行 `npm run dev` → 发现平台不匹配错误
+   - 检查 `lsof -i :3002 -i :5173` → 发现端口被占用
+   - 检查 `ps aux | grep tsx` → 发现多个残留进程
+
+2. **Phase 2: 模式分析**
+   - 查看错误信息中的关键词：`@rollup/rollup-darwin-arm64`, `esbuild for another platform`
+   - 结论：node_modules 是在其他架构上安装的
+
+3. **Phase 3: 假设验证**
+   - 假设：删除 node_modules 重新安装可以修复
+   - 测试：`rm -rf node_modules && npm install` → 成功
+
+**教训 / 规则**：
+1. **服务器启动失败时，系统性诊断流程**：
+   - ✅ 先检查错误日志（`npm run dev 2>&1`）
+   - ✅ 检查端口占用（`lsof -i :3002 -i :5173`）
+   - ✅ 检查进程状态（`ps aux | grep -E "tsx|vite|node.*server"`）
+   - ✅ 检查平台特定的错误关键词（`darwin-arm64`, `platform`, `MODULE_NOT_FOUND`）
+
+2. **原生依赖包问题 → 重新安装**：
+   - 看到 `Cannot find module '@xxx/darwin-arm64'` → 立即删除 node_modules 重新安装
+   - 看到 `esbuild for another platform` → 同上
+   - **不要尝试其他修复**（如手动安装单个包），重新安装是正确方案
+
+3. **进程清理优先**：
+   - 启动前先检查是否有残留进程
+   - 清理命令：`pkill -f "tsx watch" && pkill -f "vite.*host"`
+   - 顽固进程：`kill -9 [PID]`
+
+4. **预防措施**：
+   - 使用 Ctrl+C 而不是直接关闭终端来停止 concurrently 进程
+   - 定期检查残留进程（特别是开发过程中频繁重启时）
+
+**修复命令**：
+```bash
+# 1. 清理残留进程
+pkill -f "tsx watch server/index.ts"
+pkill -f "vite.*host"
+kill -9 [顽固进程PID]  # 如果 pkill 无效
+
+# 2. 重新安装依赖
+rm -rf node_modules package-lock.json
+npm install
+
+# 3. 启动服务器
+npm run dev
+```
+
+**相关文件**：
+- `/Users/luzhoua/DeliveryConsole/package.json` - 依赖配置
+- `/Users/luzhoua/DeliveryConsole/node_modules/` - 依赖目录（已重新安装）
+
+**验证结果**（2026-03-03）：
+- ✅ 前端：http://localhost:5173 正常响应
+- ✅ 后端：http://localhost:3002/api/version 返回 `{"version":"v3.7.1"}`
+- ✅ Skill Sync 完成（5/5）
+- ✅ Socket.IO 客户端连接正常
+
+---
+
 ## 📝 Lessons 模板
 
 ```markdown
@@ -248,3 +373,116 @@ for (const line of lines) {
 - [ ] 当前任务模块的 lessons 是否有相关记录
 - [ ] 是否有类似的错误模式需要避免
 - [ ] 是否需要复习特定的规则或约定
+
+## 2026-03-03 (白屏 + Phase 2 卡死问题)
+
+### 问题 1: App.tsx 白屏 - JS 语法错误
+**症状**：页面纯白屏
+**原因**：App.tsx 第 227 行使用了 `MessageCircle` 图标但未导入
+```tsx
+import { Loader2, Users, Send, Clock } from 'lucide-react';  // ← 缺少 MessageCircle
+```
+**修复**：添加 `MessageCircle` 到导入列表
+
+**教训**：
+- 检查导入完整性：确保所有使用的组件/图标都已正确导入
+- 组件重命名时注意同步更新所有引用
+
+---
+
+### 问题 2: App.final.tsx 右侧面板类型导入错误
+**症状**：编译时提示 `RightPanelMode` 类型未导出
+```tsx
+import { RightPanel, RightPanelMode } from './components/RightPanel';
+// 错误：RightPanelMode 是 type，需要用 import type
+```
+**修复**：使用 `import type { RightPanelMode } from './components/RightPanel';`
+
+**教训**：
+- type 导入使用 `import type` 语法
+- 检查类型定义的导出方式（type vs interface vs export type）
+
+---
+
+### 问题 3: 项目切换时业务逻辑不完整，导致卡死在旧状态
+**症状**：切换项目后，前端卡死无法操作，提示 "LLM 生成失败"
+
+**根本原因**：
+1. 前端 `handleSelectProject` 只设置 `projectId` 和 `lastUpdated`，并发送 socket 事件
+2. 后端 `select-project` 事件只读取并发送 `delivery_store.json`
+3. **关键缺陷**：`delivery_store.json` 包含了旧项目的 Director Phase 2 审阅状态（`phase2_review_state.json`）
+4. 切换项目时，旧项目的临时状态文件没有被清除
+5. 前端读取 `delivery_store.json`，接收到旧项目的状态数据
+6. 系统认为 Phase 2 还在进行中，导致卡死
+
+**修复**：在 `server/index.ts` 的 `select-project` 事件处理中添加清除旧项目临时状态的逻辑：
+```typescript
+// 清除旧项目的临时状态文件（防止卡在旧状态）
+const oldProjectId = socketToProjectMap.get(socket);
+if (oldProjectId && oldProjectId !== projectId) {
+    const oldProjectRoot = getProjectRoot(oldProjectId);
+    const oldPhase2ReviewPath = path.join(oldProjectRoot, '04_Visuals', 'phase2_review_state.json');
+    if (fs.existsSync(oldPhase2ReviewPath)) {
+        fs.unlinkSync(oldPhase2ReviewPath);
+        console.log(\`[select-project] Cleared old phase2_review_state.json for \${oldProjectId}\`);
+    }
+}
+```
+
+**教训**：
+- 临时状态文件必须在切换项目时完全清除
+- 不要依赖 `delivery_store.json` 的默认值覆盖
+- 项目切换是完整的原子操作：离开旧房间 → 清理旧状态 → 加入新房间 → 设置新监听器
+
+---
+
+### 问题 4: Phase 2 LLM 生成持续失败 (fetch failed)
+**症状**：Phase 2 启动后，提示 "LLM 生成失败，重试 2 次后使用兜底方案"，13 分钟后无响应
+
+**根本原因**：
+1. SiliconFlow API 调用返回 `fetch failed` 错误
+2. 错误处理不完善，没有详细错误信息
+3. 缺少超时设置，请求无限等待
+
+**修复**：
+1. 添加 30 秒超时设置，防止无限等待
+2. 添加 AbortController 用于取消请求
+3. 增强错误日志，记录 HTTP status 和错误详情
+4. 检查环境变量配置是否正确
+
+**代码位置**：`server/llm.ts` 的 `callSiliconFlowLLM` 函数
+
+**教训**：
+- LLM API 调用必须有超时机制
+- 错误信息要详细（HTTP status + response text）
+- 添加调试日志便于排查问题
+
+---
+
+### 问题 5: SiliconFlow 模型名称配置错误
+**症状**：配置文件中模型名称为 `Pro/moonshotai/Kimi-K2.5`，但默认值不同
+
+**修复**：
+1. 检查 API 支持的模型列表（`/v1/models`）
+2. 使用正确的模型名称
+3. 确保 `llm.ts` 中的调用与配置一致
+
+**教训**：
+- API 配置变更前测试模型名称是否有效
+- 使用官方文档推荐的默认模型
+
+---
+
+### 问题 6: Edit 工具多次失败，代码更新未生效
+**原因**：直接编辑文件时，由于缩进或特殊字符导致匹配失败
+
+**修复**：
+1. 使用 Bash 命本进行精确替换
+2. 验证修改是否成功
+3. 必要时验证文件内容
+
+**教训**：
+- 复杂修改使用脚本确保准确性
+- 验证文件是否正确更新
+
+---

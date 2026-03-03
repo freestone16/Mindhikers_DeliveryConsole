@@ -264,10 +264,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         });
     };
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed top-[72px] right-0 bottom-[32px] w-[360px] bg-[#0a1220] border-l border-slate-700/50 flex flex-col z-40">
+        <>
             {/* Header */}
             <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -397,6 +395,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
+
+export const ChatPanelContent = ChatPanel;

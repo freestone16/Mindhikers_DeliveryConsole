@@ -11,10 +11,13 @@ import { DistributionQueue } from './components/DistributionQueue';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggleButton } from './components/ChatToggleButton';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
-import { Loader2, Users, Send, Clock } from 'lucide-react';
+import { Loader2, Users, Send, Clock, MessageCircle } from 'lucide-react';
 import { EXPERTS } from './config/experts';
 import type { ExpertStatus } from './types';
 import { StatusFooter } from './components/StatusFooter';
+import { CrucibleHome } from './components/CrucibleHome';
+import { RightPanel } from './components/RightPanel';
+import type { RightPanelMode } from './components/RightPanel';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
@@ -24,7 +27,7 @@ function App() {
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
-    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(null);
 
     const handleSelectProject = (projectId: string) => {
         // Optimistically clear the state so we don't show the previous project's data
@@ -44,11 +47,26 @@ function App() {
         }
     }, [state.activeExpertId]);
 
+    // 同步 activeModule 从全局状态
+    useEffect(() => {
+        if (state.activeModule) {
+            setActiveModule(state.activeModule);
+        }
+    }, [state.activeModule]);
+
     const handleSelectExpert = (expertId: string) => {
         setActiveExpertId(expertId);
         updateState({
             ...state,
             activeExpertId: expertId
+        });
+    };
+
+    const handleModuleChange = (module: ModuleType) => {
+        setActiveModule(module);
+        updateState({
+            ...state,
+            activeModule: module
         });
     };
 
@@ -133,13 +151,12 @@ function App() {
                 onSelectProject={handleSelectProject}
                 onSelectScript={selectScript}
                 activeModule={activeModule}
-                onModuleChange={setActiveModule}
+                onModuleChange={handleModuleChange}
             />
 
             {activeModule === 'crucible' ? (
-                <main className="max-w-7xl mx-auto px-6 py-20 text-center text-slate-400">
-                    <h2 className="text-2xl font-bold mb-4 text-amber-500">🔥 黄金坩埚 (Golden Crucible)</h2>
-                    <p>苏格拉底对话界面与状态机模块即将接入...</p>
+                <main className="max-w-7xl mx-auto px-6 py-20">
+                    <CrucibleHome />
                 </main>
             ) : activeModule === 'delivery' ? (
                 <div className="flex-1 flex overflow-hidden relative">
@@ -188,16 +205,28 @@ function App() {
                             </div>
                         </main>
                     </div>
-                    {isChatOpen ? (
-                        <ChatPanel
-                            isOpen={isChatOpen}
-                            onToggle={() => setIsChatOpen(false)}
-                            expertId={activeExpertId}
-                            projectId={state.projectId}
-                            socket={socket}
-                        />
+                    {rightPanelMode ? (
+                        <RightPanel
+                            isOpen={rightPanelMode !== null}
+                            onClose={() => setRightPanelMode(null)}
+                            mode={rightPanelMode}
+                        >
+                            <ChatPanel
+                                isOpen={true}
+                                onToggle={() => setRightPanelMode(null)}
+                                expertId={activeExpertId}
+                                projectId={state.projectId}
+                                socket={socket}
+                            />
+                        </RightPanel>
                     ) : (
-                        <ChatToggleButton onClick={() => setIsChatOpen(true)} />
+                        <button
+                            onClick={() => setRightPanelMode('chat')}
+                            className="fixed bottom-20 right-6 w-12 h-12 bg-blue-600 hover:bg-blue-500 rounded-full shadow-lg flex items-center justify-center transition-colors z-50"
+                            title="打开评审面板"
+                        >
+                            <MessageCircle className="w-5 h-5 text-white" />
+                        </button>
                     )}
                 </div>
             ) : (

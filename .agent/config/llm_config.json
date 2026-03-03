@@ -2,7 +2,7 @@
   "global": {
     "provider": "siliconflow",
     "model": "Pro/moonshotai/Kimi-K2.5",
-    "baseUrl": null
+    "baseUrl": "https://api.siliconflow.cn/v1"
   },
   "generation": {
     "imageModel": "doubao-image-01",

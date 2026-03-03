@@ -1,14 +1,21 @@
 {
   "name": "deliver",
   "private": true,
-  "version": "3.7.1",
+  "version": "3.8.0",
   "scripts": {
-    "dev": "concurrently \"tsx watch server/index.ts\" \"vite --host\"",
+    "dev": "concurrently \"tsx watch server/index.ts\" \"vite --host\" --kill-others --kill-others-on-fail",
+    "dev:clean": "pkill -f \"tsx watch server/index.ts\" 2>/dev/null || true && pkill -f \"vite.*--host\" 2>/dev/null || true",
+    "dev:check": "node scripts/check-port.js",
+    "dev:force": "npm run dev:clean && npm run dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "node scripts/preview.js",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs"
   },
   "dependencies": {
     "@babel/core": "^7.29.0",

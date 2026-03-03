@@ -27,6 +27,13 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({ data, onUpda
 
     const currentData = data.titleTagSets.length > 0 ? data : mockMarketModuleV2;
 
+    // 同步 phase 从全局状态
+    useEffect(() => {
+        if (currentData.phase !== undefined) {
+            setPhase(currentData.phase);
+        }
+    }, [currentData.phase]);
+
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
@@ -64,6 +71,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({ data, onUpda
             }
 
             setPhase(2);
+            onUpdate({ ...currentData, phase: 2 });
         } catch (error) {
             console.error('Generate error:', error);
         } finally {
@@ -73,6 +81,12 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({ data, onUpda
 
     const handleSelect = (id: string) => {
         onUpdate({ ...currentData, selectedSetId: id });
+    };
+
+    // 同步 phase 变更到全局 store
+    const handlePhaseChange = (newPhase: Phase) => {
+        setPhase(newPhase);
+        onUpdate({ ...currentData, phase: newPhase });
     };
 
     const handleRescore = async (id: string) => {
@@ -170,7 +184,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({ data, onUpda
                     {([1, 2, 3] as Phase[]).map((p) => (
                         <React.Fragment key={p}>
                             <button
-                                onClick={() => setPhase(p)}
+                                onClick={() => handlePhaseChange(p)}
                                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors
                                     ${phase === p
                                         ? 'bg-orange-500 text-white'

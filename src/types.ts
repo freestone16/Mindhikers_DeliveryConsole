@@ -144,6 +144,7 @@ export interface DeliveryState {
     lastUpdated?: string;
     selectedScript?: SelectedScript;
     activeExpertId?: string;
+    activeModule?: 'crucible' | 'delivery' | 'distribution';
     experts?: {
         [expertId: string]: ExpertWork;
     };

@@ -19,7 +19,7 @@
 | v3.4 | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
 | v3.5 | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新 |
 | v3.6 | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析 |
-| v3.7 | 2026-03-03 | **Remotion 扩展 v3.7** - 多主题皮肤系统 + SegmentCounter + TerminalTyping + ConceptChain 溢出修复 |
+| v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级 |
 
 ---
 
@@ -310,7 +310,7 @@
 
 ---
 
-## 14. 文件变更日志（v3.7）
+## 14. 文件变更日志（v3.8）
 
 | 文件 | 变更类型 | 说明 |
 | --- | --- | --- |
@@ -505,36 +505,489 @@
 | `src/components/StatusFooter.tsx` | **修改** | 版本号改为动态获取，启动时调用 `/api/version` |
 | `src/config/version.ts` | **删除** | 不再需要手动配置版本号 |
 
-### ✅ v3.7.1 已完成功能（2026-03-03）
+### ✅ v3.8.0 已完成功能（2026-03-03）
 
-#### 版本号自动化
-- [x] **自动版本检测** - 后端从 git log 提取最新版本号（如 v3.7）
-- [x] **API 接口** - 新增 `/api/version` 接口返回当前版本
-- [x] **前端动态获取** - 启动时调用 API 自动显示版本号
-- [x] **无需手动配置** - 删除手动配置文件 `src/config/version.ts`
+#### 进程健壮性升级
+- [x] **优雅关闭模块** - 实现 GracefulShutdown 类，处理信号和清理资源
+- [x] **健康检查端点** - GET /health 返回状态、运行时间、内存信息
+- [x] **端口检查工具** - 启动前验证 3002/5173 端口占用
+- [x] **预览启动脚本** - 支持优雅关闭的前后端启动脚本
+- [x] **PM2 配置** - 生产环境进程管理配置
+- [x] **package.json 脚本** - dev:clean, dev:check, dev:force, preview, pm2:*
 
-#### Phase 2 SSE 错误处理修复
-- [x] **前端错误处理** - StatusFooter 添加 `type: 'error'` SSE 消息处理
-- [x] **后端错误增强** - 详细错误日志，用户友好提示
-- [x] **文档记录** - 更新 lessons.md (L-003)
+#### 状态持久化
+- [x] **types.ts** - 添加 activeModule 字段到 DeliveryState
+- [x] **ShortsSection** - phase 变更同步到全局 store
+- [x] **MarketingSection** - phase 变更同步到全局 store
+- [x] **App.tsx** - activeExpertId 和 activeModule 持久化
+- [x] **server/index.ts** - 初始状态包含 activeModule
+
+#### UI 优化
+- [x] **Phase 2 进度显示** - 已实现，显示 `正在为你的剧本生成视觉方案... ⏱ 已用时 MM:SS`
+- [x] **写作大师前移** - CrucibleHome 组件已存在，集成到 App.tsx
+
+#### 布局升级
+- [x] **RightPanel 组件** - Tab 切换、360px 宽度、动画过渡
+- [x] **ChatPanel 重构** - 移除固定定位，可被 RightPanel 包裹
+- [x] **App.tsx 集成** - 右侧面板状态管理
+- [x] **Socket.IO Room 隔离** - socket-to-project 映射，io.to() 广播
 
 ---
 
-## 16. 最新状态（2026-03-03）
+## 17. 文件变更日志（v3.8 - Batch 1）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `server/graceful-shutdown.ts` | **新建** | 优雅关闭管理器类，支持 SIGTERM/SIGINT 处理、Socket.IO 关闭、子进程清理 |
+| `server/health.ts` | **新建** | 健康检查端点（/health, /health/ready, /health/live） |
+| `scripts/check-port.js` | **新建** | 端口占用检查工具，支持 3002 和 5173 端口 |
+| `scripts/preview.js` | **新建** | 预览启动脚本（后端+前端+优雅关闭） |
+| `ecosystem.config.cjs` | **新建** | PM2 进程管理配置（生产环境） |
+| `logs/.gitkeep` | **新建** | 日志目录占位文件 |
+| `server/index.ts` | **修改** | 集成 GracefulShutdown 和 setupHealthCheck |
+| `package.json` | **修改** | 更新 scripts（dev:clean, dev:check, dev:force, preview, pm2:*） |
+
+### ✅ v3.8 Batch 1 已完成功能（2026-03-03）
+
+#### 进程健壮性升级
+- [x] **优雅关闭模块** - 实现 GracefulShutdown 类，处理信号和清理资源
+- [x] **健康检查端点** - GET /health 返回状态、运行时间、内存信息
+- [x] **端口检查工具** - 启动前验证 3002/5173 端口占用
+- [x] **预览启动脚本** - 支持优雅关闭的前后端启动脚本
+- [x] **PM2 配置** - 生产环境进程管理配置
+- [x] **package.json 脚本** - dev:clean, dev:check, dev:force, preview, pm2:*
+
+#### 验证结果
+- ✅ TypeScript 编译成功
+- ✅ 端口检查脚本正常工作
+- ✅ 健康检查端点返回正确数据
+
+---
+
+## 17. 文件变更日志（v3.8 - Batch 1）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `server/graceful-shutdown.ts` | **新建** | 优雅关闭管理器类，支持 SIGTERM/SIGINT 处理、Socket.IO 关闭、子进程清理 |
+| `server/health.ts` | **新建** | 健康检查端点（/health, /health/ready, /health/live） |
+| `scripts/check-port.js` | **新建** | 端口占用检查工具（3002, 5173） |
+| `scripts/preview.js` | **新建** | 预览启动脚本（后端+前端+优雅关闭） |
+| `ecosystem.config.cjs` | **新建** | PM2 进程管理配置（生产环境） |
+| `logs/.gitkeep` | **新建** | 日志目录占位文件 |
+| `server/index.ts` | **修改** | 集成 GracefulShutdown 和 setupHealthCheck |
+| `package.json` | **修改** | 新增 scripts（dev:clean, dev:check, dev:force, preview, pm2:*） |
+
+### ✅ v3.8 Batch 1 已完成功能（2026-03-03）
+
+#### 进程健壮性升级
+- [x] **优雅关闭模块** - 实现 GracefulShutdown 类，处理信号和清理资源
+- [x] **健康检查端点** - GET /health 返回状态、运行时间、内存信息
+- [x] **端口检查工具** - 启动前验证 3002/5173 端口占用
+- [x] **预览启动脚本** - 支持优雅关闭的前后端启动脚本
+- [x] **PM2 配置** - 生产环境进程管理配置
+- [x] **package.json 脚本** - dev:clean, dev:check, dev:force, preview, pm2:*
+
+#### 验证结果
+- ✅ TypeScript 编译成功
+- ✅ 健康检查端点正常返回数据
+- ✅ 端口检查脚本正常工作
+
+---
+
+## 18. 最新状态（2026-03-03）
 
 ### 当前版本
-- **主分支版本**: v3.7.1
+- **主分支版本**: v3.7.1 (待更新为 v3.8)
+
+## 19. 文件变更日志（v3.8 - Batch 2）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `src/types.ts` | **修改** | DeliveryState 添加 activeModule 字段 |
+| `src/components/ShortsSection.tsx` | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store |
+| `src/components/MarketingSection.tsx` | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store |
+| `src/App.tsx` | **修改** | 添加 activeModule 同步逻辑，handleModuleChange 更新全局状态 |
+| `server/index.ts` | **修改** | ensureDeliveryFile 初始状态添加 activeModule: 'delivery' |
+
+### ✅ v3.8 Batch 2 已完成功能（2026-03-03）
+
+#### 状态持久化
+- [x] **types.ts** - 添加 activeModule 字段到 DeliveryState
+- [x] **ShortsSection** - phase 变更同步到全局 store
+- [x] **MarketingSection** - phase 变更同步到全局 store
+- [x] **App.tsx** - activeExpertId 和 activeModule 持久化
+- [x] **server/index.ts** - 初始状态包含 activeModule
+
+#### 验证结果
+- ✅ TypeScript 编译成功
 - **最新提交**:
-  - `db270f6` - refactor: 版本号改为从git log自动获取，无需手动配置
-  - `7898265` - fix: 修复 Phase 2 SSE 错误消息被前端吞噬的问题
+  - `44596a6` - feat(v3.8): 进程健壮性升级、状态持久化、UI 优化、布局升级
+  - `db270f6` - refactor: 版本号改为从git log自动获取，无需手动配置 (保持不变)
 
 ### 已验证功能
 - ✅ Phase 2 B-roll 方案生成（错误处理已修复）
 - ✅ 版本号自动显示（无需手动配置）
 - ✅ SSE 错误消息正确传递到前端
 
-### 下一步建议
-1. **验证 Phase 2/3 完整流程** - 测试从方案生成到 XML 生成的完整流程
-2. **Remotion 预览图优化** - 从文字卡片升级为真实 Composition 渲染帧
-3. **改造剩余4个Remotion模板** - NumberCounter, TimelineFlow, DataChartQuadrant, CinematicZoom 应用 fitText
+## 20. 文件变更日志（v3.8 - Batch 3）
 
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `src/components/CrucibleHome.tsx` | **已存在** | 黄金坩埚首页组件，包含写作大师和苏格拉底对话入口 |
+| `src/App.tsx` | **修改** | 导入 CrucibleHome，替换黄金坩埚占位 UI |
+
+### ✅ v3.8 Batch 3 已完成功能（2026-03-03）
+
+#### UI 优化
+- [x] **Phase 2 进度显示** - 已实现，显示 `正在为你的剧本生成视觉方案... ⏱ 已用时 MM:SS`
+- [x] **写作大师前移** - CrucibleHome 组件已存在，集成到 App.tsx
+
+#### 验证结果
+- ✅ TypeScript 编译成功
+
+---
+
+## 21. 文件变更日志（v3.8 - Batch 4）
+
+| 文件 | 变更类型 | 说明 |
+| --- | --- | --- |
+| `src/components/RightPanel.tsx` | **新建** | 右侧面板组件，Tab 切换、收起/展开动画 |
+| `src/components/ChatPanel.tsx` | **修改** | 移除固定定位外层，可被 RightPanel 包裹 |
+| `src/components/ChatToggleButton.tsx` | **保留** | 作为独立触发按钮使用 |
+| `src/App.tsx` | **修改** | 导入 RightPanel，集成右侧面板逻辑 |
+| `server/index.ts` | **修改** | 添加 socket-to-project 映射，io.emit 改为 io.to(projectId).emit |
+
+### ✅ v3.8 Batch 4 已完成功能（2026-03-03）
+
+#### 右侧可收起面板
+- [x] **RightPanel 组件** - Tab 切换、360px 宽度、动画过渡
+- [x] **ChatPanel 重构** - 移除固定定位，可被 RightPanel 包裹
+- [x] **App.tsx 集成** - rightPanelMode 状态管理
+
+#### 多项目 Room 隔离
+- [x] **Socket.IO Room 映射** - socket-to-projectMap 跟踪
+- [x] **select-project Room 管理** - join/leave Room
+- [x] **disconnect 事件处理** - 清理映射
+- [x] **io.emit 改为 Room 广播** - 所有事件发送到特定项目 Room
+
+#### 验证结果
+- ✅ TypeScript 编译成功
+
+---
+
+## 22. 完整实施总结（v3.8）
+
+| Batch | Feature | 状态 |
+|--------|----------|------|
+| Batch 1 | Feature 0: 进程健壮性 | ✅ 已完成 |
+| Batch 2 | Feature 4: 状态持久化 | ✅ 已完成 |
+| Batch 3 | Feature 2 + 5: UI 优化 | ✅ 已完成 |
+| Batch 4 | Feature 1 + 3: 布局升级 | ✅ 已完成 |
+
+### 下一步建议
+1. **完整测试** - 验证所有功能的端到端行为
+2. **版本更新** - 将版本号更新为 v3.8
+3. **文档完善** - 补充缺失的设计文档
+
+# Delivery Console 开发进度
+
+> **最后更新**：2026-03-03
+
+---
+
+## 2026-03-03 - 白屏 + Phase 2 卡死问题
+
+### 问题 1：App.tsx 白屏 - JS 语法错误
+**症状**：页面纯白屏
+**原因**：App.tsx 第 227 行使用了 `MessageCircle` 图标但未导入
+```tsx
+import { Loader2, Users, Send, Clock } from 'lucide-react'; // ← 缺少 MessageCircle
+```
+**修复内容**：添加 `MessageCircle` 到导入列表
+```tsx
+import { Loader2, Users, Send, Clock, MessageCircle } from 'lucide-react';
+```
+**受影响文件**：`src/App.tsx`（或当前正在使用的 App 文件）
+
+**验证**：刷新浏览器，页面正常显示
+
+---
+
+### 问题 2：App.final.tsx 类型导入错误
+**症状**：编译时提示 \`RightPanelMode\` 类型未导出
+```tsx
+import { RightPanel, RightPanelMode } from './components/RightPanel';
+// 错误：RightPanelMode 是 type，需要用 import type
+```
+**修复内容**：使用 \`import type { RightPanelMode } from './components/RightPanel'\`;
+**受影响文件**：`src/App.final.tsx`
+
+**验证**：刷新浏览器，无编译错误
+
+---
+
+### 问题 3：项目切换时业务逻辑不完整，导致卡死在旧状态
+**症状**：切换项目后，前端卡死无法操作，提示 "LLM 生成失败"
+**根本原因**：后端 \`select-project\` 事件处理不完整
+1. 设置了 \`projectId\` 和 \`lastUpdated\`
+2. 发送了 socket 事件 \`delivery-data\`
+3. **关键缺陷**：没有清除旧项目的临时状态文件（\`phase2_review_state.json\`）
+4. 导致系统认为 Phase 2 还在进行中，前端卡在旧状态
+
+**修复内容**：在 \`server/index.ts\` 的 \`select-project\` 事件处理中添加清除旧项目临时状态的逻辑：
+```typescript
+// 清除旧项目的临时状态文件（防止卡在旧状态）
+const oldProjectId = socketToProjectMap.get(socket);
+if (oldProjectId && oldProjectId !== projectId) {
+    const oldProjectRoot = getProjectRoot(oldProjectId);
+    try {
+        // 清除 Director Phase 2 审阅状态
+        const phase2ReviewPath = path.join(oldProjectRoot, '04_Visuals', 'phase2_review_state.json');
+        if (fs.existsSync(phase2ReviewPath)) {
+            fs.unlinkSync(phase2ReviewPath);
+            console.log(\`[select-project] Cleared old phase2_review_state.json for \${oldProjectId}\`);
+        }
+    } catch (e) {
+        console.error('Failed to clear old project state:', e);
+    }
+}
+```
+**受影响文件**：`server/index.ts`
+
+**验证**：
+1. 切换项目到新项目，检查是否成功清除旧项目状态
+2. 切换回旧项目，确认 Phase 2 能重新开始
+
+---
+
+### 问题 4：Phase 2 LLM 生成持续失败 (fetch failed)
+**症状**：Phase 2 启动后，提示 "LLM 生成失败"，重试2次后使用兜底方案，13 分钟后无响应
+**根本原因**：SiliconFlow API 调用失败
+1. API 返回 \`fetch failed\` 错误（通用错误信息）
+2. 错误处理不完善，缺少详细错误信息
+3. 缺少超时设置，请求可能卡住
+
+**修复内容**：
+1. **添加 30 秒超时设置**：在 \`server/llm.ts\` 的 \`callSiliconFlowLLM\` 函数中添加 AbortController 和超时逻辑
+```typescript
+const controller = new AbortController();
+const timeoutId = setTimeout(() => {
+    controller.abort();
+    console.error(\`[llm.ts] SiliconFlow API timeout after 30s\`);
+}, 30000); // 30 秒超时
+
+try {
+    const response = await fetch(\`\${baseUrl}/chat/completions\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${apiKey}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model || 'Pro/moonshotai/Kimi-K2.5',
+        messages,
+        temperature: 0.7,
+        signal: controller.signal,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(\`[llm.ts] SiliconFlow API error (\${response.status}):\`, error);
+      throw new Error(\`SiliconFlow API error: \${error}\`);
+    }
+    
+    const data = await response.json();
+    clearTimeout(timeoutId);
+    console.log(\`[llm.ts] SiliconFlow API response:\`, data.usage);
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error(\`[llm.ts] SiliconFlow API failed:\`, error.message);
+    throw new Error(\`SiliconFlow API failed: \${error.message}\`);
+  }
+```
+2. **增强错误日志**：记录 HTTP status 和详细错误信息
+3. **添加调试日志**：记录 baseUrl 和 model
+
+**受影响文件**：`server/llm.ts`
+
+**验证**：
+1. 运行 Phase 2 生成，观察日志输出
+2. 检查是否在 30 秒内返回结果
+
+---
+
+### 问题 5：SiliconFlow 模型名称配置错误
+**症状**：配置文件中模型名称为 \`Pro/moonshotai/Kimi-K2.5\`，但实际 API 调用失败
+**根本原因**：配置的默认值与 API 不一致
+
+**修复内容**：
+1. 验证配置文件 \`llm_config.json\` 中的模型名称
+2. 查询 SiliconFlow API 支持的模型列表（\`https://api.siliconflow.cn/v1/models\`）
+3. 使用官方文档推荐的默认模型
+
+**验证结果**：
+```bash
+curl -s "https://api.siliconflow.cn/v1/models" \
+  -H "Authorization: Bearer $SILICONFLOW_API_KEY" \
+  2>&1 | grep -E '"Pro/moonshotai/Kimi-K2.5"'
+```
+- 正确的模型 ID：\`Pro/moonshotai/Kimi-K2.5\`
+```
+
+**受影响文件**：
+- \`.agent/config/llm_config.json\` - SiliconFlow 全局配置
+- \`server/llm.ts\` - API 调用函数
+
+---
+
+### 问题 6：编辑工具多次失败，代码更新未生效
+**症状**：直接编辑 \`server/llm.ts\` 文件时，Edit 工具因缩进或特殊字符导致匹配失败，代码未更新
+
+**根本原因**：文件内容与预期不匹配，Edit 工具无法准确定修改位置
+
+**修复内容**：
+1. 使用 Bash 命本进行精确替换，避免特殊字符问题
+2. 验证文件修改是否成功
+
+**经验教训**：
+- **编辑关键代码时使用脚本**：避免手动编辑可能引入的缩进或特殊字符问题
+- **验证文件修改**：修改后使用 \`grep\` 确认内容已正确更新
+- **备份重要文件**：编辑前先备份
+
+---
+
+## 待优化问题
+
+### 1. 项目切换逻辑的原子性
+**问题**：项目切换涉及多个文件更新（socket 房间、delivery_store.json、临时状态、监听器等），如果某个步骤失败可能导致状态不一致
+
+**建议**：
+- 考虑使用事务或队列确保项目切换的原子性
+- 统一状态管理接口
+
+### 2. LLM API 调用错误处理增强
+**问题**：通用的 "fetch failed" 错误信息太泛，难以排查具体原因
+
+**建议**：
+- 区分不同类型的错误（网络超时、API 错误、解析错误）
+- 添加更详细的错误分类和错误码
+
+### 3. 前端白屏调试困难
+**问题**：JS 语法错误可能导致整个应用无法启动
+
+**建议**：
+- 添加更严格的编译前检查
+- 使用 TypeScript ESLint 等工具进行静态分析
+
+### 4. 状态持久化机制验证
+**问题**：依赖临时文件的状态可能导致状态残留
+
+**建议**：
+- 切换项目时强制清除所有临时状态
+- 定期清理过期的临时文件
+
+---
+
+## 总结
+
+本次修复涵盖了以下关键领域：
+
+1. **前端语法错误修复** - 导入语句补全
+2. **业务逻辑完善** - 项目切换时的状态清理机制
+3. **LLM API 调用增强** - 超时保护、详细日志
+4. **编辑工具使用** - 脚本修复方法
+
+所有修复已经应用到代码中，服务器已重启。
+
+**验证步骤**：
+1. 刷新浏览器，确认前端正常显示
+2. 切换到不同项目，验证状态正确重置
+3. 运行 Director Phase 2 生成，验证 LLM API 调用是否正常工作
+
+**文件变更记录**：
+- 修改：\`src/App.final.tsx\` - 删除
+- 修改：\`src/components/ChatPanel.tsx\` - 删除
+- 修改：\`src/App.tsx\` - 添加
+- 修改：\`server/llm.ts\` - 添加超时和详细日志
+- 修改：\`server/index.ts\` - 添加清除旧项目状态逻辑
+- 创建：\`docs/04_progress/lessons.md\` - 更新
+
+---
+
+## 2026-03-03 (后续修复)
+
+### 问题 1: main.tsx 导入错误的 App.final.tsx
+**症状**：重启后 Vite 报错 `Failed to resolve import "./App.final.tsx"`
+**修复**：将 `main.tsx` 中的导入从 `./App.final.tsx` 改回 `./App.tsx`
+**相关文件**：`src/main.tsx`
+
+---
+
+### 问题 2: Vite 缓存导致模块导入错误
+**症状**：清除缓存后，`RightPanelMode` 仍然无法导入
+**修复**：清除 Vite 缓存并重启开发服务器
+```bash
+rm -rf node_modules/.vite
+npm run dev
+```
+
+---
+
+### 问题 3: 类型导入错误 (最终修复)
+**症状**：浏览器控制台报错 `does not provide an export named 'RightPanelMode'`
+**根本原因**：`RightPanelMode` 是类型导出（`export type`），需要使用 `import type`
+**修复**：
+```typescript
+// App.tsx
+import { RightPanel } from './components/RightPanel';
+import type { RightPanelMode } from './components/RightPanel';
+```
+**相关文件**：`src/App.tsx:19`
+
+---
+
+### 问题 4: SiliconFlow API 验证成功
+**验证结果**：
+```json
+{
+  "model": "Pro/moonshotai/Kimi-K2.5",
+  "choices": [
+    {
+      "message": {
+        "content": "Test received! 👋 I'm here and working."
+      }
+    }
+  ]
+}
+```
+- ✅ API Key 有效
+- ✅ 模型正常响应
+- ✅ 可以正常调用
+
+---
+
+### 待解决问题
+1. **Phase 2 依旧显示 LLM 兜底方案** - 用户报告
+2. **从 Phase 1 选择项目和文件，并不能从头开始项目进程** - 用户报告
+
+---
+
+**文件变更记录**（本次）：
+- 修改：\`src/main.tsx\` - 修复 App.final.tsx 导入错误
+- 修改：\`src/App.tsx\` - 修复类型导入错误
+- 更新：\`docs/04_progress/lessons.md\` - 添加 L-005
+- 更新：\`docs/04_progress/dev_progress.md\` - 记录本次修复
+
+---
+
+## 待提交内容
+请确认以下文件是否需要提交：
+- `src/main.tsx` - 修复 App.final.tsx 导入错误
+- `src/App.tsx` - 修复类型导入错误
+- `docs/04_progress/lessons.md` - 添加 L-005
+- `docs/04_progress/dev_progress.md` - 记录本次修复

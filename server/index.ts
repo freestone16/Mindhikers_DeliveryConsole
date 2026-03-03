@@ -21,6 +21,8 @@ import * as shorts from './shorts';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot, parseIntent, isModificationExpert } from './chat';
 import { executeModification } from './chat-modifications';
 import marketRouter from './market';
+import { createDefaultShutdown } from './graceful-shutdown';
+import { setupHealthCheck } from './health';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -44,6 +46,9 @@ const io = new Server(httpServer, {
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
 // No longer globally hardcoded. Projects are specified per request.
 let currentProjectName: string | null = null; // Track active project for server-side operations
+
+// Socket.IO Room isolation - track which project each socket belongs to
+const socketToProjectMap = new Map<any, string>();
 // let PROJECT_ROOT = getProjectRoot(currentProjectName);
 // let DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
 // let SHORTS_AROLL_DIR = path.join(PROJECT_ROOT, '09_shorts_aroll');
@@ -198,6 +203,7 @@ function ensureDeliveryFile(projectId: string) {
         projectId: projectId,
         lastUpdated: new Date().toISOString(),
         activeExpertId: 'Director',
+        activeModule: 'delivery',
         experts: {
             Director: { status: 'idle', logs: [] },
             MusicDirector: { status: 'idle', logs: [] },
@@ -369,7 +375,7 @@ function setupProjectWatcher(projectId: string) {
         try {
             console.log(`delivery_store.json changed for project ${projectId}, broadcasting...`);
             const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-            io.emit('delivery-data', data);
+            io.to(currentProjectName).emit('delivery-data', data);
         } catch (e) {
             console.error('Error reading delivery file on change:', e);
         }
@@ -421,7 +427,7 @@ function setupExpertWatchers(projectId: string) {
                 };
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-                io.emit('delivery-data', deliveryData);
+                io.to(currentProjectName).emit('delivery-data', deliveryData);
             }
         }
 
@@ -458,7 +464,7 @@ function setupExpertWatchers(projectId: string) {
                 };
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-                io.emit('delivery-data', deliveryData);
+                io.to(currentProjectName).emit('delivery-data', deliveryData);
             }
         });
 
@@ -478,7 +484,16 @@ function setupExpertWatchers(projectId: string) {
 syncSkills(io);
 
 io.on('connection', (socket) => {
-    console.log('Client connected');
+    console.log(`Client connected: ${socket.id}`);
+
+    socket.on('disconnect', () => {
+        const projectId = socketToProjectMap.get(socket);
+        if (projectId) {
+            socket.leave(projectId);
+            socketToProjectMap.delete(socket);
+            console.log(`Socket ${socket.id} left room: ${projectId}`);
+        }
+    });
     // Send current project data (if any is active on server, though now it's client-driven)
     // if (fs.existsSync(DELIVERY_FILE)) {
     //     const data = JSON.parse(fs.readFileSync(DELIVERY_FILE, 'utf-8'));
@@ -491,8 +506,31 @@ io.on('connection', (socket) => {
     sendSyncStatusToSocket(socket);
 
     socket.on('select-project', (projectId) => {
-        console.log(`Client selected project: ${projectId}`);
+        console.log(`Client ${socket.id} selected project: ${projectId}`);
         currentProjectName = projectId; // Update server's active project
+
+        // Socket.IO Room isolation: join the project room
+        const oldProjectId = socketToProjectMap.get(socket);
+        if (oldProjectId && oldProjectId !== projectId) {
+            socket.leave(oldProjectId);
+            console.log(`Socket ${socket.id} left room: ${oldProjectId}`);
+
+            // 清除旧项目的临时状态文件（防止卡在旧状态）
+            const oldProjectRoot = getProjectRoot(oldProjectId);
+            const oldPhase2ReviewPath = path.join(oldProjectRoot, '04_Visuals', 'phase2_review_state.json');
+            try {
+                if (fs.existsSync(oldPhase2ReviewPath)) {
+                    fs.unlinkSync(oldPhase2ReviewPath);
+                    console.log(`[select-project] Cleared old phase2_review_state.json for ${oldProjectId}`);
+                }
+            } catch (e) {
+                console.error('Failed to clear old phase2 state:', e);
+            }
+        }
+
+        socket.join(projectId);
+        socketToProjectMap.set(socket, projectId);
+        console.log(`Socket ${socket.id} joined room: ${projectId}`);
         // 1. Ensure file exists for this project
         ensureDeliveryFile(projectId);
 
@@ -522,7 +560,7 @@ io.on('connection', (socket) => {
         console.log(`Received update from client for ${newData.projectId}`);
         newData.lastUpdated = new Date().toISOString();
         fs.writeFileSync(deliveryFile, JSON.stringify(newData, null, 2));
-        socket.broadcast.emit('delivery-data', newData); // Broadcast to other clients
+        io.to(newData.projectId).emit('delivery-data', newData); // Send to project room
     });
 
     socket.on('start-render', (data) => {
@@ -557,7 +595,7 @@ io.on('connection', (socket) => {
 
                     deliveryData.lastUpdated = new Date().toISOString();
                     fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-                    io.emit('delivery-data', deliveryData);
+                    io.to(currentProjectName).emit('delivery-data', deliveryData);
                 }
             }
         });
@@ -669,7 +707,7 @@ io.on('connection', (socket) => {
                     }
 
                     // 5. 推送更新到所有客户端
-                    io.emit('expert-data-update', {
+                    io.to(payload.projectId || currentProjectName).emit('expert-data-update', {
                         expertId,
                         action: intent.target!.action,
                         data: result.data
@@ -841,8 +879,8 @@ app.post('/api/projects/switch', (req, res) => {
     const deliveryFile = path.join(newRoot, 'delivery_store.json');
     const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
 
-    io.emit('delivery-data', data);
-    io.emit('active-project', { name: currentProjectName });
+    io.to(currentProjectName).emit('delivery-data', data);
+    io.to(currentProjectName).emit('active-project', { name: currentProjectName });
 
     res.json({ success: true, project: currentProjectName, projectRoot: newRoot });
 });
@@ -1002,7 +1040,7 @@ app.post('/api/scripts/select', (req, res) => {
 
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-                io.emit('delivery-data', deliveryData);
+                io.to(currentProjectName).emit('delivery-data', deliveryData);
             } finally {
                 isStoreLocked = false;
             }
@@ -1077,7 +1115,7 @@ app.post('/api/experts/start', (req, res) => {
         deliveryData.lastUpdated = new Date().toISOString();
         fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
 
-        io.emit('delivery-data', deliveryData);
+        io.to(currentProjectName).emit('delivery-data', deliveryData);
 
         res.json({ success: true, taskId, taskFile, message: '请在 Antigravity 中执行对应 skill' });
     } catch (error: any) {
@@ -1150,7 +1188,7 @@ app.post('/api/experts/run', (req, res) => {
         };
         deliveryData.lastUpdated = new Date().toISOString();
         fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-        io.emit('delivery-data', deliveryData);
+        io.to(currentProjectName).emit('delivery-data', deliveryData);
 
         // Execute Python skill (pass script content via stdin) with timeout 10 mins
         const python = spawn('python3', [
@@ -1238,6 +1276,13 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`📂 Projects Base: ${PROJECTS_BASE}`);
     //    console.log(`🎬 A-roll dir: ${SHORTS_AROLL_DIR}`);
 });
+
+// Initialize Graceful Shutdown
+const shutdownManager = createDefaultShutdown(httpServer);
+shutdownManager.setSocketIO(io);
+
+// Setup Health Check Endpoints
+setupHealthCheck(app);
 
 // --- Global Error Handlers (prevent server crashes from unhandled async errors) ---
 process.on('uncaughtException', (err) => {

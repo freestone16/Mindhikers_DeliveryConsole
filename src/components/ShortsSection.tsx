@@ -26,7 +26,14 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
     const [scripts, setScripts] = useState<ShortScript[]>(initialData.scripts);
     const [renderUnits, setRenderUnits] = useState<ShortRenderUnit[]>(initialData.renderUnits);
     const [lastModifiedId, setLastModifiedId] = useState<string | null>(null);
-    
+
+    // 同步 phase 从全局状态
+    useEffect(() => {
+        if (initialData.phase !== undefined) {
+            setPhase(initialData.phase);
+        }
+    }, [initialData.phase]);
+
     const { socket } = useDeliveryStore();
 
     // SD-207.1: 监听来自 Chat Panel 的修改更新
@@ -87,6 +94,12 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
         setScripts(newScripts);
         setPhase(2);
         onUpdate({ ...initialData, phase: 2, scripts: newScripts });
+    };
+
+    // 同步 phase 变更到全局 store
+    const handlePhaseChange = (newPhase: Phase) => {
+        setPhase(newPhase);
+        onUpdate({ ...initialData, phase: newPhase });
     };
 
     const handleScriptsUpdate = (updatedScripts: ShortScript[]) => {
@@ -156,7 +169,7 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
                     {[1, 2, 3].map(p => (
                         <button
                             key={p}
-                            onClick={() => canEnterPhase(p as Phase) && setPhase(p as Phase)}
+                            onClick={() => canEnterPhase(p as Phase) && handlePhaseChange(p as Phase)}
                             disabled={!canEnterPhase(p as Phase)}
                             className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${
                                 phase === p 
