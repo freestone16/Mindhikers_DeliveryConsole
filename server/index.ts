@@ -67,29 +67,24 @@ const EXPERTS_CONFIG = [
 // --- Version Auto-Detection (from git log) ---
 function getAppVersion(): string {
     try {
-        // Read package.json version as fallback
-        const packageJsonPath = path.join(__dirname, '../../package.json');
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-        const packageVersion = packageJson.version;
-
-        // Try to get version from git log (e.g., "v3.7")
-        const gitLogPath = path.join(__dirname, '../../.git');
-        if (fs.existsSync(gitLogPath)) {
-            const { execSync } = require('child_process');
-            try {
-                // Get latest commit message and extract version
-                const commitMsg = execSync('git log -1 --pretty=%B', { encoding: 'utf-8', cwd: __dirname + '/../../' });
-                const versionMatch = commitMsg.match(/v(\d+\.\d+(?:\.\d+)?)/);
-                if (versionMatch) {
-                    return `v${versionMatch[1]}`;
-                }
-            } catch (e) {
-                // Git not available or error, fall through
+        // Try to get version from git log (e.g., "v3.7.1")
+        const { execSync } = require('child_process');
+        try {
+            // Get just the commit subject (first line), using current working directory
+            const commitSubject = execSync('git log -1 --pretty=%s', { encoding: 'utf-8' });
+            // Match version pattern (v3.7, v3.7.1, etc.)
+            const versionMatch = commitSubject.match(/v(\d+\.\d+(?:\.\d+)?)/);
+            if (versionMatch) {
+                return `v${versionMatch[1]}`;
             }
+        } catch (e) {
+            // Git error, fall through
         }
 
         // Fallback to package.json version
-        return `v${packageVersion}`;
+        const packageJsonPath = path.join(__dirname, '../../package.json');
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        return `v${packageJson.version}`;
     } catch (e) {
         return 'v0.0.0';
     }
@@ -110,7 +105,12 @@ app.post('/api/visual-plan/scene/review', updateSceneReview);
 
 // Version Route
 app.get('/api/version', (req, res) => {
-    res.json({ version: getAppVersion() });
+    try {
+        const version = getAppVersion();
+        res.json({ version });
+    } catch (e: any) {
+        res.json({ version: 'v0.0.0' });
+    }
 });
 
 // LLM Config Routes
