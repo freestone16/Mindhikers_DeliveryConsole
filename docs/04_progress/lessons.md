@@ -19,6 +19,7 @@
 
 ### 服务器启动 / 依赖管理
 - [x] node_modules 平台不匹配导致启动失败 → 见下方 L-004
+- [x] llm.ts 文件被错误覆盖 → 见下方 L-006
 
 ### 通用开发
 - [x] 不要擅自修改配置路径 → 见下方 L-001
@@ -252,6 +253,93 @@ import type { RightPanelMode } from './components/RightPanel';
 **相关文件**：
 - `/Users/luzhoua/DeliveryConsole/src/App.tsx:19` - 类型导入修复
 - `/Users/luzhoua/DeliveryConsole/src/components/RightPanel.tsx:4` - 类型导出
+
+---
+
+### [LLM 模块] L-006 - llm.ts 文件被错误覆盖，导致 Phase 2 总是显示兜底方案
+
+**日期**：2026-03-03
+
+**问题**：
+- Phase 2 启动后，总是显示"兜底方案（LLM 生成失败）"
+- SiliconFlow API 验证成功，但 Phase 2 仍然无法正常生成
+- 前端显示：所有 B-roll 方案的 `rationale` 都是"兜底方案（LLM 生成失败）"
+
+**根本原因**：
+1. `llm.ts` 文件被错误覆盖，从 510 行缩减到 50 行
+2. 缺少 Phase 2 生成所需的核心函数：
+   - `generateGlobalBRollPlan` - 全局 B-roll 规划生成
+   - `generateFallbackOptions` - 兜底方案生成
+   - `generateBRollOptions` - 单章节 B-roll 方案生成
+   - `BRollOption` 类型定义
+3. `director.ts` 导入这些函数时报错，导致每次调用都使用兜底方案
+4. **关键问题**：覆盖文件时使用了 `Write` 工具而不是 `Edit`，导致整个文件内容丢失
+
+**诊断过程**：
+```bash
+# Phase 1: 根因调查
+wc -l server/llm.ts          # 只有 50 行
+wc -l server/llm_backup.ts  # 510 行（完整文件）
+
+# Phase 2: 模式分析
+grep -n "generateGlobalBRollPlan" server/llm.ts      # 未找到
+grep -n "generateGlobalBRollPlan" server/llm_backup.ts  # 找到（在 237 行）
+
+# Phase 3: 结论验证
+# director.ts 从 './llm' 导入，但 llm.ts 缺少必要的函数
+# 导致运行时调用失败，只能使用兜底方案
+```
+
+**修复**：
+1. 从 `llm_backup.ts` 恢复完整的 `llm.ts` 文件
+2. 在恢复的 `callSiliconFlowLLM` 函数中保留新添加的超时逻辑：
+   ```typescript
+   const controller = new AbortController();
+   const timeoutId = setTimeout(() => {
+     controller.abort();
+     console.error(`[llm.ts] SiliconFlow API timeout after 30s`);
+   }, 30000); // 30 秒超时
+   ```
+3. 重启服务器，确保新代码加载
+
+**教训 / 规则**：
+1. **永远不要对大文件使用 Write 工具进行部分修复**：
+   - `Write` 工具会覆盖整个文件
+   - 对于部分修复，必须使用 `Edit` 工具
+   - 如果文件超过 50 行，考虑使用 `Edit` 或 `Edit` with `replace_all`
+
+2. **修复前的验证清单**：
+   - ✅ 检查文件完整内容（`Read` 工具读取全部）
+   - ✅ 确认要修改的位置和上下文
+   - ✅ 使用 `old_string` 包含足够多的上下文（至少 5-10 行）
+   - ✅ 验证 `old_string` 在文件中唯一存在
+
+3. **核心文件备份机制**：
+   - 修改前创建备份：`cp file.ts file.ts.backup`
+   - 发现文件被错误覆盖时，立即从备份恢复
+   - 定期清理过期的备份文件
+
+4. **错误检测机制**：
+   - 文件被覆盖后，检查行数是否突然减少
+   - 检查关键函数是否仍然存在（用 `grep`）
+   - 如果发现异常，立即停止并恢复
+
+5. **Phase 2 生成失败的诊断流程**：
+   - 检查 `llm.ts` 是否包含 `generateGlobalBRollPlan`
+   - 检查 `director.ts` 是否能正确导入函数
+   - 查看 `rationale` 字段是否为"兜底方案"
+   - 如果都是兜底，检查 `llm.ts` 是否被损坏
+
+**相关文件**：
+- `/Users/luzhoua/DeliveryConsole/server/llm.ts` - 已恢复完整内容
+- `/Users/luzhoua/DeliveryConsole/server/llm_backup.ts` - 备份文件
+- `/Users/luzhoua/DeliveryConsole/server/director.ts:4` - 导入语句
+
+**验证结果**（2026-03-03）：
+- ✅ `llm.ts` 恢复为 510 行
+- ✅ 所有必要的函数都存在
+- ✅ SiliconFlow 超时逻辑保留
+- ✅ 代码已提交到 main 分支
 
 ---
 
