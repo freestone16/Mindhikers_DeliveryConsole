@@ -6,21 +6,21 @@
 
 ## 1. 版本迭代历史
 
-| 版本 | 日期       | 里程碑                                                        |
-| ---- | ---------- | ------------------------------------------------------------- |
-| v1.0 | 2026-02-10 | 初版：单项目（CSET-SP3 硬编码）五大模块 Dashboard             |
-| v2.0 | 2026-02-11 | Shorts Publisher 模块：状态机 + OAuth + YouTube Upload        |
-| v2.1 | 2026-02-12 | Link Video（手动关联视频）+ Marketing 数据导入 + File Browser |
-| v2.2 | 2026-02-13 | **多项目热切换** + Docker 化开发环境                          |
-| v3.0 | 2026-02-14 | **专家导航系统** + 文稿选择 + 半自动 Antigravity 集成           |
-| v3.1 | 2026-02-28 | **Remotion 新模板赋能** - 强制 template 字段 + 4 个新模板可用 |
-| v3.2 | 2026-02-28 | **导演大师 Phase 2/3 重构** - 预审流程 + 渲染二审 + XML 生成 |
-| v3.3 | 2026-03-01 | **Phase2/3 细节优化** - 进度显示、评论提交、列表头、章节名、预览图质量 |
-| v3.4 | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
-| v3.5 | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新 |
-| v3.6 | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析 |
-| v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级 |
-| v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID |
+| 版本   | 日期       | 里程碑                                                                                               |
+| ------ | ---------- | ---------------------------------------------------------------------------------------------------- |
+| v1.0   | 2026-02-10 | 初版：单项目（CSET-SP3 硬编码）五大模块 Dashboard                                                    |
+| v2.0   | 2026-02-11 | Shorts Publisher 模块：状态机 + OAuth + YouTube Upload                                               |
+| v2.1   | 2026-02-12 | Link Video（手动关联视频）+ Marketing 数据导入 + File Browser                                        |
+| v2.2   | 2026-02-13 | **多项目热切换** + Docker 化开发环境                                                                 |
+| v3.0   | 2026-02-14 | **专家导航系统** + 文稿选择 + 半自动 Antigravity 集成                                                |
+| v3.1   | 2026-02-28 | **Remotion 新模板赋能** - 强制 template 字段 + 4 个新模板可用                                        |
+| v3.2   | 2026-02-28 | **导演大师 Phase 2/3 重构** - 预审流程 + 渲染二审 + XML 生成                                         |
+| v3.3   | 2026-03-01 | **Phase2/3 细节优化** - 进度显示、评论提交、列表头、章节名、预览图质量                               |
+| v3.4   | 2026-03-01 | **Worktree 环境修复** - launch.json 注入正确 PROJECTS_BASE/SKILLS_BASE；抢救提交昨日 1799 行丢失进度 |
+| v3.5   | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新                            |
+| v3.6   | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析                       |
+| v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级                                                            |
+| v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID                 |
 
 ---
 
@@ -129,11 +129,11 @@
 
 ### 🔴 Critical
 
-| ID  | 问题                         | 影响                                        | 建议                                                               | 状态 |
-| --- | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------ | ---- |
-| C-1 | Agent 无法调用 Docker socket | macOS sandbox 拦截 `unix:///...docker.sock` | Agent 通过 HTTP 访问容器端口替代；Docker 操作由用户在 GUI/终端执行 | Open |
-| ~~C-2~~ | ~~Phase2 火山引擎文生图预览失败~~ | ~~100% 失败，无法生成预览图~~ | ~~根本原因：VOLCENGINE_ACCESS_KEY 格式错误（缺少连字符）~~ | **✅ 已修复 (v3.9.0)** |
-| ~~C-3~~ | ~~Phase2 视频方案策划 LLM 调用不稳定~~ | ~~生成方案时偶发失败~~ | ~~需检查：超时机制、重试逻辑、错误处理~~ | **⚠️ 待观察** |
+| ID      | 问题                                   | 影响                                        | 建议                                                               | 状态                  |
+| ------- | -------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ | --------------------- |
+| C-1     | Agent 无法调用 Docker socket           | macOS sandbox 拦截 `unix:///...docker.sock` | Agent 通过 HTTP 访问容器端口替代；Docker 操作由用户在 GUI/终端执行 | Open                  |
+| ~~C-2~~ | ~~Phase2 火山引擎文生图预览失败~~      | ~~100% 失败，无法生成预览图~~               | ~~根本原因：VOLCENGINE_ACCESS_KEY 格式错误（缺少连字符）~~         | **✅ 已修复 (v3.9.0)** |
+| ~~C-3~~ | ~~Phase2 视频方案策划 LLM 调用不稳定~~ | ~~生成方案时偶发失败~~                      | ~~需检查：超时机制、重试逻辑、错误处理~~                           | **⚠️ 待观察**          |
 
 ### 🟡 Medium
 
@@ -146,19 +146,19 @@
 
 ### 🟢 Low / Backlog
 
-| ID  | 问题                                             | 说明                                                  |
-| --- | ------------------------------------------------ | ----------------------------------------------------- |
-| L-1 | `delivery_store.json` → Markdown 骨架迁移        | 核心理念：让 Obsidian 也能原生编辑                    |
-| L-2 | 多项目间共享 YouTube Auth Token                  | 目前切换项目后 token 仍有效（内存级），但逻辑上应隔离 |
-| L-3 | Docker 生产部署优化                              | 当前 Dockerfile.dev 仅适合开发，生产版需多阶段构建    |
-| L-4 | 旧 Dockerfile.backend / Dockerfile.frontend 清理 | 已被 Dockerfile.dev 取代，可删除                      |
-| L-5 | A-Roll 扫描逻辑（已注释）                        | v2.0 切换到 Script-First 后禁用，待决定是否复用       |
-| L-6 | 后台服务常驻方案                                 | LaunchAgent 开机自启 + Web 状态栏显示，搁置待定       |
-| L-7 | Antigravity ↔ Web 通信桥梁                       | 文件触发方案（.tasks/*.json），需新建任务监听器       |
-| L-8 | ~~火山引擎文生视频集成~~ | ✅ v3.5 已完成：`renderVolcVideo` 函数已实现完整的 API 调用 |
-| L-9 | 前端文件上传实现                                 | Phase3View 中的文件选择对话框需要完整实现              |
+| ID   | 问题                                             | 说明                                                           |
+| ---- | ------------------------------------------------ | -------------------------------------------------------------- |
+| L-1  | `delivery_store.json` → Markdown 骨架迁移        | 核心理念：让 Obsidian 也能原生编辑                             |
+| L-2  | 多项目间共享 YouTube Auth Token                  | 目前切换项目后 token 仍有效（内存级），但逻辑上应隔离          |
+| L-3  | Docker 生产部署优化                              | 当前 Dockerfile.dev 仅适合开发，生产版需多阶段构建             |
+| L-4  | 旧 Dockerfile.backend / Dockerfile.frontend 清理 | 已被 Dockerfile.dev 取代，可删除                               |
+| L-5  | A-Roll 扫描逻辑（已注释）                        | v2.0 切换到 Script-First 后禁用，待决定是否复用                |
+| L-6  | 后台服务常驻方案                                 | LaunchAgent 开机自启 + Web 状态栏显示，搁置待定                |
+| L-7  | Antigravity ↔ Web 通信桥梁                       | 文件触发方案（.tasks/*.json），需新建任务监听器                |
+| L-8  | ~~火山引擎文生视频集成~~                         | ✅ v3.5 已完成：`renderVolcVideo` 函数已实现完整的 API 调用     |
+| L-9  | 前端文件上传实现                                 | Phase3View 中的文件选择对话框需要完整实现                      |
 | L-10 | 可视化时间线编辑器                               | Phase 3 可以考虑添加时间线编辑器，让用户手动调整 B-roll 时间码 |
-| L-11 | 批量操作优化                                     | 可以考虑添加批量 Pass/Skip、批量重新渲染等操作        |
+| L-11 | 批量操作优化                                     | 可以考虑添加批量 Pass/Skip、批量重新渲染等操作                 |
 
 ---
 
@@ -178,13 +178,13 @@
 ```
 
 **核心组件**:
-| 组件 | 职责 | 状态 |
-|------|------|------|
+| 组件         | 职责                        | 状态   |
+| ------------ | --------------------------- | ------ |
 | 项目创建向导 | 选择目录 → 以目录名为项目名 | 待开发 |
-| 文稿识别 | 读取 02_Script/*.md | 待开发 |
-| 任务触发器 | Web 写 .tasks/*.json | 待开发 |
-| 任务监听器 | Antigravity 监听 → 调 skill | 待开发 |
-| 方案展示 | Web 读取并展示专家输出 | 待开发 |
+| 文稿识别     | 读取 02_Script/*.md         | 待开发 |
+| 任务触发器   | Web 写 .tasks/*.json        | 待开发 |
+| 任务监听器   | Antigravity 监听 → 调 skill | 待开发 |
+| 方案展示     | Web 读取并展示专家输出      | 待开发 |
 
 **设计文档**: 待编写
 
@@ -207,29 +207,29 @@
 
 ## 8. 文件变更日志（v3.0）
 
-| 文件                        | 变更类型 | 说明                           |
-| --------------------------- | -------- | ------------------------------ |
-| `src/config/experts.ts`     | **新建** | 专家配置（5 位专家）           |
-| `src/components/ExpertNav.tsx` | **新建** | 顶部专家导航栏                 |
-| `src/components/ExpertPage.tsx` | **新建** | 专家页面容器                   |
-| `src/components/experts/IdleState.tsx` | **新建** | 未开始状态 UI                  |
-| `src/components/experts/PendingState.tsx` | **新建** | 等待执行状态 UI                |
-| `src/components/experts/CompletedState.tsx` | **新建** | 已完成状态 UI                  |
-| `src/components/experts/FailedState.tsx` | **新建** | 失败状态 UI                    |
-| `src/types.ts`             | **修改** | 新增 ExpertStatus, ExpertWork  |
-| `src/App.tsx`              | **重写** | 集成专家导航系统               |
-| `server/index.ts`           | **修改** | Experts API + 输出目录监听     |
+| 文件                                        | 变更类型 | 说明                          |
+| ------------------------------------------- | -------- | ----------------------------- |
+| `src/config/experts.ts`                     | **新建** | 专家配置（5 位专家）          |
+| `src/components/ExpertNav.tsx`              | **新建** | 顶部专家导航栏                |
+| `src/components/ExpertPage.tsx`             | **新建** | 专家页面容器                  |
+| `src/components/experts/IdleState.tsx`      | **新建** | 未开始状态 UI                 |
+| `src/components/experts/PendingState.tsx`   | **新建** | 等待执行状态 UI               |
+| `src/components/experts/CompletedState.tsx` | **新建** | 已完成状态 UI                 |
+| `src/components/experts/FailedState.tsx`    | **新建** | 失败状态 UI                   |
+| `src/types.ts`                              | **修改** | 新增 ExpertStatus, ExpertWork |
+| `src/App.tsx`                               | **重写** | 集成专家导航系统              |
+| `server/index.ts`                           | **修改** | Experts API + 输出目录监听    |
 
 ---
 
 ## 8. 文件变更日志（v3.1）
 
-| 文件                                      | 变更类型 | 说明                                                      |
-| ----------------------------------------- | -------- | --------------------------------------------------------- |
-| `server/llm.ts`                           | **修改** | 强制 template 字段验证、添加示例、智能模板推荐函数         |
-| `server/skill-loader.ts`                   | **修改** | 优化 Prompt，新模板优先级提升，添加适用场景关键词          |
-| `server/director.ts`                      | **修改** | CinematicZoom 占位图从 localhost URL 改为 Unsplash        |
-| `.claude/plans/hidden-dancing-melody.md`  | **修改** | 验证路径改为通用 PROJECT_NAME 变量                        |
+| 文件                                     | 变更类型 | 说明                                               |
+| ---------------------------------------- | -------- | -------------------------------------------------- |
+| `server/llm.ts`                          | **修改** | 强制 template 字段验证、添加示例、智能模板推荐函数 |
+| `server/skill-loader.ts`                 | **修改** | 优化 Prompt，新模板优先级提升，添加适用场景关键词  |
+| `server/director.ts`                     | **修改** | CinematicZoom 占位图从 localhost URL 改为 Unsplash |
+| `.claude/plans/hidden-dancing-melody.md` | **修改** | 验证路径改为通用 PROJECT_NAME 变量                 |
 
 ---
 
@@ -265,13 +265,13 @@
 
 ## 11. 文件变更日志（v3.3）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `docs/02_design/remotion_spatial_layout_engine.md` | **新建** | Remotion空间排版引擎完整设计文档 |
-| `server/director.ts` | **修改** | 初始进度不发送数字，等方案生成后更新 |
-| `server/llm.ts` | **修改** | Prompt强化：每章最少3个方案，添加 ⚠️ 警告 |
-| `server/remotion-api-renderer.ts` | **修改** | 预览图优化：frame=50, scale=1.5, quality=90，增强错误日志 |
-| `src/components/director/ChapterCard.tsx` | **修改** | 列表头"缩略图预览"→"预览图"，章节名去重，添加Ctrl+Enter提交 |
+| 文件                                               | 变更类型 | 说明                                                        |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------- |
+| `docs/02_design/remotion_spatial_layout_engine.md` | **新建** | Remotion空间排版引擎完整设计文档                            |
+| `server/director.ts`                               | **修改** | 初始进度不发送数字，等方案生成后更新                        |
+| `server/llm.ts`                                    | **修改** | Prompt强化：每章最少3个方案，添加 ⚠️ 警告                    |
+| `server/remotion-api-renderer.ts`                  | **修改** | 预览图优化：frame=50, scale=1.5, quality=90，增强错误日志   |
+| `src/components/director/ChapterCard.tsx`          | **修改** | 列表头"缩略图预览"→"预览图"，章节名去重，添加Ctrl+Enter提交 |
 
 ### ✅ v3.3 已完成功能
 
@@ -290,11 +290,11 @@
 
 ## 13. 文件变更日志（v3.5 - v3.6）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `server/volcengine.ts` | **修改** | 修复文生图尺寸限制（1024x1024→2048x2048），修复响应数据路径解析 |
-| `server/director.ts` | **修改** | 文生视频 API 集成，预览图生成端点调用火山引擎 |
-| `docs/04_progress/lessons.md` | **修改** | 新增 L-002：火山引擎文生图预览生成失败的教训 |
+| 文件                          | 变更类型 | 说明                                                            |
+| ----------------------------- | -------- | --------------------------------------------------------------- |
+| `server/volcengine.ts`        | **修改** | 修复文生图尺寸限制（1024x1024→2048x2048），修复响应数据路径解析 |
+| `server/director.ts`          | **修改** | 文生视频 API 集成，预览图生成端点调用火山引擎                   |
+| `docs/04_progress/lessons.md` | **修改** | 新增 L-002：火山引擎文生图预览生成失败的教训                    |
 
 ### ✅ v3.5-v3.6 已完成功能
 
@@ -315,17 +315,17 @@
 
 ## 14. 文件变更日志（v3.8）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `skills/RemotionStudio/src/BrollTemplates/ConceptChain.tsx` | **修改** | 溢出防爆修复：nodes 硬上限截断、标签折行、描述截断、Zod 约束 |
-| `skills/RemotionStudio/src/BrollTemplates/SegmentCounter.tsx` | **新建** | 赛博朋克/LCD 质感数字翻页器（前后缀、光晕特效） |
-| `skills/RemotionStudio/src/BrollTemplates/TerminalTyping.tsx` | **新建** | MacOS 风格黑客终端框，真实代码逐字敲打效果 |
-| `skills/RemotionStudio/src/shared/theme.ts` | **新建** | 多主题皮肤系统（5 大渐变主题：deep-space/warm-gold/sci-fi-purple/forest-green/crimson-red） |
-| `skills/RemotionStudio/src/index.tsx` | **修改** | 新组件渲染端挂载 |
-| `skills/RemotionStudio/src/schemas/index.ts` | **修改** | 新增 segmentCounterSchema 和 terminalTypingSchema |
-| `server/skill-loader.ts` | **修改** | Director Prompt 注入新组件契约指南和 Theme 控制器 |
-| `server/director.ts` | **修改** | SegmentCounter 和 TerminalTyping 加入 supportedCoreTemplates 白名单 |
-| `docs/dev_logs/2026-03-03_SD202_Remotion_Extension_v3.7.md` | **新建** | Remotion 扩展 v3.7 完整开发日志 |
+| 文件                                                          | 变更类型 | 说明                                                                                        |
+| ------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `skills/RemotionStudio/src/BrollTemplates/ConceptChain.tsx`   | **修改** | 溢出防爆修复：nodes 硬上限截断、标签折行、描述截断、Zod 约束                                |
+| `skills/RemotionStudio/src/BrollTemplates/SegmentCounter.tsx` | **新建** | 赛博朋克/LCD 质感数字翻页器（前后缀、光晕特效）                                             |
+| `skills/RemotionStudio/src/BrollTemplates/TerminalTyping.tsx` | **新建** | MacOS 风格黑客终端框，真实代码逐字敲打效果                                                  |
+| `skills/RemotionStudio/src/shared/theme.ts`                   | **新建** | 多主题皮肤系统（5 大渐变主题：deep-space/warm-gold/sci-fi-purple/forest-green/crimson-red） |
+| `skills/RemotionStudio/src/index.tsx`                         | **修改** | 新组件渲染端挂载                                                                            |
+| `skills/RemotionStudio/src/schemas/index.ts`                  | **修改** | 新增 segmentCounterSchema 和 terminalTypingSchema                                           |
+| `server/skill-loader.ts`                                      | **修改** | Director Prompt 注入新组件契约指南和 Theme 控制器                                           |
+| `server/director.ts`                                          | **修改** | SegmentCounter 和 TerminalTyping 加入 supportedCoreTemplates 白名单                         |
+| `docs/dev_logs/2026-03-03_SD202_Remotion_Extension_v3.7.md`   | **新建** | Remotion 扩展 v3.7 完整开发日志                                                             |
 
 ### ✅ v3.7 已完成功能
 
@@ -357,17 +357,17 @@
 
 ## 12. 文件变更日志（v3.2）
 
-| 文件                                      | 变更类型 | 说明                                                      |
-| ----------------------------------------- | -------- | --------------------------------------------------------- |
-| `src/types.ts`                            | **修改** | 新增 Phase 2/3 重构类型定义                             |
-| `server/srt-parser.ts`                     | **新建** | SRT 字幕解析器                                          |
-| `server/assets.ts`                         | **新建** | 外部素材加载 API                                        |
-| `server/xml-generator.ts`                   | **新建** | Final Cut Pro XML 生成器                                  |
-| `server/director.ts`                       | **修改** | 新增 Phase 2/3 API 端点，集成渲染逻辑                      |
-| `server/index.ts`                          | **修改** | 注册新增的 API 端点，配置文件上传中间件                    |
-| `src/components/director/Phase2View.tsx`   | **重写** | 重构为预审流程                                          |
-| `src/components/director/Phase3View.tsx`   | **重写** | 重构为渲染及二审流程                                      |
-| `src/components/DirectorSection.tsx`       | **修改** | 适配新的 Phase 2/3 组件接口                             |
+| 文件                                     | 变更类型 | 说明                                    |
+| ---------------------------------------- | -------- | --------------------------------------- |
+| `src/types.ts`                           | **修改** | 新增 Phase 2/3 重构类型定义             |
+| `server/srt-parser.ts`                   | **新建** | SRT 字幕解析器                          |
+| `server/assets.ts`                       | **新建** | 外部素材加载 API                        |
+| `server/xml-generator.ts`                | **新建** | Final Cut Pro XML 生成器                |
+| `server/director.ts`                     | **修改** | 新增 Phase 2/3 API 端点，集成渲染逻辑   |
+| `server/index.ts`                        | **修改** | 注册新增的 API 端点，配置文件上传中间件 |
+| `src/components/director/Phase2View.tsx` | **重写** | 重构为预审流程                          |
+| `src/components/director/Phase3View.tsx` | **重写** | 重构为渲染及二审流程                    |
+| `src/components/DirectorSection.tsx`     | **修改** | 适配新的 Phase 2/3 组件接口             |
 
 ### ✅ 依赖包安装
 - [x] `subtitle` - SRT 字幕解析库
@@ -403,14 +403,14 @@
 
 ## 11. 文件变更日志（v3.3）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `docs/02_design/remotion_spatial_layout_engine.md` | **新建** | Remotion空间排版引擎完整设计文档 |
-| `server/director.ts` | **修改** | 初始进度不发送数字，等方案生成后更新 |
-| `server/llm.ts` | **修改** | Prompt强化：每章最少3个方案，添加 ⚠️ 警告 |
-| `server/remotion-api-renderer.ts` | **修改** | 预览图优化（frame=50, scale=1.5, quality=90），增强错误日志 |
-| `src/components/DirectorSection.tsx` | **修改** | loadingProgress 初始值从 '0/0' 改为 '' |
-| `src/components/director/ChapterCard.tsx` | **修改** | 列表头"缩略图预览"→"预览图"，章节名去重，添加Ctrl+Enter提交 |
+| 文件                                               | 变更类型 | 说明                                                        |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------- |
+| `docs/02_design/remotion_spatial_layout_engine.md` | **新建** | Remotion空间排版引擎完整设计文档                            |
+| `server/director.ts`                               | **修改** | 初始进度不发送数字，等方案生成后更新                        |
+| `server/llm.ts`                                    | **修改** | Prompt强化：每章最少3个方案，添加 ⚠️ 警告                    |
+| `server/remotion-api-renderer.ts`                  | **修改** | 预览图优化（frame=50, scale=1.5, quality=90），增强错误日志 |
+| `src/components/DirectorSection.tsx`               | **修改** | loadingProgress 初始值从 '0/0' 改为 ''                      |
+| `src/components/director/ChapterCard.tsx`          | **修改** | 列表头"缩略图预览"→"预览图"，章节名去重，添加Ctrl+Enter提交 |
 
 ---
 
@@ -458,20 +458,20 @@
 
 ## 13. 文件变更日志（v3.4）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `.claude/launch.json` | **修改** | 注入 `PROJECTS_BASE`/`SKILLS_BASE` env 变量，修复 worktree 路径问题 |
-| `~/.claude/settings.json` | **修改** | 配置 statusline 显示 Context 用量百分比 |
+| 文件                      | 变更类型 | 说明                                                                |
+| ------------------------- | -------- | ------------------------------------------------------------------- |
+| `.claude/launch.json`     | **修改** | 注入 `PROJECTS_BASE`/`SKILLS_BASE` env 变量，修复 worktree 路径问题 |
+| `~/.claude/settings.json` | **修改** | 配置 statusline 显示 Context 用量百分比                             |
 
 ---
 
 ## 14. 文件变更日志（v3.5）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `server/volcengine.ts` | **修改** | 新增视频生成 API（generateVideoWithVolc, pollVolcVideoResult, downloadVideo） |
-| `server/director.ts` | **修改** | renderVolcVideo 实现真正的火山引擎视频生成调用 |
-| `~/.config/opencode/skills/OldYang/SKILL.md` | **修改** | 新增 §7 项目协议遵循，引用 CLAUDE.md 工作流约定 |
+| 文件                                         | 变更类型 | 说明                                                                          |
+| -------------------------------------------- | -------- | ----------------------------------------------------------------------------- |
+| `server/volcengine.ts`                       | **修改** | 新增视频生成 API（generateVideoWithVolc, pollVolcVideoResult, downloadVideo） |
+| `server/director.ts`                         | **修改** | renderVolcVideo 实现真正的火山引擎视频生成调用                                |
+| `~/.config/opencode/skills/OldYang/SKILL.md` | **修改** | 新增 §7 项目协议遵循，引用 CLAUDE.md 工作流约定                               |
 
 ### ✅ v3.5 已完成功能（2026-03-03）
 
@@ -502,11 +502,11 @@
 
 ## 15. 文件变更日志（v3.7.1）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `server/index.ts` | **修改** | 新增 `getAppVersion()` 函数，自动从 git log 提取版本号；新增 `/api/version` 接口 |
-| `src/components/StatusFooter.tsx` | **修改** | 版本号改为动态获取，启动时调用 `/api/version` |
-| `src/config/version.ts` | **删除** | 不再需要手动配置版本号 |
+| 文件                              | 变更类型 | 说明                                                                             |
+| --------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| `server/index.ts`                 | **修改** | 新增 `getAppVersion()` 函数，自动从 git log 提取版本号；新增 `/api/version` 接口 |
+| `src/components/StatusFooter.tsx` | **修改** | 版本号改为动态获取，启动时调用 `/api/version`                                    |
+| `src/config/version.ts`           | **删除** | 不再需要手动配置版本号                                                           |
 
 ### ✅ v3.8.0 已完成功能（2026-03-03）
 
@@ -539,16 +539,16 @@
 
 ## 17. 文件变更日志（v3.8 - Batch 1）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
+| 文件                          | 变更类型 | 说明                                                                   |
+| ----------------------------- | -------- | ---------------------------------------------------------------------- |
 | `server/graceful-shutdown.ts` | **新建** | 优雅关闭管理器类，支持 SIGTERM/SIGINT 处理、Socket.IO 关闭、子进程清理 |
-| `server/health.ts` | **新建** | 健康检查端点（/health, /health/ready, /health/live） |
-| `scripts/check-port.js` | **新建** | 端口占用检查工具，支持 3002 和 5173 端口 |
-| `scripts/preview.js` | **新建** | 预览启动脚本（后端+前端+优雅关闭） |
-| `ecosystem.config.cjs` | **新建** | PM2 进程管理配置（生产环境） |
-| `logs/.gitkeep` | **新建** | 日志目录占位文件 |
-| `server/index.ts` | **修改** | 集成 GracefulShutdown 和 setupHealthCheck |
-| `package.json` | **修改** | 更新 scripts（dev:clean, dev:check, dev:force, preview, pm2:*） |
+| `server/health.ts`            | **新建** | 健康检查端点（/health, /health/ready, /health/live）                   |
+| `scripts/check-port.js`       | **新建** | 端口占用检查工具，支持 3002 和 5173 端口                               |
+| `scripts/preview.js`          | **新建** | 预览启动脚本（后端+前端+优雅关闭）                                     |
+| `ecosystem.config.cjs`        | **新建** | PM2 进程管理配置（生产环境）                                           |
+| `logs/.gitkeep`               | **新建** | 日志目录占位文件                                                       |
+| `server/index.ts`             | **修改** | 集成 GracefulShutdown 和 setupHealthCheck                              |
+| `package.json`                | **修改** | 更新 scripts（dev:clean, dev:check, dev:force, preview, pm2:*）        |
 
 ### ✅ v3.8 Batch 1 已完成功能（2026-03-03）
 
@@ -569,16 +569,16 @@
 
 ## 17. 文件变更日志（v3.8 - Batch 1）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
+| 文件                          | 变更类型 | 说明                                                                   |
+| ----------------------------- | -------- | ---------------------------------------------------------------------- |
 | `server/graceful-shutdown.ts` | **新建** | 优雅关闭管理器类，支持 SIGTERM/SIGINT 处理、Socket.IO 关闭、子进程清理 |
-| `server/health.ts` | **新建** | 健康检查端点（/health, /health/ready, /health/live） |
-| `scripts/check-port.js` | **新建** | 端口占用检查工具（3002, 5173） |
-| `scripts/preview.js` | **新建** | 预览启动脚本（后端+前端+优雅关闭） |
-| `ecosystem.config.cjs` | **新建** | PM2 进程管理配置（生产环境） |
-| `logs/.gitkeep` | **新建** | 日志目录占位文件 |
-| `server/index.ts` | **修改** | 集成 GracefulShutdown 和 setupHealthCheck |
-| `package.json` | **修改** | 新增 scripts（dev:clean, dev:check, dev:force, preview, pm2:*） |
+| `server/health.ts`            | **新建** | 健康检查端点（/health, /health/ready, /health/live）                   |
+| `scripts/check-port.js`       | **新建** | 端口占用检查工具（3002, 5173）                                         |
+| `scripts/preview.js`          | **新建** | 预览启动脚本（后端+前端+优雅关闭）                                     |
+| `ecosystem.config.cjs`        | **新建** | PM2 进程管理配置（生产环境）                                           |
+| `logs/.gitkeep`               | **新建** | 日志目录占位文件                                                       |
+| `server/index.ts`             | **修改** | 集成 GracefulShutdown 和 setupHealthCheck                              |
+| `package.json`                | **修改** | 新增 scripts（dev:clean, dev:check, dev:force, preview, pm2:*）        |
 
 ### ✅ v3.8 Batch 1 已完成功能（2026-03-03）
 
@@ -604,13 +604,13 @@
 
 ## 19. 文件变更日志（v3.8 - Batch 2）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `src/types.ts` | **修改** | DeliveryState 添加 activeModule 字段 |
-| `src/components/ShortsSection.tsx` | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store |
-| `src/components/MarketingSection.tsx` | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store |
-| `src/App.tsx` | **修改** | 添加 activeModule 同步逻辑，handleModuleChange 更新全局状态 |
-| `server/index.ts` | **修改** | ensureDeliveryFile 初始状态添加 activeModule: 'delivery' |
+| 文件                                  | 变更类型 | 说明                                                        |
+| ------------------------------------- | -------- | ----------------------------------------------------------- |
+| `src/types.ts`                        | **修改** | DeliveryState 添加 activeModule 字段                        |
+| `src/components/ShortsSection.tsx`    | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store           |
+| `src/components/MarketingSection.tsx` | **修改** | phase 变更通过 handlePhaseChange 同步到全局 store           |
+| `src/App.tsx`                         | **修改** | 添加 activeModule 同步逻辑，handleModuleChange 更新全局状态 |
+| `server/index.ts`                     | **修改** | ensureDeliveryFile 初始状态添加 activeModule: 'delivery'    |
 
 ### ✅ v3.8 Batch 2 已完成功能（2026-03-03）
 
@@ -634,10 +634,10 @@
 
 ## 20. 文件变更日志（v3.8 - Batch 3）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
+| 文件                              | 变更类型   | 说明                                             |
+| --------------------------------- | ---------- | ------------------------------------------------ |
 | `src/components/CrucibleHome.tsx` | **已存在** | 黄金坩埚首页组件，包含写作大师和苏格拉底对话入口 |
-| `src/App.tsx` | **修改** | 导入 CrucibleHome，替换黄金坩埚占位 UI |
+| `src/App.tsx`                     | **修改**   | 导入 CrucibleHome，替换黄金坩埚占位 UI           |
 
 ### ✅ v3.8 Batch 3 已完成功能（2026-03-03）
 
@@ -652,13 +652,13 @@
 
 ## 21. 文件变更日志（v3.8 - Batch 4）
 
-| 文件 | 变更类型 | 说明 |
-| --- | --- | --- |
-| `src/components/RightPanel.tsx` | **新建** | 右侧面板组件，Tab 切换、收起/展开动画 |
-| `src/components/ChatPanel.tsx` | **修改** | 移除固定定位外层，可被 RightPanel 包裹 |
-| `src/components/ChatToggleButton.tsx` | **保留** | 作为独立触发按钮使用 |
-| `src/App.tsx` | **修改** | 导入 RightPanel，集成右侧面板逻辑 |
-| `server/index.ts` | **修改** | 添加 socket-to-project 映射，io.emit 改为 io.to(projectId).emit |
+| 文件                                  | 变更类型 | 说明                                                            |
+| ------------------------------------- | -------- | --------------------------------------------------------------- |
+| `src/components/RightPanel.tsx`       | **新建** | 右侧面板组件，Tab 切换、收起/展开动画                           |
+| `src/components/ChatPanel.tsx`        | **修改** | 移除固定定位外层，可被 RightPanel 包裹                          |
+| `src/components/ChatToggleButton.tsx` | **保留** | 作为独立触发按钮使用                                            |
+| `src/App.tsx`                         | **修改** | 导入 RightPanel，集成右侧面板逻辑                               |
+| `server/index.ts`                     | **修改** | 添加 socket-to-project 映射，io.emit 改为 io.to(projectId).emit |
 
 ### ✅ v3.8 Batch 4 已完成功能（2026-03-03）
 
@@ -680,11 +680,11 @@
 
 ## 22. 完整实施总结（v3.8）
 
-| Batch | Feature | 状态 |
-|--------|----------|------|
-| Batch 1 | Feature 0: 进程健壮性 | ✅ 已完成 |
-| Batch 2 | Feature 4: 状态持久化 | ✅ 已完成 |
-| Batch 3 | Feature 2 + 5: UI 优化 | ✅ 已完成 |
+| Batch   | Feature                 | 状态     |
+| ------- | ----------------------- | -------- |
+| Batch 1 | Feature 0: 进程健壮性   | ✅ 已完成 |
+| Batch 2 | Feature 4: 状态持久化   | ✅ 已完成 |
+| Batch 3 | Feature 2 + 5: UI 优化  | ✅ 已完成 |
 | Batch 4 | Feature 1 + 3: 布局升级 | ✅ 已完成 |
 
 ### 下一步建议
@@ -1116,3 +1116,21 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 **分支：** `fix/phase2-stability-issues`
 
 **状态：** 🟡 Phase2 生成超时问题未解决，需要继续调查
+
+---
+
+## 2026-03-04 - Kimi k2.5 适配与缓存重置优化
+
+### ✅ 已完成功能
+1. **适配 Kimi k2.5 `max_tokens` 限制**
+   - **现象**：全局模型切换至 `api.moonshot.cn/v1` 的 `kimi-k2.5` 后，Phase 1 生成稳定报错 (400 Bad Request)
+   - **原因**：Kimi K2.5 对 `max_tokens` 入参不兼容过大值
+   - **修复**：在 `server/llm.ts` `callKimiLLM` 中移除写死的 `max_tokens: 16384` 参数，顺利通行。
+
+2. **全局重新选择脚本时物理清空缓存**
+   - **需求**：只要项目和文件重新选择，所有后续 Phase 进度应该切断，从 Phase 1 重新来过
+   - **实现**：在 `server/index.ts` `select-project` 及 `api/scripts/select` 中，除了清空 `delivery_store.json`，增加对其项目下 `04_Visuals` 内历史状态文件（`selection_state.json` / `phase2_review_state.json` / `phase3_render_state.json`）的物理删除 `fs.unlinkSync` 逻辑。
+
+3. **Phase 1 概念提案本地落盘**
+   - **需求**：Phase 1 Web 界面端生成的“视觉概念提案”必须以物理文件留存以做记录
+   - **实现**：在 `server/director.ts` 的 `generatePhase1` 和 `reviseConcept` 方法中，自动将 Markdown 内容写入 `04_Visuals/phase1_视觉概念提案_${projectId}.md`
