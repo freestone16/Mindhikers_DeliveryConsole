@@ -18,9 +18,22 @@ import { StatusFooter } from './components/StatusFooter';
 import { CrucibleHome } from './components/CrucibleHome';
 import { RightPanel } from './components/RightPanel';
 import type { RightPanelMode } from './components/RightPanel';
+import { LLMConfigPage } from './components/LLMConfigPage';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
+
+function useHashRoute() {
+    const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
+    useEffect(() => {
+        const handleHashChange = () => {
+            setHash(window.location.hash.slice(1) || '/');
+        };
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+    return hash;
+}
 
 function App() {
     const { state, isConnected, selectScript, updateState, socket, setState } = useDeliveryStore();
@@ -131,6 +144,12 @@ function App() {
     }, [state?.experts]);
 
     const currentExpertWork = state.experts?.[activeExpertId];
+
+    const hashRoute = useHashRoute();
+
+    if (hashRoute === '/llm-config') {
+        return <LLMConfigPage onClose={() => window.location.hash = '/'} />;
+    }
 
     if (!isConnected) {
         return (

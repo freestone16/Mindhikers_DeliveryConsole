@@ -139,7 +139,39 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
   };
 }
 
-async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): Promise<LLMResponse> {
+async function callYinliLLM(messages: LLMMessage[], model = 'claude-sonnet-4-6-thinking'): Promise<LLMResponse> {
+  const apiKey = process.env.YINLI_API_KEY;
+  if (!apiKey) {
+    throw new Error('YINLI_API_KEY not configured');
+  }
+
+  const response = await fetch('https://yinli.one/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 16384,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Yinli API error: ${error}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data.choices[0].message.content,
+    usage: data.usage,
+  };
+}
+
+async function callKimiLLM(messages: LLMMessage[], model = 'kimi-k2.5'): Promise<LLMResponse> {
   const apiKey = process.env.KIMI_API_KEY;
   if (!apiKey) {
     throw new Error('KIMI_API_KEY not configured');
@@ -177,7 +209,7 @@ async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): 
 
 export async function callLLM(
   messages: LLMMessage[],
-  provider: 'zhipu' | 'openai' | 'deepseek' | 'anthropic' | 'siliconflow' | 'kimi' = 'deepseek',
+  provider: 'zhipu' | 'openai' | 'deepseek' | 'anthropic' | 'siliconflow' | 'kimi' | 'yinli' = 'deepseek',
   model?: string
 ): Promise<LLMResponse> {
   switch (provider) {
@@ -190,7 +222,9 @@ export async function callLLM(
     case 'siliconflow':
       return callSiliconFlowLLM(messages, model || 'Pro/moonshotai/Kimi-K2.5');
     case 'kimi':
-      return callKimiLLM(messages, model || 'moonshot-v1-128k');
+      return callKimiLLM(messages, model || 'kimi-k2.5');
+    case 'yinli':
+      return callYinliLLM(messages, model || 'claude-sonnet-4-6-thinking');
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }

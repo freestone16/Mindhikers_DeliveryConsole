@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Zap, ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
-import { LLMConfigModal } from './LLMConfigModal';
 
 interface Project {
     name: string;
@@ -29,7 +28,6 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
     const [scripts, setScripts] = useState<ScriptFile[]>([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isScriptDropdownOpen, setIsScriptDropdownOpen] = useState(false);
-    const [isConfigOpen, setIsConfigOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const scriptDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -239,7 +237,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
                         {/* Settings Button */}
                         <button
-                            onClick={() => setIsConfigOpen(true)}
+                            onClick={() => window.open('/#/llm-config', '_blank')}
                             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                             title="LLM Configuration"
                         >
@@ -248,8 +246,6 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                     </div>
                 </div>
             </header>
-
-            <LLMConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
         </>
     );
 };

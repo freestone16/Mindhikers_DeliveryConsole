@@ -2,13 +2,12 @@ import { z } from 'zod';
 
 export const LLMProviderSchema = z.enum([
   'openai',
-  'anthropic',
-  'google',
   'deepseek',
   'zhipu',
   'siliconflow',
   'kimi',
-  'volcengine'
+  'volcengine',
+  'yinli'
 ]);
 
 export const GenProviderSchema = z.enum(['volcengine', 'siliconflow']);
@@ -99,26 +98,12 @@ export const PROVIDER_INFO: Record<string, {
     baseUrl: 'https://api.openai.com/v1',
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
   },
-  anthropic: {
-    name: 'Anthropic',
-    type: 'llm',
-    envVars: ['ANTHROPIC_API_KEY'],
-    baseUrl: 'https://api.anthropic.com',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229'],
-  },
-  google: {
-    name: 'Google',
-    type: 'llm',
-    envVars: ['GOOGLE_API_KEY'],
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    models: ['gemini-1.5-pro', 'gemini-1.5-flash'],
-  },
   deepseek: {
     name: 'DeepSeek',
     type: 'llm',
     envVars: ['DEEPSEEK_API_KEY'],
     baseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-chat', 'deepseek-coder'],
+    models: ['deepseek-chat', 'deepseek-reasoner'],
   },
   zhipu: {
     name: 'Zhipu AI',
@@ -132,14 +117,21 @@ export const PROVIDER_INFO: Record<string, {
     type: 'llm',
     envVars: ['SILICONFLOW_API_KEY'],
     baseUrl: 'https://api.siliconflow.cn/v1',
-    models: ['Pro/moonshotai/Kimi-K2.5', 'Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V2.5', 'THUDM/glm-4-9b-chat'],
+    models: ['Pro/moonshotai/Kimi-K2.5', 'Pro/deepseek-ai/DeepSeek-V3.2'],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     type: 'llm',
     envVars: ['KIMI_API_KEY'],
     baseUrl: 'https://api.moonshot.cn/v1',
-    models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    models: ['kimi-k2.5'],
+  },
+  yinli: {
+    name: 'Yinli的引力',
+    type: 'llm',
+    envVars: ['YINLI_API_KEY'],
+    baseUrl: 'https://yinli.one/v1',
+    models: ['claude-sonnet-4-6-thinking'],
   },
   volcengine: {
     name: 'Volcengine (火山引擎)',

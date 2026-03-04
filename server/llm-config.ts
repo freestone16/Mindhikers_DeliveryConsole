@@ -39,12 +39,12 @@ const saveConfig = (config: LLMConfig) => {
 
 const PROVIDER_ENV_MAP: Record<string, string[]> = {
   openai: ['OPENAI_API_KEY'],
-  anthropic: ['ANTHROPIC_API_KEY'],
-  google: ['GOOGLE_API_KEY'],
   deepseek: ['DEEPSEEK_API_KEY'],
   zhipu: ['ZHIPU_API_KEY'],
   siliconflow: ['SILICONFLOW_API_KEY'],
+  kimi: ['KIMI_API_KEY'],
   volcengine: ['VOLCENGINE_ACCESS_KEY'],
+  yinli: ['YINLI_API_KEY'],
 };
 
 const getDefaultModel = (provider: string): string => {
@@ -220,6 +220,88 @@ export const testConnection = async (req: Request, res: Response) => {
   } catch (error: any) {
     res.json({ success: false, error: error.message });
   }
+};
+
+export const testAllConnections = async (req: Request, res: Response) => {
+  const results: Record<string, any> = {};
+  const envPath = path.join(process.cwd(), '.env');
+  let envContent = '';
+  if (fs.existsSync(envPath)) {
+    envContent = fs.readFileSync(envPath, 'utf-8');
+  }
+
+  const promises = Object.keys(PROVIDER_INFO).map(async (provider) => {
+    const info = PROVIDER_INFO[provider];
+    const envVars = info.envVars;
+
+    let configured = false;
+    let apiKey = process.env[envVars[0]];
+
+    const match = envContent.match(new RegExp(`${envVars[0]}=(.+)`));
+    if (match && match[1] && match[1].trim()) {
+      configured = true;
+      apiKey = match[1].trim();
+    } else if (apiKey && apiKey.trim()) {
+      configured = true;
+    }
+
+    if (!configured || !apiKey) {
+      results[provider] = { success: false, configured: false };
+      return;
+    }
+
+    const start = Date.now();
+    try {
+      let headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let response;
+      if (info.type === 'generation') {
+        const endpointId = process.env['VOLCENGINE_ENDPOINT_ID_IMAGE'] || process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
+        response = await fetch(`${info.baseUrl}/images/generations`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: endpointId,
+            prompt: 'a simple blue circle on white background',
+            size: '256x256',
+            num_images: 1,
+          }),
+          signal: controller.signal
+        });
+      } else {
+        response = await fetch(`${info.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: info.models[0],
+            messages: [{ role: 'user', content: 'Hi' }],
+            max_tokens: 5,
+          }),
+          signal: controller.signal
+        });
+      }
+      clearTimeout(timeoutId);
+
+      const latency = Date.now() - start;
+      if (response.ok) {
+        results[provider] = { success: true, configured: true, latency };
+      } else {
+        const error = await response.text();
+        results[provider] = { success: false, configured: true, error: `API Error: ${error.slice(0, 100)}` };
+      }
+    } catch (error: any) {
+      results[provider] = { success: false, configured: true, error: error.message };
+    }
+  });
+
+  await Promise.all(promises);
+  res.json(results);
 };
 
 export const getSavedKeys = (req: Request, res: Response) => {

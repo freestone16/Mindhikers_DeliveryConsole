@@ -14,7 +14,7 @@ import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
 import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview } from './visual-plan';
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
-import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig } from './llm-config';
+import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
@@ -124,6 +124,7 @@ app.get('/api/llm-config/keys', getSavedKeys);
 app.post('/api/llm-config/api-key', saveApiKey);
 app.put('/api/llm-config', updateConfig);
 app.post('/api/llm-config/test', testConnection);
+app.post('/api/llm-config/test-all', testAllConnections);
 
 // Director Phase 1-3 Routes
 app.post('/api/director/phase1/generate', director.generatePhase1);

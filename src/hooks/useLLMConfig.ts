@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import type { LLMConfig, ExpertConfig } from '../schemas/llm-config';
 
 interface ConfigStatus {
-  providers: Record<string, { 
-    configured: boolean; 
+  providers: Record<string, {
+    configured: boolean;
     type: string;
     name: string;
     models: string[];
@@ -67,8 +67,8 @@ export const useLLMConfig = () => {
     return data;
   };
 
-  const updateConfig = async (updates: { 
-    global?: Partial<LLMConfig['global']>; 
+  const updateConfig = async (updates: {
+    global?: Partial<LLMConfig['global']>;
     generation?: Partial<LLMConfig['generation']>;
     experts?: Record<string, ExpertConfig | null>;
   }) => {
@@ -91,5 +91,13 @@ export const useLLMConfig = () => {
     return res.json();
   };
 
-  return { status, savedKeys, loading, saveApiKey, updateConfig, testConnection, refresh: fetchStatus };
+  const testAllConnections = async () => {
+    const res = await fetch('http://localhost:3002/api/llm-config/test-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  };
+
+  return { status, savedKeys, loading, saveApiKey, updateConfig, testConnection, testAllConnections, refresh: fetchStatus };
 };
