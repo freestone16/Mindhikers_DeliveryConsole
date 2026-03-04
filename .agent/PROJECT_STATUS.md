@@ -27,9 +27,8 @@
 
 ## 活跃问题
 
-1. **[P0 网络阻塞]** 当前遇到 `Could not resolve host: github.com` 问题，无法拉取远端已更新至的 v3.6 代码。待网络恢复后执行 `git pull --rebase` 合并推送。
-2. **[P2]** Remotion CinematicZoom 模板暂用占位图，待接通火山引擎 AI 出图。
-3. **[P3]** EPERM `/tmp` 渲染权限警告：Mac 环境下直接使用 Puppeteer 可能需提权或替换导出目录。
+1. **[P2]** Remotion CinematicZoom 模板暂用占位图，待接通火山引擎 AI 出图。
+2. **[P3]** EPERM `/tmp` 渲染权限警告：Mac 环境下直接使用 Puppeteer 可能需提权或替换导出目录。
 
 ---
 
