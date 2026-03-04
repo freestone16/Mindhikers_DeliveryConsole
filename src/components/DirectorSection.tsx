@@ -5,6 +5,7 @@ import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
 import { Phase4View } from './director/Phase4View';
 import type { DirectorModule, DirectorChapter, RenderJob, BRollType } from '../types';
+import { useLLMConfig } from '../hooks/useLLMConfig';
 
 interface DirectorSectionProps {
   data: DirectorModule;
@@ -33,7 +34,15 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   // Feature 2: elapsed time tracking
   const [startTime, setStartTime] = useState<number | null>(null);
 
+  // Phase2 logs for debug panel
+  const [phase2Logs, setPhase2Logs] = useState<{timestamp: number; type: string; message: string}[]>([]);
+
   const [brollPaths] = useState<any[]>([]);
+
+  const { status } = useLLMConfig();
+  const currentModel = status?.global?.provider 
+    ? { provider: status.global.provider, model: status.global.model || 'default' }
+    : undefined;
 
   const handleGenerateConcept = async () => {
     if (!scriptPath) {
@@ -136,6 +145,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     setIsLoading(true);
     setStartTime(Date.now());
     setLocalChapters([]);
+    setPhase2Logs([]);
 
     try {
       const response = await fetch('http://localhost:3002/api/director/phase2/start', {
@@ -175,6 +185,13 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
                 // taskId received for polling if needed
               } else if (jsonData.type === 'progress') {
                 // Ignore numeric progress UI updates
+              } else if (jsonData.type === 'log') {
+                console.log(`[Phase2 Log] ${jsonData.level}: ${jsonData.message}`);
+                setPhase2Logs(prev => [...prev, {
+                  timestamp: Date.now(),
+                  type: (jsonData.level || 'info') as 'info' | 'warning' | 'error',
+                  message: jsonData.message
+                }].slice(-50));
               } else if (jsonData.type === 'chapter_ready') {
                 allChapters.push(jsonData.chapter);
                 setLocalChapters([...allChapters]);
@@ -316,6 +333,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             onComment={handleComment}
             onLock={handleLock}
             onProceed={handleProceed}
+            currentModel={currentModel}
+            logs={phase2Logs}
           />
         )}
 

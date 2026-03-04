@@ -377,17 +377,17 @@ export const startPhase2 = async (req: Request, res: Response) => {
   });
 
   res.write(`data: ${JSON.stringify({ type: 'taskId', taskId })}\n\n`);
-  // 初始阶段只发送消息，不发送进度数字（避免显示"0/0"无意义）
-  // 等globalPlan生成完后再发送实际方案数
 
   try {
     const config = loadConfig();
     const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
 
+    res.write(`data: ${JSON.stringify({ type: 'log', level: 'info', message: `开始生成 B-roll 方案，使用模型: ${globalConfig.provider}/${globalConfig.model}` })}\n\n`);
+
     // 上帝视角：一次性生成全局分配方案
     const globalPlan = await generateGlobalBRollPlan(
       parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
-      brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+      brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'canvas-art')[],
       globalConfig.provider as any,
       globalConfig.model
     );
@@ -400,6 +400,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
     // 计算实际生成的总 options 数量作为 totalSteps
     const totalSteps = globalPlan.chapters?.reduce((sum, ch) => sum + (ch.options?.length || 0), 0) || parsedChapters.length * 3;
     console.log(`[Phase2] 总共生成 ${totalSteps} 个 B-roll 方案`);
+
+    res.write(`data: ${JSON.stringify({ type: 'log', level: 'info', message: `方案生成完成，共 ${totalSteps} 个方案` })}\n\n`);
 
     // 更新任务的 totalSteps
     const task = taskStorage.get(taskId);
