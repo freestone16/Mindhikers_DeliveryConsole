@@ -191,7 +191,6 @@ async function callKimiLLM(messages: LLMMessage[], model = 'kimi-k2.5'): Promise
       model,
       messages,
       temperature,
-      max_tokens: 16384,
     }),
   });
 

@@ -1038,6 +1038,24 @@ app.post('/api/scripts/select', (req, res) => {
                     deliveryData.modules.director.isConceptApproved = false;
                     deliveryData.modules.director.items = [];
                     deliveryData.modules.director.renderJobs = [];
+
+                    // Also physically clear the Phase 2/3 caches on disk so Phase 2 status checks reset properly
+                    const visualsDir = path.join(projectRoot, '04_Visuals');
+                    if (fs.existsSync(visualsDir)) {
+                        const cacheFiles = [
+                            'selection_state.json',
+                            'phase2_review_state.json',
+                            'phase3_render_state.json'
+                        ];
+                        for (const file of cacheFiles) {
+                            try {
+                                const cacheFile = path.join(visualsDir, file);
+                                if (fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile);
+                            } catch (e) {
+                                console.error(`Failed to delete cache file ${file}:`, e);
+                            }
+                        }
+                    }
                 }
                 if (deliveryData.modules?.music) {
                     // 重置 Music 到 Phase 1，清空所有缓存数据

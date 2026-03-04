@@ -1,6 +1,6 @@
 {
   "global": {
-    "provider": "siliconflow",
+    "provider": "kimi",
     "model": "Pro/moonshotai/Kimi-K2.5",
     "baseUrl": "https://api.siliconflow.cn/v1"
   },

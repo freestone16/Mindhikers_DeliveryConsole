@@ -250,6 +250,13 @@ export const generatePhase1 = async (req: Request, res: Response) => {
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
 
+    // Save concept proposal to local directory
+    const visualsDir = path.join(projectRoot, '04_Visuals');
+    ensureDir(visualsDir);
+    const mdOutputPath = path.join(visualsDir, `phase1_视觉概念提案_${projectId}.md`);
+    fs.writeFileSync(mdOutputPath, finalContent, 'utf-8');
+    console.log(`[Phase1] Generated concept proposal saved to: ${mdOutputPath}`);
+
     res.write(`data: ${JSON.stringify({ type: 'content', content: finalContent })}\n\n`);
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
   } catch (error: any) {
@@ -296,6 +303,13 @@ export const reviseConcept = async (req: Request, res: Response) => {
     ], 'deepseek');
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
+
+    // Save concept proposal to local directory
+    const visualsDir = path.join(projectRoot, '04_Visuals');
+    ensureDir(visualsDir);
+    const mdOutputPath = path.join(visualsDir, `phase1_视觉概念提案_${projectId}.md`);
+    fs.writeFileSync(mdOutputPath, finalContent, 'utf-8');
+    console.log(`[Phase1 Revise] Revised concept proposal saved to: ${mdOutputPath}`);
 
     return res.json({
       success: true,
