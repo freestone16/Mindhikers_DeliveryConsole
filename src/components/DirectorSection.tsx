@@ -35,12 +35,12 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   const [startTime, setStartTime] = useState<number | null>(null);
 
   // Phase2 logs for debug panel
-  const [phase2Logs, setPhase2Logs] = useState<{timestamp: number; type: string; message: string}[]>([]);
+  const [phase2Logs, setPhase2Logs] = useState<{ timestamp: number; type: string; message: string }[]>([]);
 
   const [brollPaths] = useState<any[]>([]);
 
   const { status } = useLLMConfig();
-  const currentModel = status?.global?.provider 
+  const currentModel = status?.global?.provider
     ? { provider: status.global.provider, model: status.global.model || 'default' }
     : undefined;
 
@@ -255,6 +255,20 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
     onUpdate({ ...data, renderJobs: newJobs, phase: 3 });
   };
 
+  const handleImportChapters = (importedChapters: DirectorChapter[]) => {
+    // Normalize and inject defaults
+    const normalized = importedChapters.map((ch, i) => ({
+      ...ch,
+      chapterIndex: ch.chapterIndex ?? i,
+      isLocked: ch.isLocked ?? false,
+      options: (ch.options || []).map((opt, j) => ({
+        ...opt,
+        id: opt.id || `${ch.chapterId}-opt-${j}`,
+      })),
+    }));
+    onUpdate({ ...data, items: normalized, phase: 2 });
+  };
+
   const phaseLabels: Record<Phase, string> = {
     1: 'Concept',
     2: 'Storyboard',
@@ -319,6 +333,7 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             onGenerate={handleGenerateConcept}
             onRevise={handleReviseConcept}
             onApprove={handleApproveConcept}
+            onImportChapters={handleImportChapters}
           />
         )}
 

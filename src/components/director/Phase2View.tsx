@@ -12,7 +12,7 @@ interface LogEntry {
   model?: string;
 }
 
- interface Phase2ViewProps {
+interface Phase2ViewProps {
   projectId: string;
   chapters: DirectorChapter[];
   isLoading: boolean;
@@ -25,7 +25,7 @@ interface LogEntry {
   currentModel?: { provider: string; model: string };
   logs?: LogEntry[];
 }
- export const Phase2View = ({
+export const Phase2View = ({
   projectId,
   chapters,
   isLoading,
@@ -92,10 +92,10 @@ interface LogEntry {
               <span className="text-slate-400">模型:</span>
               <span className="text-white font-medium">
                 {currentModel.provider === 'siliconflow' ? 'SiliconFlow / Kimi-K2.5' :
-                 currentModel.provider === 'deepseek' ? 'DeepSeek' :
-                 currentModel.provider === 'kimi' ? 'Kimi' :
-                 currentModel.provider === 'yinli' ? 'Yinli / Claude-Sonnet-4-6-Th' :
-                 'Unknown'}
+                  currentModel.provider === 'deepseek' ? 'DeepSeek' :
+                    currentModel.provider === 'kimi' ? 'Kimi' :
+                      currentModel.provider === 'yinli' ? 'Yinli / Claude-Sonnet-4-6-Th' :
+                        'Unknown'}
               </span>
               <span className="text-slate-500 text-xs">({currentModel.model})</span>
             </div>

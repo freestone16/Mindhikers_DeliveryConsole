@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Sparkles, RefreshCw, CheckCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Sparkles, RefreshCw, CheckCircle, Upload, Copy, Check } from 'lucide-react';
+import type { DirectorChapter } from '../../types';
 
 const SimpleMarkdown = ({ text }: { text: string }) => {
   if (!text) return null;
@@ -58,6 +59,7 @@ interface Phase1ViewProps {
   onGenerate: () => void;
   onRevise: (comment: string) => void;
   onApprove: () => void;
+  onImportChapters?: (chapters: DirectorChapter[]) => void;
 }
 
 export const Phase1View = ({
@@ -69,8 +71,54 @@ export const Phase1View = ({
   onGenerate,
   onRevise,
   onApprove,
+  onImportChapters,
 }: Phase1ViewProps) => {
   const [feedback, setFeedback] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const templatePath = "~/.gemini/antigravity/skills/Director/prompts/broll.md";
+
+  const handleCopyPath = () => {
+    navigator.clipboard.writeText(templatePath);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        let content = e.target?.result as string;
+
+        // Strip markdown code wrap if the user saved it exactly as LLM returns (e.g., ```json\n...\n```)
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch && jsonMatch[1]) {
+          content = jsonMatch[1];
+        }
+
+        const raw = JSON.parse(content);
+        let chapters: DirectorChapter[];
+        if (Array.isArray(raw)) chapters = raw;
+        else if (raw?.chapters && Array.isArray(raw.chapters)) chapters = raw.chapters;
+        else throw new Error('顶层结构必须是 { "chapters": [...] } 或直接数组');
+        for (let i = 0; i < chapters.length; i++) {
+          const ch = chapters[i];
+          if (!ch.chapterId) throw new Error(`第 ${i + 1} 章缺少 chapterId`);
+          if (!ch.chapterName) throw new Error(`第 ${i + 1} 章缺少 chapterName`);
+          if (!Array.isArray(ch.options)) throw new Error(`第 ${i + 1} 章缺少 options 数组`);
+        }
+        onImportChapters?.(chapters);
+      } catch (err: any) {
+        alert('导入失败: 无法正确读取或解析JSON格式\n\n具体错误: ' + err.message);
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // A concept is considered empty if it's null, empty string, or just the default placeholder text.
   // It is NOT empty if it contains actual generated content (usually > 50 chars).
@@ -96,12 +144,34 @@ export const Phase1View = ({
         <p className="text-slate-400 text-sm mb-6">
           准备为当前剧本<strong className="text-blue-300">「{displayPath}」</strong>进行概念提案...
         </p>
-        <button
-          onClick={onGenerate}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
-        >
-          开始头脑风暴并生成概念提案
-        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={onGenerate}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+          >
+            开始头脑风暴并生成概念提案
+          </button>
+          <div className="h-8 w-px bg-slate-700"></div>
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 rounded-lg font-medium flex items-center gap-2 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            导入离线分镜 JSON
+          </button>
+        </div>
+        <div className="mt-4 flex items-center justify-center">
+          <div
+            className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded border border-slate-700 cursor-pointer hover:border-slate-500 transition-colors"
+            onClick={handleCopyPath}
+            title="点击复制路径，在 Antigravity 中向导演大师提交时可用"
+          >
+            <span className="text-[10px] text-slate-500">模板:</span>
+            <code className="text-[10px] text-blue-300 font-mono">{templatePath}</code>
+            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3 text-slate-500" />}
+          </div>
+        </div>
       </div>
     );
   }
