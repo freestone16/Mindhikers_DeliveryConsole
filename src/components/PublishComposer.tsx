@@ -22,6 +22,10 @@ interface PlatformConfig {
     customTags?: string;
 }
 
+interface PublishComposerProps {
+    projectId?: string;
+}
+
 const AVAILABLE_PLATFORMS: PlatformConfig[] = [
     { id: 'twitter', name: 'X / Twitter', icon: '🐦', enabled: false },
     { id: 'youtube_shorts', name: 'YouTube Shorts', icon: '📱', enabled: false, aspectRatio: '9:16' },
@@ -33,7 +37,7 @@ const AVAILABLE_PLATFORMS: PlatformConfig[] = [
     { id: 'wechat_mp', name: '微信公众号', icon: '📝', enabled: false }
 ];
 
-export const PublishComposer = () => {
+export const PublishComposer = ({ projectId: propProjectId }: PublishComposerProps) => {
     const [videos, setVideos] = useState<VideoAsset[]>([]);
     const [marketingFiles, setMarketingFiles] = useState<MarketingFile[]>([]);
     const [selectedVideo, setSelectedVideo] = useState<VideoAsset | null>(null);
@@ -126,7 +130,7 @@ export const PublishComposer = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    projectId: 'CSET-SP3',
+                    projectId: propProjectId || 'default-project',
                     platforms: selectedPlatforms,
                     assets: {
                         mediaUrl: selectedVideo.path,

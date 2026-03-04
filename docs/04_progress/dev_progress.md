@@ -20,6 +20,7 @@
 | v3.5 | 2026-03-03 | **火山引擎视频生成集成** - 文生视频 API + 文生图预览 + OldYang Skill 更新 |
 | v3.6 | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析 |
 | v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级 |
+| v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID |
 
 ---
 
@@ -128,9 +129,11 @@
 
 ### 🔴 Critical
 
-| ID  | 问题                         | 影响                                        | 建议                                                               |
-| --- | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
-| C-1 | Agent 无法调用 Docker socket | macOS sandbox 拦截 `unix:///...docker.sock` | Agent 通过 HTTP 访问容器端口替代；Docker 操作由用户在 GUI/终端执行 |
+| ID  | 问题                         | 影响                                        | 建议                                                               | 状态 |
+| --- | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------ | ---- |
+| C-1 | Agent 无法调用 Docker socket | macOS sandbox 拦截 `unix:///...docker.sock` | Agent 通过 HTTP 访问容器端口替代；Docker 操作由用户在 GUI/终端执行 | Open |
+| ~~C-2~~ | ~~Phase2 火山引擎文生图预览失败~~ | ~~100% 失败，无法生成预览图~~ | ~~根本原因：VOLCENGINE_ACCESS_KEY 格式错误（缺少连字符）~~ | **✅ 已修复 (v3.9.0)** |
+| ~~C-3~~ | ~~Phase2 视频方案策划 LLM 调用不稳定~~ | ~~生成方案时偶发失败~~ | ~~需检查：超时机制、重试逻辑、错误处理~~ | **⚠️ 待观察** |
 
 ### 🟡 Medium
 
@@ -977,17 +980,139 @@ import type { RightPanelMode } from './components/RightPanel';
 
 ---
 
-**文件变更记录**（本次）：
-- 修改：\`src/main.tsx\` - 修复 App.final.tsx 导入错误
-- 修改：\`src/App.tsx\` - 修复类型导入错误
-- 更新：\`docs/04_progress/lessons.md\` - 添加 L-005
-- 更新：\`docs/04_progress/dev_progress.md\` - 记录本次修复
+**v3.9.0 修复记录（2026-03-04）**
+
+### 问题1： Phase2 火山引擎文生图预览 100% 失败
+
+**根本原因：**
+1. API Key 格式错误：缺少连字符
+   - 错误格式：`354e79c042194af48f784460ba54973`（31字符）
+   - 正确格式：`354e79c0-4219-4af4-8f78-44460ba54973`（36字符，带连字符）
+2. 使用了 endpoint ID 而非模型名称
+
+**修复步骤：**
+1. ✅ 修正 API Key 格式（添加连字符）
+2. ✅ 更新模型配置：使用 `doubao-seedream-4-0-250828` 替代 endpoint ID
+3. ✅ 验证 API 调用成功（返回图片 URL)
+
+**验证命令：**
+```bash
+curl -X POST https://ark.cn-beijing.volces.com/api/v3/images/generations \
+  -H "Authorization: Bearer 354e79c0-4219-4af4-8f78-44460ba54973" \
+  -d '{"model":"doubao-seedream-4-0-250828","prompt":"测试图片","size":"2560x1440"}'
+# 成功返回：{"data":[{"url":"https://..."}]}
+```
+
+**涉及文件：**
+- `.env` - 修正 VOLCENGINE_ACCESS_KEY 格式
+- `.env` - 更新 VOLCENGINE_ENDPOINT_ID_IMAGE 为模型名称
+- `docs/04_progress/rules.md` - 添加规则 28-29
+- `docs/04_progress/dev_progress.md` - 记录修复过程
+
+**分支：** `fix/phase2-stability-issues`
+
+---
+
+### 问题2： Phase1 "转了转但界面没变"
+
+**根本原因：**
+- `server/llm.ts` 添加了 30 秒超时
+- Phase1 生成概念提案需要 40-60 秒（读取 18KB 剧本 + 构建概念）
+- 超时后 `type: 'done' 未发送，前端 `onUpdate` 未被调用
+
+**历史对比：**
+- main 分支/c9237d6 版本：无超时机制 → Phase1 正常工作
+- 当前分支：添加 30 秒超时 → Phase1 失败
+
+**修复方案：**
+```bash
+git checkout origin/main -- server/llm.ts  # 回退到无超时版本
+```
+
+**涉及文件：**
+- `server/llm.ts` - 移除 30 秒超时限制
+
+---
+
+### 问题3： LLM_PROVIDER 被错误配置为 deepseek
+
+**根本原因:**
+- `.env` 文件中 `LLM_PROVIDER=deepseek`
+- 用户一直使用的是 `siliconflow` 的 `Kimi-K2.5`
+
+**修复方案：**
+```bash
+# .env
+LLM_PROVIDER=siliconflow  # 修改前：deepseek
+```
+
+---
+
+### 问题4： CSET-SP3 硬编码
+
+**发现位置：**
+- `src/components/PublishComposer.tsx:129` - `projectId: 'CSET-SP3'`
+- `server/distribution.ts:293` - `const projectId = req.query.project as string || 'CSET-SP3'`
+
+**修复方案：**
+1. `PublishComposer.tsx` - 添加 `projectId` prop，移除硬编码
+2. `distribution.ts` - 移除默认值，要求必须传递 `project` 参数
+
+**涉及文件：**
+- `src/components/PublishComposer.tsx`
+- `server/distribution.ts`
+
+---
+
+### 新增功能： Phase1/Phase2 耗时统计
+
+**实现位置：**
+- `src/components/DirectorSection.tsx`
+  - Phase1: 添加 `phase1StartTime` 计时
+  - Phase1 done: 打印耗时日志
+  - Phase2 done: 打印耗时日志
+
+**日志格式：**
+```
+[Phase1] 🚀 开始生成概念提案...
+[Phase1] ✅ 概念提案生成完成，耗时 45.3 秒
+[Phase2] ✅ 视频方案生成完成，耗时 32.1 秒
+```
+
+**用途：** 开发阶段性能监控，后续可移除
+
+---
+
+### 🚨 未解决问题： Phase2 生成超过 10 分钟未完成
+
+**现象：**
+- Phase2 视频方案生成超过 10 分钟仍未完成
+- LLM 配置已修正为 `siliconflow`
+- 需要进一步调查
+
+**可能原因：**
+1. SiliconFlow API 响应慢
+2. `generateGlobalBRollPlan` 函数处理逻辑问题
+3. 网络连接问题
+
+**下一步行动：**
+- 检查 SiliconFlow API 响应时间
+- 添加更详细的日志输出
+- 考虑添加超时警告
 
 ---
 
 ## 待提交内容
-请确认以下文件是否需要提交：
-- `src/main.tsx` - 修复 App.final.tsx 导入错误
-- `src/App.tsx` - 修复类型导入错误
-- `docs/04_progress/lessons.md` - 添加 L-005
-- `docs/04_progress/dev_progress.md` - 记录本次修复
+- `.env` - 修正 LLM_PROVIDER 和火山引擎配置
+- `server/llm.ts` - 回退到 main 分支版本（无超时）
+- `src/components/DirectorSection.tsx` - 添加耗时统计
+- `src/components/PublishComposer.tsx` - 移除 CSET-SP3 硬编码
+- `server/distribution.ts` - 移除 CSET-SP3 硬编码
+- `docs/04_progress/rules.md` - 新增规则 28-29
+- `docs/04_progress/dev_progress.md` - 记录修复过程
+
+---
+
+**分支：** `fix/phase2-stability-issues`
+
+**状态：** 🟡 Phase2 生成超时问题未解决，需要继续调查

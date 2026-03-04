@@ -43,6 +43,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
 
     setIsGeneratingConcept(true);
     setStreamingConcept('');
+    const phase1StartTime = Date.now();
+    console.log('[Phase1] 🚀 开始生成概念提案...');
 
     try {
       const response = await fetch('http://localhost:3002/api/director/phase1/generate', {
@@ -79,6 +81,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
                   fullContent += jsonData.content;
                   setStreamingConcept(fullContent);
                 } else if (jsonData.type === 'done') {
+                  const elapsed = ((Date.now() - phase1StartTime) / 1000).toFixed(1);
+                  console.log(`[Phase1] ✅ 概念提案生成完成，耗时 ${elapsed} 秒`);
                   onUpdate({ ...data, conceptProposal: fullContent });
                   setStreamingConcept(null);
                 }
@@ -175,6 +179,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
                 allChapters.push(jsonData.chapter);
                 setLocalChapters([...allChapters]);
               } else if (jsonData.type === 'done') {
+                const elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : 'N/A';
+                console.log(`[Phase2] ✅ 视频方案生成完成，耗时 ${elapsed} 秒`);
                 onUpdate({ ...data, items: jsonData.chapters || allChapters, phase: 2 });
                 setLocalChapters(null);
                 setStartTime(null);

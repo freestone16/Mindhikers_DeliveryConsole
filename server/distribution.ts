@@ -290,7 +290,10 @@ router.post('/queue/:taskId/retry', (req, res) => {
 
 router.get('/assets', (req, res) => {
     try {
-        const projectId = req.query.project as string || 'CSET-SP3';
+        const projectId = req.query.project as string;
+        if (!projectId) {
+            return res.status(400).json({ success: false, error: 'Missing project parameter' });
+        }
         const projectRoot = path.join(PROJECTS_BASE, projectId);
         
         const shortsDir = path.join(projectRoot, '05_Shorts_Output');
