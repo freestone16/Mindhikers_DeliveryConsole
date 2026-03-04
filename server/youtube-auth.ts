@@ -134,7 +134,7 @@ router.post('/shorts/upload', async (req, res) => {
     }
 
     try {
-        const PROJECT_NAME = process.env.PROJECT_NAME || 'CSET-SP3';
+        const PROJECT_NAME = process.env.PROJECT_NAME || 'MindHikers Delivery Console';
         const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
         const PROJECT_ROOT = path.resolve(PROJECTS_BASE, PROJECT_NAME);
         const DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');

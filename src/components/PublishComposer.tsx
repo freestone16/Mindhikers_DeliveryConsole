@@ -77,11 +77,12 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             alert('请先运行 Marketing Master 生成营销方案');
             return;
         }
-        
+
         try {
-            const res = await fetch(`http://localhost:3002/api/files?dir=/data/projects/CSET-SP3/05_Marketing`);
+            const projectDir = propProjectId || 'MindHikers Delivery Console';
+            const res = await fetch(`http://localhost:3002/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
             const data = await res.json();
-            
+
             const planFile = data.files?.find((f: any) => f.name === 'marketing_plan.json');
             if (planFile) {
                 setTitle('AI 如何重构工作方式 (#Short)');
@@ -98,20 +99,20 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     };
 
     const togglePlatform = (platformId: string) => {
-        setPlatforms(prev => prev.map(p => 
+        setPlatforms(prev => prev.map(p =>
             p.id === platformId ? { ...p, enabled: !p.enabled } : p
         ));
     };
 
     const handlePlatformSetting = (platformId: string, field: 'customTitle' | 'customTags', value: string) => {
-        setPlatforms(prev => prev.map(p => 
+        setPlatforms(prev => prev.map(p =>
             p.id === platformId ? { ...p, [field]: value } : p
         ));
     };
 
     const handleSubmit = async () => {
         const selectedPlatforms = platforms.filter(p => p.enabled).map(p => p.id);
-        
+
         if (selectedPlatforms.length === 0) {
             alert('请至少选择一个发布平台');
             return;
@@ -144,13 +145,13 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             });
 
             const data = await res.json();
-            
+
             if (data.success) {
                 setSubmitResult({
                     success: true,
                     message: isScheduleMode ? '定时发布任务已创建' : '已加入发布队列'
                 });
-                
+
                 setTimeout(() => {
                     setSelectedVideo(null);
                     setTitle('');
@@ -196,7 +197,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                 <Film className="w-4 h-4" />
                                 步骤 1: 选择资产
                             </h3>
-                            
+
                             <div className="space-y-2 max-h-80 overflow-y-auto">
                                 {videos.length === 0 ? (
                                     <p className="text-xs text-slate-500 py-4 text-center">暂无视频资产</p>
@@ -205,11 +206,10 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                         <button
                                             key={video.path}
                                             onClick={() => setSelectedVideo(video)}
-                                            className={`w-full text-left p-3 rounded-lg border transition-all ${
-                                                selectedVideo?.path === video.path
+                                            className={`w-full text-left p-3 rounded-lg border transition-all ${selectedVideo?.path === video.path
                                                     ? 'bg-blue-600/20 border-blue-500/50'
                                                     : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs px-1.5 py-0.5 bg-slate-700 rounded text-slate-300">
@@ -251,7 +251,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <label className="text-xs text-slate-400 mb-1 block">正文</label>
                                     <textarea
@@ -262,7 +262,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <label className="text-xs text-slate-400 mb-1 block">Tags (逗号分隔)</label>
                                     <input
@@ -289,11 +289,10 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                 {platforms.map((platform) => (
                                     <div
                                         key={platform.id}
-                                        className={`p-3 rounded-lg border transition-all ${
-                                            platform.enabled
+                                        className={`p-3 rounded-lg border transition-all ${platform.enabled
                                                 ? 'bg-blue-600/10 border-blue-500/30'
                                                 : 'bg-slate-800/30 border-slate-700'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <label className="flex items-center gap-2 cursor-pointer">
@@ -307,14 +306,14 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                                     {platform.icon} {platform.name}
                                                 </span>
                                             </label>
-                                            
+
                                             {platform.enabled && platform.aspectRatio && (
                                                 <span className="text-xs text-slate-500">
                                                     {platform.aspectRatio}
                                                 </span>
                                             )}
                                         </div>
-                                        
+
                                         {platform.enabled && (
                                             <div className="mt-2 pl-6 space-y-2">
                                                 <input
@@ -340,7 +339,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                             {/* Schedule */}
                             <div className="border-t border-slate-700 pt-4 mb-4">
                                 <label className="text-xs text-slate-400 mb-2 block">发帖策略</label>
-                                
+
                                 <div className="space-y-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -352,7 +351,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                         />
                                         <span className="text-sm text-slate-300">立即进入安全队列</span>
                                     </label>
-                                    
+
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                             type="radio"
@@ -363,7 +362,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                         />
                                         <span className="text-sm text-slate-300">定时发布</span>
                                     </label>
-                                    
+
                                     {isScheduleMode && (
                                         <div className="pl-6 space-y-2 mt-2">
                                             <input
@@ -389,14 +388,13 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
 
                             {/* Submit */}
                             {submitResult && (
-                                <div className={`mb-3 p-3 rounded-lg flex items-center gap-2 ${
-                                    submitResult.success ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'
-                                }`}>
+                                <div className={`mb-3 p-3 rounded-lg flex items-center gap-2 ${submitResult.success ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'
+                                    }`}>
                                     {submitResult.success ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                                     <span className="text-sm">{submitResult.message}</span>
                                 </div>
                             )}
-                            
+
                             <button
                                 onClick={handleSubmit}
                                 disabled={submitting || platforms.filter(p => p.enabled).length === 0}

@@ -768,7 +768,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
 
   if (option.type === 'remotion') {
     const outputFileName = `thumb_${taskKey}.png`;
-    const projectId = req.body.projectId || process.env.PROJECT_NAME || 'CSET-SP3';
+    const projectId = req.body.projectId || process.env.PROJECT_NAME || 'MindHikers Delivery Console';
     const projectRoot = getProjectRoot(projectId);
     const outputDir = path.join(projectRoot, '04_Visuals', 'thumbnails');
     if (!fs.existsSync(outputDir)) {
