@@ -21,29 +21,45 @@ async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LL
     throw new Error('ZHIPU_API_KEY not configured');
   }
 
-  const response = await fetch(ZHIPU_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Zhipu API error: ${error}`);
+  try {
+    const response = await fetch(ZHIPU_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[llm.ts] Zhipu API error (${response.status}):`, error);
+      throw new Error(`Zhipu API error: ${error}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Zhipu API timeout: request took longer than 30 seconds');
+    }
+    console.error(`[llm.ts] Zhipu API failed:`, error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
-    usage: data.usage,
-  };
 }
 
 async function callOpenAILLM(messages: LLMMessage[], model = 'gpt-4o'): Promise<LLMResponse> {
@@ -52,29 +68,45 @@ async function callOpenAILLM(messages: LLMMessage[], model = 'gpt-4o'): Promise<
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${error}`);
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[llm.ts] OpenAI API error (${response.status}):`, error);
+      throw new Error(`OpenAI API error: ${error}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('OpenAI API timeout: request took longer than 30 seconds');
+    }
+    console.error(`[llm.ts] OpenAI API failed:`, error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
-    usage: data.usage,
-  };
 }
 
 async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'): Promise<LLMResponse> {
@@ -83,29 +115,45 @@ async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'):
     throw new Error('DEEPSEEK_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`DeepSeek API error: ${error}`);
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[llm.ts] DeepSeek API error (${response.status}):`, error);
+      throw new Error(`DeepSeek API error: ${error}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('DeepSeek API timeout: request took longer than 30 seconds');
+    }
+    console.error(`[llm.ts] DeepSeek API failed:`, error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
-    usage: data.usage,
-  };
 }
 
 async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshotai/Kimi-K2.5'): Promise<LLMResponse> {
@@ -114,29 +162,51 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
     throw new Error('SILICONFLOW_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.7,
-    }),
-  });
+  // 添加超时机制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    console.error(`[llm.ts] SiliconFlow API timeout after 30s`);
+  }, 30000); // 30 秒超时
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SiliconFlow API error: ${error}`);
+  try {
+    const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[llm.ts] SiliconFlow API error (${response.status}):`, error);
+      throw new Error(`SiliconFlow API error: ${error}`);
+    }
+
+    const data = await response.json();
+    console.log(`[llm.ts] SiliconFlow API success, usage:`, data.usage);
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.error(`[llm.ts] SiliconFlow API request aborted (timeout)`);
+      throw new Error('SiliconFlow API timeout: request took longer than 30 seconds');
+    }
+    console.error(`[llm.ts] SiliconFlow API failed:`, error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
-    usage: data.usage,
-  };
 }
 
 async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): Promise<LLMResponse> {
@@ -149,30 +219,46 @@ async function callKimiLLM(messages: LLMMessage[], model = 'moonshot-v1-128k'): 
   const isKimiK25 = model.includes('kimi-k2') || model.includes('k2.5');
   const temperature = isKimiK25 ? 1 : 0.7;
 
-  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens: 16384,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // Kimi 可能需要更长时间，60秒
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Kimi API error: ${error}`);
+  try {
+    const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: 16384,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[llm.ts] Kimi API error (${response.status}):`, error);
+      throw new Error(`Kimi API error: ${error}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices[0].message.content,
+      usage: data.usage,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Kimi API timeout: request took longer than 60 seconds');
+    }
+    console.error(`[llm.ts] Kimi API failed:`, error.message);
+    throw error;
   }
-
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
-    usage: data.usage,
-  };
 }
 
 export async function callLLM(

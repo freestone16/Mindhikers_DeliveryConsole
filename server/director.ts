@@ -824,6 +824,54 @@ export const generateThumbnail = async (req: Request, res: Response) => {
             } else if (result.task_id) {
               task.taskId = result.task_id;
               task.status = 'pending';
+              console.log(`[Volcengine Thumbnail] Pending: ${taskKey}, taskId=${result.task_id}`);
+
+              // 启动轮询检查火山引擎任务状态
+              const pollVolc = async () => {
+                let pollCount = 0;
+                const maxPolls = 30; // 最多轮询 30 次（60秒）
+
+                while (pollCount < maxPolls) {
+                  pollCount++;
+                  const pollResult = await pollVolcImageResult(result.task_id);
+                  const currentTask = thumbnailTasks.get(taskKey);
+
+                  if (!currentTask) break; // 任务已被清理
+
+                  if (pollResult.status === 'completed' && pollResult.image_url) {
+                    currentTask.status = 'completed';
+                    currentTask.imageUrl = pollResult.image_url;
+                    console.log(`[Volcengine Thumbnail] Poll Success: ${taskKey} (${pollCount} polls)`);
+                    break;
+                  } else if (pollResult.status === 'failed') {
+                    currentTask.status = 'failed';
+                    currentTask.error = pollResult.error || 'Volcengine task failed';
+                    console.error(`[Volcengine Thumbnail] Poll Failed: ${taskKey}`, pollResult.error);
+                    break;
+                  } else if (pollResult.status === 'processing') {
+                    // 继续轮询
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  }
+                }
+
+                if (pollCount >= maxPolls) {
+                  const timeoutTask = thumbnailTasks.get(taskKey);
+                  if (timeoutTask) {
+                    timeoutTask.status = 'failed';
+                    timeoutTask.error = 'Timeout: Volcengine task did not complete within 60 seconds';
+                    console.error(`[Volcengine Thumbnail] Timeout: ${taskKey}`);
+                  }
+                }
+              };
+
+              pollVolc().catch(err => {
+                const errorTask = thumbnailTasks.get(taskKey);
+                if (errorTask) {
+                  errorTask.status = 'failed';
+                  errorTask.error = `Poll error: ${err.message}`;
+                }
+                console.error(`[Volcengine Thumbnail] Poll Error: ${taskKey}`, err);
+              });
             } else {
               task.status = 'failed';
               task.error = result.error || 'Unknown Volcengine error';
