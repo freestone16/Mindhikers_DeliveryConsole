@@ -3,7 +3,7 @@
 > 最后更新: 2026-03-05  
 > 分支: `main`
 > 最新里程碑: `v3.9` (Universal Expert Action Engine)
-> 最新 Commit: `e2d78b3`
+> 最新 Commit: `96b39a1`
 
 ---
 
