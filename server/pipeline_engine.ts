@@ -4,7 +4,7 @@ import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
 
-const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR || 
+const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
   path.join(os.homedir(), '.opencode/skills/RemotionStudio');
 
 const getProjectRoot = (projectId: string): string => {
@@ -16,7 +16,7 @@ interface VisualPlanScene {
   id: string;
   timestamp: string;
   script_line: string;
-  type: 'remotion' | 'seedance' | 'artlist';
+  type: 'remotion' | 'seedance' | 'artlist' | 'infographic';
   template?: string;
   props?: Record<string, unknown>;
   prompt?: string;
@@ -62,29 +62,29 @@ const activeRenders = new Map<string, any>();
 
 export const renderBrolls = async (req: Request, res: Response) => {
   const { projectId, sceneIds } = req.body as RenderBrollsRequest;
-  
+
   if (!projectId) {
     return res.status(400).json({ error: 'Missing projectId' });
   }
 
   const projectRoot = getProjectRoot(projectId);
   const visualPlanPath = path.join(projectRoot, '04_Visuals', 'visual_plan.json');
-  
+
   if (!fs.existsSync(visualPlanPath)) {
     return res.status(404).json({ error: 'visual_plan.json not found. Please complete Phase 2 first.' });
   }
 
   const visualPlan: VisualPlan = JSON.parse(fs.readFileSync(visualPlanPath, 'utf-8'));
-  
-  const scenesToRender = sceneIds 
+
+  const scenesToRender = sceneIds
     ? visualPlan.scenes.filter(s => sceneIds.includes(s.id) && s.type === 'remotion')
     : visualPlan.scenes.filter(s => s.type === 'remotion' && s.status === 'approved');
 
   if (scenesToRender.length === 0) {
-    return res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       message: 'No Remotion scenes to render',
-      results: [] 
+      results: []
     });
   }
 
@@ -94,15 +94,15 @@ export const renderBrolls = async (req: Request, res: Response) => {
   }
 
   const taskId = `render-${Date.now()}`;
-  
-  res.json({ 
-    taskId, 
+
+  res.json({
+    taskId,
     message: `Started rendering ${scenesToRender.length} scenes`,
     sceneCount: scenesToRender.length
   });
 
   const results: RenderResult[] = [];
-  
+
   for (const scene of scenesToRender) {
     const result = await renderSingleScene(scene, outputDir, projectRoot);
     results.push(result);
@@ -117,7 +117,7 @@ export const renderBrolls = async (req: Request, res: Response) => {
 };
 
 async function renderSingleScene(
-  scene: VisualPlanScene, 
+  scene: VisualPlanScene,
   outputDir: string,
   _projectRoot: string
 ): Promise<RenderResult> {
@@ -222,7 +222,7 @@ export const weaveTimeline = (req: Request, res: Response) => {
   }
 
   const projectRoot = getProjectRoot(projectId);
-  
+
   const arollFullPath = path.isAbsolute(arollPath) ? arollPath : path.join(projectRoot, arollPath);
   const srtFullPath = path.isAbsolute(srtPath) ? srtPath : path.join(projectRoot, srtPath);
 
@@ -248,10 +248,10 @@ export const weaveTimeline = (req: Request, res: Response) => {
     });
 
     if (brollPaths[index]) {
-      const brollPath = path.isAbsolute(brollPaths[index]) 
-        ? brollPaths[index] 
+      const brollPath = path.isAbsolute(brollPaths[index])
+        ? brollPaths[index]
         : path.join(projectRoot, brollPaths[index]);
-      
+
       if (fs.existsSync(brollPath)) {
         clips.push({
           file: brollPath,
@@ -347,7 +347,7 @@ function generateFCPXML(params: FCPXMLParams): string {
   Object.keys(trackGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(trackNum => {
     const trackClips = trackGroups[parseInt(trackNum)];
     let clipItems = '';
-    
+
     trackClips.forEach((clip, idx) => {
       const fileName = path.basename(clip.file);
       clipItems += `

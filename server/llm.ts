@@ -237,13 +237,17 @@ export const SYSTEM_PROMPTS = {
 
 export interface BRollOption {
   name: string;
-  type: 'remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture';
+  type: 'remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic';
   template?: string;
   props?: Record<string, any>;
   quote: string;
   prompt: string;
   imagePrompt?: string;
   rationale?: string;
+  // Infographic specific
+  infographicLayout?: string;
+  infographicStyle?: string;
+  infographicUseMode?: 'cinematic-zoom' | 'static';
 }
 
 export interface GlobalBRollProposal {
@@ -262,7 +266,7 @@ import { buildDirectorSystemPrompt } from './skill-loader';
  */
 export async function generateGlobalBRollPlan(
   chapters: { id: string; name: string; text: string }[],
-  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
   provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'kimi' = 'deepseek',
   model?: string
 ): Promise<GlobalBRollProposal> {
@@ -287,7 +291,7 @@ function suggestTemplateFromContent(prompt: string, quote: string): string {
 
 async function generateGlobalBRollPlanWithRetry(
   chapters: { id: string; name: string; text: string }[],
-  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
   provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'kimi' = 'deepseek',
   model?: string,
   retryCount: number = 0,
@@ -470,7 +474,7 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
 export async function generateBRollOptions(
   chapterName: string,
   scriptText: string,
-  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+  brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
   provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
 ): Promise<BRollOption[]> {
   const options: BRollOption[] = [];
@@ -519,11 +523,11 @@ export async function generateBRollOptions(
 }
 
 export function generateFallbackOptions(
-  types: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture')[],
+  types: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
   scriptText: string = ''
 ): BRollOption[] {
   const quote = scriptText.split(/[。！？\n]/).filter(s => s.trim()).slice(0, 2).join('。') || '原文引用';
-  const typeLabels: Record<string, string> = { remotion: '数据可视化', generative: '概念意象', artlist: '空镜', 'internet-clip': '互联网素材', 'user-capture': '截图录屏' };
+  const typeLabels: Record<string, string> = { remotion: '数据可视化', generative: '概念意象', artlist: '空镜', 'internet-clip': '互联网素材', 'user-capture': '截图录屏', infographic: '信息图' };
   return types.map((type, index) => ({
     name: `${typeLabels[type] || type}-方案${index + 1}`,
     type,
