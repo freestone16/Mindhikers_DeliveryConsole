@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
@@ -11,8 +11,6 @@ import { DistributionQueue } from './components/DistributionQueue';
 import { ChatPanel } from './components/ChatPanel';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import { Loader2, Users, Send, Clock } from 'lucide-react';
-import { EXPERTS } from './config/experts';
-import type { ExpertStatus } from './types';
 import { StatusFooter } from './components/StatusFooter';
 import { CrucibleHome } from './components/CrucibleHome';
 import { LLMConfigPage } from './components/LLMConfigPage';
@@ -33,14 +31,13 @@ function useHashRoute() {
 }
 
 function App() {
-    const { state, isConnected, selectScript, updateState, socket, setState } = useDeliveryStore();
+    const { state, isConnected, selectScript, socket, setState } = useDeliveryStore();
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleSelectProject = (projectId: string) => {
-        // Optimistically clear the state so we don't show the previous project's data
         setState({
             ...INITIAL_STATE,
             projectId: projectId,
@@ -50,15 +47,6 @@ function App() {
             socket.emit('select-project', projectId);
         }
     };
-
-    useEffect(() => {
-        // activeExpertId now strictly managed locally, can default from localstorage later
-    }, []);
-
-    // ActiveModule local management
-    useEffect(() => {
-        // activeModule managed locally
-    }, []);
 
     const handleSelectExpert = (expertId: string) => {
         setActiveExpertId(expertId);
@@ -74,16 +62,14 @@ function App() {
             return;
         }
 
-        const expert = EXPERTS.find(e => e.id === expertId);
-        if (!expert) return;
-
         try {
             const res = await fetch('http://localhost:3002/api/experts/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     expertId,
-                    scriptPath: state.selectedScript.path
+                    scriptPath: state.selectedScript.path,
+                    projectId: state.projectId
                 })
             });
 
@@ -98,37 +84,21 @@ function App() {
         }
     };
 
-    const handleCancel = (expertId: string) => {
-        const experts = state.experts || {};
-        const currentExpert = experts[expertId] || {};
-
-        updateState({
-            ...state,
-            experts: {
-                ...experts,
-                [expertId]: {
-                    ...currentExpert,
-                    status: 'idle',
-                    logs: []
-                }
-            }
-        });
+    const handleCancel = async (expertId: string) => {
+        if (socket) {
+            socket.emit('update-expert-data', {
+                projectId: state.projectId,
+                expertId,
+                data: { status: 'idle', logs: [] }
+            });
+        }
     };
 
     const handleRerun = (expertId: string) => {
         handleStartWork(expertId);
     };
 
-    const expertStatuses = useMemo(() => {
-        const statuses: Record<string, { status: ExpertStatus }> = {};
-        EXPERTS.forEach(e => {
-            const rawStatus = state?.experts?.[e.id]?.status;
-            statuses[e.id] = { status: (rawStatus as ExpertStatus) || 'idle' };
-        });
-        return statuses;
-    }, [state?.experts]);
-
-    const currentExpertWork = state.experts?.[activeExpertId];
+    const expertStatuses = {};
 
     const hashRoute = useHashRoute();
 
@@ -182,17 +152,18 @@ function App() {
                                         <DirectorSection
                                             projectId={state.projectId}
                                             scriptPath={state.selectedScript?.path || ''}
+                                            socket={socket}
                                         />
                                     ) : activeExpertId === 'ShortsMaster' ? (
                                         <ShortsSection
                                             projectId={state.projectId}
                                             scriptPath={state.selectedScript?.path || ''}
+                                            socket={socket}
                                         />
                                     ) : (
                                         <ExpertPage
                                             expertId={activeExpertId}
                                             projectId={state.projectId}
-                                            expertWork={currentExpertWork}
                                             selectedScript={state.selectedScript}
                                             onStartWork={handleStartWork}
                                             onCancel={handleCancel}

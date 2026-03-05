@@ -180,7 +180,8 @@ export async function* callLLMStream(
 
 export function loadExpertContext(
     projectRoot: string,
-    expertId: string
+    expertId: string,
+    scriptPath?: string
 ): { systemPrompt: string; contextMap: ExpertContextMap } {
     const EXPERTS_OUTPUT_DIRS: Record<string, string> = {
         Director: '04_Visuals',
@@ -261,9 +262,10 @@ ${contextContent ? `\n以下是该专家已有的产出内容（供参考）:${c
     return { systemPrompt, contextMap };
 }
 
-export function loadChatHistory(projectRoot: string, expertId: string): ChatMessage[] {
+export function loadChatHistory(projectRoot: string, expertId: string, scriptPath?: string): ChatMessage[] {
     const chatDir = path.join(projectRoot, '.tasks', 'chat_history');
-    const chatFile = path.join(chatDir, `${expertId}.json`);
+    const filename = scriptPath ? `${expertId}_${path.basename(scriptPath, '.md')}.json` : `${expertId}.json`;
+    const chatFile = path.join(chatDir, filename);
 
     if (!fs.existsSync(chatFile)) {
         return [];
@@ -278,10 +280,25 @@ export function loadChatHistory(projectRoot: string, expertId: string): ChatMess
     }
 }
 
+export function clearChatHistory(projectRoot: string, expertId: string, scriptPath?: string): void {
+    const chatDir = path.join(projectRoot, '.tasks', 'chat_history');
+    const filename = scriptPath ? `${expertId}_${path.basename(scriptPath, '.md')}.json` : `${expertId}.json`;
+    const chatFile = path.join(chatDir, filename);
+    if (fs.existsSync(chatFile)) {
+        try {
+            fs.unlinkSync(chatFile);
+            console.log(`[Chat] History cleared for ${expertId}`);
+        } catch (e) {
+            console.error(`Failed to clear history for ${expertId}:`, e);
+        }
+    }
+}
+
 export function saveChatHistory(
     projectRoot: string,
     expertId: string,
-    messages: ChatMessage[]
+    messages: ChatMessage[],
+    scriptPath?: string
 ): void {
     const chatDir = path.join(projectRoot, '.tasks', 'chat_history');
 
@@ -305,7 +322,8 @@ export function saveChatHistory(
         lastUpdated: new Date().toISOString(),
     };
 
-    const chatFile = path.join(chatDir, `${expertId}.json`);
+    const filename = scriptPath ? `${expertId}_${path.basename(scriptPath, '.md')}.json` : `${expertId}.json`;
+    const chatFile = path.join(chatDir, filename);
     fs.writeFileSync(chatFile, JSON.stringify(history, null, 2));
 }
 

@@ -4,11 +4,11 @@ import { ShortsPhase1 } from './shorts/ShortsPhase1';
 import { ShortsPhase2 } from './shorts/ShortsPhase2';
 import { ShortsPhase3 } from './shorts/ShortsPhase3';
 import type { ShortsModule, ShortsModule_V2, ShortScript, ShortRenderUnit, ExpertDataUpdate } from '../types';
-import { useDeliveryStore } from '../hooks/useDeliveryStore';
 
 interface ShortsSectionProps {
     projectId: string;
     scriptPath: string;
+    socket: any;
 }
 
 type Phase = 1 | 2 | 3;
@@ -21,7 +21,7 @@ import { useExpertState } from '../hooks/useExpertState';
 
 const INITIAL_SHORTS_STATE: ShortsModule_V2 = { phase: 1, scripts: [], renderUnits: [], subtitleConfigs: [] };
 
-export const ShortsSection = ({ projectId, scriptPath: _scriptPath }: ShortsSectionProps) => {
+export const ShortsSection = ({ projectId, scriptPath: _scriptPath, socket }: ShortsSectionProps) => {
     const { state: rawData, updateState } = useExpertState<ShortsModule | ShortsModule_V2>('ShortsMaster', INITIAL_SHORTS_STATE);
     const initialData = rawData && isV2(rawData) ? rawData : INITIAL_SHORTS_STATE;
 
@@ -39,8 +39,6 @@ export const ShortsSection = ({ projectId, scriptPath: _scriptPath }: ShortsSect
             setPhase(initialData.phase);
         }
     }, [initialData.phase]);
-
-    const { socket } = useDeliveryStore();
 
     // SD-207.1: 监听来自 Chat Panel 的修改更新
     useEffect(() => {
@@ -178,8 +176,8 @@ export const ShortsSection = ({ projectId, scriptPath: _scriptPath }: ShortsSect
                             onClick={() => canEnterPhase(p as Phase) && handlePhaseChange(p as Phase)}
                             disabled={!canEnterPhase(p as Phase)}
                             className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${phase === p
-                                    ? 'bg-cyan-600 text-white'
-                                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                ? 'bg-cyan-600 text-white'
+                                : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                                 }`}
                         >
                             P{p}

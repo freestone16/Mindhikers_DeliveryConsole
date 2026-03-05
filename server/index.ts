@@ -18,7 +18,7 @@ import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
@@ -196,26 +196,10 @@ function ensureDeliveryFile(projectId: string) {
     const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
     const initialState = {
-        projectId: projectId,
+        projectId,
         lastUpdated: new Date().toISOString(),
-        activeExpertId: 'Director',
-        activeModule: 'delivery',
-        experts: {
-            Director: { status: 'idle', logs: [] },
-            MusicDirector: { status: 'idle', logs: [] },
-            ThumbnailMaster: { status: 'idle', logs: [] },
-            ShortsMaster: { status: 'idle', logs: [] },
-            MarketingMaster: { status: 'idle', logs: [] }
-        },
-        modules: {
-            director: { phase: 1, conceptProposal: "", conceptFeedback: "", isConceptApproved: false, items: [], renderJobs: [] },
-            music: { phase: 1, moodProposal: "", items: [] },
-            thumbnail: { variants: [] },
-            marketing: { strategy: { seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' }, social: { twitterThread: '', redditPost: '' }, geo: { locationTags: [], culturalRelleance: '' } }, feedback: '', isSubmitted: false },
-            shorts: { items: [], uploadHistory: [] }
-        }
+        selectedScript: null
     };
-
     if (!fs.existsSync(deliveryFile)) {
         console.log(`Creating new delivery_store.json for ${projectId}`);
         if (!fs.existsSync(projectRoot)) {
@@ -223,6 +207,9 @@ function ensureDeliveryFile(projectId: string) {
         }
         fs.writeFileSync(deliveryFile, JSON.stringify(initialState, null, 2));
     } else {
+        // If it exists, we still want to ensure it has the basic structure,
+        // but we don't want to overwrite existing data unless explicitly migrating.
+        // For now, just ensure projectId is correct and add selectedScript if missing.
         const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
         if (!data.modules.shorts || Array.isArray(data.modules.shorts.shorts)) {
             // Migration or initialization
@@ -625,11 +612,11 @@ io.on('connection', (socket) => {
 
     // --- Chat Panel Socket Events ---
 
-    socket.on('chat-load-context', async ({ expertId, projectId }) => {
+    socket.on('chat-load-context', async ({ expertId, projectId, scriptPath: clientScriptPath }) => {
         try {
             if (!projectId) throw new Error('projectId is required for chat-load-context');
             const projectRoot = getProjectRoot(projectId);
-            const ctx = loadExpertContext(projectRoot, expertId);
+            let ctx = loadExpertContext(projectRoot, expertId, clientScriptPath || undefined);
             socket.emit('chat-context-loaded', { expertId, systemPrompt: ctx.systemPrompt });
         } catch (error: any) {
             socket.emit('chat-error', { error: error.message, expertId });
@@ -652,7 +639,7 @@ io.on('connection', (socket) => {
             if (!projectId) throw new Error('projectId is required for chat-clear-history');
             const projectRoot = getProjectRoot(projectId);
             clearChatHistory(projectRoot, expertId);
-            socket.emit('chat-history-cleared', { expertId });
+            socket.emit('chat-history', { expertId, messages: [] });
         } catch (error: any) {
             socket.emit('chat-error', { error: error.message, expertId });
         }
@@ -816,10 +803,10 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 
 app.post('/api/chat/context', (req, res) => {
     try {
-        const { expertId, projectId } = req.body;
+        const { expertId, projectId, scriptPath } = req.body;
         if (!projectId) throw new Error('projectId is required');
         const projectRoot = getProjectRoot(projectId);
-        const ctx = loadExpertContext(projectRoot, expertId);
+        const ctx = loadExpertContext(projectRoot, expertId, (scriptPath as string) || undefined);
         res.json(ctx);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -1025,8 +1012,8 @@ app.post('/api/scripts/select', (req, res) => {
         }
 
         const projectRoot = getProjectRoot(projectId);
-        const fullPath = path.join(projectRoot, scriptPath);
         const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+        const fullPath = path.join(projectRoot, scriptPath);
 
         if (!fs.existsSync(fullPath)) {
             return res.status(404).json({ error: 'Script file not found' });
@@ -1046,43 +1033,6 @@ app.post('/api/scripts/select', (req, res) => {
                     path: scriptPath,
                     selectedAt: new Date().toISOString()
                 };
-                // Reset phase proposals when a new script is chosen
-                if (deliveryData.modules?.director) {
-                    // 重置 Director 到 Phase 1，清空所有缓存数据
-                    deliveryData.modules.director.phase = 1;
-                    deliveryData.modules.director.conceptProposal = "";
-                    deliveryData.modules.director.conceptFeedback = "";
-                    deliveryData.modules.director.isConceptApproved = false;
-                    deliveryData.modules.director.items = [];
-                    deliveryData.modules.director.renderJobs = [];
-
-                    // Also physically clear the Phase 2/3 caches on disk so Phase 2 status checks reset properly
-                    const visualsDir = path.join(projectRoot, '04_Visuals');
-                    if (fs.existsSync(visualsDir)) {
-                        const cacheFiles = [
-                            'selection_state.json',
-                            'phase2_review_state.json',
-                            'phase3_render_state.json'
-                        ];
-                        for (const file of cacheFiles) {
-                            try {
-                                const cacheFile = path.join(visualsDir, file);
-                                if (fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile);
-                            } catch (e) {
-                                console.error(`Failed to delete cache file ${file}:`, e);
-                            }
-                        }
-                    }
-                }
-                if (deliveryData.modules?.music) {
-                    // 重置 Music 到 Phase 1，清空所有缓存数据
-                    deliveryData.modules.music.phase = 1;
-                    deliveryData.modules.music.moodProposal = "";
-                    deliveryData.modules.music.conceptFeedback = "";
-                    deliveryData.modules.music.isConceptApproved = false;
-                    deliveryData.modules.music.items = [];
-                }
-
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                 io.to(currentProjectName).emit('delivery-data', deliveryData);
@@ -1148,19 +1098,14 @@ app.post('/api/experts/start', (req, res) => {
         fs.writeFileSync(taskFile, JSON.stringify(taskData, null, 2));
         console.log(`📝 Task created: ${taskId} for project ${projectId}`);
 
-        const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-        if (!deliveryData.experts) {
-            deliveryData.experts = {};
-        }
-        deliveryData.experts[expertId] = {
-            status: 'pending',
-            startedAt: new Date().toISOString(),
-            logs: [`任务已创建: ${taskId}`, `等待在 Antigravity 中执行 ${expert.skillName} skill`]
-        };
-        deliveryData.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
+        // Update independent expert state
+        const expertState = loadExpertState(projectRoot, expertId);
+        expertState.status = 'pending';
+        expertState.startedAt = new Date().toISOString();
+        expertState.logs = [`任务已创建: ${taskId}`, `等待在 Antigravity 中执行 ${expert.skillName} skill`].concat(expertState.logs || []);
+        saveExpertState(projectRoot, expertId, expertState);
 
-        io.to(currentProjectName).emit('delivery-data', deliveryData);
+        io.to(projectId).emit(`expert-data-update:${expertId}`, expertState);
 
         res.json({ success: true, taskId, taskFile, message: '请在 Antigravity 中执行对应 skill' });
     } catch (error: any) {
@@ -1221,19 +1166,13 @@ app.post('/api/experts/run', (req, res) => {
         const outputDir = path.join(projectRoot, expert.outputDir);
         const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
-        // Update status to running
-        const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-        if (!deliveryData.experts) {
-            deliveryData.experts = {};
-        }
-        deliveryData.experts[expertId] = {
-            status: 'running',
-            startedAt: new Date().toISOString(),
-            logs: ['正在执行 Skill...']
-        };
-        deliveryData.lastUpdated = new Date().toISOString();
-        fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
-        io.to(currentProjectName).emit('delivery-data', deliveryData);
+        // Update status to running independently
+        const expertState = loadExpertState(projectRoot, expertId);
+        expertState.status = 'running';
+        expertState.startedAt = new Date().toISOString();
+        expertState.logs = ['正在执行 Skill...'].concat(expertState.logs || []);
+        saveExpertState(projectRoot, expertId, expertState);
+        io.to(projectId).emit(`expert-data-update:${expertId}`, expertState);
 
         // Execute Python skill (pass script content via stdin) with timeout 10 mins
         const python = spawn('python3', [
@@ -1266,19 +1205,15 @@ app.post('/api/experts/run', (req, res) => {
                 const result = JSON.parse(output);
 
                 if (result.success) {
-                    // Update status to completed
-                    const updatedData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-                    updatedData.experts[expertId] = {
-                        status: 'completed',
-                        startedAt: deliveryData.experts[expertId].startedAt,
-                        completedAt: new Date().toISOString(),
-                        outputPath: result.output_files[0] || '',
-                        outputContent: result.logs.join('\n'),
-                        logs: result.logs
-                    };
-                    updatedData.lastUpdated = new Date().toISOString();
-                    fs.writeFileSync(deliveryFile, JSON.stringify(updatedData, null, 2));
-                    io.emit('delivery-data', updatedData);
+                    // Update status to completed independently
+                    const expertState = loadExpertState(projectRoot, expertId);
+                    expertState.status = 'completed';
+                    expertState.completedAt = new Date().toISOString();
+                    expertState.outputPath = result.output_files[0] || '';
+                    expertState.outputContent = result.logs.join('\n');
+                    expertState.logs = result.logs;
+                    saveExpertState(projectRoot, expertId, expertState);
+                    io.to(projectId).emit(`expert-data-update:${expertId}`, expertState);
 
                     res.json({
                         success: true,
@@ -1286,17 +1221,13 @@ app.post('/api/experts/run', (req, res) => {
                         logs: result.logs
                     });
                 } else {
-                    // Update status to failed
-                    const updatedData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-                    updatedData.experts[expertId] = {
-                        status: 'failed',
-                        startedAt: deliveryData.experts[expertId].startedAt,
-                        error: result.error,
-                        logs: result.logs
-                    };
-                    updatedData.lastUpdated = new Date().toISOString();
-                    fs.writeFileSync(deliveryFile, JSON.stringify(updatedData, null, 2));
-                    io.emit('delivery-data', updatedData);
+                    // Update status to failed independently
+                    const expertState = loadExpertState(projectRoot, expertId);
+                    expertState.status = 'failed';
+                    expertState.error = result.error;
+                    expertState.logs = result.logs;
+                    saveExpertState(projectRoot, expertId, expertState);
+                    io.to(projectId).emit(`expert-data-update:${expertId}`, expertState);
 
                     res.status(500).json({
                         error: result.error,

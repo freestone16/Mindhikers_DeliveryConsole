@@ -1290,8 +1290,16 @@ export const phase2RenderChecked = async (req: Request, res: Response) => {
     const visualsDir = path.join(projectRoot, '04_Visuals');
     ensureDir(visualsDir);
 
+    const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
+
     for (const chapter of chapters) {
       if (!chapter.chapterId) continue;
+
+      // Skip rendering for non-renderable types (e.g., internet-clip, artlist)
+      if (chapter.type && !RENDERABLE_TYPES.includes(chapter.type)) {
+        console.log(`[Phase2 Render] Skipping non-renderable type: ${chapter.type} for ${chapter.chapterId}`);
+        continue;
+      }
 
       // Cleanup old files logic
       try {

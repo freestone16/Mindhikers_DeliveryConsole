@@ -61,8 +61,12 @@ export const Phase2View = ({
     return `${m}:${s}`;
   };
 
+  const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
   const totalOptions = chapters.reduce((sum, ch) => sum + ch.options.length, 0);
   const checkedCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => o.isChecked).length, 0);
+  const renderableCheckedCount = chapters.reduce((sum, ch) =>
+    sum + ch.options.filter(o => o.isChecked && RENDERABLE_TYPES.includes(o.type)).length, 0
+  );
   const allChecked = chapters.length > 0 && chapters.every(c => c.options.some(o => o.isChecked));
 
   const handleConfirmBRoll = () => {
@@ -177,13 +181,20 @@ export const Phase2View = ({
 
             <div className="flex items-center gap-3">
               {checkedCount > 0 && (
-                <button
-                  onClick={onRenderChecked}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
-                >
-                  <Play className="w-4 h-4" />
-                  渲染已确认条目 ({checkedCount})
-                </button>
+                <div className="flex flex-col items-end">
+                  <button
+                    onClick={onRenderChecked}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
+                  >
+                    <Play className="w-4 h-4" />
+                    渲染 AI 条目 ({renderableCheckedCount})
+                  </button>
+                  {checkedCount > renderableCheckedCount && (
+                    <span className="text-[10px] text-slate-500 mt-1">
+                      (其余 {checkedCount - renderableCheckedCount} 项为外部素材，无需渲染)
+                    </span>
+                  )}
+                </div>
               )}
               {allChecked && (
                 <button

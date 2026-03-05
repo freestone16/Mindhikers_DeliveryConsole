@@ -145,16 +145,6 @@ export interface DeliveryState {
     selectedScript?: SelectedScript;
     activeExpertId?: string;
     activeModule?: 'crucible' | 'delivery' | 'distribution';
-    experts?: {
-        [expertId: string]: ExpertWork;
-    };
-    modules: {
-        director: DirectorModule;
-        music: MusicModule;
-        thumbnail: ThumbnailModule;
-        marketing: MarketingModule;
-        shorts: ShortsModule | ShortsModule_V2;
-    };
 }
 
 // --- Visual Audit Module (v3.1) ---

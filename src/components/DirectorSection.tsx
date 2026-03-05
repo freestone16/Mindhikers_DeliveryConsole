@@ -9,13 +9,14 @@ import { useLLMConfig } from '../hooks/useLLMConfig';
 interface DirectorSectionProps {
   projectId: string;
   scriptPath: string;
+  socket: any;
 }
 
 type Phase = 1 | 2 | 3;
 
 import { useExpertState } from '../hooks/useExpertState';
 
-export const DirectorSection = ({ projectId, scriptPath }: DirectorSectionProps) => {
+export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSectionProps) => {
   const { state: data, updateState } = useExpertState<DirectorModule>('Director', { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] });
 
   const onUpdate = (newData: DirectorModule) => {
@@ -149,6 +150,9 @@ export const DirectorSection = ({ projectId, scriptPath }: DirectorSectionProps)
     setPhase2Logs([]);
 
     try {
+      // Feature 1: Clear chat history when regenerating Phase 2
+      socket?.emit('chat-clear-history', { expertId: 'Director', projectId });
+
       const response = await fetch('http://localhost:3002/api/director/phase2/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -249,14 +253,23 @@ export const DirectorSection = ({ projectId, scriptPath }: DirectorSectionProps)
   };
 
   const handleRenderChecked = async () => {
-    // Collect all checked options across all chapters
+    const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
+
+    // Collect all checked options across all chapters, filtered by renderable type
     const checkedItems = chapters.flatMap(c =>
       c.options
-        .filter(o => o.isChecked)
-        .map(o => ({ chapterId: c.chapterId, optionId: o.id }))
+        .filter(o => o.isChecked && RENDERABLE_TYPES.includes(o.type))
+        .map(o => ({ chapterId: c.chapterId, optionId: o.id, type: o.type }))
     );
 
-    if (!checkedItems.length) return;
+    if (!checkedItems.length) {
+      // Check if there are other checked items that were filtered out
+      const anyChecked = chapters.some(c => c.options.some(o => o.isChecked));
+      if (anyChecked) {
+        alert('当前选中的素材（如互联网素材/用户采集）无需触发 AI 渲染，您可以直接进入 Phase 3 进行后续处理。');
+      }
+      return;
+    }
 
     // We will call the backend to start rendering
     try {

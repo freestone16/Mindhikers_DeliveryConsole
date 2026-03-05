@@ -8,22 +8,6 @@ const API_URL = 'http://localhost:3002';
 export const INITIAL_STATE: DeliveryState = {
     projectId: '',
     lastUpdated: new Date().toISOString(),
-    experts: {},
-    modules: {
-        director: { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [] },
-        music: { phase: 1, moodProposal: '', conceptFeedback: '', isConceptApproved: false, items: [] },
-        thumbnail: { variants: [] },
-        marketing: {
-            strategy: {
-                seo: { titleCandidates: [], description: '', keywords: [], competitorAnalysis: '' },
-                social: { twitterThread: '', redditPost: '' },
-                geo: { locationTags: [], culturalRelevance: '' }
-            },
-            feedback: '',
-            isSubmitted: false
-        },
-        shorts: { items: [], uploadHistory: [] }
-    }
 };
 
 export const useDeliveryStore = () => {
@@ -47,15 +31,7 @@ export const useDeliveryStore = () => {
 
         newSocket.on('delivery-data', (data: DeliveryState) => {
             console.log('Received data update', data);
-            const normalizedData = {
-                ...data,
-                modules: {
-                    ...INITIAL_STATE.modules,
-                    ...data.modules,
-                    shorts: data.modules.shorts || { items: [], uploadHistory: [] }
-                }
-            };
-            setState(normalizedData);
+            setState(data);
         });
 
         newSocket.on('render-progress', (progress: any) => {

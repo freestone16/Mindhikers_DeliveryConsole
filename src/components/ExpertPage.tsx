@@ -8,22 +8,23 @@ import type { ExpertWork, SelectedScript } from '../types';
 interface ExpertPageProps {
     expertId: string;
     projectId: string;
-    expertWork: ExpertWork | undefined;
     selectedScript?: SelectedScript;
     onStartWork: (expertId: string) => void;
     onCancel: (expertId: string) => void;
     onRerun: (expertId: string) => void;
 }
 
-export const ExpertPage = ({ 
-    expertId, 
+import { useExpertState } from '../hooks/useExpertState';
+
+export const ExpertPage = ({
+    expertId,
     projectId,
-    expertWork, 
     selectedScript,
-    onStartWork, 
-    onCancel, 
-    onRerun 
+    onStartWork,
+    onCancel,
+    onRerun
 }: ExpertPageProps) => {
+    const { state: expertWork } = useExpertState<ExpertWork>(expertId, { status: 'idle', logs: [] });
     const expert = EXPERTS.find(e => e.id === expertId);
     if (!expert) {
         return (

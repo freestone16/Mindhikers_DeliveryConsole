@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Paperclip, Loader2, AlertCircle, Check } from 'lucide-react';
+import { X, Send, Paperclip, Loader2, AlertCircle, Check, Trash2 } from 'lucide-react';
 import type { ChatMessage, Attachment, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 
@@ -30,6 +30,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // 使用 ref 跟踪当前 expertId，避免闭包问题
     const currentExpertIdRef = useRef(expertId);
     const prevExpertIdRef = useRef<string | null>(null);
+    const streamingContentRef = useRef('');
+
+    useEffect(() => {
+        streamingContentRef.current = streamingContent;
+    }, [streamingContent]);
 
     const expert = EXPERTS.find(e => e.id === expertId);
     const expertName = expert?.name || expertId;
@@ -119,6 +124,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const handleChatActionConfirm = (data: { expertId: string; confirmId: string; actionName: string; actionArgs: any; description: string }) => {
             if (data.expertId !== prevExpertIdRef.current) return;
+
+            // Fix: If there's streaming content, convert it to a message first so it doesn't disappear
+            const currentStreaming = streamingContentRef.current;
+            if (currentStreaming) {
+                const textMsg: ChatMessage = {
+                    id: `msg_text_${Date.now()}`,
+                    role: 'assistant',
+                    content: currentStreaming,
+                    timestamp: new Date().toISOString(),
+                };
+                setMessages(prev => [...prev, textMsg]);
+            }
+
             setIsStreaming(false);
             setStreamingContent('');
             setMessages(prev => [...prev, {
@@ -322,6 +340,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         });
     };
 
+    const handleClearHistory = () => {
+        if (!window.confirm('确定要清空对话历史吗？')) return;
+        socket?.emit('chat-clear-history', { expertId, projectId });
+        setMessages([]);
+    };
+
     return (
         <div className="flex flex-col h-full bg-[#0b1529]/80 backdrop-blur-md">
             {/* Header */}
@@ -333,12 +357,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <span className="text-xs text-green-400" title="上下文已加载">●</span>
                     )}
                 </div>
-                <button
-                    onClick={onToggle}
-                    className="p-1 hover:bg-slate-700 rounded transition-colors"
-                >
-                    <X className="w-4 h-4 text-slate-400" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={handleClearHistory}
+                        title="清空对话历史"
+                        className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-all"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={onToggle}
+                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                    >
+                        <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                </div>
             </div>
 
             {/* Warning Toast */}
@@ -465,15 +498,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         onChange={(e) => {
                             setInputText(e.target.value);
                             e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                            e.target.style.height = `${Math.max(88, Math.min(e.target.scrollHeight, 240))}px`;
                         }}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         placeholder="输入消息或指令（Shift+Enter 换行）..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none max-h-40 focus:outline-none focus:border-blue-500 overflow-y-auto min-h-[44px]"
-                        rows={1}
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 overflow-y-auto"
+                        rows={3}
                         disabled={isStreaming}
-                        style={{ height: '44px' }}
+                        style={{ height: '88px' }}
                     />
                     <button
                         onClick={handleSend}
