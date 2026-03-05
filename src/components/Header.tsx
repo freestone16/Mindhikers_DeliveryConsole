@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Zap, ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
+import { ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
 
 interface Project {
     name: string;
@@ -100,9 +100,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
             <header className="bg-[#0b1529]/80 backdrop-blur-xl border-b border-blue-900/40 px-6 py-4 relative z-[100]">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="bg-blue-600 p-2 rounded-lg">
-                            <Zap className="text-white w-6 h-6" />
-                        </div>
+                        <img src="/logo.png" alt="MindHikers Logo" className="w-10 h-10 rounded-lg shadow-sm object-cover overflow-hidden" />
                         <div>
                             <h1 className="text-xl font-bold text-white tracking-tight">MindHikers Delivery Console</h1>
                         </div>
