@@ -210,7 +210,7 @@ export interface VisualPlan {
 
 // --- Director Master V2 Types ---
 
-export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture';
+export type BRollType = 'remotion' | 'seedance' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic';
 
 export interface SceneOption {
     id: string;
@@ -225,6 +225,11 @@ export interface SceneOption {
     rationale?: string;
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
+    // Infographic specific (BaoyuInfographic)
+    infographicLayout?: string;   // 'pyramid' | 'funnel' | 'iceberg' | 'fishbone' | 'venn' | ...
+    infographicStyle?: string;    // 'cyberpunk-neon' | 'aged-academia' | 'dore-engraving' | ...
+    infographicUseMode?: 'cinematic-zoom' | 'static'; // cinematic-zoom: Ken Burns slow zoom; static: PNG only
+    isChecked?: boolean;
 }
 
 export interface DirectorChapter {
@@ -236,6 +241,7 @@ export interface DirectorChapter {
     selectedOptionId?: string;
     userComment?: string;
     isLocked: boolean;
+    isChecked?: boolean;
 }
 
 export interface SelectionState {

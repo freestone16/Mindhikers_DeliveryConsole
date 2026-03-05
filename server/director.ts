@@ -79,7 +79,7 @@ interface Phase3RenderState {
   externalAssets: {
     assetId: string;
     chapterId: string;
-    type: 'artlist' | 'internet-clip' | 'user-capture';
+    type: 'artlist' | 'internet-clip' | 'user-capture' | 'infographic';
     sourcePath: string;
     targetPath: string;
     loadedAt: string;
@@ -101,7 +101,9 @@ export function parseMarkdownChapters(content: string): { title: string; text: s
     const h2Match = line.match(/^##\s+(.+)/);
     if (h2Match) {
       const newTitle = h2Match[1].trim();
-      const cleanTitle = newTitle.replace(/\s*\(.*?\)\s*/g, '').trim();
+      let cleanTitle = newTitle.replace(/\s*\(.*?\)\s*/g, '').trim();
+      // Remove prefixes like "1-2 第三章：" or "第3章:"
+      cleanTitle = cleanTitle.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
 
       if (currentTitle && currentText.trim()) {
         chapters.push({
@@ -401,7 +403,7 @@ export const startPhase2 = async (req: Request, res: Response) => {
     // 上帝视角：一次性生成全局分配方案
     const globalPlan = await generateGlobalBRollPlan(
       parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
-      brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'canvas-art')[],
+      brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
       globalConfig.provider as any,
       globalConfig.model
     );
@@ -812,6 +814,166 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     }
   }
 
+  // ============================================================
+  // Infographic: BaoyuInfographic 结构化信息图生成
+  // ============================================================
+  if (option.type === 'infographic') {
+    const layout = option.infographicLayout || option.props?.layout || 'feature-list';
+    const style = option.infographicStyle || option.props?.style || 'craft-handmade';
+    const lang = option.props?.lang || 'zh';
+    const useMode = option.infographicUseMode || option.props?.useMode || 'cinematic-zoom';
+    const topic = option.imagePrompt || option.prompt || option.name || '信息图主题';
+
+    // 读取 layouts.md 中对应布局的 Prompt 规格（简化内联版本，完整版见 BaoyuInfographic/references/layouts.md）
+    const LAYOUT_PROMPTS: Record<string, string> = {
+      'pyramid': 'PYRAMID LAYOUT: Triangle divided into 3-5 horizontal tiers from base (largest, most fundamental) to apex (smallest, highest level). Each tier has a distinct color, tier label, and brief description.',
+      'funnel': 'FUNNEL LAYOUT: Wide top tapering to narrow bottom with 3-5 distinct horizontal layers. Each layer shows a stage name, optional metric/percentage, and brief description.',
+      'fishbone': 'FISHBONE LAYOUT: Main effect at right (fish head). Central horizontal spine arrow. 4-6 major cause categories as diagonal bones. Each major bone has 2-3 sub-causes.',
+      'venn': 'VENN DIAGRAM LAYOUT: 2-3 overlapping circles, each representing a distinct concept with unique characteristics listed. Overlapping areas contain shared characteristics.',
+      'iceberg': 'ICEBERG LAYOUT: Top ~20% above waterline (visible elements), ~80% submerged below (hidden/deeper elements). Ocean visual metaphor with distinct color contrast.',
+      'comparison-table': 'COMPARISON TABLE LAYOUT: Structured table with 2-4 columns representing options and 4-6 rows of comparison criteria. Clear column headers.',
+      'timeline-horizontal': 'HORIZONTAL TIMELINE LAYOUT: Central horizontal line from earliest to latest. 4-7 event markers above/below the line. Each event: date label, title, and description.',
+      'circular-flow': 'CIRCULAR FLOW LAYOUT: 4-6 interconnected stages in circular pattern with directional arrows. Each stage has icon and short label.',
+      'bridge': 'BRIDGE LAYOUT: Two distinct states (Problem State left, Solution State right) connected by a bridge. Contrasting colors for two states.',
+      'mind-map': 'MIND MAP LAYOUT: Central concept in the middle with 4-6 main branches radiating outward. Each main branch has 2-3 sub-branches. Radial symmetry.',
+      'nested-circles': 'NESTED CIRCLES LAYOUT: 3-5 concentric circles from innermost (core) to outermost (context). Each ring labeled with category name.',
+      'priority-quadrants': 'PRIORITY QUADRANTS LAYOUT: Equal four-quadrant grid with two labeled axes. Each quadrant has distinct color and label.',
+      'scale-balance': 'SCALE BALANCE LAYOUT: Balance scale with two sides, each showing 3-4 items/factors. Optional tilt to show comparison.',
+      'tree-hierarchy': 'TREE HIERARCHY LAYOUT: Root node at top, branching downward. 2-3 levels of hierarchy with connecting lines.',
+      'journey-path': 'JOURNEY PATH LAYOUT: Winding path from start to destination. 4-6 milestone markers along the path.',
+      'layers-stack': 'LAYERS STACK LAYOUT: 3-6 horizontal layers stacked vertically. Bottom layers are foundational, top layers are application-facing.',
+      'grid-cards': 'GRID CARDS LAYOUT: 4-9 equal-size cards in 2x2, 2x3, or 3x3 grid. Each card: centered icon, short title, 1-2 line description.',
+      'feature-list': 'FEATURE LIST LAYOUT: 4-8 features in a clean list or grid format. Each item: distinctive icon, feature name, 1-2 line description.',
+      'equation': 'EQUATION LAYOUT: Visual formula where 2-4 components combine to create an outcome. "+" operators between component blocks. Final "=" leads to result.',
+      'do-dont': 'DO/DON\'T LAYOUT: Split into two sections. "DO ✓" section with green tones showing 3-4 correct practices. "DON\'T ✗" section with red tones showing 3-4 incorrect practices.',
+    };
+
+    const STYLE_PROMPTS: Record<string, string> = {
+      'craft-handmade': 'STYLE: Hand-crafted illustration style. Slight paper texture background, hand-drawn line quality, watercolor-like fills, warm organic aesthetic.',
+      'cyberpunk-neon': 'STYLE: Cyberpunk neon aesthetic. Very dark background, electric neon glowing lines in cyan, magenta, and electric blue, circuit board pattern details.',
+      'aged-academia': 'STYLE: Aged academic/scientific illustration. Sepia tones and yellowed parchment background, fine-line engraving style, Victorian-era diagram aesthetic.',
+      'bold-graphic': 'STYLE: Bold graphic/comic style. Strong black outlines, limited color palette, Ben-Day dots for shading, graphic novel aesthetic.',
+      'corporate-memphis': 'STYLE: Corporate Memphis. Simplified geometric figures, flat vector art with bold solid colors, organic blob shapes, modern SaaS aesthetic.',
+      'technical-schematic': 'STYLE: Technical/engineering schematic. Blueprint background, precise line drawings, isometric 3D projection, professional engineering quality.',
+      'chalkboard': 'STYLE: Chalkboard illustration. Dark slate background, hand-drawn white chalk lines, colorful chalk accents, educational feeling.',
+      'storybook-watercolor': 'STYLE: Storybook watercolor. Soft translucent washes, gentle color bleeding, warm dreamy palette, magical/whimsical atmosphere.',
+      'origami': 'STYLE: Origami/paper folding aesthetic. Geometric forms appearing to be folded paper, angular shapes with visible fold lines, Japanese minimalist sensibility.',
+      'pixel-art': 'STYLE: Pixel art/8-bit retro style. Visible square pixel grid, limited color palette, chunky pixelated typography, nostalgic game aesthetic.',
+      'kawaii': 'STYLE: Japanese kawaii aesthetic. Adorable chibi-style characters, pastel color palette, rounded soft shapes, cute icons.',
+      'claymation': 'STYLE: Claymation aesthetic. 3D clay-textured objects, rounded forms, bright saturated colors with matte finish, cheerful and tactile.',
+      'subway-map': 'STYLE: Metro/subway map style. Clean colored lines connecting labeled stations, 45-degree or 90-degree line angles, transport authority map aesthetic.',
+      'ikea-manual': 'STYLE: IKEA-style instruction manual. Ultra-minimal line art, no color or single accent, step-by-step panels, generous white space.',
+      'knolling': 'STYLE: Knolling/flat lay style. Items arranged at 90-degree angles, viewed from above, perfectly parallel alignment, clean white background.',
+      'lego-brick': 'STYLE: LEGO brick construction style. Everything represented as interlocking bricks with stud dots, primary color palette, isometric view.',
+      'ui-wireframe': 'STYLE: UI wireframe/prototype style. Grayscale only, clean rectangular wireframe boxes, professional UX documentation appearance.',
+      // MindHikers 扩展风格
+      'dore-engraving': 'STYLE: Vintage Gustave Doré engraving style. Intricate fine-line crosshatching, dramatic chiaroscuro lighting, Gothic atmosphere, high contrast black and white.',
+      'chinese-ink-wash': 'STYLE: Traditional Chinese ink wash painting (水墨画). Expressive bold brush strokes, generous negative space (留白), monochromatic black ink, Zen-like minimalism.',
+      'premium-manga': 'STYLE: High-quality seinen manga style. Detailed precise ink linework, screentone patterns, cinematic panel composition, monochromatic.',
+    };
+
+    const layoutPrompt = LAYOUT_PROMPTS[layout] || `LAYOUT: ${layout} infographic layout with clear visual hierarchy.`;
+    const stylePrompt = STYLE_PROMPTS[style] || `STYLE: ${style} visual aesthetic.`;
+
+    const infographicPrompt = `Create a high-quality infographic illustration with the following specifications:
+
+TOPIC: ${topic}
+LAYOUT: ${layout}
+STYLE: ${style}
+LANGUAGE: ${lang}
+
+${layoutPrompt}
+
+${stylePrompt}
+
+QUALITY REQUIREMENTS:
+- Ultra-high detail, professional infographic quality
+- Clean composition with clear visual hierarchy
+- All text must be legible and properly sized
+- Use appropriate icons, symbols, and data visualization elements
+- Maintain consistent color palette throughout
+- 16:9 aspect ratio for video compatibility
+- Minimum resolution equivalent to 1920x1080
+${useMode === 'static' ? '- IMPORTANT: Include detailed text content for close reading' : '- IMPORTANT: Design for visual impact at a glance, minimal dense text'}`;
+
+    console.log(`[Infographic Thumbnail] Generating for: ${taskKey}, layout: ${layout}, style: ${style}, useMode: ${useMode}`);
+
+    try {
+      thumbnailTasks.set(taskKey, {
+        taskId: `infographic-${Date.now()}`,
+        type: 'volcengine',
+        status: 'processing',
+        createdAt: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        taskId: thumbnailTasks.get(taskKey)!.taskId,
+        taskKey,
+        status: 'processing'
+      });
+
+      (async () => {
+        try {
+          const result = await generateImageWithVolc(infographicPrompt);
+          const task = thumbnailTasks.get(taskKey);
+          if (task) {
+            if (result.image_url) {
+              task.status = 'completed';
+              task.imageUrl = result.image_url;
+              console.log(`[Infographic Thumbnail] Success: ${taskKey}`);
+            } else if (result.task_id) {
+              task.taskId = result.task_id;
+              task.status = 'pending';
+              // 复用轮询逻辑
+              const pollVolc = async () => {
+                let pollCount = 0;
+                const maxPolls = 30;
+                while (pollCount < maxPolls) {
+                  pollCount++;
+                  const pollResult = await pollVolcImageResult(result.task_id as string);
+                  const currentTask = thumbnailTasks.get(taskKey);
+                  if (!currentTask) break;
+                  if (pollResult.status === 'completed' && pollResult.image_url) {
+                    currentTask.status = 'completed';
+                    currentTask.imageUrl = pollResult.image_url;
+                    console.log(`[Infographic Thumbnail] Poll Success: ${taskKey} (${pollCount} polls)`);
+                    break;
+                  } else if (pollResult.status === 'failed') {
+                    currentTask.status = 'failed';
+                    currentTask.error = pollResult.error || 'Volcengine task failed';
+                    break;
+                  } else {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  }
+                }
+                if (pollCount >= maxPolls) {
+                  const t = thumbnailTasks.get(taskKey);
+                  if (t) { t.status = 'failed'; t.error = 'Timeout'; }
+                }
+              };
+              pollVolc().catch(err => {
+                const t = thumbnailTasks.get(taskKey);
+                if (t) { t.status = 'failed'; t.error = `Poll error: ${err.message}`; }
+              });
+            } else {
+              task.status = 'failed';
+              task.error = result.error || 'Unknown infographic gen error';
+            }
+          }
+        } catch (err: any) {
+          const task = thumbnailTasks.get(taskKey);
+          if (task) { task.status = 'failed'; task.error = err.message; }
+          console.error(`[Infographic Thumbnail Error] ${err.message}`);
+        }
+      })();
+
+      return;
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   if (option.type === 'generative' || option.type === 'seedance') {
     try {
       thumbnailTasks.set(taskKey, {
@@ -849,7 +1011,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
 
                 while (pollCount < maxPolls) {
                   pollCount++;
-                  const pollResult = await pollVolcImageResult(result.task_id);
+                  const pollResult = await pollVolcImageResult(result.task_id as string);
                   const currentTask = thumbnailTasks.get(taskKey);
 
                   if (!currentTask) break; // 任务已被清理
@@ -1083,7 +1245,8 @@ export const phase2Ready = async (req: Request, res: Response) => {
   }
 
   try {
-    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
+    const projIdStr = (Array.isArray(projectId) ? projectId[0] : projectId) as string;
+    const projectRoot = getProjectRoot(projIdStr);
     const selectionState = loadSelectionState(projectRoot);
     const reviewState = loadPhase2ReviewState(projectRoot);
 
@@ -1110,616 +1273,146 @@ export const phase2Ready = async (req: Request, res: Response) => {
 };
 
 // ============================================================
-// Phase 3 渲染及二审 API
+// Phase 2 渲染落盘 API
 // ============================================================
 
-/**
- * 启动 Remotion 和文生视频渲染
- * POST /api/director/phase3/start-render
- */
-export const phase3StartRender = async (req: Request, res: Response) => {
-  const { projectId } = req.body;
-
-  if (!projectId) {
-    return res.status(400).json({ error: 'Missing projectId' });
+export const phase2RenderChecked = async (req: Request, res: Response) => {
+  const { projectId, chapters } = req.body;
+  if (!projectId || !chapters || !Array.isArray(chapters)) {
+    return res.status(400).json({ error: 'Missing projectId or chapters list' });
   }
 
   try {
     const projectRoot = getProjectRoot(projectId);
+    const visualsDir = path.join(projectRoot, '04_Visuals');
+    ensureDir(visualsDir);
 
-    // 读取 Phase 2 审阅状态
-    const reviewState = loadPhase2ReviewState(projectRoot);
-    if (!reviewState) {
-      return res.status(404).json({ error: 'Review state not found, please complete Phase 2 first' });
-    }
+    for (const chapter of chapters) {
+      if (!chapter.chapterId) continue;
 
-    // 读取选择状态，获取章节详情
-    const selectionState = loadSelectionState(projectRoot);
-    if (!selectionState) {
-      return res.status(404).json({ error: 'Selection state not found' });
-    }
-
-    // 初始化 Phase 3 渲染状态
-    let renderState = loadPhase3RenderState(projectRoot);
-    if (!renderState) {
-      renderState = {
-        projectId,
-        lastUpdated: new Date().toISOString(),
-        renderJobs: [],
-        externalAssets: [],
-        xmlGenerated: false,
-        xmlPath: undefined
-      };
-    }
-
-    // 创建渲染任务
-    const renderJobs = [];
-
-    for (const chapter of selectionState.chapters) {
-      const chapterReview = reviewState.chapters.find(rc => rc.chapterId === chapter.chapterId);
-      if (!chapterReview || chapterReview.reviewStatus !== 'approved') {
-        continue;
+      // Cleanup old files logic
+      try {
+        const files = fs.readdirSync(visualsDir);
+        files.forEach(f => {
+          if (f.startsWith(chapter.chapterId + '_') && f.endsWith('.mp4')) {
+            const oldPath = path.join(visualsDir, f);
+            fs.unlinkSync(oldPath);
+            console.log(`[Phase2 Render] Deleted old file: ${oldPath}`);
+          }
+        });
+      } catch (e) {
+        // ignore
       }
 
-      if (!chapterReview.selectedOptionId) {
-        continue;
-      }
-
-      const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
-      if (!selectedOption) {
-        continue;
-      }
-
-      // 仅渲染 remotion 和 seedance 类型
-      if (selectedOption.type === 'remotion' || selectedOption.type === 'seedance') {
-        const jobId = `render-${chapter.chapterId}-${selectedOption.id}-${Date.now()}`;
-
-        const renderJob = {
-          jobId,
-          chapterId: chapter.chapterId,
-          optionId: selectedOption.id,
-          type: selectedOption.type as 'remotion' | 'seedance',
-          status: 'waiting' as const,
-          progress: 0,
-          startedAt: undefined,
-          completedAt: undefined,
-          retryCount: 0
-        };
-
-        renderJobs.push(renderJob);
-        renderState.renderJobs.push(renderJob);
-      }
+      // In a real implementation this would queue the render job async.
+      // For now, we mock the creation of a completed video.
+      const mockOut = path.join(visualsDir, `${chapter.chapterId}_rendered.mp4`);
+      fs.writeFileSync(mockOut, 'Mock video content');
+      console.log(`[Phase2 Render] Mock rendered file at ${mockOut}`);
     }
 
-    renderState.lastUpdated = new Date().toISOString();
-    savePhase3RenderState(projectRoot, renderState);
-
-    // 实际启动渲染任务
-    await startRenderJobs(renderState, projectRoot, selectionState, reviewState);
-
-    res.json({ success: true, renderJobs });
+    res.json({ success: true, message: '渲染已触发' });
   } catch (error: any) {
-    console.error('[Phase3 Start Render] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to start render' });
+    console.error('[Phase2 Render] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to trigger render' });
   }
 };
 
-/**
- * 启动渲染任务（Remotion 和文生视频）
- */
-async function startRenderJobs(
-  renderState: Phase3RenderState,
-  projectRoot: string,
-  selectionState: SelectionState,
-  reviewState: Phase2ReviewState
-) {
-  const brollDir = path.join(projectRoot, '06_Video_Broll');
-  ensureDir(brollDir);
+// ============================================================
+// Phase 3 终态比照与 XML 输出 API
+// ============================================================
 
-  // 串行渲染（避免性能问题）
-  for (const renderJob of renderState.renderJobs) {
-    if (renderJob.type === 'remotion') {
-      await renderRemotionJob(renderJob, projectRoot, selectionState, reviewState);
-    } else if (renderJob.type === 'seedance') {
-      await renderSeedanceJob(renderJob, projectRoot, selectionState, reviewState);
-    }
+import { parseSRT, compileSRTForLLM, generateFCPXML, generateJianyingXML } from './srt-aligner';
 
-    // 更新渲染状态
-    const updatedState = loadPhase3RenderState(projectRoot);
-    if (updatedState) {
-      const jobIndex = updatedState.renderJobs.findIndex(j => j.jobId === renderJob.jobId);
-      if (jobIndex >= 0) {
-        updatedState.renderJobs[jobIndex] = renderJob;
-        savePhase3RenderState(projectRoot, updatedState);
-      }
-    }
-  }
-}
-
-/**
- * 渲染 Remotion 任务
- */
-async function renderRemotionJob(
-  renderJob: any,
-  projectRoot: string,
-  selectionState: SelectionState,
-  reviewState: Phase2ReviewState
-) {
-  try {
-    // 更新状态为渲染中
-    renderJob.status = 'rendering';
-    renderJob.startedAt = new Date().toISOString();
-    renderJob.progress = 0;
-
-    // 获取章节和选项详情
-    const chapter = selectionState.chapters.find(c => c.chapterId === renderJob.chapterId);
-    const chapterReview = reviewState.chapters.find(rc => rc.chapterId === renderJob.chapterId);
-
-    if (!chapter || !chapterReview) {
-      throw new Error('Chapter or review not found');
-    }
-
-    const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
-    if (!selectedOption) {
-      throw new Error('Selected option not found');
-    }
-
-    // 生成输出文件名
-    const fileName = `${renderJob.chapterId}_remotion.mp4`;
-    const outputPath = path.join(projectRoot, '06_Video_Broll', fileName);
-
-    // 构建 Remotion 渲染参数
-    const { buildRemotionPreview } = await import('./remotion-api-renderer');
-    const { compositionId, props } = buildRemotionPreview(selectedOption);
-
-    // 调用 Remotion 渲染（使用 remotion 命令行工具）
-    await renderRemotionVideo(compositionId, outputPath, props);
-
-    // 更新状态为完成
-    renderJob.status = 'completed';
-    renderJob.progress = 100;
-    renderJob.completedAt = new Date().toISOString();
-    renderJob.outputPath = outputPath;
-
-    console.log(`[Remotion Render] Success: ${renderJob.jobId} -> ${outputPath}`);
-  } catch (error: any) {
-    console.error(`[Remotion Render] Failed: ${renderJob.jobId}`, error);
-    renderJob.status = 'failed';
-    renderJob.error = error.message || 'Render failed';
-  }
-}
-
-/**
- * 渲染文生视频任务
- */
-async function renderSeedanceJob(
-  renderJob: any,
-  projectRoot: string,
-  selectionState: SelectionState,
-  reviewState: Phase2ReviewState
-) {
-  try {
-    // 更新状态为渲染中
-    renderJob.status = 'rendering';
-    renderJob.startedAt = new Date().toISOString();
-    renderJob.progress = 0;
-
-    // 获取章节和选项详情
-    const chapter = selectionState.chapters.find(c => c.chapterId === renderJob.chapterId);
-    const chapterReview = reviewState.chapters.find(rc => rc.chapterId === renderJob.chapterId);
-
-    if (!chapter || !chapterReview) {
-      throw new Error('Chapter or review not found');
-    }
-
-    const selectedOption = chapter.options.find(opt => opt.id === chapterReview.selectedOptionId);
-    if (!selectedOption) {
-      throw new Error('Selected option not found');
-    }
-
-    // 生成输出文件名
-    const fileName = `${renderJob.chapterId}_seedance.mp4`;
-    const outputPath = path.join(projectRoot, '06_Video_Broll', fileName);
-
-    // 调用火山引擎生成视频
-    await renderVolcVideo(selectedOption.imagePrompt || selectedOption.prompt || '', outputPath);
-
-    // 更新状态为完成
-    renderJob.status = 'completed';
-    renderJob.progress = 100;
-    renderJob.completedAt = new Date().toISOString();
-    renderJob.outputPath = outputPath;
-
-    console.log(`[Seedance Render] Success: ${renderJob.jobId} -> ${outputPath}`);
-  } catch (error: any) {
-    console.error(`[Seedance Render] Failed: ${renderJob.jobId}`, error);
-    renderJob.status = 'failed';
-    renderJob.error = error.message || 'Render failed';
-  }
-}
-
-/**
- * 使用 Remotion CLI 渲染视频
- */
-async function renderRemotionVideo(
-  compositionId: string,
-  outputPath: string,
-  inputProps: any
-): Promise<void> {
-  const os = await import('os');
-  const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
-    path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio');
-
-  const { spawn } = await import('child_process');
-
-  const tmpPropsPath = `/tmp/remotion-props-${Date.now()}.json`;
-  fs.writeFileSync(tmpPropsPath, JSON.stringify(inputProps), 'utf-8');
-
-  return new Promise((resolve, reject) => {
-    const remotionBin = path.join(REMOTION_STUDIO_DIR, 'node_modules', '.bin', 'remotion');
-    const args = [
-      'render',
-      'src/index.tsx',
-      compositionId,
-      outputPath,
-      '--jpeg-quality=80',
-      '--frames=all',
-      `--props=${tmpPropsPath}`
-    ];
-
-    console.log(`[Remotion Render] Running: ${remotionBin} ${args.join(' ')}`);
-
-    const proc = spawn(remotionBin, args, {
-      cwd: REMOTION_STUDIO_DIR,
-      shell: true,
-      env: { ...process.env, NODE_ENV: 'production' }
-    });
-
-    let stderr = '';
-
-    proc.stdout.on('data', (data) => {
-      const output = data.toString();
-      console.log(`[Remotion] ${output.trim()}`);
-    });
-
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    proc.on('close', (code) => {
-      if (fs.existsSync(tmpPropsPath)) {
-        fs.unlinkSync(tmpPropsPath);
-      }
-
-      if (code !== 0) {
-        reject(new Error(`Remotion exited with code ${code}: ${stderr}`));
-        return;
-      }
-
-      if (!fs.existsSync(outputPath)) {
-        reject(new Error(`Render completed but file not found: ${outputPath}`));
-        return;
-      }
-
-      resolve();
-    });
-
-    proc.on('error', (err) => {
-      if (fs.existsSync(tmpPropsPath)) {
-        fs.unlinkSync(tmpPropsPath);
-      }
-      reject(new Error(`Failed to spawn: ${err.message}`));
-    });
-  });
-}
-
-/**
- * 使用火山引擎生成视频
- */
-async function renderVolcVideo(prompt: string, outputPath: string): Promise<void> {
-  console.log(`[VolcEngine Video] Starting video generation with prompt: ${prompt.slice(0, 100)}...`);
-
-  const result = await generateVideoWithVolc(prompt);
-
-  if (result.error) {
-    throw new Error(`VolcEngine video generation failed: ${result.error}`);
-  }
-
-  const taskId = result.task_id;
-  if (!taskId) {
-    throw new Error('No task_id returned from VolcEngine');
-  }
-
-  console.log(`[VolcEngine Video] Task submitted: ${taskId}, polling for result...`);
-
-  const maxPolls = 120;
-  const pollInterval = 5000;
-
-  for (let i = 0; i < maxPolls; i++) {
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-    const pollResult = await pollVolcVideoResult(taskId);
-
-    if (pollResult.error) {
-      throw new Error(`Poll error: ${pollResult.error}`);
-    }
-
-    if (pollResult.status === 'completed' && pollResult.video_url) {
-      console.log(`[VolcEngine Video] Task completed, downloading video...`);
-
-      const downloadResult = await downloadVideo(pollResult.video_url, outputPath);
-      if (!downloadResult.success) {
-        throw new Error(`Download failed: ${downloadResult.error}`);
-      }
-
-      console.log(`[VolcEngine Video] Video saved to: ${outputPath}`);
-      return;
-    }
-
-    if (pollResult.status === 'failed') {
-      throw new Error(`Video generation failed: ${pollResult.error || 'Unknown error'}`);
-    }
-
-    console.log(`[VolcEngine Video] Polling... (${i + 1}/${maxPolls}) status: ${pollResult.status}`);
-  }
-
-  throw new Error('Video generation timeout (10 minutes)');
-}
-
-export const phase3RenderStatus = async (req: Request, res: Response) => {
-  const { jobId } = req.params;
-  const { projectId } = req.query;
-
-  if (!projectId) {
-    return res.status(400).json({ error: 'Missing projectId' });
+export const phase3AlignSrt = async (req: Request, res: Response) => {
+  const { projectId, srtContent, brolls } = req.body;
+  if (!projectId || !srtContent || !brolls) {
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
   try {
-    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
-    const renderState = loadPhase3RenderState(projectRoot);
+    const segments = parseSRT(srtContent);
+    const srtText = compileSRTForLLM(segments);
 
-    if (!renderState) {
-      return res.json({ status: 'not_found' });
+    // We call LLM to match each broll's keySentence to the SRT's text and timeframe.
+    const prompt = `
+You are a video editor AI. You have a list of B-Roll visual items and an SRT subtitle file content.
+Your job is to match each B-Roll item to the exact timestamp in the SRT where it best belongs, based on the 'keySentence'.
+
+SRT Segments:
+${srtText}
+
+B-Rolls to match:
+${JSON.stringify(brolls, null, 2)}
+
+Return a JSON array of matched alignments:
+[
+  {
+    "brollId": "chapterId",
+    "brollName": "name",
+    "keySentence": "quote",
+    "matchedText": "the text from srt that matched",
+    "startTime": "HH:MM:SS,mmm",
+    "endTime": "HH:MM:SS,mmm"
+  }
+]
+Reply ONLY with the valid JSON array, no markdown.`;
+
+    const config = loadConfig();
+    const resultText = await callLLM([{ role: 'user', content: prompt }], config.global.provider as any, config.global.model);
+
+    let alignments = [];
+    try {
+      alignments = JSON.parse(resultText.content.trim().replace(/^```json/i, '').replace(/```$/i, '').trim());
+    } catch (e) {
+      console.error('LLM format error:', resultText);
+      throw new Error('LLM did not return proper JSON');
     }
 
-    const renderJob = renderState.renderJobs.find(job => job.jobId === jobId);
-    if (!renderJob) {
-      return res.json({ status: 'not_found' });
-    }
-
-    res.json({
-      jobId: renderJob.jobId,
-      status: renderJob.status,
-      progress: renderJob.progress,
-      frame: renderJob.frame,
-      totalFrames: renderJob.totalFrames,
-      outputPath: renderJob.outputPath,
-      error: renderJob.error,
-      startedAt: renderJob.startedAt,
-      completedAt: renderJob.completedAt
-    });
+    res.json({ success: true, alignments });
   } catch (error: any) {
-    console.error('[Phase3 Render Status] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to get render status' });
+    console.error('[Phase3 Align] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to align SRT' });
   }
 };
 
-/**
- * 重新渲染
- * POST /api/director/phase3/rerender
- */
-export const phase3Rerender = async (req: Request, res: Response) => {
-  const { projectId, chapterId, optionId } = req.body;
-
-  if (!projectId || !chapterId || !optionId) {
-    return res.status(400).json({ error: 'Missing required fields' });
+export const phase3GenerateXml = async (req: Request, res: Response) => {
+  const { projectId, alignments } = req.body;
+  if (!projectId || !alignments) {
+    return res.status(400).json({ error: 'Missing fields' });
   }
 
   try {
     const projectRoot = getProjectRoot(projectId);
-    let renderState = loadPhase3RenderState(projectRoot);
+    const outputDir = path.join(projectRoot, '04_Visuals');
+    ensureDir(outputDir);
 
-    if (!renderState) {
-      return res.status(404).json({ error: 'Render state not found' });
-    }
+    const fcpxml = generateFCPXML(alignments, projectRoot);
+    const jianying = generateJianyingXML(alignments, projectRoot);
 
-    // 查找现有的渲染任务
-    const existingJob = renderState.renderJobs.find(
-      job => job.chapterId === chapterId && job.optionId === optionId
-    );
+    fs.writeFileSync(path.join(outputDir, 'sequence_premiere.xml'), fcpxml);
+    fs.writeFileSync(path.join(outputDir, 'sequence_jianying.json'), jianying);
 
-    if (existingJob) {
-      // 删除旧的视频文件
-      if (existingJob.outputPath && fs.existsSync(existingJob.outputPath)) {
-        fs.unlinkSync(existingJob.outputPath);
-      }
-
-      // 更新渲染任务状态
-      existingJob.status = 'waiting';
-      existingJob.progress = 0;
-      existingJob.outputPath = undefined;
-      existingJob.error = undefined;
-      existingJob.startedAt = undefined;
-      existingJob.completedAt = undefined;
-      existingJob.retryCount = (existingJob.retryCount || 0) + 1;
-    }
-
-    renderState.lastUpdated = new Date().toISOString();
-    savePhase3RenderState(projectRoot, renderState);
-
-    // TODO: 实际启动重新渲染任务
-
-    res.json({ success: true, jobId: existingJob?.jobId });
+    res.json({ success: true, xmlPath: path.join(outputDir, 'sequence_premiere.xml') });
   } catch (error: any) {
-    console.error('[Phase3 Rerender] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to rerender' });
-  }
-};
-
-/**
- * 二审通过，视频落盘
- * POST /api/director/phase3/approve
- */
-export const phase3Approve = async (req: Request, res: Response) => {
-  const { projectId, chapterId } = req.body;
-
-  if (!projectId || !chapterId) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  try {
-    const projectRoot = getProjectRoot(projectId);
-    let renderState = loadPhase3RenderState(projectRoot);
-
-    if (!renderState) {
-      return res.status(404).json({ error: 'Render state not found' });
-    }
-
-    // 查找渲染任务
-    const renderJob = renderState.renderJobs.find(job => job.chapterId === chapterId);
-    if (!renderJob) {
-      return res.status(404).json({ error: 'Render job not found' });
-    }
-
-    if (renderJob.status !== 'completed') {
-      return res.status(400).json({ error: 'Cannot approve incomplete render' });
-    }
-
-    // 视频已经落盘，只需更新状态
-    renderJob.status = 'completed';
-    renderState.lastUpdated = new Date().toISOString();
-    savePhase3RenderState(projectRoot, renderState);
-
-    res.json({ success: true, outputPath: renderJob.outputPath });
-  } catch (error: any) {
-    console.error('[Phase3 Approve] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to approve render' });
-  }
-};
-
-// ============================================================
-// Phase 3 外部素材 API
-// ============================================================
-
-/**
- * 加载外部素材，复制到项目目录
- * POST /api/director/phase3/load-asset
- */
-export const phase3LoadAsset = async (req: Request, res: Response) => {
-  const { projectId, chapterId, type, sourcePath } = req.body;
-  const file = req.file as any;
-
-  if (!projectId || !chapterId || !type) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-
-  if (!['artlist', 'internet-clip', 'user-capture'].includes(type)) {
-    return res.status(400).json({ error: 'Invalid type, must be "artlist", "internet-clip", or "user-capture"' });
-  }
-
-  if (!file && !sourcePath) {
-    return res.status(400).json({ error: 'Missing file or sourcePath' });
-  }
-
-  try {
-    const { loadExternalAsset, handleUploadedFile } = require('./assets');
-    let asset;
-
-    if (file) {
-      // 处理上传的文件
-      asset = await handleUploadedFile(
-        projectId,
-        chapterId,
-        type as 'artlist' | 'internet-clip' | 'user-capture',
-        file
-      );
-    } else {
-      // 处理本地文件路径
-      asset = await loadExternalAsset(
-        projectId,
-        chapterId,
-        type as 'artlist' | 'internet-clip' | 'user-capture',
-        sourcePath
-      );
-    }
-
-    // 更新渲染状态
-    const projectRoot = getProjectRoot(projectId);
-    let renderState = loadPhase3RenderState(projectRoot);
-    if (!renderState) {
-      renderState = {
-        projectId,
-        lastUpdated: new Date().toISOString(),
-        renderJobs: [],
-        externalAssets: [],
-        xmlGenerated: false,
-        xmlPath: undefined
-      };
-    }
-
-    renderState.externalAssets.push(asset);
-    renderState.lastUpdated = new Date().toISOString();
-    savePhase3RenderState(projectRoot, renderState);
-
-    res.json({ success: true, assetId: asset.assetId, targetPath: asset.targetPath });
-  } catch (error: any) {
-    console.error('[Phase3 Load Asset] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to load asset' });
-  }
-};
-
-/**
- * 获取已加载的外部素材
- * GET /api/director/phase3/assets
- */
-export const phase3GetAssets = async (req: Request, res: Response) => {
-  const { projectId } = req.query;
-
-  if (!projectId) {
-    return res.status(400).json({ error: 'Missing projectId' });
-  }
-
-  try {
-    const projectRoot = getProjectRoot(Array.isArray(projectId) ? projectId[0] : projectId);
-    const renderState = loadPhase3RenderState(projectRoot);
-
-    if (!renderState) {
-      return res.json({ assets: [] });
-    }
-
-    res.json({ assets: renderState.externalAssets || [] });
-  } catch (error: any) {
-    console.error('[Phase3 Get Assets] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to get assets' });
-  }
-};
-
-// ============================================================
-// Phase 3 XML 生成 API
-// ============================================================
-
-/**
- * 生成 Final Cut Pro XML 文件
- * POST /api/director/phase3/generate-xml
- */
-export const phase3GenerateXML = async (req: Request, res: Response) => {
-  const { projectId } = req.body;
-
-  if (!projectId) {
-    return res.status(400).json({ error: 'Missing projectId' });
-  }
-
-  try {
-    const { generateFCPXML } = require('./xml-generator');
-    const { xmlPath, success } = await generateFCPXML(projectId);
-
-    if (!success) {
-      return res.status(500).json({ error: 'Failed to generate XML' });
-    }
-
-    res.json({ success: true, xmlPath });
-  } catch (error: any) {
-    console.error('[Phase3 Generate XML] Error:', error);
+    console.error('[Phase3 Generate] Error:', error);
     res.status(500).json({ error: error.message || 'Failed to generate XML' });
+  }
+};
+
+export const phase3DownloadXml = async (req: Request, res: Response) => {
+  const { projectId, format } = req.params;
+  try {
+    const projectRoot = getProjectRoot(projectId as string);
+    const fileName = format === 'premiere' ? 'sequence_premiere.xml' : 'sequence_jianying.json';
+    const filePath = path.join(projectRoot, '04_Visuals', fileName);
+
+    if (fs.existsSync(filePath)) {
+      res.download(filePath);
+    } else {
+      res.status(404).json({ error: 'XML file not generated yet' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 };

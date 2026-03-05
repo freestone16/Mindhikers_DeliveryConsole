@@ -34,7 +34,7 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
     }, []);
 
     return (
-        <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur border-t border-slate-800 py-1.5 px-6 text-xs z-[50]">
+        <footer className="w-full bg-slate-900/90 backdrop-blur border-t border-slate-800 py-1.5 px-6 text-xs z-[50]">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 {/* Connection Status */}
                 <div className="flex items-center gap-2">

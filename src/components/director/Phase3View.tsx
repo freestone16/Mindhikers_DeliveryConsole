@@ -1,205 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Play, Loader2, CheckCircle, XCircle, Sparkles, FolderOpen, Trash2, FileVideo, RotateCcw, Download } from 'lucide-react';
-import type { DirectorChapter, RenderJob_V2, ExternalAsset } from '../../types';
+import { useState, useRef } from 'react';
+import { Upload, FileText, Loader2, Download, CheckCircle, RefreshCw } from 'lucide-react';
+import type { DirectorChapter } from '../../types';
 
-// ============================================================
-// 渲染任务卡片
-// ============================================================
-
-interface RenderJobCardProps {
-  job: RenderJob_V2;
-  chapterName: string;
-  onRerender: () => void;
-  onApprove: () => void;
+interface AlignResult {
+  brollId: string;
+  brollName: string;
+  keySentence: string;
+  matchedText: string;
+  startTime: string;
+  endTime: string;
+  duration?: string;
 }
-
-const statusConfig = {
-  waiting: { icon: Play, color: 'text-slate-400', bg: 'bg-slate-700', label: '等待渲染' },
-  rendering: { icon: Loader2, color: 'text-blue-400', bg: 'bg-blue-500/20', label: '渲染中' },
-  completed: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500/20', label: '已完成' },
-  failed: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500/20', label: '失败' },
-};
-
-export const RenderJobCard = ({ job, chapterName, onRerender, onApprove }: RenderJobCardProps) => {
-  const config = statusConfig[job.status];
-  const Icon = config.icon;
-
-  return (
-    <div className={`flex items-center gap-4 p-4 rounded-lg border border-slate-700 ${config.bg}`}>
-      <div className={`${config.color} ${job.status === 'rendering' ? 'animate-spin' : ''}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-
-      <div className="flex-1">
-        <div className="text-white font-medium">{chapterName}</div>
-        <div className="text-xs text-slate-400 mt-1">{config.label}</div>
-
-        {job.status === 'rendering' && (
-          <div className="mt-2">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>Frame {job.frame} / {job.totalFrames}</span>
-              <span>•</span>
-              <span>{job.progress}%</span>
-            </div>
-            <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-1">
-              <div
-                className="h-full bg-blue-500 transition-all"
-                style={{ width: `${job.progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {job.status === 'completed' && job.outputPath && (
-          <div className="mt-2 flex items-center gap-2">
-            <FileVideo className="w-3 h-3 text-green-400" />
-            <span className="text-xs text-green-400 font-mono">{job.outputPath}</span>
-          </div>
-        )}
-
-        {job.status === 'failed' && job.error && (
-          <div className="mt-2 text-xs text-red-400">{job.error}</div>
-        )}
-
-        {job.retryCount && job.retryCount > 0 && (
-          <div className="mt-2 text-xs text-orange-400">
-            重试次数: {job.retryCount}
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        {job.status === 'completed' && (
-          <button
-            onClick={onApprove}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-sm flex items-center gap-1 transition-colors"
-          >
-            <CheckCircle className="w-3 h-3" />
-            落盘
-          </button>
-        )}
-
-        {(job.status === 'completed' || job.status === 'failed') && (
-          <button
-            onClick={onRerender}
-            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm flex items-center gap-1 transition-colors"
-          >
-            <RotateCcw className="w-3 h-3" />
-            重新渲染
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================
-// 外部素材加载卡片
-// ============================================================
-
-interface AssetLoaderCardProps {
-  chapterId: string;
-  chapterName: string;
-  type: 'artlist' | 'internet-clip' | 'user-capture';
-  asset?: ExternalAsset;
-  onLoad: (sourcePath: string) => void;
-  onRemove: () => void;
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  artlist: 'Artlist 实拍',
-  'internet-clip': '互联网素材',
-  'user-capture': '用户截图/录屏',
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  artlist: 'bg-green-500/20 text-green-300 border-green-500/30',
-  'internet-clip': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  'user-capture': 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-};
-
-export const AssetLoaderCard = ({ chapterName, type, asset, onLoad, onRemove }: AssetLoaderCardProps) => {
-  const handleLoadAsset = () => {
-    // 触发文件选择对话框
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'video/*,.mp4,.mov,.avi,.mkv,.webm';
-
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        // 将文件传递给后端上传
-        // 注意：这里需要实现文件上传逻辑
-        console.log('Selected file:', file.name);
-        onLoad('');
-      }
-    };
-
-    input.click();
-  };
-
-  return (
-    <div className={`flex items-center gap-4 p-4 rounded-lg border ${TYPE_COLORS[type]} border`}>
-      <div className="text-2xl">
-        {type === 'artlist' ? '🎬' : type === 'internet-clip' ? '🌐' : '📸'}
-      </div>
-
-      <div className="flex-1">
-        <div className="text-white font-medium">{chapterName}</div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${TYPE_COLORS[type]}`}>
-            {TYPE_LABELS[type]}
-          </span>
-          {asset ? (
-            <span className="text-xs text-green-400">已加载</span>
-          ) : (
-            <span className="text-xs text-slate-400">待加载</span>
-          )}
-        </div>
-
-        {asset && (
-          <div className="mt-2 flex items-center gap-2">
-            <FileVideo className="w-3 h-3 text-green-400" />
-            <span className="text-xs text-green-400 font-mono">{asset.targetPath}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        {asset ? (
-          <>
-            <button
-              onClick={() => {/* 打开视频预览 */}}
-              className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm flex items-center gap-1 transition-colors"
-            >
-              <Play className="w-3 h-3" />
-              预览
-            </button>
-            <button
-              onClick={onRemove}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded text-sm flex items-center gap-1 transition-colors"
-            >
-              <Trash2 className="w-3 h-3" />
-              移除
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={handleLoadAsset}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm flex items-center gap-1 transition-colors"
-          >
-            <FolderOpen className="w-3 h-3" />
-            加载素材
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================
-// Phase 3 主视图
-// ============================================================
 
 interface Phase3ViewProps {
   projectId: string;
@@ -208,315 +19,234 @@ interface Phase3ViewProps {
 }
 
 export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) => {
-  const [renderJobs, setRenderJobs] = useState<RenderJob_V2[]>([]);
-  const [externalAssets, setExternalAssets] = useState<ExternalAsset[]>([]);
-  const [isRendering, setIsRendering] = useState(false);
+  const [srtFile, setSrtFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [alignResults, setAlignResults] = useState<AlignResult[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [xmlGenerated, setXmlGenerated] = useState(false);
-  const [xmlPath, setXmlPath] = useState<string | null>(null);
+  const [errorError, setError] = useState<string | null>(null);
 
-  // 加载 Phase 3 状态
-  useEffect(() => {
-    const loadPhase3State = async () => {
-      try {
-        // 加载渲染任务
-        const jobsRes = await fetch(`http://localhost:3002/api/director/phase3/render-status?projectId=${projectId}`);
-        const jobsData = await jobsRes.json();
-        setRenderJobs(jobsData.renderJobs || []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-        // 加载外部素材
-        const assetsRes = await fetch(`http://localhost:3002/api/director/phase3/assets?projectId=${projectId}`);
-        const assetsData = await assetsRes.json();
-        setExternalAssets(assetsData.assets || []);
-      } catch (error) {
-        console.error('Failed to load Phase 3 state:', error);
-      }
-    };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && (file.name.endsWith('.srt') || file.type === 'application/x-subrip')) {
+      setSrtFile(file);
+      setError(null);
+    } else {
+      setError('请上传有效的 .srt 格式字幕文件');
+    }
+  };
 
-    loadPhase3State();
-  }, [projectId]);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.endsWith('.srt')) {
+      setSrtFile(file);
+      setError(null);
+    } else {
+      setError('请上传有效的 .srt 格式字幕文件');
+    }
+  };
 
-  const handleStartRender = async () => {
-    setIsRendering(true);
+  const handleAlign = async () => {
+    if (!srtFile) return;
+
+    setIsAnalyzing(true);
+    setError(null);
 
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/start-render', {
+      // 1. 读取文件内容
+      const srtContent = await srtFile.text();
+
+      // 我们收集已选的 options，因为我们需要比较
+      // 我们收集所有已确认方案的视觉条目，我们需要与 SRT 比较
+      const selectedBrolls = chapters.flatMap(c =>
+        c.options
+          .filter(o => o.isChecked)
+          .map(o => ({
+            brollId: c.chapterId, // We might need optionId eventually if multiple per chapter, but keeping existing key logic
+            brollName: o.name || c.chapterName,
+            keySentence: o.quote || c.scriptText.split(/[。！？\n]/)[0],
+          }))
+      );
+
+      if (selectedBrolls.length === 0) {
+        throw new Error('没有检测到已确认并选择方案的视觉条目');
+      }
+
+      const res = await fetch('http://localhost:3002/api/director/phase3/align-srt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({
+          projectId,
+          srtContent,
+          brolls: selectedBrolls
+        })
       });
 
       const data = await res.json();
-      setRenderJobs(data.renderJobs || []);
+      if (!res.ok) throw new Error(data.error || '分析失败');
 
-      // 轮询渲染状态
-      if (data.renderJobs && data.renderJobs.length > 0) {
-        pollRenderStatus();
-      }
-    } catch (error) {
-      console.error('Failed to start render:', error);
+      setAlignResults(data.alignments || []);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || '比照分析时发生错误');
     } finally {
-      setIsRendering(false);
-    }
-  };
-
-  const pollRenderStatus = async () => {
-    const completedCount = renderJobs.filter(job => job.status === 'completed').length;
-
-    if (completedCount === renderJobs.length) {
-      setIsRendering(false);
-      return;
-    }
-
-    try {
-      // 更新所有渲染任务的状态
-      for (const job of renderJobs) {
-        if (job.status !== 'completed' && job.status !== 'failed') {
-          const res = await fetch(`http://localhost:3002/api/director/phase3/render-status/${job.jobId}?projectId=${projectId}`);
-          const data = await res.json();
-
-          setRenderJobs(prev => prev.map(j =>
-            j.jobId === job.jobId ? { ...j, ...data } : j
-          ));
-        }
-      }
-
-      setTimeout(pollRenderStatus, 2000);
-    } catch (error) {
-      console.error('Failed to poll render status:', error);
-    }
-  };
-
-  const handleRerender = async (job: RenderJob_V2) => {
-    try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/rerender', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          chapterId: job.chapterId,
-          optionId: job.optionId,
-        }),
-      });
-
-      if (res.ok) {
-        setRenderJobs(prev => prev.map(j =>
-          j.jobId === job.jobId
-            ? { ...j, status: 'waiting', progress: 0, outputPath: undefined }
-            : j
-        ));
-
-        // 重新轮询
-        setTimeout(pollRenderStatus, 2000);
-      }
-    } catch (error) {
-      console.error('Failed to rerender:', error);
-    }
-  };
-
-  const handleApproveRender = async (job: RenderJob_V2) => {
-    try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, chapterId: job.chapterId }),
-      });
-
-      if (res.ok) {
-        // 视频已落盘，更新状态
-        setRenderJobs(prev => prev.map(j =>
-          j.jobId === job.jobId ? { ...j } : j
-        ));
-      }
-    } catch (error) {
-      console.error('Failed to approve render:', error);
-    }
-  };
-
-  const handleLoadAsset = async (chapterId: string, sourcePath: string) => {
-    // TODO: 确定素材类型
-    const type = 'artlist' as const;
-
-    try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/load-asset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          chapterId,
-          type,
-          sourcePath,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setExternalAssets(prev => [...prev, data]);
-      }
-    } catch (error) {
-      console.error('Failed to load asset:', error);
-    }
-  };
-
-  const handleRemoveAsset = async (assetId: string) => {
-    try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/remove-asset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, assetId }),
-      });
-
-      if (res.ok) {
-        setExternalAssets(prev => prev.filter(a => a.assetId !== assetId));
-      }
-    } catch (error) {
-      console.error('Failed to remove asset:', error);
+      setIsAnalyzing(false);
     }
   };
 
   const handleGenerateXML = async () => {
+    setIsGenerating(true);
+    setError(null);
+
     try {
       const res = await fetch('http://localhost:3002/api/director/phase3/generate-xml', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({
+          projectId,
+          alignments: alignResults
+        })
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'XML生成失败');
 
-      if (data.success) {
-        setXmlGenerated(true);
-        setXmlPath(data.xmlPath);
-      }
-    } catch (error) {
-      console.error('Failed to generate XML:', error);
+      setXmlGenerated(true);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || '生成 XML 时发生错误');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  // 计算进度
-  const completedRenders = renderJobs.filter(j => j.status === 'completed').length;
-  const loadedAssets = externalAssets.length;
-  const totalItems = renderJobs.length + chapters.length; // 假设每个章节可能需要外部素材
-  const completedItems = completedRenders + loadedAssets;
-  const allReady = completedItems === totalItems && totalItems > 0;
-
-  const getChapterName = (chapterId: string) => {
-    return chapters.find(c => c.chapterId === chapterId)?.chapterName || chapterId;
+  const handleDownload = (format: 'premiere' | 'jianying') => {
+    window.open(`http://localhost:3002/api/director/phase3/download-xml/${projectId}/${format}`, '_blank');
   };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 头部：进度提示 */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-bold text-white">渲染及二审</h3>
-          <p className="text-sm text-slate-400 mt-1">
-            已完成: <span className="text-blue-400 font-medium">{completedItems}</span> / {totalItems}
-            {totalItems > 0 && (
-              <span className="ml-2 text-slate-500">
-                ({renderJobs.length > 0 && `渲染: ${completedRenders}/${renderJobs.length}`}
-                {loadedAssets > 0 && ` • 素材: ${loadedAssets}`})
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={handleStartRender}
-          disabled={isRendering || renderJobs.length === 0}
-          className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded font-medium flex items-center gap-2 transition-colors"
-        >
-          {isRendering ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中...</>
-          ) : (
-            <><Play className="w-4 h-4" /> 开始渲染</>
-          )}
-        </button>
-      </div>
+      <div className="bg-slate-900 rounded-lg border border-slate-700 p-6">
+        <h3 className="text-lg font-bold text-white mb-2">Phase 3: 终态时轴比照与 XML 输出</h3>
+        <p className="text-sm text-slate-400 mb-6">
+          上传包含解说词的 SRT 字幕文件，AI将自动比照视觉方案剧本并生成可一键导入剪辑软件的 XML 文件。
+        </p>
 
-      {/* 渲染进度区 */}
-      {renderJobs.length > 0 && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-          <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-            <h4 className="text-white font-semibold">Remotion & 文生视频渲染组</h4>
+        {errorError && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 p-3 rounded mb-4 text-sm">
+            {errorError}
           </div>
-          <div className="p-4 space-y-3">
-            {renderJobs.map(job => (
-              <RenderJobCard
-                key={job.jobId}
-                job={job}
-                chapterName={getChapterName(job.chapterId)}
-                onRerender={() => handleRerender(job)}
-                onApprove={() => handleApproveRender(job)}
+        )}
+
+        {!alignResults.length ? (
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className="w-full max-w-2xl p-8 border-2 border-dashed border-slate-600 rounded-xl hover:border-blue-500 hover:bg-slate-800/50 transition-all cursor-pointer flex flex-col items-center justify-center gap-4"
+              onDragOver={e => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".srt"
+                className="hidden"
+                onChange={handleFileChange}
               />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 外部素材区 */}
-      {chapters.length > 0 && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-          <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-blue-400" />
-            <h4 className="text-white font-semibold">外部素材加载</h4>
-          </div>
-          <div className="p-4 space-y-3">
-            {chapters.map(chapter => (
-              <AssetLoaderCard
-                key={`asset-${chapter.chapterId}`}
-                chapterId={chapter.chapterId}
-                chapterName={chapter.chapterName}
-                type="artlist"
-                asset={externalAssets.find(a => a.chapterId === chapter.chapterId)}
-                onLoad={(sourcePath) => handleLoadAsset(chapter.chapterId, sourcePath)}
-                onRemove={() => {
-                  const asset = externalAssets.find(a => a.chapterId === chapter.chapterId);
-                  if (asset) handleRemoveAsset(asset.assetId);
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 底部全局按钮：生成 XML */}
-      {allReady && !xmlGenerated && (
-        <div className="flex justify-end bg-slate-900 rounded-lg border border-slate-700 p-6">
-          <button
-            onClick={handleGenerateXML}
-            className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Download className="w-5 h-5" />
-            生成 XML
-          </button>
-        </div>
-      )}
-
-      {/* XML 生成成功提示 */}
-      {xmlGenerated && xmlPath && (
-        <div className="bg-green-500/10 border border-green-500/50 rounded-lg p-6">
-          <div className="flex items-start gap-4">
-            <CheckCircle className="w-6 h-6 text-green-400 mt-1" />
-            <div className="flex-1">
-              <div className="text-white font-semibold mb-2">XML 生成成功！</div>
-              <div className="space-y-2">
-                <div className="text-sm text-slate-300">
-                  文件路径: <code className="text-green-400 font-mono">{xmlPath}</code>
-                </div>
-                <div className="text-sm text-slate-400">
-                  可以将此 XML 文件导入到 Premiere Pro 或 Final Cut Pro 中进行进一步编辑。
-                </div>
+              <FileText className={`w-12 h-12 ${srtFile ? 'text-blue-400' : 'text-slate-500'}`} />
+              <div className="text-center">
+                <p className="text-white font-medium mb-1">
+                  {srtFile ? srtFile.name : '点击或拖拽 SRT 文件到此处'}
+                </p>
+                <p className="text-xs text-slate-400">仅支持 .srt 格式</p>
               </div>
             </div>
+
             <button
-              onClick={onProceed}
-              className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+              onClick={handleAlign}
+              disabled={!srtFile || isAnalyzing}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg flex items-center gap-2 transition-colors mt-4"
             >
-              完成并退出
+              {isAnalyzing ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> 分析中...</>
+              ) : (
+                <><Upload className="w-5 h-5" /> 开始比照</>
+              )}
             </button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                比照完成 (共 {alignResults.length} 条)
+              </h4>
+              <button
+                onClick={() => setAlignResults([])}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" /> 重新上传
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-700 rounded-lg">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-800 text-xs uppercase font-semibold text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">B-Roll 条目</th>
+                    <th className="px-4 py-3 w-1/4">Key Sentence</th>
+                    <th className="px-4 py-3 w-1/4">匹配 SRT 文本</th>
+                    <th className="px-4 py-3">时间码</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {alignResults.map((res, i) => (
+                    <tr key={i} className="hover:bg-slate-800/30">
+                      <td className="px-4 py-3 text-white font-medium">{res.brollName}</td>
+                      <td className="px-4 py-3 text-xs">{res.keySentence}</td>
+                      <td className="px-4 py-3 text-xs text-blue-300">{res.matchedText}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="bg-slate-800 px-2 py-1 rounded text-xs font-mono">{res.startTime} - {res.endTime}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-4 mt-6">
+              {!xmlGenerated ? (
+                <button
+                  onClick={handleGenerateXML}
+                  disabled={isGenerating}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg flex items-center gap-2"
+                >
+                  {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                  生成 XML
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleDownload('premiere')}
+                    className="px-6 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Download className="w-5 h-5" /> 下载 Premiere XML
+                  </button>
+                  <button
+                    onClick={() => handleDownload('jianying')}
+                    className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Download className="w-5 h-5" /> 下载剪映 XML
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

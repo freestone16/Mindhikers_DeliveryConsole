@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Check, Lock, Loader2, Image } from 'lucide-react';
+import { Check, Loader2, Image } from 'lucide-react';
 import type { DirectorChapter, SceneOption } from '../../types';
 
 interface ChapterCardProps {
   chapter: DirectorChapter;
   projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
-  onComment: (chapterId: string, comment: string) => void;
-  onLock: (chapterId: string) => void;
+  onToggleCheck: (chapterId: string, optionId: string) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -17,6 +16,7 @@ const TYPE_COLORS: Record<string, string> = {
   artlist: 'bg-green-500/20 text-green-300',
   'internet-clip': 'bg-orange-500/20 text-orange-300',
   'user-capture': 'bg-cyan-500/20 text-cyan-300',
+  infographic: 'bg-amber-500/20 text-amber-300',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -26,10 +26,11 @@ const TYPE_LABELS: Record<string, string> = {
   artlist: 'Artlist实拍',
   'internet-clip': '🌐 互联网素材',
   'user-capture': '📸 用户截图/录屏',
+  infographic: '📊 信息图',
 };
 
-// Artlist 和互联网/用户截图不需要 AI 预览
-const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance'];
+// Artlist、互联网/用户截图不需要 AI 预览；infographic static 模式由后端直接生图
+const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance', 'infographic'];
 
 function getScriptPreview(text: string): string {
   const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
@@ -45,11 +46,10 @@ interface OptionRowProps {
   index: number;
   projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
-  onComment: (chapterId: string, comment: string) => void;
-  onLock: (chapterId: string) => void;
+  onToggleCheck: (chapterId: string, optionId: string) => void;
 }
 
-const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onLock }: OptionRowProps) => {
+const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
   const isSelected = chapter.selectedOptionId === option.id;
@@ -84,6 +84,10 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
             prompt: option.prompt,
             imagePrompt: option.imagePrompt,
             rationale: option.rationale,
+            // Infographic specific fields
+            infographicLayout: option.infographicLayout,
+            infographicStyle: option.infographicStyle,
+            infographicUseMode: option.infographicUseMode,
           },
           chapterId: chapter.chapterId,
           projectId: projectId
@@ -138,23 +142,25 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
     <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${isSelected
       ? 'border-blue-500 bg-blue-500/5'
       : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
-      } ${chapter.isLocked ? 'opacity-60' : ''}`}>
+      }`}>
+      {/* 序号 (col 1) */}
       <div className="col-span-1 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
           {rowId}
         </div>
       </div>
 
+      {/* 原文一句话 (col 3) */}
       <div className="col-span-3 flex items-center">
         <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
           {quoteText}
         </p>
       </div>
 
-      {/* 方案描述/提示词 (col 2) */}
+      {/* 设计方案/提示词 (col 3) */}
       <div
-        className="col-span-2 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
-        onClick={() => !chapter.isLocked && onSelect(chapter.chapterId, option.id)}
+        className="col-span-3 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
+        onClick={() => onSelect(chapter.chapterId, option.id)}
       >
         <div className="flex items-center gap-2 mb-1">
           <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type]}`}>
@@ -172,8 +178,8 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         )}
       </div>
 
-      {/* 缩略图预览 (col 3 = 150%) */}
-      <div className="col-span-3 flex items-center justify-center">
+      {/* 预览图 (col 4) */}
+      <div className="col-span-4 flex items-center justify-center">
         <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
           {thumbStatus === 'completed' && previewUrl ? (
             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -194,6 +200,20 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
               </span>
               <span className="text-slate-500 text-[10px]">用户自行采集</span>
             </div>
+          ) : option.type === 'infographic' && option.infographicUseMode === 'static' && thumbStatus === 'idle' ? (
+            // infographic static 模式：可生成静态预览图
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGenerateThumbnail();
+              }}
+              disabled={!option.imagePrompt && !option.prompt}
+              className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
+            >
+              <span className="text-amber-400 text-lg mb-1">📊</span>
+              <span className="text-[10px] text-amber-400 font-medium">静态信息图</span>
+              <span className="text-[9px] text-slate-500 mt-0.5">点击生成预览</span>
+            </button>
           ) : (
             <button
               onClick={(e) => {
@@ -210,67 +230,50 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onComment, onL
         </div>
       </div>
 
-      {/* 反馈 (col 2) */}
-      <div className="col-span-2 flex items-stretch">
-        <textarea
-          className="flex-1 w-full bg-slate-800/50 border border-slate-700 rounded p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800 transition-colors resize-none"
-          placeholder="反馈意见... (Ctrl+Enter 提交)"
-          defaultValue={chapter.userComment || ''}
-          onBlur={(e) => onComment(chapter.chapterId, e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.ctrlKey) {
-              e.preventDefault();
-              onComment(chapter.chapterId, (e.target as HTMLTextAreaElement).value);
-            }
-          }}
-          disabled={chapter.isLocked}
-        />
-      </div>
-
+      {/* 确认 Checkbox (col 1) */}
       <div className="col-span-1 flex items-center justify-center">
+        {/* 已经不需要强绑定 isSelected 才能发确认了，每行都有自己独立的 isChecked */}
         <button
-          onClick={() => onLock(chapter.chapterId)}
-          disabled={chapter.isLocked || !chapter.selectedOptionId}
-          className={`w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-2 rounded text-xs font-medium transition-all
-            ${chapter.isLocked
-              ? 'bg-green-600 text-white cursor-default'
-              : 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCheck(chapter.chapterId, option.id);
+          }}
+          title={option.isChecked ? '取消确认' : '确认该方案，加入渲染队列'}
+          className={`w-7 h-7 rounded border-2 flex items-center justify-center transition-all ${option.isChecked
+            ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
+            : 'border-slate-500 hover:border-slate-300 opacity-60 hover:opacity-100 hover:bg-slate-700'
+            }`}
         >
-          {chapter.isLocked ? (
-            <><Lock className="w-4 h-4" /><span>已锁定</span></>
-          ) : (
-            <><Check className="w-4 h-4" /><span>锁定</span></>
-          )}
+          {option.isChecked && <Check className="w-4 h-4" />}
         </button>
       </div>
     </div>
   );
 };
 
-export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }: ChapterCardProps) => {
-  // 如果章节名中已包含"第X章"前缀，去掉它以避免重复
-  let cleanChapterName = chapter.chapterName;
-  const prefixMatch = chapter.chapterName.match(/^第\d+章\s+(.+)$/);
-  if (prefixMatch) {
-    cleanChapterName = prefixMatch[1]; // 只保留"第X章"后面的部分
-  }
+/** Strip redundant "第X章" prefix from chapter names at render time */
+const cleanChapterName = (name: string) =>
+  name.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
+
+export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck }: ChapterCardProps) => {
+  const isAnyOptionChecked = chapter.options.length > 0 && chapter.options.every(opt => opt.isChecked);
+  const displayName = cleanChapterName(chapter.chapterName);
 
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
       <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
         <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
-        <span className="text-white font-medium">{cleanChapterName}</span>
-        {chapter.isLocked && <Lock className="w-4 h-4 text-green-400" />}
+        <span className="text-white font-medium">{displayName}</span>
+        {isAnyOptionChecked && <Check className="w-4 h-4 text-green-400" />}
       </div>
 
       <div className="p-3">
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
           <div className="col-span-3 text-xs text-slate-500 font-bold">原文一句话</div>
-          <div className="col-span-2 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold text-center">预览图</div>
-          <div className="col-span-2 text-xs text-slate-500 font-bold">反馈意见</div>
-          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">锁定</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
+          <div className="col-span-4 text-xs text-slate-500 font-bold text-center">预览图</div>
+          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">确认</div>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -282,8 +285,7 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onComment, onLock }:
               index={idx}
               projectId={projectId}
               onSelect={onSelect}
-              onComment={onComment}
-              onLock={onLock}
+              onToggleCheck={onToggleCheck}
             />
           ))}
         </div>

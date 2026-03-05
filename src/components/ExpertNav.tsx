@@ -1,4 +1,4 @@
-import { Eye, Music, Image, Video, Megaphone, CheckCircle, Clock, AlertCircle, PenTool } from 'lucide-react';
+import { Eye, Music, Image, Video, Megaphone, CheckCircle, Clock, AlertCircle, PenTool, MessageSquare } from 'lucide-react';
 import { EXPERTS, getExpertColorClass } from '../config/experts';
 import type { ExpertStatus } from '../types';
 
@@ -15,6 +15,8 @@ interface ExpertNavProps {
     activeExpertId: string;
     expertStatuses: Record<string, { status: ExpertStatus }>;
     onSelectExpert: (expertId: string) => void;
+    isChatOpen?: boolean;
+    onToggleChat?: () => void;
 }
 
 const getStatusIcon = (status: ExpertStatus) => {
@@ -46,10 +48,10 @@ const getStatusBg = (status: ExpertStatus, isActive: boolean): string => {
     }
 };
 
-export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert }: ExpertNavProps) => {
+export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert, isChatOpen, onToggleChat }: ExpertNavProps) => {
     return (
         <nav className="bg-[#0b1529]/60 border-b border-blue-900/30 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                     {EXPERTS.map((expert) => {
                         const Icon = iconMap[expert.icon] || Eye;
@@ -82,6 +84,16 @@ export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert }: Ex
                         );
                     })}
                 </div>
+                {onToggleChat && (
+                    <button
+                        onClick={onToggleChat}
+                        className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isChatOpen ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                            }`}
+                        title="对话面板 (ChatPanel)"
+                    >
+                        <MessageSquare className="w-5 h-5" />
+                    </button>
+                )}
             </div>
         </nav>
     );

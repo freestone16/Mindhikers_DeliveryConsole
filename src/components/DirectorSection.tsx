@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { MonitorPlay, Rocket } from 'lucide-react';
+import { MonitorPlay } from 'lucide-react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
-import { Phase4View } from './director/Phase4View';
-import type { DirectorModule, DirectorChapter, RenderJob, BRollType } from '../types';
+import type { DirectorModule, DirectorChapter, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
 interface DirectorSectionProps {
@@ -14,15 +13,13 @@ interface DirectorSectionProps {
   onUpdate: (newData: DirectorModule) => void;
 }
 
-type Phase = 1 | 2 | 3 | 4;
+type Phase = 1 | 2 | 3;
 
 export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: DirectorSectionProps) => {
   const phase = (data.phase || 1) as Phase;
   const conceptApproved = data.isConceptApproved || false;
   const chapters = (data.items || []) as DirectorChapter[];
-  const jobs = (data.renderJobs || []) as RenderJob[];
-
-  // Local state for streaming to avoid overwhelming the file system / socket
+  // Jobs and BrollPaths replaced by Phase3 SRT -> XML flow
   const [isGeneratingConcept, setIsGeneratingConcept] = useState(false);
   const [streamingConcept, setStreamingConcept] = useState<string | null>(null);
   const concept = isGeneratingConcept ? streamingConcept : data.conceptProposal;
@@ -36,8 +33,6 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
 
   // Phase2 logs for debug panel
   const [phase2Logs, setPhase2Logs] = useState<{ timestamp: number; type: string; message: string }[]>([]);
-
-  const [brollPaths] = useState<any[]>([]);
 
   const { status } = useLLMConfig();
   const currentModel = status?.global?.provider
@@ -224,24 +219,58 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   };
 
   const handleSelectOption = (chapterId: string, optionId: string) => {
-    onUpdate({
-      ...data,
-      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId } : ch)
-    });
+    const updated = displayedChapters.map(ch =>
+      ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId, isChecked: false } : ch
+    );
+    setLocalChapters(null); // switch to data.items source
+    onUpdate({ ...data, items: updated });
   };
 
-  const handleComment = (chapterId: string, comment: string) => {
-    onUpdate({
-      ...data,
-      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, userComment: comment } : ch)
+  const handleToggleCheck = (chapterId: string, optionId: string) => {
+    const updated = displayedChapters.map(ch => {
+      if (ch.chapterId === chapterId) {
+        return {
+          ...ch,
+          options: ch.options.map(opt =>
+            opt.id === optionId ? { ...opt, isChecked: !opt.isChecked } : opt
+          )
+        };
+      }
+      return ch;
     });
+    setLocalChapters(null); // switch to data.items source
+    onUpdate({ ...data, items: updated });
   };
 
-  const handleLock = (chapterId: string) => {
-    onUpdate({
-      ...data,
-      items: chapters.map(ch => ch.chapterId === chapterId ? { ...ch, isLocked: true } : ch)
-    });
+  const handleRenderChecked = async () => {
+    // Collect all checked options across all chapters
+    const checkedItems = chapters.flatMap(c =>
+      c.options
+        .filter(o => o.isChecked)
+        .map(o => ({ chapterId: c.chapterId, optionId: o.id }))
+    );
+
+    if (!checkedItems.length) return;
+
+    // We will call the backend to start rendering
+    try {
+      const response = await fetch('http://localhost:3002/api/director/phase2/render_checked', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          chapters: checkedItems
+        })
+      });
+      if (response.ok) {
+        alert('渲染已触发');
+      } else {
+        alert('渲染触发失败');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('渲染请求错误');
+    }
   };
 
   const handleProceed = () => {
@@ -272,15 +301,13 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
   const phaseLabels: Record<Phase, string> = {
     1: 'Concept',
     2: 'Storyboard',
-    3: 'Render',
-    4: 'Assembly'
+    3: 'XML Layout'
   };
 
   const phaseColors: Record<Phase, string> = {
     1: 'bg-yellow-500/20 text-yellow-300',
     2: 'bg-blue-500/20 text-blue-300',
-    3: 'bg-purple-500/20 text-purple-300',
-    4: 'bg-orange-500/20 text-orange-300'
+    3: 'bg-purple-500/20 text-purple-300'
   };
 
   return (
@@ -292,26 +319,19 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
           <span className={`px-2 py-0.5 rounded text-xs ml-2 ${phaseColors[phase]}`}>
             Phase {phase}: {phaseLabels[phase]}
           </span>
-          {phase === 4 && brollPaths.length > 0 && (
-            <span className="px-2 py-0.5 rounded text-xs ml-2 bg-green-500/20 text-green-300 flex items-center gap-1">
-              <Rocket className="w-3 h-3" /> Ready to Weave
-            </span>
-          )}
         </div>
         <div className="flex gap-2">
-          {[1, 2, 3, 4].map(p => (
+          {[1, 2, 3].map(p => (
             <button
               key={p}
               onClick={() => {
                 if (p === 1) onUpdate({ ...data, phase: 1 });
                 else if (p === 2 && conceptApproved) onUpdate({ ...data, phase: 2 });
-                else if (p === 3 && jobs.length > 0) onUpdate({ ...data, phase: 3 });
-                else if (p === 4 && brollPaths.length > 0) onUpdate({ ...data, phase: 4 });
+                // We'll let users proceed to Phase 3 manually if they want for now
+                else if (p === 3) onUpdate({ ...data, phase: 3 });
               }}
               disabled={
-                (p === 2 && !conceptApproved) ||
-                (p === 3 && jobs.length === 0) ||
-                (p === 4 && brollPaths.length === 0)
+                (p === 2 && !conceptApproved)
               }
               className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                 }`}
@@ -345,8 +365,8 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             startTime={startTime}
             onConfirmBRoll={handleConfirmBRoll}
             onSelect={handleSelectOption}
-            onComment={handleComment}
-            onLock={handleLock}
+            onToggleCheck={handleToggleCheck}
+            onRenderChecked={handleRenderChecked}
             onProceed={handleProceed}
             currentModel={currentModel}
             logs={phase2Logs}
@@ -358,13 +378,6 @@ export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: Direc
             projectId={projectId}
             chapters={chapters}
             onProceed={handleProceed}
-          />
-        )}
-
-        {phase === 4 && (
-          <Phase4View
-            projectId={projectId}
-            brollPaths={brollPaths.map(b => ({ sceneId: b.sceneId, outputPath: b.outputPath! }))}
           />
         )}
       </div>

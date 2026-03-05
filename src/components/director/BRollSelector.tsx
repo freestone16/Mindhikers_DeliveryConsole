@@ -1,4 +1,4 @@
-import { Check, Code, Video, Film, Globe, Camera } from 'lucide-react';
+import { Check, Code, Video, Film, Globe, Camera, BarChart3 } from 'lucide-react';
 import type { BRollType } from '../../types';
 
 interface BRollSelectorProps {
@@ -13,6 +13,7 @@ const BROLL_OPTIONS: { type: BRollType; label: string; icon: typeof Code; descri
   { type: 'artlist', label: 'C. Artlist 实拍', icon: Film, description: '素材库实拍' },
   { type: 'internet-clip', label: 'D. 互联网素材', icon: Globe, description: '真实片段建议' },
   { type: 'user-capture', label: 'E. 用户截图/录屏', icon: Camera, description: '自行采集素材' },
+  { type: 'infographic', label: 'F. 信息图', icon: BarChart3, description: '结构化逻辑图示' },
 ];
 
 export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorProps) => {
