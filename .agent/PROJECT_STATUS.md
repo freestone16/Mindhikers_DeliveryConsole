@@ -3,7 +3,7 @@
 > 最后更新: 2026-03-05  
 > 分支: `main`
 > 最新里程碑: `v3.9` (Universal Expert Action Engine)
-> 最新 Commit: `96b39a1`
+> 最新 Commit: `8b23ec3`
 
 ---
 
@@ -23,17 +23,18 @@
 | Marketing Master                  | ⏸️ 基础     | 30%    | 基本框架在                                                               |
 | 项目切换 & 状态管理               | ✅ 修复     | 95%    | 已去除硬编码，切换项目时正确清空前端 state                               |
 | 多项目隔离 (SD-208)               | 📝 规划中   | 0%     | 架构设计已出，待实施                                                     |
+| 服务器稳定性                      | ✅ 修复     | 100%   | 修复了优雅关闭时 watch 线程挂起的问题，实现干净退出                      |
 
 ---
 
 ## 活跃问题
 
-无显著阻塞性问题（本地 `npm run dev` 运行正常）。
+无显著阻塞性问题（因 Github 网络波动，需手动 push）。
 
 ## 最新变更
 
-- **2026-03-05**: ✅ 完成 SD-209 Phase 3 素材上传闭环 (internet-clip / user-capture)
+- **2026-03-05**: ✅ 修复了服务器优雅关闭退出卡顿的问题；整理了版本管理规范。
 
 ---
 
-最新 Memory Dump: `.agent/memory_dumps/memory_2026-03-05_SD209_MaterialUpload.md`
+最新 Memory Dump: `.agent/memory_dumps/memory_2026-03-05_GracefulShutdownFIx.md`
