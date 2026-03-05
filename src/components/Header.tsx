@@ -98,7 +98,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
     return (
         <>
             <header className="bg-[#0b1529]/80 backdrop-blur-xl border-b border-blue-900/40 px-6 py-4 relative z-[100]">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <img src="/logo.png" alt="MindHikers Logo" className="w-10 h-10 rounded-lg shadow-sm object-cover overflow-hidden" />
                         <div>

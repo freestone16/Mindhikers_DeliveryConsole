@@ -51,7 +51,7 @@ const getStatusBg = (status: ExpertStatus, isActive: boolean): string => {
 export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert, isChatOpen, onToggleChat }: ExpertNavProps) => {
     return (
         <nav className="bg-[#0b1529]/60 border-b border-blue-900/30 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+            <div className="px-6 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                     {EXPERTS.map((expert) => {
                         const Icon = iconMap[expert.icon] || Eye;
