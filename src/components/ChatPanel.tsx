@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Paperclip, Loader2, AlertCircle } from 'lucide-react';
-import type { ChatMessage, Attachment } from '../types';
+import { X, Send, Paperclip, Loader2, AlertCircle, Check } from 'lucide-react';
+import type { ChatMessage, Attachment, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 
 interface ChatPanelProps {
@@ -26,7 +26,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [streamingContent, setStreamingContent] = useState('');
     const [warning, setWarning] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    
+
     // 使用 ref 跟踪当前 expertId，避免闭包问题
     const currentExpertIdRef = useRef(expertId);
     const prevExpertIdRef = useRef<string | null>(null);
@@ -55,7 +55,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const handleChatDone = ({ expertId: msgExpertId }: { expertId: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
-            
+
             setStreamingContent(prev => {
                 if (prev) {
                     const aiMessage: ChatMessage = {
@@ -105,7 +105,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const handleChatConfirmation = ({ expertId: msgExpertId, message }: { expertId: string; message: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
-            
+
             // 直接显示确认消息
             const confirmMessage: ChatMessage = {
                 id: `msg_${Date.now()}`,
@@ -117,6 +117,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setIsStreaming(false);
         };
 
+        const handleChatActionConfirm = (data: { expertId: string; confirmId: string; actionName: string; actionArgs: any; description: string }) => {
+            if (data.expertId !== prevExpertIdRef.current) return;
+            setIsStreaming(false);
+            setStreamingContent('');
+            setMessages(prev => [...prev, {
+                id: `msg_${Date.now()}`,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date().toISOString(),
+                actionConfirm: {
+                    confirmId: data.confirmId,
+                    actionName: data.actionName,
+                    actionArgs: data.actionArgs,
+                    description: data.description,
+                    status: 'pending'
+                }
+            }]);
+        };
+
+        const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
+            if (data.expertId !== prevExpertIdRef.current) return;
+            setIsStreaming(false);
+            setMessages(prev => [...prev, {
+                id: `msg_${Date.now()}`,
+                role: 'assistant',
+                content: data.message,
+                timestamp: new Date().toISOString()
+            }]);
+        };
+
         socket.on('chat-chunk', handleChatChunk);
         socket.on('chat-done', handleChatDone);
         socket.on('chat-error', handleChatError);
@@ -124,6 +154,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         socket.on('chat-history', handleChatHistory);
         socket.on('chat-context-loaded', handleChatContextLoaded);
         socket.on('chat-confirmation', handleChatConfirmation);
+        socket.on('chat-action-confirm', handleChatActionConfirm);
+        socket.on('chat-action-result', handleChatActionResult);
 
         console.log('Chat socket events registered');
 
@@ -135,17 +167,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.off('chat-history', handleChatHistory);
             socket.off('chat-context-loaded', handleChatContextLoaded);
             socket.off('chat-confirmation', handleChatConfirmation);
+            socket.off('chat-action-confirm', handleChatActionConfirm);
+            socket.off('chat-action-result', handleChatActionResult);
         };
     }, [socket]);
 
     // Load history when expert changes
     useEffect(() => {
-        if (!socket || !isOpen) return;
+        if (!socket || !isOpen || !projectId) return;
 
         // 如果 expertId 变化了
         if (prevExpertIdRef.current !== expertId) {
             console.log('Expert changed from', prevExpertIdRef.current, 'to', expertId);
-            
+
             // 重置状态
             setMessages([]);
             setContextLoaded(false);
@@ -153,18 +187,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             // 加载新专家的历史
             socket.emit('chat-load-history', { expertId, projectId });
-            
+
             prevExpertIdRef.current = expertId;
         }
     }, [expertId, projectId, socket, isOpen]);
 
     // 首次打开时加载历史
     useEffect(() => {
-        if (socket && isOpen && messages.length === 0) {
+        if (socket && isOpen && messages.length === 0 && projectId) {
             console.log('Loading history for', expertId);
             socket.emit('chat-load-history', { expertId, projectId });
         }
-    }, [isOpen]);
+    }, [isOpen, projectId]);
 
     const handleSend = useCallback(() => {
         if (!inputText.trim() && attachments.length === 0) return;
@@ -205,6 +239,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             e.preventDefault();
             handleSend();
         }
+    };
+
+    const handleConfirmAction = (actionConfirm: ToolCallConfirmation) => {
+        setMessages(prev => prev.map(msg =>
+            msg.actionConfirm?.confirmId === actionConfirm.confirmId
+                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'confirmed' } }
+                : msg
+        ));
+        setIsStreaming(true);
+        socket?.emit('chat-action-execute', {
+            expertId,
+            projectId,
+            actionName: actionConfirm.actionName,
+            actionArgs: actionConfirm.actionArgs,
+            originalMessages: messages.filter(m => m.actionConfirm?.status !== 'pending')
+        });
+    };
+
+    const handleCancelAction = (actionConfirm: ToolCallConfirmation) => {
+        setMessages(prev => prev.map(msg =>
+            msg.actionConfirm?.confirmId === actionConfirm.confirmId
+                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'cancelled' }, content: '已取消该操作。' }
+                : msg
+        ));
     };
 
     const handlePaste = (e: React.ClipboardEvent) => {
@@ -265,7 +323,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     return (
-        <>
+        <div className="flex flex-col h-full bg-[#0b1529]/80 backdrop-blur-md">
             {/* Header */}
             <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -305,11 +363,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                                        msg.role === 'user'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-800 text-slate-200'
-                                    }`}
+                                    className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${msg.role === 'user'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-800 text-slate-200'
+                                        }`}
                                 >
                                     {msg.attachments && msg.attachments.length > 0 && (
                                         <div className="flex flex-wrap gap-1 mb-2">
@@ -323,7 +380,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                             ))}
                                         </div>
                                     )}
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
+
+                                    {msg.actionConfirm && (
+                                        <div className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3">
+                                            <p className="text-amber-200 text-sm mb-3 font-medium">
+                                                🤖 {msg.actionConfirm.description}
+                                            </p>
+                                            {msg.actionConfirm.status === 'pending' ? (
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleConfirmAction(msg.actionConfirm!)}
+                                                        className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-green-500"
+                                                    >
+                                                        <Check className="w-3 h-3" /> 确认执行
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCancelAction(msg.actionConfirm!)}
+                                                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-slate-600"
+                                                    >
+                                                        <X className="w-3 h-3" /> 取消
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className={`text-xs font-medium px-2 py-1 rounded inline-block ${msg.actionConfirm.status === 'confirmed'
+                                                    ? 'bg-green-900/50 text-green-400 border border-green-800'
+                                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                                    }`}>
+                                                    {msg.actionConfirm.status === 'confirmed' ? '✓ 已确认' : '✕ 已取消'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -395,7 +483,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </button>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 

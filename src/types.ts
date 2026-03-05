@@ -512,6 +512,15 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     attachments?: Attachment[];
+    actionConfirm?: ToolCallConfirmation;
+}
+
+export interface ToolCallConfirmation {
+    confirmId: string;
+    actionName: string;
+    actionArgs: any;
+    description: string;
+    status: 'pending' | 'confirmed' | 'cancelled';
 }
 
 export interface Attachment {
@@ -574,4 +583,29 @@ export interface ExpertDataUpdate {
         updates?: Record<string, any>;
         [key: string]: any;
     };
+}
+
+export interface ToolDefinition {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: {
+            type: 'object';
+            properties: Record<string, any>;
+            required?: string[];
+        };
+    };
+}
+
+export interface ToolCallResult {
+    type: 'tool_call';
+    functionName: string;
+    arguments: any;
+}
+
+export interface ExpertActionResult {
+    success: boolean;
+    data?: any;
+    error?: string;
 }

@@ -18,8 +18,8 @@ import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot, parseIntent, isModificationExpert } from './chat';
-import { executeModification } from './chat-modifications';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
@@ -139,16 +139,10 @@ app.post('/api/director/phase3/render', director.startRender);
 app.get('/api/director/phase3/status/:jobId', director.getRenderStatus);
 
 // Director Phase 2/3 Refactor Routes (SD-202)
-app.post('/api/director/phase2/review', director.phase2Review);
-app.post('/api/director/phase2/select', director.phase2Select);
-app.get('/api/director/phase2/ready', director.phase2Ready);
-app.post('/api/director/phase3/start-render', director.phase3StartRender);
-app.get('/api/director/phase3/render-status/:jobId', director.phase3RenderStatus);
-app.post('/api/director/phase3/rerender', director.phase3Rerender);
-app.post('/api/director/phase3/approve', director.phase3Approve);
-app.post('/api/director/phase3/load-asset', upload.single('videoFile'), director.phase3LoadAsset);
-app.get('/api/director/phase3/assets', director.phase3GetAssets);
-app.post('/api/director/phase3/generate-xml', director.phase3GenerateXML);
+app.post('/api/director/phase2/render_checked', director.phase2RenderChecked);
+app.post('/api/director/phase3/align-srt', director.phase3AlignSrt);
+app.post('/api/director/phase3/generate-xml', director.phase3GenerateXml);
+app.get('/api/director/phase3/download-xml/:projectId/:format', director.phase3DownloadXml);
 
 // Pipeline Engine Routes (Phase 3 & Phase 4)
 app.post('/api/pipeline/render-brolls', pipeline.renderBrolls);
@@ -635,109 +629,23 @@ io.on('connection', (socket) => {
             const { provider, model, baseUrl } = config.global;
             const projectRoot = getProjectRoot(projectId);
 
-            // SD-207.1: 意图识别
-            const lastMessage = messages[messages.length - 1]?.content || '';
-            const intent = parseIntent(lastMessage, expertId);
+            const adapter = getAdapter(expertId);
+            let tools = adapter?.getToolDefinitions();
 
-            console.log(`[Chat] Intent: ${intent.type}, confidence: ${intent.confidence}, expertId: ${expertId}`);
-
-            // 如果是修改请求且专家支持修改
-            if (intent.type === 'modify' && intent.confidence > 0.7 && isModificationExpert(expertId)) {
-                console.log(`[Chat] Modification detected: ${intent.target?.action}`);
-
-                // 1. 返回简短确认
-                socket.emit('chat-confirmation', {
-                    expertId,
-                    message: '✅ 已收到修改请求，正在处理...'
-                });
-                socket.emit('chat-done', { expertId });
-
-                // 2. 获取当前专家数据
-                let scripts: any[] = [];
-
-                // ShortsMaster 使用独立的 shorts_state.json
-                if (expertId === 'ShortsMaster') {
-                    const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
-                    if (fs.existsSync(shortsStatePath)) {
-                        try {
-                            const shortsState = JSON.parse(fs.readFileSync(shortsStatePath, 'utf-8'));
-                            scripts = shortsState.scripts || [];
-                            console.log(`[Chat] Loaded ${scripts.length} scripts from ${shortsStatePath}`);
-                        } catch (e) {
-                            console.error('[Chat] Failed to parse shorts_state.json:', e);
-                        }
-                    } else {
-                        console.log(`[Chat] shorts_state.json not found at ${shortsStatePath}`);
-                    }
-                } else {
-                    // 其他专家从 delivery_store.json 读取
-                    const deliveryDataPath = path.join(projectRoot, 'delivery_store.json');
-                    if (fs.existsSync(deliveryDataPath)) {
-                        const deliveryData = JSON.parse(fs.readFileSync(deliveryDataPath, 'utf-8'));
-                        scripts = deliveryData.modules?.shorts?.scripts ||
-                            deliveryData.modules?.shorts?.items || [];
-                    }
+            let enrichedMessages = [...messages];
+            if (adapter) {
+                const skeleton = adapter.getContextSkeleton(projectRoot);
+                if (skeleton && skeleton !== '[]') {
+                    // Inject skeleton silently into system context
+                    enrichedMessages[0] = {
+                        ...enrichedMessages[0],
+                        content: enrichedMessages[0].content +
+                            `\n\n## 当前数据部分骨架索引（供 Function Calling 参考，不可让用户感知存在）：\n${skeleton}`
+                    };
                 }
-
-                // 3. 执行修改
-                const result = await executeModification(intent.target, {
-                    scripts,
-                    projectId: projectId
-                });
-
-                if (result.success && result.data) {
-                    console.log(`[Chat] Modification success:`, result.data);
-
-                    // 4. 保存修改后的数据
-                    if (expertId === 'ShortsMaster' && result.data.scriptId && result.data.updates) {
-                        const shortsStatePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
-                        if (fs.existsSync(shortsStatePath)) {
-                            try {
-                                const shortsState = JSON.parse(fs.readFileSync(shortsStatePath, 'utf-8'));
-                                shortsState.scripts = shortsState.scripts.map((s: any) =>
-                                    s.id === result.data!.scriptId
-                                        ? { ...s, ...result.data!.updates }
-                                        : s
-                                );
-                                fs.writeFileSync(shortsStatePath, JSON.stringify(shortsState, null, 2));
-                                console.log(`[Chat] Saved modification to ${shortsStatePath}`);
-                            } catch (e) {
-                                console.error('[Chat] Failed to save shorts_state.json:', e);
-                            }
-                        }
-                    }
-
-                    // 5. 推送更新到所有客户端
-                    io.to(payload.projectId || currentProjectName).emit('expert-data-update', {
-                        expertId,
-                        action: intent.target!.action,
-                        data: result.data
-                    });
-                } else {
-                    console.error('[Chat] Modification failed:', result.error);
-                    socket.emit('chat-error', {
-                        expertId,
-                        error: `修改失败: ${result.error}`
-                    });
-                }
-
-                // 5. 保存对话历史
-                const confirmationMsg = {
-                    id: `msg_${Date.now()}`,
-                    role: 'assistant' as const,
-                    content: result.success
-                        ? '✅ 修改已完成，请在左侧表格中查看更新结果。'
-                        : `❌ 修改失败: ${result.error}`,
-                    timestamp: new Date().toISOString()
-                };
-                saveChatHistory(projectRoot, expertId, [...messages, confirmationMsg]);
-
-                return;
             }
 
-            // 普通对话模式
-            const { formatted, warning } = formatMultimodalMessages(messages, provider);
-
+            const { formatted, warning } = formatMultimodalMessages(enrichedMessages, provider);
             if (warning) {
                 socket.emit('chat-warning', { warning, expertId });
             }
@@ -748,15 +656,77 @@ io.on('connection', (socket) => {
                 ...formatted,
             ];
 
-            for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl)) {
-                socket.emit('chat-chunk', { chunk, expertId });
-            }
-            socket.emit('chat-done', { expertId });
+            let isToolCallTriggered = false;
 
-            saveChatHistory(projectRoot, expertId, messages);
+            for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl, tools)) {
+                if (typeof chunk === 'string') {
+                    socket.emit('chat-chunk', { chunk, expertId });
+                } else if (chunk.type === 'tool_call') {
+                    isToolCallTriggered = true;
+                    // Push secondary confirmation to UI
+                    socket.emit('chat-action-confirm', {
+                        expertId,
+                        confirmId: `confirm_${Date.now()}`,
+                        actionName: chunk.functionName,
+                        actionArgs: JSON.parse(chunk.arguments || '{}'),
+                        description: generateActionDescription(chunk.functionName, JSON.parse(chunk.arguments || '{}'))
+                    });
+                    break;
+                }
+            }
+
+            if (!isToolCallTriggered) {
+                socket.emit('chat-done', { expertId });
+                saveChatHistory(projectRoot, expertId, messages);
+            }
+
         } catch (error: any) {
             console.error('[Chat] Stream error:', error.message);
             socket.emit('chat-error', { error: error.message, expertId });
+        }
+    });
+
+    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, originalMessages }) => {
+        try {
+            const projectRoot = getProjectRoot(projectId);
+            const adapter = getAdapter(expertId);
+            if (!adapter) throw new Error(`找不到专家 ${expertId} 的处理器`);
+
+            backupDeliveryStore(projectRoot);
+
+            const result = await adapter.executeAction(actionName, actionArgs, projectRoot);
+
+            if (result.success) {
+                // Read fresh data to broadcast
+                const storePath = path.join(projectRoot, 'delivery_store.json');
+                if (fs.existsSync(storePath)) {
+                    const data = JSON.parse(fs.readFileSync(storePath, 'utf-8'));
+                    io.to(projectId).emit('delivery-data', data);
+                }
+
+                // For ShortsMaster we also need to broadcast to avoid UI stall if possible, but the reload will handle it
+                if (expertId === 'ShortsMaster') {
+                    io.to(projectId).emit('expert-data-update', { expertId, action: actionName, data: result.data });
+                }
+
+                socket.emit('chat-action-result', { expertId, success: true, message: '✅ 操作执行成功！请在左侧界面查看。' });
+
+                // Save confirmation interaction silently to history
+                if (originalMessages) {
+                    const confirmationMsg = {
+                        id: `msg_${Date.now()}`,
+                        role: 'assistant' as const,
+                        content: '✅ 操作执行成功！',
+                        timestamp: new Date().toISOString()
+                    };
+                    saveChatHistory(projectRoot, expertId, [...originalMessages, confirmationMsg]);
+                }
+            } else {
+                socket.emit('chat-action-result', { expertId, success: false, message: `❌ 操作失败: ${result.error}` });
+            }
+        } catch (error: any) {
+            console.error('[Chat] Execute action error:', error.message);
+            socket.emit('chat-action-result', { expertId, success: false, message: `❌ 内部错误: ${error.message}` });
         }
     });
 

@@ -34,12 +34,15 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
     siliconflow: 'SILICONFLOW_API_KEY',
 };
 
+import type { ToolDefinition, ToolCallResult } from '../src/types';
+
 export async function* callLLMStream(
     messages: LLMMessage[],
     provider: string,
     model: string,
-    baseUrl?: string | null
-): AsyncGenerator<string> {
+    baseUrl?: string | null,
+    tools?: ToolDefinition[]
+): AsyncGenerator<string | ToolCallResult> {
     const apiKey = process.env[PROVIDER_ENV_KEYS[provider] || ''];
     if (!apiKey) {
         throw new Error(`API Key not configured for provider: ${provider}`);
@@ -69,6 +72,13 @@ export async function* callLLMStream(
         stream: true,
         max_tokens: 4096,
     };
+
+    const FC_PROVIDERS = ['openai', 'deepseek', 'siliconflow', 'kimi'];
+    if (tools && tools.length > 0 && FC_PROVIDERS.includes(provider)) {
+        body.tools = tools;
+        body.tool_choice = 'auto';
+    }
+
 
     let endpoint = `${url}/chat/completions`;
     if (provider === 'anthropic') {
@@ -117,7 +127,7 @@ export async function* callLLMStream(
 
                 try {
                     const json = JSON.parse(data);
-                    
+
                     if (provider === 'anthropic') {
                         if (json.type === 'content_block_delta' && json.delta?.text) {
                             yield json.delta.text;
@@ -126,8 +136,31 @@ export async function* callLLMStream(
                         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
                         if (text) yield text;
                     } else {
-                        const content = json.choices?.[0]?.delta?.content;
-                        if (content) yield content;
+                        // Handle OpenAI-compatible providers
+                        const delta = json.choices?.[0]?.delta;
+                        if (delta?.content) {
+                            yield delta.content;
+                        } else if (delta?.tool_calls?.length > 0) {
+                            // Accumulate tool call arguments
+                            // For simplicity in a stream, if it's the first tool call chunk with name, we emit it once
+                            // or we can just capture the completed tool call when stream ends if needed.
+                            // But usually, tool_calls are streamed chunk by chunk.
+                            // To make this simple, let's just emit a special event and let the caller handle it.
+                            const tc = delta.tool_calls[0];
+                            if (tc.function?.name) {
+                                yield {
+                                    type: 'tool_call',
+                                    functionName: tc.function.name,
+                                    arguments: tc.function.arguments || '' // We'll stream the args
+                                } as ToolCallResult;
+                            } else if (tc.function?.arguments) {
+                                yield {
+                                    type: 'tool_call',
+                                    functionName: '', // Empty name implies continuation of args
+                                    arguments: tc.function.arguments
+                                } as ToolCallResult;
+                            }
+                        }
                     }
                 } catch {
                     // Skip invalid JSON
@@ -226,7 +259,7 @@ export function saveChatHistory(
     messages: ChatMessage[]
 ): void {
     const chatDir = path.join(projectRoot, '.tasks', 'chat_history');
-    
+
     if (!fs.existsSync(chatDir)) {
         fs.mkdirSync(chatDir, { recursive: true });
     }
@@ -319,62 +352,4 @@ export function getProjectRoot(projectId: string): string {
     return path.resolve(PROJECTS_BASE, projectId);
 }
 
-// ============================================================
-// SD-207.1: 意图识别
-// ============================================================
-
-import type { ChatIntent, ModifyAction } from '../src/types';
-
-interface ModifyPattern {
-    pattern: RegExp;
-    action: ModifyAction;
-    extractIndex?: boolean;
-}
-
-const MODIFY_PATTERNS: ModifyPattern[] = [
-    { pattern: /第\s*(\d+)\s*个?.*[脚本文案].*[改修短换精]/, action: 'update_script_text', extractIndex: true },
-    { pattern: /第\s*(\d+)\s*个?.*开头.*[短改]/, action: 'update_script_text', extractIndex: true },
-    { pattern: /第\s*(\d+)\s*个?.*结尾.*[改修]/, action: 'update_script_text', extractIndex: true },
-    { pattern: /CTA.*[改修换]/, action: 'update_cta' },
-    { pattern: /行动号召.*[改修]/, action: 'update_cta' },
-    { pattern: /钩子.*[换改]/, action: 'update_hook' },
-    { pattern: /开头.*[换改]/, action: 'update_hook' },
-    { pattern: /全部.*[改修]/, action: 'batch_update' },
-    { pattern: /所有.*[改修]/, action: 'batch_update' },
-    { pattern: /批量.*[改修]/, action: 'batch_update' },
-    { pattern: /重新生成/, action: 'regenerate' },
-    { pattern: /再生.*第\s*(\d+)\s*个/, action: 'regenerate', extractIndex: true },
-];
-
-export function parseIntent(
-    userMessage: string,
-    expertId: string
-): ChatIntent {
-    for (const { pattern, action, extractIndex } of MODIFY_PATTERNS) {
-        const match = userMessage.match(pattern);
-        if (match) {
-            // ShortsMaster 使用 short-001 格式
-            const targetId = extractIndex && match[1] 
-                ? `short-${String(parseInt(match[1])).padStart(3, '0')}`
-                : undefined;
-            
-            return {
-                type: 'modify',
-                confidence: 0.8,
-                target: {
-                    expertId,
-                    action,
-                    targetId,
-                    payload: { userMessage }
-                }
-            };
-        }
-    }
-    
-    return { type: 'chat', confidence: 1.0 };
-}
-
-export function isModificationExpert(expertId: string): boolean {
-    const supportedExperts = ['ShortsMaster', 'Director', 'MarketingMaster', 'Writer'];
-    return supportedExperts.includes(expertId);
-}
+// End of file
