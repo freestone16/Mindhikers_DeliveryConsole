@@ -31,6 +31,13 @@ export const setupVisualPlanWatcher = (io: Server, projectPath: string) => {
     }
 };
 
+export const closeVisualPlanWatcher = () => {
+    if (currentWatcher) {
+        currentWatcher.close();
+        currentWatcher = null;
+    }
+};
+
 const pushVisualPlan = (io: Server, filePath: string) => {
     try {
         const content = fs.readFileSync(filePath, 'utf-8');

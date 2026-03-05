@@ -56,8 +56,8 @@ export const IdleState = ({ expertId, selectedScript, onStartWork }: IdleStatePr
                 className={`
                     flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold
                     transition-all transform hover:scale-105 active:scale-95
-                    ${selectedScript 
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+                    ${selectedScript
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                         : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                     }
                 `}
@@ -66,9 +66,11 @@ export const IdleState = ({ expertId, selectedScript, onStartWork }: IdleStatePr
                 开始工作
             </button>
 
-            <p className="text-slate-500 text-sm mt-6">
-                点击后将在 Antigravity 中执行 {expert.skillName} skill
-            </p>
+            {expertId !== 'MarketingMaster' && (
+                <p className="text-slate-500 text-sm mt-6">
+                    点击后将在 Antigravity 中执行 {expert.skillName} skill
+                </p>
+            )}
         </div>
     );
 };

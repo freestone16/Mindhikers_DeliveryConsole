@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Clock, FileText, Loader2 } from 'lucide-react';
 import { EXPERTS, getExpertColorClass } from '../../config/experts';
 import type { SelectedScript } from '../../types';
@@ -23,6 +24,23 @@ export const PendingState = ({ expertId, projectId, selectedScript, startedAt, l
         return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    useEffect(() => {
+        const start = new Date(startedAt).getTime();
+        setElapsedSeconds(Math.floor((Date.now() - start) / 1000)); // Initial calculation
+        const interval = window.setInterval(() => {
+            setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+        }, 1000);
+        return () => window.clearInterval(interval);
+    }, [startedAt]);
+
+    const formatElapsed = (seconds: number) => {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] py-16">
             <div className={`
@@ -34,17 +52,18 @@ export const PendingState = ({ expertId, projectId, selectedScript, startedAt, l
             </div>
 
             <h2 className="text-3xl font-bold text-white mb-2">{expert.name}</h2>
-            
+
             <div className="flex items-center gap-2 text-blue-400 mb-4">
                 <Clock className="w-5 h-5" />
-                <span className="text-lg">正在执行中...</span>
+                <span className="text-lg">请耐心等待，正在执行中...</span>
+                <span className="text-slate-400 font-mono text-sm ml-2">⏱ 已用时 {formatElapsed(elapsedSeconds)}</span>
             </div>
 
             <div className="bg-slate-800/80 rounded-xl p-6 max-w-lg mb-8 border border-slate-700">
                 <p className="text-slate-300 mb-4 text-center">
                     <span className="text-emerald-400 font-semibold">{expert.skillName}</span> 正在自动执行
                 </p>
-                
+
                 {selectedScript && (
                     <div className="bg-slate-900 rounded-lg p-4 mb-4 flex items-center gap-3">
                         <FileText className="w-5 h-5 text-slate-400" />
@@ -59,7 +78,7 @@ export const PendingState = ({ expertId, projectId, selectedScript, startedAt, l
                     <p className="text-slate-400 text-sm mb-2">输出目录：</p>
                     <code className="text-cyan-400 font-mono text-sm">Projects/{projectId}/{expert.outputDir}/</code>
                 </div>
-                
+
                 {logs.length > 0 && (
                     <div className="bg-slate-900 rounded-lg p-4 mt-4">
                         <p className="text-slate-400 text-sm mb-2">执行日志：</p>

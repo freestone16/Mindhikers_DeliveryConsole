@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Check, Loader2, Image } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Check, Loader2, Image, Upload, FileVideo } from 'lucide-react';
 import type { DirectorChapter, SceneOption } from '../../types';
 
 interface ChapterCardProps {
@@ -32,6 +32,9 @@ const TYPE_LABELS: Record<string, string> = {
 // Artlist、互联网/用户截图不需要 AI 预览；infographic static 模式由后端直接生图
 const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance', 'infographic'];
 
+// Types that require manual upload (non-AI sources)
+const UPLOAD_REQUIRED_TYPES = ['internet-clip', 'user-capture'];
+
 function getScriptPreview(text: string): string {
   const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
   if (sentences.length >= 2) {
@@ -52,10 +55,15 @@ interface OptionRowProps {
 const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed' | 'failed'>('idle');
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isSelected = chapter.selectedOptionId === option.id;
   const rowId = `${chapter.chapterIndex + 1}-${index + 1}`;
   const quoteText = option.quote || getScriptPreview(chapter.scriptText);
   const taskKey = `${chapter.chapterId}-${option.id}`;
+  const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
+  const isChecked = option.isChecked;
 
   useEffect(() => {
     if (option.previewUrl) {
@@ -63,6 +71,72 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
       setThumbStatus('completed');
     }
   }, [option.previewUrl]);
+
+  // Check if material already exists when option is checked
+  useEffect(() => {
+    if (requiresUpload && isChecked) {
+      checkMaterialExists();
+    }
+  }, [requiresUpload, isChecked]);
+
+  const checkMaterialExists = async () => {
+    try {
+      const res = await fetch(`http://localhost:3002/api/director/material-exists?projectId=${projectId}&chapterId=${chapter.chapterId}&optionId=${option.id}`);
+      const data = await res.json();
+      if (data.success && data.data.exists) {
+        setUploadStatus('completed');
+      } else {
+        setUploadStatus('idle'); // Ensure it resets to idle if not exists
+      }
+    } catch (error) {
+      console.error('Check material exists failed:', error);
+      setUploadStatus('idle'); // Set idle on error
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      alert('请选择视频文件 (MP4, WebM, MOV 等)');
+      return;
+    }
+
+    setUploadStatus('uploading');
+
+    try {
+      const formData = new FormData();
+      formData.append('videoFile', file);
+      formData.append('projectId', projectId);
+      formData.append('chapterId', chapter.chapterId);
+      formData.append('optionId', option.id);
+
+      const res = await fetch('http://localhost:3002/api/director/upload-material', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setUploadStatus('completed');
+        setUploadedFile(data.data.filename);
+        console.log('[Upload] Success:', data.message);
+      } else {
+        throw new Error(data.error || '上传失败');
+      }
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      setUploadStatus('failed');
+      alert(`上传失败: ${error.message}`);
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleGenerateThumbnail = async () => {
     if (!option.imagePrompt && !option.prompt) return;
@@ -150,16 +224,16 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
         </div>
       </div>
 
-      {/* 原文一句话 (col 3) */}
-      <div className="col-span-3 flex items-center">
+      {/* 原文一句话 (col 2 instead of 3 - ~70% width) */}
+      <div className="col-span-2 flex items-center">
         <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
           {quoteText}
         </p>
       </div>
 
-      {/* 设计方案/提示词 (col 3) */}
+      {/* 设计方案/提示词 (col 4 instead of 3 - more space) */}
       <div
-        className="col-span-3 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
+        className="col-span-4 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
         onClick={() => onSelect(chapter.chapterId, option.id)}
       >
         <div className="flex items-center gap-2 mb-1">
@@ -193,12 +267,58 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
               <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">失败</span>
               <button onClick={(e) => { e.stopPropagation(); handleGenerateThumbnail(); }} className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2">重试生成</button>
             </div>
+          ) : requiresUpload && isChecked ? (
+            // Non-AI sources (internet-clip, user-capture) with upload capability
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80 relative">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="video/mp4,video/webm,video/quicktime"
+                className="hidden"
+              />
+              {uploadStatus === 'completed' ? (
+                <div className="flex flex-col items-center">
+                  <FileVideo className="w-8 h-8 text-green-400 mb-1" />
+                  <span className="text-green-400 text-xs font-medium">已上传</span>
+                  <span className="text-[9px] text-slate-500 mt-0.5">{uploadedFile || `${chapter.chapterId}_${option.id}_rendered.mp4`}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerFileInput();
+                    }}
+                    className="text-[10px] text-slate-400 mt-1 hover:text-white underline"
+                  >
+                    重新上传
+                  </button>
+                </div>
+              ) : uploadStatus === 'uploading' ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="w-6 h-6 text-blue-400 animate-spin mb-1" />
+                  <span className="text-blue-400 text-[10px]">上传中...</span>
+                </div>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerFileInput();
+                  }}
+                  className="flex flex-col items-center hover:bg-slate-700/50 p-3 rounded-lg transition-colors"
+                >
+                  <Upload className="w-6 h-6 text-orange-400 mb-1" />
+                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-orange-400' : 'text-cyan-400'}`}>
+                    {option.type === 'internet-clip' ? '🌐 上传网络素材' : '📸 上传录屏/截图'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 mt-1">点击选择视频文件</span>
+                </button>
+              )}
+            </div>
           ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80">
               <span className={`text-xs font-medium mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'user-capture' ? 'text-cyan-400' : 'text-green-400'}`}>
                 {option.type === 'internet-clip' ? '🌐 互联网素材建议' : option.type === 'user-capture' ? '📸 截图/录屏建议' : '🎬 实拍素材'}
               </span>
-              <span className="text-slate-500 text-[10px]">用户自行采集</span>
+              <span className="text-slate-500 text-[10px]">确认后上传</span>
             </div>
           ) : option.type === 'infographic' && option.infographicUseMode === 'static' && thumbStatus === 'idle' ? (
             // infographic static 模式：可生成静态预览图
@@ -270,8 +390,8 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck }: Cha
       <div className="p-3">
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">原文一句话</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
+          <div className="col-span-2 text-xs text-slate-500 font-bold">原文一句话</div>
+          <div className="col-span-4 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
           <div className="col-span-4 text-xs text-slate-500 font-bold text-center">预览图</div>
           <div className="col-span-1 text-xs text-slate-500 font-bold text-center">确认</div>
         </div>

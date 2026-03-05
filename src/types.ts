@@ -449,6 +449,7 @@ export interface TitleTagSet {
     id: string;
     index: number;
     title: string;
+    description?: string;
     tags: string[];
     source: 'llm' | 'user';
     status: 'pending' | 'scoring' | 'scored';

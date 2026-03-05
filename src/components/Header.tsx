@@ -154,14 +154,14 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             </button>
 
                             {isDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
+                                <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
                                     <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
                                         Available Projects
                                     </div>
                                     {projects.length === 0 ? (
                                         <div className="px-3 py-4 text-sm text-slate-500 text-center">加载中...</div>
                                     ) : (
-                                        <div className="max-h-60 overflow-y-auto">
+                                        <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {projects.map(p => (
                                                 <button
                                                     key={p.name}
@@ -204,14 +204,14 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             </button>
 
                             {isScriptDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
+                                <div className="absolute top-full right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
                                     <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
                                         02_Script 文稿
                                     </div>
                                     {scripts.length === 0 ? (
                                         <div className="px-3 py-4 text-sm text-slate-500 text-center">暂无文稿</div>
                                     ) : (
-                                        <div className="max-h-60 overflow-y-auto">
+                                        <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {scripts.map(s => (
                                                 <button
                                                     key={s.path}

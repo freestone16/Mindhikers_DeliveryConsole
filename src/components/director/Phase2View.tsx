@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Play, Loader2, ChevronDown, ChevronUp, Info, Check } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import type { DirectorChapter, BRollType } from '../../types';
@@ -38,10 +38,13 @@ export const Phase2View = ({
   currentModel,
   logs = [],
 }: Phase2ViewProps) => {
-  const [brollSelections, setBrollSelections] = useState<BRollType[]>(['remotion', 'seedance', 'artlist', 'infographic']);
-  const [brollConfirmed, setBrollConfirmed] = useState(false);
+  const [brollConfirmed, setBrollConfirmed] = useState(chapters.length > 0);
+  const [brollSelections, setBrollSelections] = useState<BRollType[]>(
+    chapters.length > 0 ? [] : ['remotion', 'seedance', 'artlist', 'infographic']
+  );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(true);
+  const [wasLoading, setWasLoading] = useState(false);
 
   useEffect(() => {
     let interval: number;
@@ -55,6 +58,24 @@ export const Phase2View = ({
     return () => window.clearInterval(interval);
   }, [isLoading, startTime]);
 
+  // Sync state if chapters are loaded externally (e.g., initial fetch)
+  useEffect(() => {
+    if (chapters.length > 0 && !brollConfirmed && !isLoading && !wasLoading) {
+      setBrollConfirmed(true);
+      setBrollSelections([]);
+    }
+  }, [chapters.length, brollConfirmed, isLoading, wasLoading]);
+
+  // Clear selections when generation finishes so the user starts with an empty filter
+  useEffect(() => {
+    if (isLoading) {
+      setWasLoading(true);
+    } else if (wasLoading && !isLoading) {
+      setBrollSelections([]);
+      setWasLoading(false);
+    }
+  }, [isLoading, wasLoading]);
+
   const formatElapsed = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
@@ -62,6 +83,14 @@ export const Phase2View = ({
   };
 
   const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
+
+  // Counts based on currently visible filters
+  const visibleOptionsCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => brollSelections.includes(o.type)).length, 0);
+  const visibleCheckedCount = chapters.reduce((sum, ch) =>
+    sum + ch.options.filter(o => brollSelections.includes(o.type) && o.isChecked).length, 0
+  );
+
+  // Total counts for overall progress
   const totalOptions = chapters.reduce((sum, ch) => sum + ch.options.length, 0);
   const checkedCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => o.isChecked).length, 0);
   const renderableCheckedCount = chapters.reduce((sum, ch) =>
@@ -136,17 +165,35 @@ export const Phase2View = ({
         </div>
       )}
 
-      {/* B-Roll 类型选择 */}
+      {/* B-Roll 类型选择与过滤 */}
       <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
-        <h3 className="text-sm text-slate-400 uppercase font-bold mb-3">
-          Select B-Roll Types
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm text-slate-400 uppercase font-bold">
+            {brollConfirmed ? '过滤视觉方案 (Excel 式筛选)' : 'Select B-Roll Types'}
+          </h3>
+          {brollConfirmed && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
+                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
+              >
+                显示全部
+              </button>
+              <button
+                onClick={() => setBrollSelections([])}
+                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
+              >
+                清空过滤
+              </button>
+            </div>
+          )}
+        </div>
         <BRollSelector
           selected={brollSelections}
           onChange={setBrollSelections}
-          disabled={brollConfirmed}
+          disabled={!brollConfirmed && isLoading}
         />
-        {!brollConfirmed && (
+        {!brollConfirmed ? (
           <button
             onClick={handleConfirmBRoll}
             disabled={brollSelections.length === 0}
@@ -154,6 +201,39 @@ export const Phase2View = ({
           >
             Confirm & Generate Previews
           </button>
+        ) : (
+          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-800">
+            <span className="text-xs text-slate-500 font-medium">批量操作:</span>
+            <button
+              onClick={() => {
+                chapters.forEach(ch => {
+                  ch.options.forEach(opt => {
+                    if (brollSelections.includes(opt.type) && !opt.isChecked) {
+                      onToggleCheck(ch.chapterId, opt.id);
+                    }
+                  });
+                });
+              }}
+              className="text-xs bg-green-900/40 text-green-400 hover:bg-green-800/60 hover:text-green-300 px-3 py-1.5 rounded transition-colors border border-green-800/50 flex items-center gap-1"
+            >
+              <Check className="w-3 h-3" />
+              勾选当前显示的全部方案
+            </button>
+            <button
+              onClick={() => {
+                chapters.forEach(ch => {
+                  ch.options.forEach(opt => {
+                    if (brollSelections.includes(opt.type) && opt.isChecked) {
+                      onToggleCheck(ch.chapterId, opt.id);
+                    }
+                  });
+                });
+              }}
+              className="text-xs bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white px-3 py-1.5 rounded transition-colors border border-slate-700 flex items-center gap-1"
+            >
+              取消勾选当前显示的方案
+            </button>
+          </div>
         )}
       </div>
 
@@ -172,10 +252,17 @@ export const Phase2View = ({
           {/* 进度头工具栏 */}
           <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg">
             <div className="flex items-center gap-4">
-              <span className="text-slate-400 font-medium">已确认</span>
-              <div className="flex items-baseline gap-1">
-                <span className={`text-2xl font-bold ${checkedCount > 0 ? 'text-green-400' : 'text-slate-500'}`}>{checkedCount}</span>
-                <span className="text-slate-500 font-medium">/ {totalOptions}</span>
+              <span className="text-slate-400 font-medium whitespace-nowrap">筛选结果:</span>
+              <div className="flex gap-4">
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-bold ${visibleCheckedCount > 0 ? 'text-green-400' : 'text-slate-500'}`}>{visibleCheckedCount}</span>
+                  <span className="text-slate-500 font-medium">/ {visibleOptionsCount} (当前显示)</span>
+                </div>
+                <div className="w-px h-6 bg-slate-700 mx-2"></div>
+                <div className="flex items-baseline gap-1 opacity-60">
+                  <span className="text-lg font-bold text-slate-400">{checkedCount}</span>
+                  <span className="text-slate-500 text-sm">/ {totalOptions} (全局总计)</span>
+                </div>
               </div>
             </div>
 
@@ -208,15 +295,23 @@ export const Phase2View = ({
           </div>
 
           <div className="flex flex-col gap-4">
-            {chapters.map(chapter => (
-              <ChapterCard
-                key={chapter.chapterId}
-                chapter={chapter}
-                projectId={projectId}
-                onSelect={onSelect}
-                onToggleCheck={onToggleCheck}
-              />
-            ))}
+            {chapters.map(chapter => {
+              const filteredOptions = chapter.options.filter(o => brollSelections.includes(o.type));
+              if (filteredOptions.length === 0) return null;
+
+              // Only pass filtered options to the chapter card
+              const filteredChapter = { ...chapter, options: filteredOptions };
+
+              return (
+                <ChapterCard
+                  key={chapter.chapterId}
+                  chapter={filteredChapter}
+                  projectId={projectId}
+                  onSelect={onSelect}
+                  onToggleCheck={onToggleCheck}
+                />
+              );
+            })}
           </div>
         </>
       )}

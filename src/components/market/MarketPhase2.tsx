@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Target, Zap, Heart, BarChart3 } from 'lucide-react';
+import { BarChart3, Check, Loader2 } from 'lucide-react';
 import type { TitleTagSet } from '../../types';
 
 interface MarketPhase2Props {
@@ -10,98 +10,6 @@ interface MarketPhase2Props {
     isScoring: boolean;
 }
 
-const ScoreBar: React.FC<{ label: string; value: number; icon: React.ReactNode }> = ({
-    label, value, icon
-}) => {
-    const getColor = (v: number) => {
-        if (v >= 80) return 'bg-green-500';
-        if (v >= 60) return 'bg-yellow-500';
-        return 'bg-red-500';
-    };
-
-    return (
-        <div className="flex items-center gap-2">
-            <div className="w-6 text-slate-400">{icon}</div>
-            <span className="text-xs text-slate-500 w-16">{label}</span>
-            <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                    className={`h-full ${getColor(value)} transition-all duration-500`}
-                    style={{ width: `${value}%` }}
-                />
-            </div>
-            <span className="text-xs text-slate-300 w-8 text-right">{value}</span>
-        </div>
-    );
-};
-
-const ScoreCard: React.FC<{
-    set: TitleTagSet;
-    isSelected: boolean;
-    onSelect: () => void;
-    onRescore: () => void;
-    isScoring: boolean;
-}> = ({ set, isSelected, onSelect, onRescore, isScoring }) => {
-    const score = set.tubeBuddyScore;
-
-    return (
-        <div
-            onClick={onSelect}
-            className={`bg-slate-900 rounded-xl border-2 p-4 cursor-pointer transition-all
-                ${isSelected 
-                    ? 'border-orange-500 ring-2 ring-orange-500/30' 
-                    : 'border-slate-700 hover:border-slate-600'}`}
-        >
-            <div className="flex justify-between items-start mb-3">
-                <span className="text-xs text-slate-500">方案 #{set.index + 1}</span>
-                {set.status === 'scoring' && (
-                    <span className="text-xs text-orange-400 flex items-center gap-1">
-                        <div className="w-3 h-3 border border-orange-400/30 border-t-orange-400 rounded-full animate-spin" />
-                        打分中
-                    </span>
-                )}
-            </div>
-
-            <h4 className="text-sm font-medium text-white mb-2 line-clamp-2">
-                {set.title}
-            </h4>
-
-            <div className="flex flex-wrap gap-1 mb-4">
-                {set.tags.slice(0, 4).map((tag, i) => (
-                    <span key={i} className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                        #{tag}
-                    </span>
-                ))}
-                {set.tags.length > 4 && (
-                    <span className="text-xs text-slate-500">+{set.tags.length - 4}</span>
-                )}
-            </div>
-
-            {score && (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-400">综合评分</span>
-                        <span className="text-2xl font-bold text-white">{score.overallScore}</span>
-                    </div>
-                    <ScoreBar label="搜索量" value={score.metrics.searchVolume} icon={<Target className="w-3 h-3" />} />
-                    <ScoreBar label="竞争度" value={100 - score.metrics.competition} icon={<Zap className="w-3 h-3" />} />
-                    <ScoreBar label="优化度" value={score.metrics.optimization} icon={<TrendingUp className="w-3 h-3" />} />
-                    <ScoreBar label="相关度" value={score.metrics.relevance} icon={<Heart className="w-3 h-3" />} />
-                </div>
-            )}
-
-            {!score && set.status !== 'scoring' && (
-                <button
-                    onClick={(e) => { e.stopPropagation(); onRescore(); }}
-                    disabled={isScoring}
-                    className="w-full py-2 mt-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-300"
-                >
-                    获取分数
-                </button>
-            )}
-        </div>
-    );
-};
-
 export const MarketPhase2: React.FC<MarketPhase2Props> = ({
     titleTagSets,
     selectedSetId,
@@ -109,33 +17,124 @@ export const MarketPhase2: React.FC<MarketPhase2Props> = ({
     onRescore,
     isScoring
 }) => {
-    const sortedSets = [...titleTagSets].sort((a, b) => 
+    const sortedSets = [...titleTagSets].sort((a, b) =>
         (b.tubeBuddyScore?.overallScore || 0) - (a.tubeBuddyScore?.overallScore || 0)
     );
 
     return (
-        <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-            <div className="flex items-center justify-between mb-6">
+        <div className="bg-slate-800 rounded-xl border border-slate-700 p-0 overflow-hidden">
+            <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
                 <div className="flex items-center gap-2">
                     <BarChart3 className="w-5 h-5 text-orange-400" />
-                    <h3 className="text-lg font-semibold text-white">Phase 2: TubeBuddy 打分</h3>
+                    <h3 className="text-lg font-semibold text-white">Phase 2: LLM 返回与 TubeBuddy 打分评估</h3>
                 </div>
                 <span className="text-sm text-slate-400">
                     {titleTagSets.filter(s => s.status === 'scored').length} / {titleTagSets.length} 已打分
                 </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sortedSets.map(set => (
-                    <ScoreCard
-                        key={set.id}
-                        set={set}
-                        isSelected={selectedSetId === set.id}
-                        onSelect={() => onSelect(set.id)}
-                        onRescore={() => onRescore(set.id)}
-                        isScoring={isScoring}
-                    />
-                ))}
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-900/50 text-slate-400 text-sm">
+                            <th className="p-4 font-medium border-b border-slate-700 w-16 text-center">序号</th>
+                            <th className="p-4 font-medium border-b border-slate-700 w-32">条目名称</th>
+                            <th className="p-4 font-medium border-b border-slate-700">内容</th>
+                            <th className="p-4 font-medium border-b border-slate-700 w-32 text-center">用户确认</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/50 text-sm">
+                        {sortedSets.map((set, i) => {
+                            const isSelected = selectedSetId === set.id;
+                            const rowSpan = set.description ? 3 : 2;
+                            const rowBg = isSelected ? 'bg-orange-500/10' : 'hover:bg-slate-800/80 transition-colors';
+
+                            return (
+                                <React.Fragment key={set.id}>
+                                    {/* 视频 Title 行 */}
+                                    <tr className={rowBg}>
+                                        <td className="p-4 align-top text-slate-500 font-mono text-center border-b border-slate-700/50" rowSpan={rowSpan}>
+                                            <div className="font-bold text-lg">{i + 1}</div>
+                                            {set.tubeBuddyScore && (
+                                                <div className="mt-2 flex flex-col items-center">
+                                                    <span className="text-[10px] text-slate-400">黄金得分</span>
+                                                    <span className="text-orange-400 font-bold">{set.tubeBuddyScore.overallScore}</span>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="p-4 align-top text-slate-300 font-medium">视频 Title</td>
+                                        <td className="p-4 align-top">
+                                            <div className="text-white font-medium text-base mb-1">{set.title}</div>
+                                            {set.tubeBuddyScore && (
+                                                <div className="flex items-center gap-3 text-xs text-slate-400 mt-2 bg-slate-900/50 p-2 rounded">
+                                                    <span>搜索量: <span className="text-blue-400">{set.tubeBuddyScore.metrics.searchVolume}</span></span>
+                                                    <span>竞争度: <span className="text-yellow-400">{100 - set.tubeBuddyScore.metrics.competition}</span></span>
+                                                    <span>相关度: <span className="text-green-400">{set.tubeBuddyScore.metrics.relevance}</span></span>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="p-4 align-middle text-center border-b border-slate-700/50" rowSpan={rowSpan}>
+                                            <div className="flex flex-col items-center justify-center gap-3">
+                                                <button
+                                                    onClick={() => onSelect(set.id)}
+                                                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSelected
+                                                            ? 'bg-green-500 text-white shadow-lg shadow-green-500/20 scale-110'
+                                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-green-400'
+                                                        }`}
+                                                >
+                                                    <Check className="w-6 h-6" />
+                                                </button>
+                                                {!set.tubeBuddyScore && set.status !== 'scoring' && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onRescore(set.id); }}
+                                                        disabled={isScoring}
+                                                        className="py-1 px-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-[11px] text-orange-400 whitespace-nowrap transition-colors"
+                                                    >
+                                                        TubeBuddy 评估
+                                                    </button>
+                                                )}
+                                                {set.status === 'scoring' && (
+                                                    <span className="text-[11px] text-orange-400 flex items-center gap-1 border border-orange-400/30 px-2 py-1 rounded bg-orange-400/10">
+                                                        <Loader2 className="w-3 h-3 animate-spin" /> 打分中
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    {/* 视频描述 行 (如果存在) */}
+                                    {set.description && (
+                                        <tr className={rowBg}>
+                                            <td className="p-4 align-top text-slate-300 font-medium">视频描述</td>
+                                            <td className="p-4 align-top text-slate-400 text-sm whitespace-pre-wrap">{set.description}</td>
+                                        </tr>
+                                    )}
+
+                                    {/* Hash Tags 行 */}
+                                    <tr className={rowBg}>
+                                        <td className="p-4 align-top text-slate-300 font-medium border-b border-slate-700/50">Hash Tags</td>
+                                        <td className="p-4 align-top border-b border-slate-700/50">
+                                            <div className="flex flex-wrap gap-2">
+                                                {set.tags.map((tag, j) => (
+                                                    <span key={j} className="text-xs font-mono bg-slate-900/80 border border-slate-700 text-blue-400 px-2.5 py-1 rounded-md">
+                                                        #{tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </React.Fragment>
+                            );
+                        })}
+                        {sortedSets.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="p-8 text-center text-slate-500">
+                                    尚无 LLM 生成结果，请在 Phase 1 生成
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

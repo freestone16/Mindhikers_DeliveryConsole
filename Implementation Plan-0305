@@ -1,0 +1,41 @@
+# Feature: 非 AI 素材上传与 Phase 3 闭环实现
+
+## 问题场景
+用户在 Phase 2 选择“互联网素材”或“用户自己录屏”条目后，目前只能“点绿勾确认”，但没有物理文件产生。
+系统 Phase 3 的逻辑是：自动从 `04_Visuals` 目录汇总所有以 `${chapterId}_rendered.mp4` 命名的视频信息。
+如果用户不上传，Phase 3 将缺失这些物料，导致逻辑不闭环。
+
+## 修复策略
+1. **后端**：新增一个上传接口，接收 `projectId`、`chapterId` 和视频文件，将其保存为 `${chapterId}_rendered.mp4`。
+2. **前端**：修改 `ChapterCard.tsx`，针对非 `PREVIEW_SUPPORTED_TYPES` 且已选中的条目，提供上传按钮。
+3. **闭环**：上传后，Phase 3 的汇总逻辑将能自动识别到这些“手动补全”的物料。
+
+---
+
+## Proposed Changes
+
+### 后端 API
+#### [NEW] [upload_handler.ts](file:///Users/luzhoua/DeliveryConsole/server/upload_handler.ts)
+实现一个基于 `multer` 的上传处理器。
+- 接收 `projectId`, `chapterId`
+- 目的路径：`projects/${projectId}/04_Visuals/${chapterId}_rendered.mp4`
+- 如果文件已存在，则覆盖。
+
+#### [MODIFY] [index.ts](file:///Users/luzhoua/DeliveryConsole/server/index.ts)
+注册此上传接口。
+
+### 前端 UI
+#### [MODIFY] [ChapterCard.tsx](file:///Users/luzhoua/DeliveryConsole/src/components/director/ChapterCard.tsx)
+- 在 `OptionRow` 中增加一个隐藏的 `<input type="file">`。
+- 当素材类型为 `internet-clip` 或 `user-capture` 时，在预览区域显示“上传视频”按钮。
+- 上传成功后显示“已上传”状态或简单预览。
+
+---
+
+## Verification Plan
+
+### 手动验证步骤
+1. 在 Phase 2 选择一个“互联网素材”条目（例如 1-1）。
+2. 点击新增的“上传视频”按钮，选择一个本地 mp4 文件。
+3. 观察 `04_Visuals` 目录是否生成了 `ch1_rendered.mp4`。
+4. 进入 Phase 3，确认该条目已被识别为“自有物料”并可参与后续 XML 合成。

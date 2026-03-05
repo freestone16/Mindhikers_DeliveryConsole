@@ -12,13 +12,14 @@ import multer from 'multer';
 
 import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
-import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview } from './visual-plan';
+import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview, closeVisualPlanWatcher } from './visual-plan';
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
 import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
@@ -144,6 +145,10 @@ app.post('/api/director/phase2/render_checked', director.phase2RenderChecked);
 app.post('/api/director/phase3/align-srt', director.phase3AlignSrt);
 app.post('/api/director/phase3/generate-xml', director.phase3GenerateXml);
 app.get('/api/director/phase3/download-xml/:projectId/:format', director.phase3DownloadXml);
+
+// Material Upload Routes (SD-209 Phase 3 Loop Closure)
+app.post('/api/director/upload-material', materialUpload.single('videoFile'), handleMaterialUpload);
+app.get('/api/director/material-exists', checkMaterialExists);
 
 // Pipeline Engine Routes (Phase 3 & Phase 4)
 app.post('/api/pipeline/render-brolls', pipeline.renderBrolls);
@@ -1256,6 +1261,27 @@ httpServer.listen(PORT, '0.0.0.0', () => {
 // Initialize Graceful Shutdown
 const shutdownManager = createDefaultShutdown(httpServer);
 shutdownManager.setSocketIO(io);
+
+// Register Watcher Cleanups
+shutdownManager.registerCleanup(async () => {
+    console.log('  正在清理服务器监控器 (Watchers)...');
+
+    // 1. Delivery Watcher
+    if (deliveryWatcher) {
+        await deliveryWatcher.close();
+        console.log('    ✓ Delivery Watcher 已关闭');
+    }
+
+    // 2. Expert Watchers
+    if (expertWatchers.length > 0) {
+        await Promise.all(expertWatchers.map(w => w.close()));
+        console.log(`    ✓ ${expertWatchers.length} 个 Expert Watchers 已关闭`);
+    }
+
+    // 3. Visual Plan Watcher
+    closeVisualPlanWatcher();
+    console.log('    ✓ Visual Plan Watcher 已关闭');
+});
 
 // Setup Health Check Endpoints
 setupHealthCheck(app);

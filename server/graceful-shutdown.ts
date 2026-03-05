@@ -16,6 +16,7 @@ export class GracefulShutdown {
   private httpServer: HttpServer;
   private io: SocketIOServer | null = null;
   private activeProcesses = new Set<ChildProcess>();
+  private cleanupTasks: (() => Promise<void> | void)[] = [];
   private shutdownTimeout = 5000; // 5秒强制关闭
   private isShuttingDown = false;
 
@@ -34,6 +35,13 @@ export class GracefulShutdown {
   registerProcess(process: ChildProcess) {
     this.activeProcesses.add(process);
     process.on('exit', () => this.activeProcesses.delete(process));
+  }
+
+  /**
+   * 注册通用的清理任务
+   */
+  registerCleanup(task: () => Promise<void> | void) {
+    this.cleanupTasks.push(task);
   }
 
   /**
@@ -81,6 +89,19 @@ export class GracefulShutdown {
     this.httpServer.close(() => {
       console.log('  ✓ HTTP 服务器已关闭');
     });
+
+    // 2.5 执行注册的清理任务
+    if (this.cleanupTasks.length > 0) {
+      console.log(`  正在执行 ${this.cleanupTasks.length} 个清理任务...`);
+      for (const task of this.cleanupTasks) {
+        try {
+          await task();
+        } catch (e) {
+          console.error('清理任务执行失败:', e);
+        }
+      }
+      console.log('  ✓ 清理任务执行完毕');
+    }
 
     // 3. 优雅关闭子进程
     if (this.activeProcesses.size > 0) {
