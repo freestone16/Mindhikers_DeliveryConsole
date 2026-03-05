@@ -7,10 +7,8 @@ import type { ShortsModule, ShortsModule_V2, ShortScript, ShortRenderUnit, Exper
 import { useDeliveryStore } from '../hooks/useDeliveryStore';
 
 interface ShortsSectionProps {
-    data: ShortsModule | ShortsModule_V2;
     projectId: string;
     scriptPath: string;
-    onUpdate: (newData: ShortsModule_V2) => void;
 }
 
 type Phase = 1 | 2 | 3;
@@ -19,9 +17,17 @@ const isV2 = (data: ShortsModule | ShortsModule_V2): data is ShortsModule_V2 => 
     return 'phase' in data && typeof data.phase === 'number';
 };
 
-export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpdate }: ShortsSectionProps) => {
-    const initialData = isV2(data) ? data : { phase: 1 as Phase, scripts: [], renderUnits: [], subtitleConfigs: [] };
-    
+import { useExpertState } from '../hooks/useExpertState';
+
+const INITIAL_SHORTS_STATE: ShortsModule_V2 = { phase: 1, scripts: [], renderUnits: [], subtitleConfigs: [] };
+
+export const ShortsSection = ({ projectId, scriptPath: _scriptPath }: ShortsSectionProps) => {
+    const { state: rawData, updateState } = useExpertState<ShortsModule | ShortsModule_V2>('ShortsMaster', INITIAL_SHORTS_STATE);
+    const initialData = rawData && isV2(rawData) ? rawData : INITIAL_SHORTS_STATE;
+
+    const onUpdate = (newData: ShortsModule_V2) => {
+        updateState(projectId, newData);
+    };
     const [phase, setPhase] = useState<Phase>(initialData.phase);
     const [scripts, setScripts] = useState<ShortScript[]>(initialData.scripts);
     const [renderUnits, setRenderUnits] = useState<ShortRenderUnit[]>(initialData.renderUnits);
@@ -42,7 +48,7 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
 
         const handleExpertUpdate = ({ expertId, action, data: updateData }: ExpertDataUpdate) => {
             if (expertId !== 'ShortsMaster') return;
-            
+
             console.log('[Shorts] Received update from Chat:', action, updateData);
 
             // 处理单个脚本更新
@@ -55,15 +61,15 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
                     return s;
                 }));
                 setLastModifiedId(updateData.scriptId);
-                
+
                 // 3秒后清除高亮
                 setTimeout(() => setLastModifiedId(null), 3000);
-                
+
                 // 同步到后端
                 onUpdate({
                     ...initialData,
-                    scripts: scripts.map(s => 
-                        s.id === updateData.scriptId 
+                    scripts: scripts.map(s =>
+                        s.id === updateData.scriptId
                             ? { ...s, ...updateData.updates }
                             : s
                     )
@@ -84,7 +90,7 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
         };
 
         socket.on('expert-data-update', handleExpertUpdate);
-        
+
         return () => {
             socket.off('expert-data-update', handleExpertUpdate);
         };
@@ -171,11 +177,10 @@ export const ShortsSection = ({ data, projectId, scriptPath: _scriptPath, onUpda
                             key={p}
                             onClick={() => canEnterPhase(p as Phase) && handlePhaseChange(p as Phase)}
                             disabled={!canEnterPhase(p as Phase)}
-                            className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${
-                                phase === p 
-                                    ? 'bg-cyan-600 text-white' 
+                            className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${phase === p
+                                    ? 'bg-cyan-600 text-white'
                                     : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                            }`}
+                                }`}
                         >
                             P{p}
                         </button>

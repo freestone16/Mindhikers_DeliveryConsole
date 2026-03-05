@@ -296,13 +296,16 @@ export const reviseConcept = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('revise');
     console.log('[Phase1 Revise] Revising with Director skill knowledge...');
 
+    const config = loadConfig();
+    const globalConfig = config.global;
+
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: `现有视觉概念提案：\n${existingConcept}\n\n用户反馈意见：\n${userComment}\n\n请根据以上反馈修改提案。`
       }
-    ], 'deepseek');
+    ], globalConfig.provider as any, globalConfig.model);
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
 

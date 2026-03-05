@@ -41,10 +41,10 @@
 ### 3. Self-Improvement Loop（自我改进循环）⭐ 核心
 
 **规则**：
-- ✅ **任何用户纠正后**：立即更新 `docs/04_progress/lessons.md` 记录模式
+- ✅ **任何用户纠正后**：立即更新 `docs/04_progress/rules.md` 或 `lessons/` 记录模式
 - ✅ **写出防止重复错误的规则**：为未来的自己制定规则
-- ✅ **无情的迭代**：不断优化这些 lessons，直到错误率下降
-- ✅ **会话开始时审查**：每次会话开始时审查相关项目的 lessons
+- ✅ **无情的迭代**：不断优化这些规则，直到错误率下降
+- ✅ **会话开始时审查**：每次会话开始时读取 `rules.md`
 
 **Delivery Console 应用**：
 ```
@@ -53,13 +53,14 @@
 我的动作：
 1. 立即修复 bug
 2. 分析根本原因（为什么写死了21）
-3. 写入 lessons.md
-4. 制定规则："动态计算 totalSteps，不要硬编码"
+3. 写入 rules.md（精炼规则）
+4. 如需详细案例，写入 lessons/L-XXX.md
 ```
 
-**Lessons 文件路径**：
-- `docs/04_progress/lessons.md` - 经验教训主文件
-- `docs/04_progress/dev_progress.md` - 开发进度记录
+**Lessons 文件结构**：
+- `docs/04_progress/rules.md` - 精炼规则（80条，每次会话必读）
+- `docs/04_progress/lessons/` - 详细案例（按需搜索）
+- `docs/04_progress/lessons-index.md` - 案例索引
 
 ---
 
@@ -118,7 +119,7 @@
 3. **Track Progress**：执行过程中使用 `TodoWrite` 标记进度
 4. **Explain Changes**：每步提供高层级总结
 5. **Document Results**：完成后更新 `docs/04_progress/dev_progress.md`
-6. **Capture Lessons**：任何纠正后更新 `docs/04_progress/lessons.md`
+6. **Capture Lessons**：任何纠正后更新 `docs/04_progress/rules.md`
 
 ---
 
@@ -169,7 +170,8 @@
 - **显式强制**：用户说"老杨，保存"时立即执行文档保存
 - **文档位置**：
   - 开发进度 → `docs/04_progress/dev_progress.md`
-  - 经验教训 → `docs/04_progress/lessons.md`
+  - 精炼规则 → `docs/04_progress/rules.md`（每次会话必读）
+  - 详细案例 → `docs/04_progress/lessons/`（按需搜索）
   - 设计方案 → `docs/02_design/[模块名].md`
 
 ---
@@ -199,11 +201,12 @@
 - ❌ 单行修复
 - ❌ 简单文本修改
 
-### 何时写入 lessons.md？
+### 何时写入 rules.md？
 - ✅ 用户明确纠正错误
 - ✅ 发现系统性问题模式
 - ✅ 代码审查中指出问题
 - ✅ 重复出现的错误类型
+- 详细案例写入 `lessons/L-XXX.md`
 
 ### 何时使用 TodoWrite？
 - ✅ 3+ 步骤的任务
@@ -227,7 +230,9 @@ DeliveryConsole/
     ├── 03_ui/                    # UI 设计稿
     ├── 04_progress/
     │   ├── dev_progress.md       # 开发进度
-    │   └── lessons.md            # 经验教训 ⭐
+    │   ├── rules.md              # 精炼规则 ⭐（每次会话必读）
+    │   ├── lessons/              # 详细案例（按需搜索）
+    │   └── lessons-index.md      # 案例索引
     ├── dev_logs/                 # 开发日志
     └── plans/                    # 计划文档
 ```
@@ -238,11 +243,12 @@ DeliveryConsole/
 
 每次新会话开始时，检查：
 
-- [ ] 阅读 `docs/04_progress/lessons.md` 相关部分
+- [ ] 阅读 `docs/04_progress/rules.md`（80条精炼规则）
+- [ ] 如需详细案例，搜索 `docs/04_progress/lessons/`
 - [ ] 检查 `docs/04_progress/dev_progress.md` 最新状态
 - [ ] 回顾当前任务相关的核心原则
 - [ ] 确认是否需要使用技能（Skills）
 
 ---
 
-**记住**：Lessons Learned 是防止重复犯错的最重要机制，务必重视！
+**记住**：Rules 是防止重复犯错的最重要机制，务必重视！

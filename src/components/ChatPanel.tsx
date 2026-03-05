@@ -462,13 +462,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </label>
                     <textarea
                         value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
+                        onChange={(e) => {
+                            setInputText(e.target.value);
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                        }}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder="输入消息..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500"
+                        placeholder="输入消息或指令（Shift+Enter 换行）..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none max-h-40 focus:outline-none focus:border-blue-500 overflow-y-auto min-h-[44px]"
                         rows={1}
                         disabled={isStreaming}
+                        style={{ height: '44px' }}
                     />
                     <button
                         onClick={handleSend}

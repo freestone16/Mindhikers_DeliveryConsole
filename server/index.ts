@@ -20,6 +20,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
+import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
@@ -529,9 +530,14 @@ io.on('connection', (socket) => {
         // 1. Ensure file exists for this project
         ensureDeliveryFile(projectId);
 
+        // Ensure all expert states exist
+        const projectRoot = getProjectRoot(projectId);
+        Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
+            ensureExpertState(projectRoot, expertId);
+        });
+
         // 2. Set up watchers for this specific project
         setupProjectWatcher(projectId);
-        const projectRoot = getProjectRoot(projectId);
         setupExpertWatchers(projectId); // Needs refactor to take projectRoot if needed globally
         setupVisualPlanWatcher(io, projectRoot);
 
@@ -540,6 +546,13 @@ io.on('connection', (socket) => {
         try {
             const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
             socket.emit('delivery-data', data);
+
+            // Send expert data explicitly upon connection
+            Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
+                const expertData = loadExpertState(projectRoot, expertId);
+                socket.emit(`expert-data-update:${expertId}`, expertData);
+            });
+
             socket.emit('active-project', { name: projectId }); // Confirm active project to client
         } catch (e) {
             console.error('Failed to read delivery file:', e);
@@ -556,6 +569,18 @@ io.on('connection', (socket) => {
         newData.lastUpdated = new Date().toISOString();
         fs.writeFileSync(deliveryFile, JSON.stringify(newData, null, 2));
         io.to(newData.projectId).emit('delivery-data', newData); // Send to project room
+    });
+
+    socket.on('update-expert-data', (payload) => {
+        const { expertId, projectId, data } = payload || {};
+        if (!projectId || !expertId) {
+            console.error('Received update-expert-data missing fields');
+            return;
+        }
+        const projectRoot = getProjectRoot(projectId);
+        console.log(`Received expert update for ${expertId} in ${projectId}`);
+        saveExpertState(projectRoot, expertId, data);
+        io.to(projectId).emit(`expert-data-update:${expertId}`, data);
     });
 
     socket.on('start-render', (data) => {
@@ -622,8 +647,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('chat-clear-history', ({ expertId, projectId }) => {
+        try {
+            if (!projectId) throw new Error('projectId is required for chat-clear-history');
+            const projectRoot = getProjectRoot(projectId);
+            clearChatHistory(projectRoot, expertId);
+            socket.emit('chat-history-cleared', { expertId });
+        } catch (error: any) {
+            socket.emit('chat-error', { error: error.message, expertId });
+        }
+    });
+
     socket.on('chat-stream', async ({ messages, expertId, projectId }) => {
         try {
+            console.log(`[Chat][V2] === chat-stream ENTRY (code version: 2026-03-05-v5) ===`);
             if (!projectId) throw new Error('projectId is required for chat-stream');
             const config = loadConfig();
             const { provider, model, baseUrl } = config.global;
@@ -632,46 +669,55 @@ io.on('connection', (socket) => {
             const adapter = getAdapter(expertId);
             let tools = adapter?.getToolDefinitions();
 
-            let enrichedMessages = [...messages];
+            // Build system prompt with optional skeleton context
+            const context = loadExpertContext(projectRoot, expertId);
+            let systemContent = context.systemPrompt;
+
             if (adapter) {
                 const skeleton = adapter.getContextSkeleton(projectRoot);
                 if (skeleton && skeleton !== '[]') {
-                    // Inject skeleton silently into system context
-                    enrichedMessages[0] = {
-                        ...enrichedMessages[0],
-                        content: enrichedMessages[0].content +
-                            `\n\n## 当前数据部分骨架索引（供 Function Calling 参考，不可让用户感知存在）：\n${skeleton}`
-                    };
+                    // Inject skeleton into the System Prompt (not user messages)
+                    // so it doesn't pollute conversation history and is always present
+                    systemContent += `\n\n---\n## 📊 当前 B-Roll 数据骨架索引（用于理解用户引用，不可向用户透露原始 ID）\n${skeleton}`;
                 }
             }
 
-            const { formatted, warning } = formatMultimodalMessages(enrichedMessages, provider);
+            const { formatted, warning } = formatMultimodalMessages(messages, provider);
             if (warning) {
                 socket.emit('chat-warning', { warning, expertId });
             }
 
-            const context = loadExpertContext(projectRoot, expertId);
             const messagesWithContext = [
-                { role: 'system' as const, content: context.systemPrompt },
+                { role: 'system' as const, content: systemContent },
                 ...formatted,
             ];
 
+            console.log(`[Chat] System prompt length: ${systemContent.length} chars, messages: ${formatted.length}`);
+
             let isToolCallTriggered = false;
+            let toolCallIndex = 0;
 
             for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl, tools)) {
                 if (typeof chunk === 'string') {
                     socket.emit('chat-chunk', { chunk, expertId });
                 } else if (chunk.type === 'tool_call') {
                     isToolCallTriggered = true;
-                    // Push secondary confirmation to UI
+                    let parsedArgs: Record<string, any> = {};
+                    try {
+                        parsedArgs = JSON.parse(chunk.arguments || '{}');
+                    } catch (e: any) {
+                        console.error(`[Chat] Failed to parse tool_call[${toolCallIndex}]. Raw: "${chunk.arguments}"`);
+                    }
+                    console.log(`[Chat] Tool call[${toolCallIndex}] => ${chunk.functionName}(${JSON.stringify(parsedArgs)})`);
+                    const desc = generateActionDescription(chunk.functionName, parsedArgs);
                     socket.emit('chat-action-confirm', {
                         expertId,
-                        confirmId: `confirm_${Date.now()}`,
+                        confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
                         actionName: chunk.functionName,
-                        actionArgs: JSON.parse(chunk.arguments || '{}'),
-                        description: generateActionDescription(chunk.functionName, JSON.parse(chunk.arguments || '{}'))
+                        actionArgs: parsedArgs,
+                        description: desc
                     });
-                    break;
+                    toolCallIndex++;
                 }
             }
 
@@ -688,6 +734,7 @@ io.on('connection', (socket) => {
 
     socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, originalMessages }) => {
         try {
+            console.log(`[Chat][DEBUG] chat-action-execute => action: ${actionName}, args:`, JSON.stringify(actionArgs));
             const projectRoot = getProjectRoot(projectId);
             const adapter = getAdapter(expertId);
             if (!adapter) throw new Error(`找不到专家 ${expertId} 的处理器`);

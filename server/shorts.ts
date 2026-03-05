@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { callLLM } from './llm';
+import { loadConfig } from './llm-config';
 import { transcribeAudio, segmentsToSRT } from './whisper';
 
 const getProjectRoot = (projectId: string): string => {
@@ -119,22 +120,23 @@ CTA 类型：
 
 export const recommend = async (req: Request, res: Response) => {
     const { projectId, content, count } = req.body;
-    
+
     if (!content || !count) {
         return res.status(400).json({ error: 'Missing content or count' });
     }
-    
+
     try {
         const truncatedContent = content.slice(0, 8000);
-        
+        const { global: g } = loadConfig();
+
         const response = await callLLM(
             [
                 { role: 'system', content: RECOMMEND_SYSTEM_PROMPT },
                 { role: 'user', content: `请为以下长文案推荐 ${count} 条短视频的 CTA 和风格组合：\n\n${truncatedContent}` }
             ],
-            'deepseek'
+            g.provider as any, g.model
         );
-        
+
         let recommendations: any[] = [];
         try {
             const jsonMatch = response.content.match(/\[[\s\S]*\]/);
@@ -144,7 +146,7 @@ export const recommend = async (req: Request, res: Response) => {
         } catch (e) {
             console.error('Parse recommendations error:', e);
         }
-        
+
         while (recommendations.length < count) {
             recommendations.push({
                 index: recommendations.length + 1,
@@ -152,7 +154,7 @@ export const recommend = async (req: Request, res: Response) => {
                 style: ['knowledge', 'suspense', 'emotion'][recommendations.length % 3]
             });
         }
-        
+
         res.json({ success: true, recommendations: recommendations.slice(0, count) });
     } catch (error: any) {
         console.error('Recommend error:', error);
@@ -167,22 +169,22 @@ export const recommend = async (req: Request, res: Response) => {
 
 export const generateScripts = async (req: Request, res: Response) => {
     const { projectId, count, ctaDistribution, styleDistribution, topic, userComment } = req.body;
-    
+
     if (!projectId || !count) {
         return res.status(400).json({ error: 'Missing projectId or count' });
     }
-    
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
-    
-    const styleInfo = styleDistribution 
+
+    const styleInfo = styleDistribution
         ? `每条脚本的风格偏好：${JSON.stringify(styleDistribution.map((s: string, i: number) => ({ index: i + 1, style: s })))}`
         : '';
-    
+
     const commentInfo = userComment ? `\n\n用户补充说明：${userComment}` : '';
-    
+
     const userMessage = `
 长文案内容：
 ${topic?.slice(0, 10000) || ''}
@@ -198,16 +200,17 @@ ${commentInfo}
 3. 每条控制在 80-150 字
 
 输出 JSON 数组格式。`;
-    
+
     try {
+        const { global: g } = loadConfig();
         const response = await callLLM(
             [
                 { role: 'system', content: SHORTS_SYSTEM_PROMPT },
                 { role: 'user', content: userMessage }
             ],
-            'deepseek'
+            g.provider as any, g.model
         );
-        
+
         let scripts: any[] = [];
         try {
             const jsonMatch = response.content.match(/\[[\s\S]*\]/);
@@ -220,7 +223,7 @@ ${commentInfo}
             res.end();
             return;
         }
-        
+
         const formattedScripts = scripts.map((item, i) => ({
             id: `short-${String(i + 1).padStart(3, '0')}`,
             index: i + 1,
@@ -229,11 +232,11 @@ ${commentInfo}
             hookType: item.hookType || 'generic',
             status: 'draft' as const,
         }));
-        
+
         for (const script of formattedScripts) {
             res.write(`data: ${JSON.stringify({ type: 'script', script })}\n\n`);
         }
-        
+
         const projectRoot = getProjectRoot(projectId);
         const state = {
             phase: 2,
@@ -247,7 +250,7 @@ ${commentInfo}
             generationConfig: req.body
         };
         saveShortsState(projectRoot, state);
-        
+
         res.write(`data: ${JSON.stringify({ type: 'done', scripts: formattedScripts })}\n\n`);
         res.end();
     } catch (error: any) {
@@ -261,17 +264,17 @@ export const saveScript = (req: Request, res: Response) => {
     const { projectId, shortId, scriptText } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const script = state.scripts.find((s: any) => s.id === shortId);
     if (script) {
         script.scriptText = scriptText;
         script.status = 'confirmed';
     }
-    
+
     saveShortsState(projectRoot, state);
     res.json({ success: true });
 };
@@ -280,30 +283,31 @@ export const regenerateScript = async (req: Request, res: Response) => {
     const { projectId, shortId, userComment } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const script = state.scripts.find((s: any) => s.id === shortId);
     if (!script) {
         return res.status(404).json({ error: 'Script not found' });
     }
-    
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
-    
+
     try {
+        const { global: g } = loadConfig();
         const response = await callLLM(
             [
                 { role: 'system', content: SHORTS_SYSTEM_PROMPT },
                 { role: 'user', content: `原脚本:\n${script.scriptText}\n\n修改意见: ${userComment}\n\n请根据修改意见重新生成单条脚本，输出单个 JSON 对象。` }
             ],
-            'deepseek'
+            g.provider as any, g.model
         );
-        
+
         let newScript: any = null;
         try {
             const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -313,7 +317,7 @@ export const regenerateScript = async (req: Request, res: Response) => {
         } catch (e) {
             console.error('Parse error:', e);
         }
-        
+
         if (newScript) {
             const updatedScript = {
                 ...script,
@@ -322,14 +326,14 @@ export const regenerateScript = async (req: Request, res: Response) => {
                 hookType: newScript.hookType || script.hookType,
                 status: 'confirmed' as const
             };
-            
+
             const scriptIndex = state.scripts.findIndex((s: any) => s.id === shortId);
             state.scripts[scriptIndex] = updatedScript;
             saveShortsState(projectRoot, state);
-            
+
             res.write(`data: ${JSON.stringify({ type: 'script', script: updatedScript })}\n\n`);
         }
-        
+
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         res.end();
     } catch (error: any) {
@@ -342,20 +346,20 @@ export const confirmAll = (req: Request, res: Response) => {
     const { projectId } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
-    const merged = state.scripts.map((s: any) => 
+
+    const merged = state.scripts.map((s: any) =>
         `## Short #${s.index}\n\n${s.scriptText}\n\n> CTA: ${s.cta} | Hook: ${s.hookType}\n`
     ).join('\n---\n\n');
-    
+
     const outputDir = path.join(projectRoot, '05_Shorts_Output');
     ensureDir(outputDir);
     const mergedPath = path.join(outputDir, 'shorts_scripts.md');
     fs.writeFileSync(mergedPath, `# Shorts 提词器版\n\n${merged}`);
-    
+
     state.phase = 3;
     state.renderUnits = state.scripts.map((s: any) => ({
         id: s.id,
@@ -368,7 +372,7 @@ export const confirmAll = (req: Request, res: Response) => {
         headerOverlay: true,
         renderStatus: 'pending',
     }));
-    
+
     saveShortsState(projectRoot, state);
     res.json({ success: true, mergedFilePath: mergedPath, shortCount: state.scripts.length });
 };
@@ -376,19 +380,19 @@ export const confirmAll = (req: Request, res: Response) => {
 export const uploadAroll = async (req: Request, res: Response) => {
     const { projectId, shortId } = req.body;
     const file = (req as any).file;
-    
+
     if (!file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     const projectRoot = getProjectRoot(projectId);
     const shortDir = path.join(projectRoot, '05_Shorts_Output', shortId);
     ensureDir(shortDir);
-    
+
     const inputPath = file.path;
     const outputPath = path.join(shortDir, 'aroll_9x16.mp4');
     const previewPath = path.join(shortDir, 'aroll_preview.png');
-    
+
     try {
         await new Promise<void>((resolve, reject) => {
             const ffmpeg = spawn('ffmpeg', [
@@ -400,7 +404,7 @@ export const uploadAroll = async (req: Request, res: Response) => {
             ffmpeg.on('close', code => code === 0 ? resolve() : reject(new Error(`FFmpeg crop exit ${code}`)));
             ffmpeg.stderr.on('data', d => console.error('[FFmpeg crop]', d.toString().trim()));
         });
-        
+
         await new Promise<void>((resolve, reject) => {
             const ffmpeg = spawn('ffmpeg', [
                 '-y', '-i', outputPath,
@@ -409,9 +413,9 @@ export const uploadAroll = async (req: Request, res: Response) => {
             ]);
             ffmpeg.on('close', code => code === 0 ? resolve() : reject(new Error(`FFmpeg preview exit ${code}`)));
         });
-        
+
         fs.unlinkSync(inputPath);
-        
+
         res.json({
             croppedPath: path.relative(projectRoot, outputPath),
             previewFrame: path.relative(projectRoot, previewPath)
@@ -426,30 +430,31 @@ export const generateBrolls = async (req: Request, res: Response) => {
     const { projectId, shortId } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const script = state.scripts.find((s: any) => s.id === shortId);
     if (!script) {
         return res.status(404).json({ error: 'Script not found' });
     }
-    
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
-    
+
     try {
+        const { global: g } = loadConfig();
         const response = await callLLM(
             [
                 { role: 'system', content: BROLL_SYSTEM_PROMPT },
                 { role: 'user', content: `脚本文案:\n${script.scriptText}\n\n请为这条短视频拆分 B-Roll 插入点。` }
             ],
-            'deepseek'
+            g.provider as any, g.model
         );
-        
+
         let brolls: any[] = [];
         try {
             const jsonMatch = response.content.match(/\[[\s\S]*\]/);
@@ -459,23 +464,23 @@ export const generateBrolls = async (req: Request, res: Response) => {
         } catch (e) {
             console.error('Parse brolls error:', e);
         }
-        
+
         const formattedBrolls = brolls.map((b, i) => ({
             id: `${shortId}-broll-${i + 1}`,
             ...b,
             confirmed: false
         }));
-        
+
         const renderUnit = state.renderUnits.find((u: any) => u.id === shortId);
         if (renderUnit) {
             renderUnit.brolls = formattedBrolls;
             saveShortsState(projectRoot, state);
         }
-        
+
         for (const broll of formattedBrolls) {
             res.write(`data: ${JSON.stringify({ type: 'broll', broll })}\n\n`);
         }
-        
+
         res.write(`data: ${JSON.stringify({ type: 'done', brolls: formattedBrolls })}\n\n`);
         res.end();
     } catch (error: any) {
@@ -488,19 +493,19 @@ export const transcribe = async (req: Request, res: Response) => {
     const { projectId, shortId } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const arollPath = path.join(projectRoot, '05_Shorts_Output', shortId, 'aroll_9x16.mp4');
-    
+
     if (!fs.existsSync(arollPath)) {
         return res.status(404).json({ error: 'A-Roll video not found' });
     }
-    
+
     try {
         const result = await transcribeAudio(arollPath);
-        
+
         const shortDir = path.join(projectRoot, '05_Shorts_Output', shortId);
         const srtPath = path.join(shortDir, 'subtitle.srt');
         const srtContent = segmentsToSRT(result.segments);
         fs.writeFileSync(srtPath, srtContent);
-        
+
         const state = loadShortsState(projectRoot);
         if (state) {
             const renderUnit = state.renderUnits.find((u: any) => u.id === shortId);
@@ -510,7 +515,7 @@ export const transcribe = async (req: Request, res: Response) => {
                 saveShortsState(projectRoot, state);
             }
         }
-        
+
         res.json({
             success: true,
             segments: result.segments,
@@ -527,17 +532,17 @@ export const updateSubtitleSegments = (req: Request, res: Response) => {
     const { projectId, segments } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const renderUnit = state.renderUnits.find((u: any) => u.id === shortId);
     if (renderUnit) {
         renderUnit.subtitle.segments = segments;
         saveShortsState(projectRoot, state);
     }
-    
+
     res.json({ success: true });
 };
 
@@ -545,11 +550,11 @@ export const getSubtitleConfigs = (req: Request, res: Response) => {
     const { projectId } = req.query;
     const projectRoot = getProjectRoot(projectId as string);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state || !state.subtitleConfigs) {
         return res.json({ configs: [] });
     }
-    
+
     res.json({ configs: state.subtitleConfigs });
 };
 
@@ -558,17 +563,17 @@ export const updateSubtitleConfig = (req: Request, res: Response) => {
     const { projectId, config } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const state = loadShortsState(projectRoot);
-    
+
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const configIndex = state.subtitleConfigs.findIndex((c: any) => c.id === id);
     if (configIndex >= 0) {
         state.subtitleConfigs[configIndex] = { ...state.subtitleConfigs[configIndex], ...config };
         saveShortsState(projectRoot, state);
     }
-    
+
     res.json({ success: true });
 };
 
@@ -576,12 +581,12 @@ export const getHeaderConfig = (req: Request, res: Response) => {
     const { projectId } = req.query;
     const projectRoot = getProjectRoot(projectId as string);
     const configPath = path.join(projectRoot, '05_Shorts_Output', 'header_config.json');
-    
+
     if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         return res.json(config);
     }
-    
+
     res.json({ enabled: true, centerText: 'MindHikers' });
 };
 
@@ -590,11 +595,11 @@ export const updateHeaderConfig = (req: Request, res: Response) => {
     const projectRoot = getProjectRoot(projectId);
     const outputDir = path.join(projectRoot, '05_Shorts_Output');
     ensureDir(outputDir);
-    
+
     const configPath = path.join(outputDir, 'header_config.json');
     const config = { ...req.body };
     delete config.projectId;
-    
+
     if ((req as any).files) {
         const files = (req as any).files as { [fieldname: string]: { path: string }[] };
         if (files.leftLogo?.[0]) {
@@ -608,7 +613,7 @@ export const updateHeaderConfig = (req: Request, res: Response) => {
             config.rightLogo = path.relative(projectRoot, logoPath);
         }
     }
-    
+
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     res.json({ success: true, config });
 };
@@ -617,39 +622,39 @@ export const renderShort = async (req: Request, res: Response) => {
     const { projectId, shortId } = req.body;
     const projectRoot = getProjectRoot(projectId);
     const shortDir = path.join(projectRoot, '05_Shorts_Output', shortId);
-    
+
     const state = loadShortsState(projectRoot);
     if (!state) {
         return res.status(404).json({ error: 'State not found' });
     }
-    
+
     const renderUnit = state.renderUnits.find((u: any) => u.id === shortId);
     if (!renderUnit) {
         return res.status(404).json({ error: 'Render unit not found' });
     }
-    
+
     renderUnit.renderStatus = 'rendering';
     saveShortsState(projectRoot, state);
-    
+
     try {
         const outputPath = path.join(shortDir, `final_${shortId}.mp4`);
         const arollPath = path.join(shortDir, 'aroll_9x16.mp4');
         const srtPath = path.join(shortDir, 'subtitle.srt');
-        
+
         await new Promise<void>((resolve, reject) => {
             const args = ['-y', '-i', arollPath];
-            
+
             if (fs.existsSync(srtPath)) {
                 args.push('-vf', `subtitles=${srtPath}`);
             }
-            
+
             args.push('-c:a', 'copy', outputPath);
-            
+
             const ffmpeg = spawn('ffmpeg', args);
             ffmpeg.on('close', code => code === 0 ? resolve() : reject(new Error(`FFmpeg exit ${code}`)));
             ffmpeg.stderr.on('data', d => console.error('[FFmpeg render]', d.toString().trim()));
         });
-        
+
         renderUnit.renderStatus = 'completed';
         renderUnit.outputPaths = {
             brollDir: path.relative(projectRoot, path.join(shortDir, 'brolls')),
@@ -657,7 +662,7 @@ export const renderShort = async (req: Request, res: Response) => {
             finalVideoPath: path.relative(projectRoot, outputPath)
         };
         saveShortsState(projectRoot, state);
-        
+
         res.json({
             success: true,
             jobId: `render-${Date.now()}`,

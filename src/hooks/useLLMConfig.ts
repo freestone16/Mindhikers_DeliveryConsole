@@ -18,7 +18,7 @@ interface ConfigStatus {
 }
 
 interface SavedKeys {
-  [provider: string]: { last4: string; configured: boolean };
+  [provider: string]: { last4: string; configured: boolean; endpointImageLast8?: string; endpointVideoLast8?: string };
 }
 
 export const useLLMConfig = () => {

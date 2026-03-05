@@ -82,8 +82,13 @@ export const getConfigStatus = (req: Request, res: Response) => {
 export const saveApiKey = (req: Request, res: Response) => {
   const { provider, apiKey, apiKey2, projectId } = req.body;
 
-  if (!provider || !apiKey) {
-    return res.status(400).json({ error: 'Missing provider or apiKey' });
+  if (!provider) {
+    return res.status(400).json({ error: 'Missing provider' });
+  }
+
+  // volcengine 允许只更新接入点，不强制要求同时更新 apiKey
+  if (!apiKey && provider !== 'volcengine') {
+    return res.status(400).json({ error: 'Missing apiKey' });
   }
 
   const envVars = PROVIDER_INFO[provider]?.envVars;
@@ -101,16 +106,22 @@ export const saveApiKey = (req: Request, res: Response) => {
   const lines = envContent.split('\n');
 
   const updateLine = (envVar: string, value: string) => {
+    if (!value) return; // 不要用空字符串覆盖现有配置
     const existingIndex = lines.findIndex(l => l.startsWith(`${envVar}=`));
     if (existingIndex >= 0) {
       lines[existingIndex] = `${envVar}=${value}`;
     } else {
       lines.push(`${envVar}=${value}`);
     }
-    if (value) process.env[envVar] = value;
+    process.env[envVar] = value;
   };
 
-  updateLine(envVars[0], apiKey);
+  if (apiKey) updateLine(envVars[0], apiKey);
+
+  if (provider === 'volcengine') {
+    if (apiKey2) updateLine(envVars[1], apiKey2);
+    if (projectId) updateLine(envVars[2], projectId);
+  }
 
   fs.writeFileSync(envPath, lines.join('\n'));
 
@@ -155,43 +166,46 @@ export const testConnection = async (req: Request, res: Response) => {
     return res.json({ success: false, error: 'Unknown provider' });
   }
 
-  const envVars = info.envVars;
-  const configured = envVars.every(v => process.env[v]);
+  // 优先从 .env 文件读取最新值（进程启动后新保存的 key 也能实时生效）
+  const getLatestKey = (varName: string): string | undefined => {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      const match = content.match(new RegExp(`^${varName}=(.+)$`, 'm'));
+      if (match && match[1]?.trim()) return match[1].trim();
+    }
+    return process.env[varName];
+  };
 
-  if (!configured) {
+  const apiKey = getLatestKey(info.envVars[0]);
+
+  if (!apiKey) {
     return res.json({ success: false, error: `${info.name} API Key not configured` });
   }
 
   const start = Date.now();
 
   try {
-    let headers: Record<string, string> = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env[envVars[0]]}`,
+      'Authorization': `Bearer ${apiKey}`,
     };
 
-    // 火山引擎 (generation provider) 不走 /chat/completions，走 /images/generations
+    // 火山引擎：使用 /models 接口轻量探测鉴权，不触发真实图生任务，不消耗配额
     if (info.type === 'generation') {
-      // 火山引擎方舟必须使用推理接入点 ID (endpoint ID)
-      const endpointId = process.env['VOLCENGINE_ENDPOINT_ID_IMAGE'] || process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
-      const response = await fetch(`${info.baseUrl}/images/generations`, {
-        method: 'POST',
+      const response = await fetch(`${info.baseUrl}/models`, {
+        method: 'GET',
         headers,
-        body: JSON.stringify({
-          model: endpointId,
-          prompt: 'a simple blue circle on white background',
-          size: '256x256',
-          num_images: 1,
-        }),
       });
 
       const latency = Date.now() - start;
 
-      if (response.ok) {
+      // 200 或 404 均代表鉴权通过（方舟的 /models 枚举可能返回 404，但连通性正常）
+      if (response.ok || response.status === 404) {
         res.json({ success: true, latency });
       } else {
         const error = await response.text();
-        res.json({ success: false, error: `API Error: ${error.slice(0, 200)}` });
+        res.json({ success: false, error: `API Error ${response.status}: ${error.slice(0, 200)}` });
       }
       return;
     }
@@ -306,31 +320,38 @@ export const testAllConnections = async (req: Request, res: Response) => {
 
 export const getSavedKeys = (req: Request, res: Response) => {
   const envPath = path.join(process.cwd(), '.env');
-  const savedKeys: Record<string, { last4: string; configured: boolean }> = {};
+  const savedKeys: Record<string, any> = {};
+
+  const readEnvFile = () => {
+    if (!fs.existsSync(envPath)) return '';
+    return fs.readFileSync(envPath, 'utf-8');
+  };
 
   for (const [provider, info] of Object.entries(PROVIDER_INFO)) {
     const envVars = info.envVars;
-    const allConfigured = envVars.every(v => {
-      if (!fs.existsSync(envPath)) return false;
-      const envContent = fs.readFileSync(envPath, 'utf-8');
-      const match = envContent.match(new RegExp(`${v}=(.+)`));
-      return match && match[1] && match[1].trim();
-    });
+    const envContent = readEnvFile();
 
-    const firstEnvVar = envVars[0];
-    if (fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, 'utf-8');
-      const match = envContent.match(new RegExp(`${firstEnvVar}=(.+)`));
-      if (match && match[1] && match[1].trim()) {
-        savedKeys[provider] = {
-          last4: match[1].trim().slice(-4),
-          configured: allConfigured
-        };
-      } else {
-        savedKeys[provider] = { last4: '', configured: false };
-      }
+    const getFieldValue = (varName: string) => {
+      const match = envContent.match(new RegExp(`${varName}=(.+)`));
+      return match && match[1] && match[1].trim() ? match[1].trim() : null;
+    };
+
+    const primaryValue = getFieldValue(envVars[0]);
+
+    if (provider === 'volcengine') {
+      const imageEp = getFieldValue(envVars[1]);
+      const videoEp = getFieldValue(envVars[2]);
+      savedKeys[provider] = {
+        last4: primaryValue ? primaryValue.slice(-4) : '',
+        configured: !!(primaryValue && imageEp && videoEp),
+        endpointImageLast8: imageEp ? imageEp.slice(-8) : '',
+        endpointVideoLast8: videoEp ? videoEp.slice(-8) : '',
+      };
     } else {
-      savedKeys[provider] = { last4: '', configured: false };
+      savedKeys[provider] = {
+        last4: primaryValue ? primaryValue.slice(-4) : '',
+        configured: !!primaryValue,
+      };
     }
   }
 

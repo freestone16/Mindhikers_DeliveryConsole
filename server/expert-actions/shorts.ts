@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
+import { loadConfig } from '../llm-config';
 
 export const ShortsAdapter: ExpertActionAdapter = {
     expertId: 'ShortsMaster',
@@ -98,7 +99,8 @@ ${oldText}
                 `.trim();
 
                 try {
-                    const res = await callLLM([{ role: 'user', content: prompt }]);
+                    const { global: g } = loadConfig();
+                    const res = await callLLM([{ role: 'user', content: prompt }], g.provider as any, g.model);
                     const newText = res.content.trim();
                     fs.writeFileSync(mdPath, newText);
                     updates = {}; // text is in md file

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
+import { PROVIDER_INFO } from '../src/schemas/llm-config';
 
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
 
@@ -16,23 +17,23 @@ export interface ContentPart {
     image_url?: { url: string };
 }
 
-const PROVIDER_BASE_URLS: Record<string, string> = {
-    openai: 'https://api.openai.com/v1',
-    anthropic: 'https://api.anthropic.com/v1',
-    deepseek: 'https://api.deepseek.com/v1',
-    zhipu: 'https://open.bigmodel.cn/api/paas/v4',
-    google: 'https://generativelanguage.googleapis.com/v1beta',
-    siliconflow: 'https://api.siliconflow.cn/v1',
-};
+// Dynamically derived from the single source of truth: PROVIDER_INFO in src/schemas/llm-config.ts
+// Adding a new provider to the schema automatically makes it available here — no manual edits needed.
+const PROVIDER_BASE_URLS: Record<string, string> = Object.fromEntries(
+    Object.entries(PROVIDER_INFO).map(([id, info]) => [id, info.baseUrl])
+);
 
-const PROVIDER_ENV_KEYS: Record<string, string> = {
-    openai: 'OPENAI_API_KEY',
-    anthropic: 'ANTHROPIC_API_KEY',
-    deepseek: 'DEEPSEEK_API_KEY',
-    zhipu: 'ZHIPU_API_KEY',
-    google: 'GOOGLE_API_KEY',
-    siliconflow: 'SILICONFLOW_API_KEY',
-};
+const PROVIDER_ENV_KEYS: Record<string, string> = Object.fromEntries(
+    Object.entries(PROVIDER_INFO).map(([id, info]) => [id, info.envVars[0]])
+);
+
+// Providers that support OpenAI-compatible Function Calling
+// Derived from PROVIDER_INFO: all LLM-type providers are assumed to support FC unless excluded.
+const FC_PROVIDERS = new Set(
+    Object.entries(PROVIDER_INFO)
+        .filter(([, info]) => info.type === 'llm')
+        .map(([id]) => id)
+);
 
 import type { ToolDefinition, ToolCallResult } from '../src/types';
 
@@ -73,8 +74,7 @@ export async function* callLLMStream(
         max_tokens: 4096,
     };
 
-    const FC_PROVIDERS = ['openai', 'deepseek', 'siliconflow', 'kimi'];
-    if (tools && tools.length > 0 && FC_PROVIDERS.includes(provider)) {
+    if (tools && tools.length > 0 && FC_PROVIDERS.has(provider)) {
         body.tools = tools;
         body.tool_choice = 'auto';
     }
@@ -111,6 +111,8 @@ export async function* callLLMStream(
 
     const decoder = new TextDecoder();
     let buffer = '';
+    // Track multiple parallel tool_calls by their index
+    const pendingToolCalls = new Map<number, { name: string; args: string }>();
 
     while (true) {
         const { done, value } = await reader.read();
@@ -136,29 +138,23 @@ export async function* callLLMStream(
                         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
                         if (text) yield text;
                     } else {
-                        // Handle OpenAI-compatible providers
+                        // Handle OpenAI-compatible providers (openai, deepseek, kimi, siliconflow, etc.)
                         const delta = json.choices?.[0]?.delta;
                         if (delta?.content) {
                             yield delta.content;
                         } else if (delta?.tool_calls?.length > 0) {
-                            // Accumulate tool call arguments
-                            // For simplicity in a stream, if it's the first tool call chunk with name, we emit it once
-                            // or we can just capture the completed tool call when stream ends if needed.
-                            // But usually, tool_calls are streamed chunk by chunk.
-                            // To make this simple, let's just emit a special event and let the caller handle it.
-                            const tc = delta.tool_calls[0];
-                            if (tc.function?.name) {
-                                yield {
-                                    type: 'tool_call',
-                                    functionName: tc.function.name,
-                                    arguments: tc.function.arguments || '' // We'll stream the args
-                                } as ToolCallResult;
-                            } else if (tc.function?.arguments) {
-                                yield {
-                                    type: 'tool_call',
-                                    functionName: '', // Empty name implies continuation of args
-                                    arguments: tc.function.arguments
-                                } as ToolCallResult;
+                            for (const tc of delta.tool_calls) {
+                                const idx = tc.index ?? 0;
+                                if (!pendingToolCalls.has(idx)) {
+                                    pendingToolCalls.set(idx, { name: '', args: '' });
+                                }
+                                const entry = pendingToolCalls.get(idx)!;
+                                if (tc.function?.name) {
+                                    entry.name = tc.function.name;
+                                }
+                                if (tc.function?.arguments) {
+                                    entry.args += tc.function.arguments;
+                                }
                             }
                         }
                     }
@@ -166,6 +162,18 @@ export async function* callLLMStream(
                     // Skip invalid JSON
                 }
             }
+        }
+    }
+
+    // After the stream is fully consumed, yield each accumulated tool_call
+    for (const [idx, tc] of pendingToolCalls) {
+        if (tc.name) {
+            console.log(`[LLM-Stream] Final tool_call[${idx}] => name: ${tc.name}, args: ${tc.args}`);
+            yield {
+                type: 'tool_call',
+                functionName: tc.name,
+                arguments: tc.args
+            } as ToolCallResult;
         }
     }
 }
@@ -219,8 +227,25 @@ export function loadExpertContext(
         }
     }
 
-    const systemPrompt = `你是${expertName}的助手。你正在帮助用户完成视频制作任务。
+    const directorHint = expertId === 'Director' ? `
 
+## 理解用户引用的 B-Roll 层级序号
+用户通常使用诸如 "1-3", "2-1" 的简写来指代视频镜头。这表示：第 X 章的第 Y 个视觉选项。
+系统已在下方为你注入了「B-Roll 数据骨架索引」（JSON 格式）。每个章节和选项都有一个 \`seq\` 字段。
+- "1-3" 指的是：在骨架中寻找 \`seq: 1\` 的 chapter，然后在其 opts 列表中寻找 \`seq: 3\` 的 option。
+
+🔴 **极其重要：工具参数提取规则**
+当你调用任何操作选项的工具（如 \`regenerate_prompt\`, \`update_prompt\`, \`delete_option\`, \`update_option_fields\`）时：
+1. **绝不能自己拼接或猜测 id！**（例如不能把 1-3 想当然地拼成 ch1-opt-3 或 ch3-opt-2）。
+2. 你必须在骨架 JSON 中找到匹配 seq 的那个具体对象，然后**提取它原本就拥有的 \`id\` 字段的值**。
+3. 把骨架中写明的 chapter \`id\` 作为 \`chapterId\`，把 option \`id\` 作为 \`optionId\`，原封不动地传给工具。
+
+🟢 **极其重要：万能修改工具 update_option_fields**
+如果用户要求“**修改文字、改成不换行、加上什么标语**”等涉及具体组件显示效果的操作，请**直接调用 \`update_option_fields\`** 工具！
+你可以通过该工具的 \`updates.props\` 字段深度覆盖原有的配置。例如：强制不换行可以传 \`updates: { props: { text: "当前地表最强的视频生成模型不换行版" } }\`（或者插入 \`\\n\` 强制换行），依实际情况而定。
+` : '';
+
+    const systemPrompt = `你是${expertName}的助手。你正在帮助用户完成视频制作任务。${directorHint}
 当前专家产出目录: ${outputDir}
 ${contextContent ? `\n以下是该专家已有的产出内容（供参考）:${contextContent}` : ''}
 
@@ -295,6 +320,23 @@ export function formatMultimodalMessages(
     const supportsImages = ['openai', 'anthropic', 'google', 'siliconflow'].includes(provider);
 
     for (const msg of messages) {
+        let textContent = msg.content;
+
+        // Fix for Kimi / OpenAI strict validation: message with role 'assistant' must not be empty
+        // If content is empty (common when it was purely a function call), we inject a placeholder
+        if (!textContent && msg.role === 'assistant') {
+            if (msg.actionConfirm) {
+                textContent = `[System Log: Executed tool ${msg.actionConfirm.actionName}]`;
+            } else {
+                textContent = ' ';
+            }
+        }
+
+        // Similarly for user, though rarely happens
+        if (!textContent && msg.role === 'user') {
+            textContent = ' ';
+        }
+
         if (msg.attachments && msg.attachments.length > 0) {
             hasImages = true;
 
@@ -302,13 +344,13 @@ export function formatMultimodalMessages(
                 imagesStripped = true;
                 formatted.push({
                     role: msg.role,
-                    content: msg.content,
+                    content: textContent,
                 });
                 continue;
             }
 
             const content: ContentPart[] = [
-                { type: 'text', text: msg.content },
+                { type: 'text', text: textContent },
             ];
 
             for (const att of msg.attachments) {
@@ -335,7 +377,7 @@ export function formatMultimodalMessages(
         } else {
             formatted.push({
                 role: msg.role,
-                content: msg.content,
+                content: textContent,
             });
         }
     }

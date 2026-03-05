@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Check, AlertCircle, Eye, EyeOff, ChevronDown, ChevronUp, Image, Video, ArrowLeft } from 'lucide-react';
+import { Settings, Check, AlertCircle, Eye, EyeOff, ChevronDown, ChevronUp, Image, Video, ArrowLeft, Server } from 'lucide-react';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 import { PROVIDER_INFO, EXPERT_LIST, IMAGE_MODELS, VIDEO_MODELS, type ExpertConfig } from '../schemas/llm-config';
 
@@ -47,11 +47,13 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
   };
 
   const handleSaveKey = async () => {
-    if (!selectedProvider || !newApiKey) return;
+    if (!selectedProvider) return;
 
     if (selectedProvider === 'volcengine') {
+      if (!newApiKey && !newApiKey2 && !newProjectId) return;
       await saveApiKey(selectedProvider, newApiKey, newApiKey2, newProjectId);
     } else {
+      if (!newApiKey) return;
       await saveApiKey(selectedProvider, newApiKey);
     }
     setNewApiKey('');
@@ -156,8 +158,8 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-6 py-4 text-sm font-medium transition-colors ${activeTab === tab.id
-                    ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800/80'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
               >
                 {tab.label}
@@ -262,6 +264,64 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
                           <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* 火山引擎方舟接入点配置 */}
+                    <div className="bg-slate-800/60 rounded-xl p-6 border border-slate-700 shadow-sm">
+                      <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2 border-b border-slate-700 pb-3">
+                        <Server className="w-5 h-5 text-orange-400" /> 火山引擎方舟接入点配置
+                      </h3>
+                      <p className="text-xs text-slate-500 mb-5 pt-3">火山引擎必须使用推理接入点 ID（ep-xxxx），不能直接使用模型名。图生和视生接入点独立分配。</p>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-slate-400 block mb-2">
+                            图生接入点 ID
+                            {savedKeys['volcengine']?.endpointImageLast8 && (
+                              <span className="ml-2 text-xs font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded">••••{savedKeys['volcengine'].endpointImageLast8}</span>
+                            )}
+                          </label>
+                          <div className="flex gap-3">
+                            <input
+                              type="text"
+                              className="w-full max-w-md bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                              placeholder={savedKeys['volcengine']?.endpointImageLast8 ? '留空则保持现有配置...' : 'ep-2025xxxx...'}
+                              value={newApiKey2}
+                              onChange={(e) => setNewApiKey2(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-400 block mb-2">
+                            视生接入点 ID
+                            {savedKeys['volcengine']?.endpointVideoLast8 && (
+                              <span className="ml-2 text-xs font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded">••••{savedKeys['volcengine'].endpointVideoLast8}</span>
+                            )}
+                          </label>
+                          <div className="flex gap-3">
+                            <input
+                              type="text"
+                              className="w-full max-w-md bg-slate-900 border border-slate-600 rounded-lg px-4 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                              placeholder={savedKeys['volcengine']?.endpointVideoLast8 ? '留空则保持现有配置...' : 'ep-2025xxxx...'}
+                              value={newProjectId}
+                              onChange={(e) => setNewProjectId(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!newApiKey2 && !newProjectId) return;
+                            setSaving(true);
+                            await saveApiKey('volcengine', '', newApiKey2, newProjectId);
+                            setNewApiKey2('');
+                            setNewProjectId('');
+                            setSaving(false);
+                          }}
+                          disabled={(!newApiKey2 && !newProjectId) || saving}
+                          className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 text-white rounded-lg font-medium text-sm transition-colors"
+                        >
+                          保存接入点配置
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -465,17 +525,16 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
                                   <button
                                     onClick={() => handleTest(id)}
                                     disabled={testing === id || testingAll}
-                                    className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50"
-                                    title="测试单个连接"
+                                    className="text-xs px-3 py-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg border border-slate-700 transition-colors disabled:opacity-50 font-medium"
                                   >
-                                    <Settings className="w-4 h-4" />
+                                    {testing === id ? '测试中...' : '测试'}
                                   </button>
                                 )}
                                 <button
                                   onClick={() => setSelectedProvider(selectedProvider === id ? null : id)}
                                   className={`text-xs px-4 py-2 font-medium rounded-lg transition-colors ${configured
-                                      ? selectedProvider === id ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                                      : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-900/20'
+                                    ? selectedProvider === id ? 'bg-slate-700 text-white shadow-inner' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                                    : 'bg-blue-600 text-white hover:bg-blue-500 shadow-md shadow-blue-900/20'
                                     }`}
                                 >
                                   {configured ? '管理 Key' : '立即配置'}
@@ -486,36 +545,97 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
                             {/* Key Editing Area */}
                             {selectedProvider === id && (
                               <div className="mt-4 pt-4 border-t border-slate-700/50 animate-in fade-in slide-in-from-top-2 duration-200">
-                                <label className="text-xs font-medium text-slate-400 block mb-2">{info.envVars[0]} (Local ENV override)</label>
-                                <div className="flex gap-3">
-                                  <div className="relative flex-1">
-                                    <input
-                                      type={showApiKey ? 'text' : 'password'}
-                                      className="w-full bg-slate-900/80 border border-slate-600 rounded-lg pl-4 pr-10 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                      placeholder={configured ? '输入新的 API Key 覆盖旧配置...' : `输入 ${info.name} API Key...`}
-                                      value={newApiKey}
-                                      onChange={(e) => setNewApiKey(e.target.value)}
-                                    />
-                                    <button
-                                      onClick={() => setShowApiKey(!showApiKey)}
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                                    >
-                                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
+                                {id === 'volcengine' ? (
+                                  <div className="space-y-4">
+                                    {/* Access Key */}
+                                    <div>
+                                      <label className="text-xs font-medium text-slate-400 block mb-2">{info.envVars[0]} (Access Key)</label>
+                                      <div className="relative">
+                                        <input
+                                          type={showApiKey ? 'text' : 'password'}
+                                          className="w-full bg-slate-900/80 border border-slate-600 rounded-lg pl-4 pr-10 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                          placeholder={configured ? '留空则保持现有配置...' : `输入 ${info.name} API Key...`}
+                                          value={newApiKey}
+                                          onChange={(e) => setNewApiKey(e.target.value)}
+                                        />
+                                        <button
+                                          onClick={() => setShowApiKey(!showApiKey)}
+                                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                      </div>
+                                    </div>
+                                    {/* Image Endpoint */}
+                                    <div>
+                                      <label className="text-xs font-medium text-slate-400 block mb-2">
+                                        {info.envVars[1] || 'VOLCENGINE_ENDPOINT_ID_IMAGE'} (图生接入点 ID)
+                                        {savedKeys['volcengine']?.endpointImageLast8 && (
+                                          <span className="ml-2 font-mono text-slate-500">••••{savedKeys['volcengine'].endpointImageLast8}</span>
+                                        )}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        className="w-full bg-slate-900/80 border border-slate-600 rounded-lg px-4 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                        placeholder={savedKeys['volcengine']?.endpointImageLast8 ? '留空则保持现有配置...' : 'ep-2025...'}
+                                        value={newApiKey2}
+                                        onChange={(e) => setNewApiKey2(e.target.value)}
+                                      />
+                                    </div>
+                                    {/* Video Endpoint */}
+                                    <div>
+                                      <label className="text-xs font-medium text-slate-400 block mb-2">
+                                        {info.envVars[2] || 'VOLCENGINE_ENDPOINT_ID_VIDEO'} (视生接入点 ID)
+                                        {savedKeys['volcengine']?.endpointVideoLast8 && (
+                                          <span className="ml-2 font-mono text-slate-500">••••{savedKeys['volcengine'].endpointVideoLast8}</span>
+                                        )}
+                                      </label>
+                                      <div className="flex gap-3">
+                                        <input
+                                          type="text"
+                                          className="w-full bg-slate-900/80 border border-slate-600 rounded-lg px-4 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                          placeholder={configured ? '留空则保持现有配置...' : 'ep-2025...'}
+                                          value={newProjectId}
+                                          onChange={(e) => setNewProjectId(e.target.value)}
+                                        />
+                                        <button
+                                          onClick={handleSaveKey}
+                                          disabled={!newApiKey && !newApiKey2 && !newProjectId}
+                                          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                                        >
+                                          保存配置
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={handleSaveKey}
-                                    disabled={!newApiKey}
-                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
-                                  >
-                                    保存 Key
-                                  </button>
-                                </div>
-                                {info.type === 'generation' && id === 'volcengine' && (
-                                  <div className="mt-3 bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg flex items-start gap-2 text-sm text-blue-300">
-                                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                                    <p>火山引擎除 Access Key 外，部分端点可能还需要 Secret Key 和 Endpoint ID，当前暂不支持在界面完整管理这些复杂凭据，建议直接在 .env 配置。</p>
-                                  </div>
+                                ) : (
+                                  <>
+                                    <label className="text-xs font-medium text-slate-400 block mb-2">{info.envVars[0]} (Local ENV override)</label>
+                                    <div className="flex gap-3">
+                                      <div className="relative flex-1">
+                                        <input
+                                          type={showApiKey ? 'text' : 'password'}
+                                          className="w-full bg-slate-900/80 border border-slate-600 rounded-lg pl-4 pr-10 py-2.5 text-white font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                          placeholder={configured ? '输入新的 API Key 覆盖旧配置...' : `输入 ${info.name} API Key...`}
+                                          value={newApiKey}
+                                          onChange={(e) => setNewApiKey(e.target.value)}
+                                        />
+                                        <button
+                                          onClick={() => setShowApiKey(!showApiKey)}
+                                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                      </div>
+                                      <button
+                                        onClick={handleSaveKey}
+                                        disabled={!newApiKey}
+                                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                                      >
+                                        保存 Key
+                                      </button>
+                                    </div>
+                                  </>
                                 )}
                               </div>
                             )}

@@ -55,6 +55,26 @@ export const DirectorAdapter: ExpertActionAdapter = {
                         required: ['chapterId', 'optionId', 'new_prompt']
                     }
                 }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'update_option_fields',
+                    description: '万能属性修改器：可以同时修改选项的 name, prompt, imagePrompt，或者覆盖/强制修改组件的 props（如修改 Remotion 文字、设置强制不换行等）',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            chapterId: { type: 'string', description: '章节ID' },
+                            optionId: { type: 'string', description: '选项ID' },
+                            updates: {
+                                type: 'object',
+                                description: '需要修改的字段键值对，可以是 name, prompt, imagePrompt, 或者是包含需要覆盖的属性的 props 对象。如果要强制某文字不换行，可以将 props 里的文本修改为加入 \n 或者修改对应的控制字段。',
+                                additionalProperties: true
+                            }
+                        },
+                        required: ['chapterId', 'optionId', 'updates']
+                    }
+                }
             }
         ];
     },
@@ -66,19 +86,24 @@ export const DirectorAdapter: ExpertActionAdapter = {
             ));
             const chapters = data.modules?.director?.items || [];
 
-            // Ultra-compact skeleton to save tokens and prevent LLM hallucination
-            const skeleton = chapters.map((ch: any) => ({
+            // Skeleton with human-readable seq numbers so LLM can map
+            // user's shorthand like "1-3" to chapterIndex=1, optionIndex=3
+            const skeleton = chapters.map((ch: any, ci: number) => ({
+                seq: ch.chapterIndex ?? (ci + 1),  // chapter seq number (X in "X-Y")
                 id: ch.chapterId,
-                title: ch.chapterName,
-                opts: ch.options.map((o: any) => ({
+                title: ch.chapterName?.substring(0, 30),
+                opts: (ch.options || []).map((o: any, oi: number) => ({
+                    seq: oi + 1,                    // option seq number (Y in "X-Y")
                     id: o.id,
                     type: o.type,
-                    name: o.name?.substring(0, 10), // Limit length
-                    prompt: o.prompt?.substring(0, 10), // Limit length
-                    img_prompt: o.imagePrompt?.substring(0, 20) // Limit length
+                    name: o.name?.substring(0, 30),
+                    img_prompt: o.imagePrompt?.substring(0, 50)
                 }))
             }));
-            return JSON.stringify(skeleton);
+
+            // Prefix a semantic hint for the LLM
+            const hint = '/* INDEX: user references items as "chapterSeq-optionSeq", e.g. "1-3" = chapter with seq:1, its option with seq:3 */\n';
+            return hint + JSON.stringify(skeleton);
         } catch (e) {
             console.error('[DirectorAdapter] Failed to get context skeleton:', e);
             return '[]';
@@ -142,6 +167,23 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
             case 'update_prompt': {
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
                 opt.imagePrompt = args.new_prompt;
+                break;
+            }
+            case 'update_option_fields': {
+                if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
+                const updates = args.updates || {};
+
+                if (updates.name) opt.name = updates.name;
+                if (updates.prompt) opt.prompt = updates.prompt;
+                if (updates.imagePrompt) opt.imagePrompt = updates.imagePrompt;
+
+                // 深度覆盖 props 属性，用于修改 Remotion 内部的文案排版、不换行等
+                if (updates.props && typeof updates.props === 'object') {
+                    opt.props = {
+                        ...(opt.props || {}),
+                        ...updates.props
+                    };
+                }
                 break;
             }
             default:

@@ -1,11 +1,11 @@
 {
   "global": {
     "provider": "kimi",
-    "model": "Pro/moonshotai/Kimi-K2.5",
-    "baseUrl": "https://api.siliconflow.cn/v1"
+    "model": "kimi-k2.5",
+    "baseUrl": null
   },
   "generation": {
-    "imageModel": "doubao-image-01",
+    "imageModel": "doubao-seedream-4-5-251128",
     "videoModel": "doubao-video-01"
   },
   "experts": {

@@ -136,7 +136,7 @@ export const PROVIDER_INFO: Record<string, {
   volcengine: {
     name: 'Volcengine (火山引擎)',
     type: 'generation',
-    envVars: ['VOLCENGINE_ACCESS_KEY'],
+    envVars: ['VOLCENGINE_ACCESS_KEY', 'VOLCENGINE_ENDPOINT_ID_IMAGE', 'VOLCENGINE_ENDPOINT_ID_VIDEO'],
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     models: ['doubao-seedream-5.0-litenew', 'doubao-seedream-4-5-251128', 'doubao-seedance-1-5-pro'],
   },

@@ -7,15 +7,21 @@ import type { DirectorModule, DirectorChapter, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
 interface DirectorSectionProps {
-  data: DirectorModule;
   projectId: string;
   scriptPath: string;
-  onUpdate: (newData: DirectorModule) => void;
 }
 
 type Phase = 1 | 2 | 3;
 
-export const DirectorSection = ({ data, projectId, scriptPath, onUpdate }: DirectorSectionProps) => {
+import { useExpertState } from '../hooks/useExpertState';
+
+export const DirectorSection = ({ projectId, scriptPath }: DirectorSectionProps) => {
+  const { state: data, updateState } = useExpertState<DirectorModule>('Director', { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] });
+
+  const onUpdate = (newData: DirectorModule) => {
+    updateState(projectId, newData);
+  };
+
   const phase = (data.phase || 1) as Phase;
   const conceptApproved = data.isConceptApproved || false;
   const chapters = (data.items || []) as DirectorChapter[];
