@@ -494,6 +494,117 @@ export interface MarketModule_V2 {
 }
 
 // ============================================================
+// SD-207 V3: MarketingMaster V3 Types (2-Phase Redesign)
+// ============================================================
+
+/** 关键词的简繁体变体，含独立的 TubeBuddy 评分 */
+export interface KeywordVariant {
+    text: string;
+    script: 'simplified' | 'traditional';
+    tubeBuddyScore?: TubeBuddyScore;
+    status: 'pending' | 'scoring' | 'scored' | 'error';
+    errorMessage?: string;
+    scoringDuration?: number;   // 评分耗时 ms
+    scoredAt?: string;
+}
+
+/** Phase 1: 候选关键词 */
+export interface CandidateKeyword {
+    id: string;
+    keyword: string;            // 主关键词（简体）
+    variants: KeywordVariant[]; // 简体 + 繁体变体
+    source: 'llm' | 'user';
+    isGolden: boolean;          // 用户选定为黄金词
+    bestScore?: number;         // variants 中最高 overallScore
+}
+
+export type Phase1SubStep = 'candidates' | 'scoring' | 'selection';
+
+/** 视频描述子区块（纯文本，禁止 Markdown） */
+export interface DescriptionBlock {
+    id: string;
+    type: 'hook' | 'geo_qa' | 'series' | 'action_plan' | 'timeline'
+        | 'references' | 'pinned_comment' | 'hashtags';
+    label: string;
+    content: string;            // 纯文本 + Emoji，严禁 ## / ** / -
+    isCollapsed: boolean;
+}
+
+/** "其他设置" 子项 */
+export interface OtherItem {
+    key: string;
+    label: string;
+    value: string;
+    isDefault: boolean;         // 是否来自 Default Settings
+}
+
+/** Phase 2 表格中的一行 */
+export interface MarketingPlanRow {
+    id: string;
+    rowType: 'title' | 'description' | 'thumbnail' | 'playlist' | 'tags' | 'other';
+    label: string;
+    content: string;
+    isConfirmed: boolean;
+    descriptionBlocks?: DescriptionBlock[]; // 仅 description 行
+    otherItems?: OtherItem[];               // 仅 other 行
+}
+
+/** 一套完整营销方案（对应一个黄金关键词） */
+export interface MarketingPlan {
+    keywordId: string;
+    keyword: string;
+    rows: MarketingPlanRow[];
+    thumbnailPaths: string[];
+    generationStatus: 'pending' | 'generating' | 'ready' | 'error';
+    errorMessage?: string;
+    generationDuration?: number; // ms
+}
+
+/** SRT 字幕解析出的章节 */
+export interface SRTChapter {
+    title: string;
+    startTime: string;          // "00:05:23"
+    endTime?: string;
+}
+
+/** MarketingMaster V3 顶层状态 */
+export interface MarketModule_V3 {
+    phase: 1 | 2;
+    phase1SubStep: Phase1SubStep;
+    candidates: CandidateKeyword[];
+    goldenKeywords: string[];   // CandidateKeyword.id 数组（1-3 个）
+    activeTabIndex: number;     // 当前激活的 Tab (0-2)
+    plans: MarketingPlan[];     // 一个黄金词 = 一套方案
+    srtChapters?: SRTChapter[];
+    llmAnalysis?: string;       // LLM 策略点评全文
+    selectedScript?: { filename: string; path: string };
+    savedOutputs?: { paths: string[]; savedAt: string };
+}
+
+/** YouTube 平台默认设置 */
+export interface YouTubeDefaults {
+    language: string;           // "zh-Hans"
+    captionsCertification: string;
+    alteredContent: boolean;
+    madeForKids: boolean;
+    category: string;           // "27"
+    categoryName: string;       // "Education"
+    license: string;            // "standard"
+    allowComments: boolean;
+    commentSort: string;
+    visibility: string;         // "public"
+    videoFilenamePattern: string;
+}
+
+/** 多平台默认设置（其他平台留 null 占位） */
+export interface PlatformDefaults {
+    youtube: YouTubeDefaults;
+    x: null;
+    wechat: null;
+    bilibili: null;
+}
+
+// ============================================================
 // SD-207: Chat Panel Types
 // ============================================================
 
