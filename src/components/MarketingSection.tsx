@@ -164,7 +164,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
                 默认设置 Modal
             ═══════════════════════════════════════════════════════ */}
             {showSettings && (
-                <MarketDefaultSettings onClose={() => setShowSettings(false)} />
+                <MarketDefaultSettings projectId={projectId} onClose={() => setShowSettings(false)} />
             )}
         </div>
     );

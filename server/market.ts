@@ -651,6 +651,235 @@ ${rowType === 'description' ? `
     }
 });
 
+// ── V3: POST /api/market/v3/confirm ──────────────────────────────────────────
+// 生成双格式输出：{keyword}-{date}.md 和 {keyword}-{date}.plain.txt
+// 保存到 05_Marketing/ 目录
+
+function slugify(text: string): string {
+    return text
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s\u4e00-\u9fff]/g, '')
+        .replace(/\s+/g, '-')
+        .slice(0, 40)
+        .toLowerCase()
+        .replace(/-+$/, '');
+}
+
+function stripMarkdown(text: string): string {
+    return text
+        .replace(/#{1,6}\s+/g, '')      // Remove ## headings
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+        .replace(/\*(.*?)\*/g, '$1')     // Remove *italic*
+        .replace(/^[-*+]\s+/gm, '')      // Remove - list bullets
+        .replace(/`([^`]+)`/g, '$1')     // Remove `code`
+        .replace(/^\s*>\s+/gm, '')       // Remove blockquotes
+        .trim();
+}
+
+function generateMarkdownContent(plan: any, projectId: string): string {
+    const now = new Date().toISOString();
+    const titleRow   = plan.rows.find((r: any) => r.rowType === 'title');
+    const descRow    = plan.rows.find((r: any) => r.rowType === 'description');
+    const thumbRow   = plan.rows.find((r: any) => r.rowType === 'thumbnail');
+    const listRow    = plan.rows.find((r: any) => r.rowType === 'playlist');
+    const tagsRow    = plan.rows.find((r: any) => r.rowType === 'tags');
+    const otherRow   = plan.rows.find((r: any) => r.rowType === 'other');
+
+    // Description: expand blocks with Markdown sub-headers
+    let descMd = '';
+    if (descRow?.descriptionBlocks?.length) {
+        descMd = descRow.descriptionBlocks
+            .filter((b: any) => b.content?.trim())
+            .map((b: any) => `### ${b.label}\n${b.content}`)
+            .join('\n\n');
+    } else {
+        descMd = descRow?.content || '';
+    }
+
+    // Other settings table
+    let otherMd = '';
+    if (otherRow?.otherItems?.length) {
+        otherMd = '| 项目 | 值 |\n|------|-----|\n' +
+            otherRow.otherItems.map((i: any) => `| ${i.label} | ${i.value} |`).join('\n');
+    } else {
+        otherMd = otherRow?.content || '';
+    }
+
+    return `---
+keyword: "${plan.keyword}"
+project: "${projectId}"
+confirmed_at: "${now}"
+status: confirmed
+format: obsidian
+---
+
+# YouTube 营销方案: ${plan.keyword}
+
+## 1. 视频标题
+${titleRow?.content || ''}
+
+## 2. 视频描述
+${descMd}
+
+## 3. 缩略图
+${thumbRow?.content || '（未设置）'}
+
+## 4. Playlist
+${listRow?.content || ''}
+
+## 5. Tags
+${tagsRow?.content || ''}
+
+## 6. 其他设置
+${otherMd}
+`;
+}
+
+function generatePlainTxtContent(plan: any): string {
+    const titleRow   = plan.rows.find((r: any) => r.rowType === 'title');
+    const descRow    = plan.rows.find((r: any) => r.rowType === 'description');
+    const tagsRow    = plan.rows.find((r: any) => r.rowType === 'tags');
+    const otherRow   = plan.rows.find((r: any) => r.rowType === 'other');
+
+    let pinnedComment = '';
+    let hashtags = '';
+    let descPlain = '';
+
+    if (descRow?.descriptionBlocks?.length) {
+        const mainBlocks = descRow.descriptionBlocks.filter((b: any) =>
+            !['pinned_comment', 'hashtags'].includes(b.type) && b.content?.trim()
+        );
+        descPlain = mainBlocks.map((b: any) => stripMarkdown(b.content)).join('\n\n');
+
+        const pinnedBlock  = descRow.descriptionBlocks.find((b: any) => b.type === 'pinned_comment');
+        const hashtagBlock = descRow.descriptionBlocks.find((b: any) => b.type === 'hashtags');
+        pinnedComment = pinnedBlock?.content || '';
+        hashtags      = hashtagBlock?.content || '';
+    } else {
+        descPlain = stripMarkdown(descRow?.content || '');
+    }
+
+    let out = '';
+    out += `=== TITLE ===\n${stripMarkdown(titleRow?.content || '')}\n\n`;
+    out += `=== DESCRIPTION ===\n${descPlain}\n\n`;
+    out += `=== TAGS ===\n${tagsRow?.content || ''}\n\n`;
+
+    if (pinnedComment) out += `=== PINNED_COMMENT ===\n${stripMarkdown(pinnedComment)}\n\n`;
+    if (hashtags)      out += `=== HASHTAGS ===\n${hashtags}\n\n`;
+
+    if (otherRow?.otherItems?.length) {
+        out += `=== OTHER ===\n`;
+        out += otherRow.otherItems.map((i: any) => `${i.key}: ${i.value}`).join('\n');
+    } else if (otherRow?.content) {
+        out += `=== OTHER ===\n${otherRow.content}`;
+    }
+
+    return out.trimEnd();
+}
+
+router.post('/v3/confirm', async (req: Request, res: Response) => {
+    const { projectId, plans } = req.body;
+    if (!projectId || !Array.isArray(plans) || plans.length === 0) {
+        res.status(400).json({ error: 'projectId and plans are required' });
+        return;
+    }
+
+    const projectRoot  = getProjectRoot(projectId);
+    const marketingDir = path.join(projectRoot, '05_Marketing');
+
+    try {
+        await fs.promises.mkdir(marketingDir, { recursive: true });
+
+        const datestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, (c) => c === 'T' ? '-' : c);
+        const savedPaths: string[] = [];
+
+        for (const plan of plans) {
+            const slug = slugify(plan.keyword) || 'plan';
+            const baseName = `marketing_plan_${slug}_${datestamp}`;
+
+            const mdContent   = generateMarkdownContent(plan, projectId);
+            const txtContent  = generatePlainTxtContent(plan);
+
+            const mdPath  = path.join(marketingDir, `${baseName}.md`);
+            const txtPath = path.join(marketingDir, `${baseName}.plain.txt`);
+
+            await fs.promises.writeFile(mdPath, mdContent, 'utf-8');
+            await fs.promises.writeFile(txtPath, txtContent, 'utf-8');
+
+            // Relative paths for display
+            savedPaths.push(`05_Marketing/${baseName}.md`);
+            savedPaths.push(`05_Marketing/${baseName}.plain.txt`);
+        }
+
+        res.json({ success: true, paths: savedPaths, savedAt: new Date().toISOString() });
+    } catch (e: any) {
+        console.error('[market/confirm] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── V3: GET /api/market/v3/load-defaults ─────────────────────────────────────
+router.get('/v3/load-defaults', async (req: Request, res: Response) => {
+    const { projectId } = req.query as { projectId?: string };
+    if (!projectId) {
+        res.status(400).json({ error: 'projectId is required' });
+        return;
+    }
+
+    const projectRoot   = getProjectRoot(projectId);
+    const defaultsPath  = path.join(projectRoot, '05_Marketing', 'market_defaults.json');
+
+    try {
+        if (!fs.existsSync(defaultsPath)) {
+            // Return built-in defaults
+            res.json({
+                youtube: {
+                    language: 'zh-Hans',
+                    captionsCertification: 'none',
+                    alteredContent: false,
+                    madeForKids: false,
+                    category: '27',
+                    categoryName: 'Education',
+                    license: 'standard',
+                    allowComments: true,
+                    commentSort: 'newest',
+                    visibility: 'public',
+                    videoFilenamePattern: '{slug}-mindhikers-{date}',
+                },
+                x: null, wechat: null, bilibili: null,
+            });
+            return;
+        }
+
+        const raw = fs.readFileSync(defaultsPath, 'utf-8');
+        res.json(JSON.parse(raw));
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── V3: POST /api/market/v3/save-defaults ────────────────────────────────────
+router.post('/v3/save-defaults', async (req: Request, res: Response) => {
+    const { projectId, defaults } = req.body;
+    if (!projectId || !defaults) {
+        res.status(400).json({ error: 'projectId and defaults are required' });
+        return;
+    }
+
+    const projectRoot   = getProjectRoot(projectId);
+    const marketingDir  = path.join(projectRoot, '05_Marketing');
+    const defaultsPath  = path.join(marketingDir, 'market_defaults.json');
+
+    try {
+        await fs.promises.mkdir(marketingDir, { recursive: true });
+        await fs.promises.writeFile(defaultsPath, JSON.stringify(defaults, null, 2), 'utf-8');
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ── V3: GET /api/market/v3/session-status ────────────────────────────────────
 router.get('/v3/session-status', async (_req: Request, res: Response) => {
     try {

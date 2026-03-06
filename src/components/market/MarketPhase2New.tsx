@@ -16,6 +16,7 @@ import {
 import type { MarketModule_V3, MarketingPlan, MarketingPlanRow, SRTChapter } from '../../types';
 import { SRTUploader } from './SRTUploader';
 import { MarketPlanTable } from './MarketPlanTable';
+import { MarketConfirmBar } from './MarketConfirmBar';
 
 export interface MarketPhase2NewProps {
     data: MarketModule_V3;
@@ -381,21 +382,19 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                 </div>
             )}
 
-            {/* ── 全部完成提示 ── */}
-            {hasAnyPlan && (() => {
-                const readyPlans = data.plans.filter(p => p.generationStatus === 'ready');
-                const allConfirmed = readyPlans.every(p =>
-                    p.rows.length > 0 && p.rows.every(r => r.isConfirmed)
-                );
-                if (!allConfirmed) return null;
-                return (
-                    <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 text-center">
-                        <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                        <p className="text-green-300 font-semibold text-sm">所有营销方案已确认！</p>
-                        <p className="text-slate-500 text-xs mt-1">Sprint 5 将在此处添加「导出确认」功能</p>
-                    </div>
-                );
-            })()}
+            {/* ── 确认导出栏 ── */}
+            {hasAnyPlan && (
+                <MarketConfirmBar
+                    plans={data.plans}
+                    projectId={projectId}
+                    onExportDone={(paths) => {
+                        onUpdate({
+                            ...dataRef.current,
+                            savedOutputs: { paths, savedAt: new Date().toISOString() },
+                        });
+                    }}
+                />
+            )}
         </div>
     );
 };
