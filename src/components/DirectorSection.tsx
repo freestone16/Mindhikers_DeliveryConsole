@@ -252,6 +252,17 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     onUpdate({ ...data, items: updated });
   };
 
+  const handleBatchSetCheck = (filterFn: (opt: any) => boolean, checked: boolean) => {
+    const updated = displayedChapters.map(ch => ({
+      ...ch,
+      options: ch.options.map(opt =>
+        filterFn(opt) ? { ...opt, isChecked: checked } : opt
+      )
+    }));
+    setLocalChapters(null);
+    onUpdate({ ...data, items: updated });
+  };
+
   const handleRenderChecked = async () => {
     const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
 
@@ -385,6 +396,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
             onConfirmBRoll={handleConfirmBRoll}
             onSelect={handleSelectOption}
             onToggleCheck={handleToggleCheck}
+            onBatchSetCheck={handleBatchSetCheck}
             onRenderChecked={handleRenderChecked}
             onProceed={handleProceed}
             currentModel={currentModel}

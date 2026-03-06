@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Loader2, ChevronDown, ChevronUp, Info, Check } from 'lucide-react';
+import { Play, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import type { DirectorChapter, BRollType } from '../../types';
@@ -20,6 +20,7 @@ interface Phase2ViewProps {
   onConfirmBRoll: (types: BRollType[]) => void;
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
+  onBatchSetCheck: (filterFn: (opt: any) => boolean, checked: boolean) => void;
   onRenderChecked: () => void;
   onProceed: () => void;
   currentModel?: { provider: string; model: string };
@@ -33,6 +34,7 @@ export const Phase2View = ({
   onConfirmBRoll,
   onSelect,
   onToggleCheck,
+  onBatchSetCheck,
   onRenderChecked,
   onProceed,
   currentModel,
@@ -84,17 +86,20 @@ export const Phase2View = ({
 
   const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
 
+  const isShowAll = brollConfirmed && brollSelections.length === 0;
+  const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
+
   // Counts based on currently visible filters
-  const visibleOptionsCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => brollSelections.includes(o.type)).length, 0);
+  const visibleOptionsCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => matchesFilter(o.type)).length, 0);
   const visibleCheckedCount = chapters.reduce((sum, ch) =>
-    sum + ch.options.filter(o => brollSelections.includes(o.type) && o.isChecked).length, 0
+    sum + ch.options.filter(o => matchesFilter(o.type) && o.isChecked).length, 0
   );
 
   // Total counts for overall progress
   const totalOptions = chapters.reduce((sum, ch) => sum + ch.options.length, 0);
   const checkedCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => o.isChecked).length, 0);
-  const renderableCheckedCount = chapters.reduce((sum, ch) =>
-    sum + ch.options.filter(o => o.isChecked && RENDERABLE_TYPES.includes(o.type)).length, 0
+  const visibleRenderableCheckedCount = chapters.reduce((sum, ch) =>
+    sum + ch.options.filter(o => o.isChecked && matchesFilter(o.type) && RENDERABLE_TYPES.includes(o.type)).length, 0
   );
   const allChecked = chapters.length > 0 && chapters.every(c => c.options.some(o => o.isChecked));
 
@@ -183,7 +188,7 @@ export const Phase2View = ({
                 onClick={() => setBrollSelections([])}
                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
               >
-                清空过滤
+                清空过滤 (显示全部)
               </button>
             </div>
           )}
@@ -204,35 +209,27 @@ export const Phase2View = ({
         ) : (
           <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-800">
             <span className="text-xs text-slate-500 font-medium">批量操作:</span>
-            <button
-              onClick={() => {
-                chapters.forEach(ch => {
-                  ch.options.forEach(opt => {
-                    if (brollSelections.includes(opt.type) && !opt.isChecked) {
-                      onToggleCheck(ch.chapterId, opt.id);
-                    }
-                  });
-                });
-              }}
-              className="text-xs bg-green-900/40 text-green-400 hover:bg-green-800/60 hover:text-green-300 px-3 py-1.5 rounded transition-colors border border-green-800/50 flex items-center gap-1"
-            >
-              <Check className="w-3 h-3" />
-              勾选当前显示的全部方案
-            </button>
-            <button
-              onClick={() => {
-                chapters.forEach(ch => {
-                  ch.options.forEach(opt => {
-                    if (brollSelections.includes(opt.type) && opt.isChecked) {
-                      onToggleCheck(ch.chapterId, opt.id);
-                    }
-                  });
-                });
-              }}
-              className="text-xs bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white px-3 py-1.5 rounded transition-colors border border-slate-700 flex items-center gap-1"
-            >
-              取消勾选当前显示的方案
-            </button>
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/80 p-1.5 -ml-1.5 rounded transition-colors group">
+              <input
+                type="checkbox"
+                className="w-4 h-4 cursor-pointer accent-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                ref={el => {
+                  if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
+                }}
+                checked={visibleCheckedCount === visibleOptionsCount && visibleOptionsCount > 0}
+                disabled={visibleOptionsCount === 0}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  onBatchSetCheck(
+                    (opt) => matchesFilter(opt.type),
+                    isChecked
+                  );
+                }}
+              />
+              <span className="text-xs text-slate-400 group-hover:text-slate-300 select-none flex items-center gap-1">
+                全选当前视图方案 <span className="text-slate-500">({visibleCheckedCount}/{visibleOptionsCount})</span>
+              </span>
+            </label>
           </div>
         )}
       </div>
@@ -259,10 +256,12 @@ export const Phase2View = ({
                   <span className="text-slate-500 font-medium">/ {visibleOptionsCount} (当前显示)</span>
                 </div>
                 <div className="w-px h-6 bg-slate-700 mx-2"></div>
-                <div className="flex items-baseline gap-1 opacity-60">
-                  <span className="text-lg font-bold text-slate-400">{checkedCount}</span>
-                  <span className="text-slate-500 text-sm">/ {totalOptions} (全局总计)</span>
-                </div>
+                {brollSelections.length > 0 && (
+                  <div className="flex items-baseline gap-1 opacity-60">
+                    <span className="text-lg font-bold text-slate-400">{checkedCount}</span>
+                    <span className="text-slate-500 text-sm">/ {totalOptions} (全局总计)</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -274,11 +273,11 @@ export const Phase2View = ({
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
                   >
                     <Play className="w-4 h-4" />
-                    渲染 AI 条目 ({renderableCheckedCount})
+                    渲染 AI 条目 ({visibleRenderableCheckedCount})
                   </button>
-                  {checkedCount > renderableCheckedCount && (
+                  {visibleCheckedCount > visibleRenderableCheckedCount && (
                     <span className="text-[10px] text-slate-500 mt-1">
-                      (其余 {checkedCount - renderableCheckedCount} 项为外部素材，无需渲染)
+                      (其余 {visibleCheckedCount - visibleRenderableCheckedCount} 项为外部素材，无需渲染)
                     </span>
                   )}
                 </div>
@@ -296,7 +295,7 @@ export const Phase2View = ({
 
           <div className="flex flex-col gap-4">
             {chapters.map(chapter => {
-              const filteredOptions = chapter.options.filter(o => brollSelections.includes(o.type));
+              const filteredOptions = chapter.options.filter(o => matchesFilter(o.type));
               if (filteredOptions.length === 0) return null;
 
               // Only pass filtered options to the chapter card
