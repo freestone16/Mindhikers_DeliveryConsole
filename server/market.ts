@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import multer from 'multer';
 import { getTubeBuddyWorker } from './workers/tubebuddy-worker';
 import type { TubeBuddyScore } from '../src/types';
 import { callLLM } from './llm';
 import { loadConfig } from './llm-config';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -411,6 +414,238 @@ ${scoredSummary}
         res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
     } catch (e: any) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: e.message })}\n\n`);
+    } finally {
+        res.end();
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sprint 4 Routes — Phase 2 营销方案生成与审阅
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Parse SRT content into plain-text timeline lines (used for description timeline block) */
+function parseSRTToTimeline(srtContent: string): string {
+    const lines = srtContent.split(/\r?\n/);
+    const timelineEntries: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i].trim();
+        // Sequence number
+        if (/^\d+$/.test(line)) {
+            i++;
+            const tcLine = (lines[i] || '').trim();
+            // Timecode line: 00:00:01,000 --> 00:00:05,000
+            const tcMatch = tcLine.match(/^(\d{2}:\d{2}:\d{2})/);
+            if (tcMatch) {
+                const start = tcMatch[1].replace(/,\d+$/, '');  // keep HH:MM:SS
+                i++;
+                const textLines: string[] = [];
+                while (i < lines.length && lines[i].trim() !== '') {
+                    textLines.push(lines[i].trim());
+                    i++;
+                }
+                const text = textLines.join(' ').trim();
+                if (text) {
+                    // Convert HH:MM:SS to MM:SS for YouTube chapters (drop leading 00:)
+                    const mmss = start.replace(/^00:/, '');
+                    timelineEntries.push(`${mmss} ${text.slice(0, 60)}`);
+                }
+            }
+        }
+        i++;
+    }
+    // Deduplicate consecutive similar entries (SRT often repeats text across frames)
+    const deduped: string[] = [];
+    for (const entry of timelineEntries) {
+        const last = deduped[deduped.length - 1] || '';
+        const lastText = last.replace(/^\d+:\d+ /, '');
+        const curText = entry.replace(/^\d+:\d+ /, '');
+        if (!last || lastText !== curText) deduped.push(entry);
+    }
+    return deduped.join('\n');
+}
+
+/** Build the LLM prompt for generating a complete marketing plan */
+function buildGeneratePlanPrompt(
+    keyword: string,
+    bestVariant: string,
+    scriptContent: string,
+    timelineContent: string
+): string {
+    return `你是MindHikers YouTube频道营销大师，专注于科学严谨的个人成长内容。
+请基于以下信息，为视频生成完整的中文营销方案。
+
+## 目标黄金关键词
+简体：${keyword}
+最优变体：${bestVariant}
+
+## 视频脚本（节选）
+${scriptContent}
+
+${timelineContent ? `## 章节时间轴（来自SRT）\n${timelineContent}\n` : ''}
+
+## 输出要求
+请严格按以下JSON格式输出（只输出JSON，不要任何其他文字）：
+{
+  "title": "视频标题（必须包含黄金关键词，总长40-60字符，吸引点击）",
+  "description_blocks": {
+    "hook": "开头钩子（1-2句激发好奇心的引导语，可含1-2个emoji，纯文本严禁Markdown）",
+    "geo_qa": "GEO结构化问答（2-3组问答，以问号结尾的问题+简洁答案，供AI引擎抓取）",
+    "series": "系列说明（1-2句介绍本视频在系列中的位置和价值）",
+    "action_plan": "行动号召（引导订阅点赞评论，含emoji，简洁有力）",
+    "timeline": "${timelineContent ? '（使用上面的SRT章节时间轴，调整为YouTube格式：00:00 章节名）' : '视频章节时间轴（00:00 开场，格式每行一个章节）'}",
+    "references": "参考资料（视频中提到的书籍、论文、工具名称，每行一条）",
+    "pinned_comment": "置顶评论文字（资源链接说明，引导用户查看描述中的内容）",
+    "hashtags": "#Hashtag1 #Hashtag2（5-8个相关Hashtag，中英文混合，空格分隔）"
+  },
+  "thumbnail": "缩略图关键词（英文设计提示词，供Midjourney/DALL-E生成，突出关键视觉元素）",
+  "playlist": "推荐播放列表名称（与视频内容最匹配的系列名）",
+  "tags": "标签1,标签2,标签3,...（20-30个YouTube SEO标签，逗号分隔，含简繁体变体和长尾词）",
+  "other": "其他营销备注（发布时机、互推建议、A/B测试提醒等）"
+}`;
+}
+
+/** Convert LLM JSON response to MarketingPlanRow array */
+function parsePlanFromLLM(llmOutput: string, keywordId: string, keyword: string): any[] {
+    let parsed: any = {};
+    try {
+        const jsonMatch = llmOutput.match(/\{[\s\S]*\}/);
+        if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+        return [];
+    }
+
+    const db = parsed.description_blocks || {};
+    const blockTypes = ['hook', 'geo_qa', 'series', 'action_plan', 'timeline', 'references', 'pinned_comment', 'hashtags'] as const;
+    const blockLabels: Record<string, string> = {
+        hook: '开头钩子', geo_qa: 'GEO问答', series: '系列说明',
+        action_plan: '行动号召', timeline: '章节时间轴', references: '参考资料',
+        pinned_comment: '置顶评论', hashtags: 'Hashtags',
+    };
+    const descriptionBlocks = blockTypes.map(type => ({
+        id: `block-${type}`,
+        type,
+        label: blockLabels[type] || type,
+        content: db[type] || '',
+        isCollapsed: type !== 'hook', // Hook expanded by default
+    }));
+
+    // Combine description blocks into a single preview string
+    const descPreview = descriptionBlocks.map(b => `[${b.label}] ${b.content}`).join('\n\n');
+
+    return [
+        { id: `${keywordId}-title`,       rowType: 'title',       label: '标题',     content: parsed.title || '',     isConfirmed: false },
+        { id: `${keywordId}-description`, rowType: 'description', label: '视频描述', content: descPreview,             isConfirmed: false, descriptionBlocks },
+        { id: `${keywordId}-thumbnail`,   rowType: 'thumbnail',   label: '缩略图',   content: parsed.thumbnail || '',  isConfirmed: false },
+        { id: `${keywordId}-playlist`,    rowType: 'playlist',    label: '播放列表', content: parsed.playlist || '',   isConfirmed: false },
+        { id: `${keywordId}-tags`,        rowType: 'tags',        label: '标签',     content: parsed.tags || '',       isConfirmed: false },
+        { id: `${keywordId}-other`,       rowType: 'other',       label: '其他设置', content: parsed.other || '',      isConfirmed: false },
+    ];
+}
+
+// ── V3: POST /api/market/v3/upload-srt ───────────────────────────────────────
+router.post('/v3/upload-srt', upload.single('srt'), (req: Request, res: Response): void => {
+    if (!req.file) {
+        res.status(400).json({ error: 'No SRT file uploaded' });
+        return;
+    }
+
+    const srtContent = req.file.buffer.toString('utf-8');
+    const timeline = parseSRTToTimeline(srtContent);
+    const chapters = timeline.split('\n').filter(Boolean).map(line => {
+        const m = line.match(/^(\d+:\d+(?::\d+)?) (.+)$/);
+        if (m) return { startTime: m[1], title: m[2] };
+        return null;
+    }).filter(Boolean);
+
+    res.json({ success: true, chapters, timeline });
+});
+
+// ── V3: POST /api/market/v3/generate-plan ────────────────────────────────────
+router.post('/v3/generate-plan', async (req: Request, res: Response) => {
+    const { projectId, scriptPath, keyword, keywordId, bestVariantText, srtTimeline = '' } = req.body;
+    setupSSE(res);
+
+    try {
+        res.write(`data: ${JSON.stringify({ type: 'generating', keywordId, keyword })}\n\n`);
+
+        let scriptContent = '';
+        try {
+            scriptContent = readScriptContent(projectId, scriptPath);
+        } catch (e: any) {
+            res.write(`data: ${JSON.stringify({ type: 'error', keywordId, message: `脚本读取失败: ${e.message}` })}\n\n`);
+            res.end();
+            return;
+        }
+
+        const prompt = buildGeneratePlanPrompt(keyword, bestVariantText || keyword, scriptContent, srtTimeline);
+
+        const config = loadConfig();
+        const provider = (config.global?.provider || 'siliconflow') as any;
+        const model = config.global?.model || undefined;
+
+        let llmOutput = '';
+        try {
+            llmOutput = await callLLM([{ role: 'user', content: prompt }], provider, model);
+        } catch (e: any) {
+            res.write(`data: ${JSON.stringify({ type: 'error', keywordId, message: `LLM生成失败: ${e.message}` })}\n\n`);
+            res.end();
+            return;
+        }
+
+        const rows = parsePlanFromLLM(llmOutput, keywordId, keyword);
+        if (rows.length === 0) {
+            res.write(`data: ${JSON.stringify({ type: 'error', keywordId, message: 'LLM返回格式无法解析，请重试' })}\n\n`);
+        } else {
+            res.write(`data: ${JSON.stringify({ type: 'plan_ready', keywordId, keyword, rows })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+    } catch (e: any) {
+        res.write(`data: ${JSON.stringify({ type: 'error', keywordId: req.body.keywordId, message: e.message })}\n\n`);
+    } finally {
+        res.end();
+    }
+});
+
+// ── V3: POST /api/market/v3/revise-row ───────────────────────────────────────
+router.post('/v3/revise-row', async (req: Request, res: Response) => {
+    const { rowType, rowLabel, instruction, currentContent, keyword, keywordId } = req.body;
+    setupSSE(res);
+
+    try {
+        res.write(`data: ${JSON.stringify({ type: 'revising', keywordId, rowType })}\n\n`);
+
+        const prompt = `你是MindHikers YouTube频道营销大师。请按指令修改以下营销方案的「${rowLabel}」字段。
+
+目标关键词：${keyword}
+
+当前内容：
+${currentContent}
+
+修改指令：${instruction}
+
+${rowType === 'description' ? `
+请只修改描述内容，保持与原格式一致（纯文本，禁止Markdown符号 ## ** - 等）。
+请以JSON格式返回修改后的description_blocks对象。` : `
+请直接返回修改后的${rowLabel}文本，不要任何解释。`}`;
+
+        const config = loadConfig();
+        const provider = (config.global?.provider || 'siliconflow') as any;
+        const model = config.global?.model || undefined;
+
+        let result = '';
+        try {
+            result = await callLLM([{ role: 'user', content: prompt }], provider, model);
+        } catch (e: any) {
+            res.write(`data: ${JSON.stringify({ type: 'error', keywordId, rowType, message: e.message })}\n\n`);
+            res.end();
+            return;
+        }
+
+        res.write(`data: ${JSON.stringify({ type: 'row_ready', keywordId, rowType, content: result.trim() })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+    } catch (e: any) {
+        res.write(`data: ${JSON.stringify({ type: 'error', keywordId: req.body.keywordId, rowType: req.body.rowType, message: e.message })}\n\n`);
     } finally {
         res.end();
     }
