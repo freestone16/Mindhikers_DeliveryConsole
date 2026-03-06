@@ -21,6 +21,7 @@
 | v3.6   | 2026-03-03 | **火山引擎文生图预览修复** - 修复尺寸限制（2560x1440, 16:9）+ 响应数据路径解析                       |
 | v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级                                                            |
 | v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID                 |
+| v4.0.0 | 2026-03-06 | **SD-207 V3 营销大师全量重构** - 5 Sprint 完成；TubeBuddy Playwright、SSE 生成、Phase 2 审阅、双格式导出 |
 
 ---
 
@@ -1132,5 +1133,51 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
    - **实现**：在 `server/index.ts` `select-project` 及 `api/scripts/select` 中，除了清空 `delivery_store.json`，增加对其项目下 `04_Visuals` 内历史状态文件（`selection_state.json` / `phase2_review_state.json` / `phase3_render_state.json`）的物理删除 `fs.unlinkSync` 逻辑。
 
 3. **Phase 1 概念提案本地落盘**
-   - **需求**：Phase 1 Web 界面端生成的“视觉概念提案”必须以物理文件留存以做记录
+   - **需求**：Phase 1 Web 界面端生成的”视觉概念提案”必须以物理文件留存以做记录
    - **实现**：在 `server/director.ts` 的 `generatePhase1` 和 `reviseConcept` 方法中，自动将 Markdown 内容写入 `04_Visuals/phase1_视觉概念提案_${projectId}.md`
+
+---
+
+## v4.0.0 营销大师全量重构（SD-207 V3）— 2026-03-06
+
+**5 Sprint 全部完成，commit: addb99a → f35df39 → b31934c**
+
+### Sprint 1 — 基础设施
+- `types.ts`：MarketModule_V3 全套类型（CandidateKeyword、KeywordVariant、DescriptionBlock、MarketingPlan 等）
+- `MarketingSection.tsx`：重写为 2-Phase 编排器
+- `App.tsx`：接入 MarketingMaster 专属路由
+- Mock 数据 + 状态持久化验证
+
+### Sprint 2 — Phase 1 前后端
+- `MarketPhase1New.tsx`：三子步视图（候选词生成 → 评分 → 选择）
+- `CandidateKeywordList.tsx`：含简繁体标识、增删、手动添加
+- `KeywordScoreTable.tsx`：TubeBuddy 评分对比表 + 重试 + 时间显示 + 追加关键词
+- `KeywordAnalysis.tsx`：LLM 策略点评卡片
+- V3 API: `generate-candidates` / `score-candidates` / `score-single` / `analyze-keywords`（SSE + LLM）
+
+### Sprint 3 — TubeBuddy Worker 升级
+- `server/workers/tubebuddy-worker.ts`：完整 Playwright Web Dashboard 交互
+- `CredentialManager`：30 分钟无活动自动清除 cookies/session
+- `RateLimiter`：3s + 0-1.5s jitter，30次/session 上限
+- `TB_SELECTORS`：配置化 CSS 选择器数组（易于适配 TubeBuddy DOM 变更）
+- `TUBEBUDDY_DEV_MOCK=1` 开关 + `/api/market/dev/tubebuddy-test` 调试页面
+
+### Sprint 4 — Phase 2 前后端
+- `SRTUploader.tsx`：拖拽上传 .srt，SSE 解析章节时间轴
+- `DescriptionEditor.tsx`：8 子区块独立可编辑（Markdown 警告 + Emoji 计数）
+- `MarketPlanTable.tsx`：6 行审阅表格（inline 编辑 + 绿色对勾 + AI 重新生成）
+- `MarketPhase2New.tsx`：完整 Phase 2 编排（dataRef 模式防 SSE 闭包泄漏）
+- V3 API: `upload-srt` / `generate-plan` / `revise-row`
+
+### Sprint 5 — 确认导出 + DefaultSettings + ConfirmBar
+- `MarketConfirmBar.tsx`：底部确认栏，显示方案确认状态，一键绿色导出
+- `POST /v3/confirm`：生成 `.md`（Obsidian 用，含 Markdown）+ `.plain.txt`（YouTube Studio 用，零 Markdown）保存至 `05_Marketing/`
+- `GET/POST /v3/load-defaults` & `/save-defaults`：双写持久化（localStorage + JSON 文件）
+- `MarketDefaultSettings.tsx`：完全受控表单，挂载时从 API 加载，保存时双写
+- `MarketPhase2New.tsx`：接入 MarketConfirmBar，导出成功写入 savedOutputs
+
+### 架构亮点
+- **dataRef 模式**：SSE 流式更新中通过 `useRef(data)` 避免 stale closure
+- **双格式输出**：.md（结构化存档）/ .plain.txt（分发终端直读）
+- **session_expired 短路**：TubeBuddy 评分时遇 session 过期立即中止整批评分
+- **slugify + stripMarkdown**：confirm 路由中对关键词生成安全文件名，对内容二次清洗
