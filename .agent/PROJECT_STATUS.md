@@ -1,9 +1,9 @@
 # 📊 DeliveryConsole 项目状态板
 
-> 最后更新: 2026-03-05  
+> 最后更新: 2026-03-06
 > 分支: `main`
 > 最新里程碑: `v3.9` (Universal Expert Action Engine)
-> 最新 Commit: `787afce`
+> 最新 Commit: `checkpoint(Director): 增加重置组件缓存与历史记录按键`
 
 ---
 
@@ -34,6 +34,7 @@
 ## 最新变更
 
 - **2026-03-06**: ✅ 修复了 Phase 2 批量勾选状态的竞态条件问题，并应用了统一的 3 态 Excel 风格 Checkbox。
+- **2026-03-06**: ✅ 新增 `DirectorSection` 的重置缓存功能，支持一键清空记录回到 Phase 1。
 - **2026-03-05**: ✅ 修复了服务器优雅关闭退出卡顿的问题；整理了版本管理规范。
 
 ---
