@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { getTubeBuddyWorker } from './workers/tubebuddy-worker';
+import type { TubeBuddyScore } from '../src/types';
 import { callLLM } from './llm';
 import { loadConfig } from './llm-config';
 
@@ -150,25 +151,34 @@ function setupSSE(res: Response) {
     res.flushHeaders();
 }
 
-/** Helper: deterministic mock TubeBuddy score (Sprint 2 placeholder, Sprint 3 = real DOM) */
-function mockTubeBuddyScore(keyword: string, script: 'simplified' | 'traditional') {
-    const seed = keyword.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const rng = (min: number, max: number, offset = 0) => min + ((seed + offset) % (max - min + 1));
-    const searchVolume = rng(35, 90, 1);
-    const competition = rng(25, 80, 2);
-    const optimization = rng(50, 95, 3);
-    const relevance = rng(60, 98, 4);
-    const penalty = script === 'traditional' ? -8 : 0;
-    const overall = Math.round(
-        searchVolume * 0.3 + (100 - competition) * 0.2 + optimization * 0.3 + relevance * 0.2 + penalty
-    );
-    return {
-        overall: Math.max(30, Math.min(99, overall)),
-        searchVolume,
-        competition,
-        optimization,
-        relevance,
-    };
+/**
+ * Dev-mode override: force mock scoring even when Playwright is available.
+ * Set env var TUBEBUDDY_DEV_MOCK=1 to enable during development without a real TubeBuddy session.
+ */
+const DEV_MOCK_MODE = process.env.TUBEBUDDY_DEV_MOCK === '1';
+
+/**
+ * Score a single keyword variant via TubeBuddyWorker (real Playwright) or its internal mock.
+ * Returns the score or throws a typed error:
+ *   { type: 'session_expired' } — user must re-login in the browser
+ *   { type: 'selector_not_found' | 'timeout' | 'network_error' } — transient, can retry
+ */
+async function scoreSingleVariant(
+    variantText: string,
+    variantScript: 'simplified' | 'traditional'
+): Promise<TubeBuddyScore> {
+    if (DEV_MOCK_MODE) {
+        // Quick deterministic mock for CI / no-browser dev sessions
+        const seed = variantText.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        const rng = (min: number, max: number, offset = 0) => min + ((seed + offset) % (max - min + 1));
+        const sv = rng(35, 90, 1), comp = rng(25, 80, 2), opt = rng(50, 95, 3), rel = rng(60, 98, 4);
+        const penalty = variantScript === 'traditional' ? -8 : 0;
+        const overall = Math.max(30, Math.min(99, Math.round(sv * 0.3 + (100 - comp) * 0.2 + opt * 0.3 + rel * 0.2 + penalty)));
+        await new Promise(r => setTimeout(r, 300 + Math.random() * 200)); // lightweight mock delay
+        return { overall, searchVolume: sv, competition: comp, optimization: opt, relevance: rel };
+    }
+    const worker = await getTubeBuddyWorker();
+    return worker.scoreKeyword(variantText, variantScript);
 }
 
 // ── V3: POST /api/market/v3/generate-candidates ──────────────────────────────
@@ -271,22 +281,30 @@ router.post('/v3/score-candidates', async (req: Request, res: Response) => {
                 })}\n\n`);
 
                 const startTime = Date.now();
-                // Sprint 2: realistic delay simulation (Sprint 3 replaces with Playwright)
-                const delay = 2500 + Math.random() * 2000;
-                await new Promise(r => setTimeout(r, delay));
 
-                // Simulate 1-in-8 error rate for UI testing
-                if (Math.random() < 0.125) {
+                let score: TubeBuddyScore;
+                try {
+                    score = await scoreSingleVariant(variant.text, variant.script);
+                } catch (err: any) {
+                    if (err.type === 'session_expired') {
+                        // Broadcast session error and abort entire scoring run
+                        res.write(`data: ${JSON.stringify({
+                            type: 'session_expired',
+                            message: err.message || 'TubeBuddy 登录已过期，请在弹出的浏览器窗口中重新登录',
+                        })}\n\n`);
+                        res.end();
+                        return;
+                    }
+                    // Transient error — mark variant as error, continue with the rest
                     res.write(`data: ${JSON.stringify({
                         type: 'error',
                         keywordId: kw.id,
                         variantScript: variant.script,
-                        message: 'TubeBuddy 评分超时，请重试',
+                        message: err.message || 'TubeBuddy 评分失败，可点击重试',
                     })}\n\n`);
                     continue;
                 }
 
-                const score = mockTubeBuddyScore(variant.text, variant.script);
                 res.write(`data: ${JSON.stringify({
                     type: 'scored',
                     keywordId: kw.id,
@@ -313,9 +331,24 @@ router.post('/v3/score-single', async (req: Request, res: Response) => {
     try {
         res.write(`data: ${JSON.stringify({ type: 'scoring', keywordId, variantScript })}\n\n`);
         const startTime = Date.now();
-        await new Promise(r => setTimeout(r, 2500 + Math.random() * 2000));
 
-        const score = mockTubeBuddyScore(variantText, variantScript);
+        let score: TubeBuddyScore;
+        try {
+            score = await scoreSingleVariant(variantText, variantScript);
+        } catch (err: any) {
+            if (err.type === 'session_expired') {
+                res.write(`data: ${JSON.stringify({
+                    type: 'session_expired',
+                    message: err.message || 'TubeBuddy 登录已过期，请重新登录',
+                })}\n\n`);
+                res.end();
+                return;
+            }
+            res.write(`data: ${JSON.stringify({ type: 'error', keywordId, variantScript, message: err.message })}\n\n`);
+            res.end();
+            return;
+        }
+
         res.write(`data: ${JSON.stringify({
             type: 'scored',
             keywordId,
@@ -381,6 +414,170 @@ ${scoredSummary}
     } finally {
         res.end();
     }
+});
+
+// ── V3: GET /api/market/v3/session-status ────────────────────────────────────
+router.get('/v3/session-status', async (_req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        res.json(worker.getSessionStatus());
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── V3: POST /api/market/v3/clear-session ────────────────────────────────────
+router.post('/v3/clear-session', async (_req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        await worker.credentialManager.clearCredentials('manual API call');
+        res.json({ success: true, message: 'Session cleared. Worker will reinitialize on next scoring request.' });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── V3: POST /api/market/v3/test-score (dev only) ────────────────────────────
+router.post('/v3/test-score', async (req: Request, res: Response) => {
+    const { keyword, script = 'simplified' } = req.body;
+    if (!keyword) {
+        res.status(400).json({ error: 'keyword is required' });
+        return;
+    }
+    try {
+        const score = await scoreSingleVariant(keyword, script);
+        res.json({ keyword, script, score });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, type: (e as any).type });
+    }
+});
+
+// ── Dev: GET /api/market/dev/tubebuddy-test ───────────────────────────────────
+// HTML debug page — only available in development
+router.get('/dev/tubebuddy-test', async (_req: Request, res: Response) => {
+    const workerStatus = await (async () => {
+        try {
+            const worker = await getTubeBuddyWorker();
+            return worker.getSessionStatus();
+        } catch (e: any) {
+            return { error: e.message };
+        }
+    })();
+
+    const statusJson = JSON.stringify(workerStatus, null, 2);
+    const profileDir = (workerStatus as any).profileDir || '(unavailable)';
+    const isPlaywright = (workerStatus as any).playwrightAvailable;
+    const statusBadge = isPlaywright
+        ? '<span class="badge ok">✅ Playwright 已安装</span>'
+        : '<span class="badge warn">⚠️ Playwright 未安装 (使用 mock 模式)</span>';
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>TubeBuddy Worker — Dev Debug</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { margin: 0; background: #0f1117; color: #e2e8f0; padding: 2rem; }
+    h1 { color: #f6ad55; margin-bottom: 0.25rem; }
+    h2 { color: #90cdf4; font-size: 1rem; margin-top: 2rem; border-bottom: 1px solid #2d3748; padding-bottom: 0.5rem; }
+    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.8rem; }
+    .badge.ok { background: #276749; color: #9ae6b4; }
+    .badge.warn { background: #744210; color: #fbd38d; }
+    .badge.err { background: #742a2a; color: #feb2b2; }
+    pre { background: #1a202c; border: 1px solid #2d3748; border-radius: 8px; padding: 1rem; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap; }
+    input, select { background: #1a202c; border: 1px solid #4a5568; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; }
+    button { background: #4a90d9; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    button:hover { background: #3a7bc8; }
+    button.danger { background: #e53e3e; }
+    button.danger:hover { background: #c53030; }
+    .row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; }
+    #result { margin-top: 1rem; }
+    .section { margin-bottom: 2rem; background: #161b27; border-radius: 10px; padding: 1.25rem; border: 1px solid #2d3748; }
+    .setup-steps ol { line-height: 2; }
+    code { background: #2d3748; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', monospace; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>🔬 TubeBuddy Worker — Dev Debug</h1>
+  <p style="color:#718096">DeliveryConsole 内部调试页面 · 仅限开发环境</p>
+
+  <div class="section">
+    <h2>⚡ 当前状态</h2>
+    ${statusBadge}
+    <pre>${statusJson}</pre>
+    <div class="row">
+      <button onclick="clearSession()">🗑️ 清除 Session</button>
+      <button onclick="refreshStatus()">🔄 刷新状态</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🧪 测试评分</h2>
+    <div class="row">
+      <input id="kw" type="text" placeholder="输入关键词，如：AI学习效率" style="width:280px" />
+      <select id="script">
+        <option value="simplified">简体</option>
+        <option value="traditional">繁體</option>
+      </select>
+      <button onclick="testScore()">📊 测试评分</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <div class="section setup-steps">
+    <h2>📋 首次使用配置步骤</h2>
+    <ol>
+      <li>安装 Playwright：<code>npm install playwright</code> 然后 <code>npx playwright install chromium</code></li>
+      <li>重启 dev server，浏览器将自动打开（使用 profile：<code>${profileDir}</code>）</li>
+      <li>在弹出的浏览器中访问 <a href="https://www.tubebuddy.com" target="_blank" style="color:#63b3ed">tubebuddy.com</a> 并登录 TubeBuddy Pro 账户</li>
+      <li>回到此页面，确认「isLoggedIn: true」</li>
+      <li>测试一个关键词，确认评分返回真实数据</li>
+    </ol>
+    <p style="color:#718096;font-size:0.85rem">
+      Chrome Profile 将保存登录状态。设置 <code>TUBEBUDDY_DEV_MOCK=1</code> 可跳过 Playwright 强制使用 mock 模式。
+    </p>
+  </div>
+
+  <script>
+    async function refreshStatus() {
+      const r = await fetch('/api/market/v3/session-status');
+      const data = await r.json();
+      document.querySelector('pre').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function clearSession() {
+      if (!confirm('确认清除 TubeBuddy Session（将需要重新登录）？')) return;
+      const r = await fetch('/api/market/v3/clear-session', { method: 'POST' });
+      const data = await r.json();
+      alert(data.message || data.error);
+      refreshStatus();
+    }
+
+    async function testScore() {
+      const keyword = document.getElementById('kw').value.trim();
+      const script = document.getElementById('script').value;
+      if (!keyword) { alert('请输入关键词'); return; }
+
+      const el = document.getElementById('result');
+      el.innerHTML = '<pre>评分中，请稍候...</pre>';
+
+      try {
+        const r = await fetch('/api/market/v3/test-score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword, script }),
+        });
+        const data = await r.json();
+        el.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      } catch (e) {
+        el.innerHTML = '<pre style="color:#fc8181">请求失败: ' + e.message + '</pre>';
+      }
+    }
+  </script>
+</body>
+</html>`);
 });
 
 export default router;

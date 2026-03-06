@@ -457,19 +457,13 @@ export interface TitleTagSet {
     userComment?: string;
 }
 
+/** TubeBuddy Keyword Explorer 评分 (Sprint 3 — 真实 DOM 提取后使用此 flat 结构) */
 export interface TubeBuddyScore {
-    overallScore: number;
-    weightedScore?: number;
-    metrics: {
-        searchVolume: number;
-        competition: number;
-        optimization: number;
-        relevance: number;
-    };
-    rawMetrics?: {
-        monthlySearches?: number;
-        competitionLevel?: 'low' | 'medium' | 'high';
-    };
+    overall: number;        // 综合评分 0-100
+    searchVolume: number;   // 搜索量 0-100
+    competition: number;    // 竞争度 0-100
+    optimization: number;   // 优化度 0-100
+    relevance: number;      // 相关度 0-100
 }
 
 export interface MarketModule_V2 {
