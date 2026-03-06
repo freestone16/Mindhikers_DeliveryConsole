@@ -9,6 +9,7 @@
 > - `docs/00_architecture/architecture_v3_master.md` (三级火箭总纲)
 > - `docs/00_architecture/llm_config_design.md` (LLM配置管理)
 > **修订记录**:
+> - 2026-03-06 (V3.1): 为组件 DirectorSection 增加「重置」按钮，清空本地状态并重置历史，回归 Phase 1。
 > - 2026-02-23 (V3): 补充完整 Phase 1-3 实施方案，预览图规格 320×180，集成 LLM 配置系统。
 > - 2026-02-23 (V2): 引入 Human-in-the-loop (带环审核) 机制，细化分镜预览 (SiliconFlow/Remotion) 与 Phase 3 渲染台逻辑。
 
@@ -81,11 +82,11 @@ interface DirectorAction {
 
 ### 4.1 预览图规格
 
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| 尺寸 | **320 × 180 px** | 约 4K 全屏的 1/12 高度 |
-| 格式 | PNG | Remotion still 输出 |
-| 存储路径 | `04_Visuals/previews/` | 按章节组织 |
+| 参数     | 值                     | 说明                   |
+| -------- | ---------------------- | ---------------------- |
+| 尺寸     | **320 × 180 px**       | 约 4K 全屏的 1/12 高度 |
+| 格式     | PNG                    | Remotion still 输出    |
+| 存储路径 | `04_Visuals/previews/` | 按章节组织             |
 
 ### 4.2 章节结构
 
@@ -103,20 +104,20 @@ interface DirectorAction {
 
 ### 4.3 渲染规格
 
-| 类型 | 分辨率 | 帧率 | 说明 |
-|------|--------|------|------|
-| Remotion | **4K (3840×2160)** | 30fps | 极清渲染 |
+| 类型     | 分辨率                | 帧率  | 说明     |
+| -------- | --------------------- | ----- | -------- |
+| Remotion | **4K (3840×2160)**    | 30fps | 极清渲染 |
 | 文生视频 | **1080p (1920×1080)** | 30fps | 生产级别 |
 
 ### 4.4 文件产出
 
-| 文件 | 路径 | 内容 |
-|------|------|------|
-| 概念提案 | `04_Visuals/phase1_concept.md` | 视觉基调与风格定义 |
-| 预览图 | `04_Visuals/previews/ch{N}_opt{M}.png` | 320×180 缩略图 |
-| 选择状态 | `04_Visuals/selection_state.json` | 用户打勾锁定记录 |
-| 视觉方案 | `04_Visuals/visual_plan.json` | 最终 JSON 契约 |
-| 渲染视频 | `06_Video_Broll/ch{N}_*.mp4` | MP4 成片 |
+| 文件     | 路径                                   | 内容               |
+| -------- | -------------------------------------- | ------------------ |
+| 概念提案 | `04_Visuals/phase1_concept.md`         | 视觉基调与风格定义 |
+| 预览图   | `04_Visuals/previews/ch{N}_opt{M}.png` | 320×180 缩略图     |
+| 选择状态 | `04_Visuals/selection_state.json`      | 用户打勾锁定记录   |
+| 视觉方案 | `04_Visuals/visual_plan.json`          | 最终 JSON 契约     |
+| 渲染视频 | `06_Video_Broll/ch{N}_*.mp4`           | MP4 成片           |
 
 ---
 
@@ -183,18 +184,18 @@ const llmConfig = await getExpertLLMConfig('director');
 
 ## 7. 实施任务清单
 
-| # | 任务 | 优先级 | 依赖 |
-|---|------|--------|------|
-| 0 | INF-001 LLM 配置系统 | P0 | 无 |
-| 1 | Phase 1 UI + SSE | P1 | #0 |
-| 2 | Phase 1 后端 API | P1 | #0 |
-| 3 | Phase 2 B-Roll 选择器 | P1 | #0 |
-| 4 | Phase 2 三列式 UI | P1 | #3 |
-| 5 | Phase 2 预览生成 (Remotion still) | P1 | #4 |
-| 6 | Phase 2 预览生成 (SiliconFlow) | P2 | #4 |
-| 7 | Phase 3 渲染控制台 UI | P1 | #5, #6 |
-| 8 | Phase 3 Remotion render 集成 | P1 | #7 |
-| 9 | 完整流程测试 | P1 | #8 |
+| #   | 任务                              | 优先级 | 依赖   |
+| --- | --------------------------------- | ------ | ------ |
+| 0   | INF-001 LLM 配置系统              | P0     | 无     |
+| 1   | Phase 1 UI + SSE                  | P1     | #0     |
+| 2   | Phase 1 后端 API                  | P1     | #0     |
+| 3   | Phase 2 B-Roll 选择器             | P1     | #0     |
+| 4   | Phase 2 三列式 UI                 | P1     | #3     |
+| 5   | Phase 2 预览生成 (Remotion still) | P1     | #4     |
+| 6   | Phase 2 预览生成 (SiliconFlow)    | P2     | #4     |
+| 7   | Phase 3 渲染控制台 UI             | P1     | #5, #6 |
+| 8   | Phase 3 Remotion render 集成      | P1     | #7     |
+| 9   | 完整流程测试                      | P1     | #8     |
 
 ---
 

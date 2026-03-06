@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MonitorPlay } from 'lucide-react';
+import { MonitorPlay, RotateCcw } from 'lucide-react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
@@ -136,6 +136,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
 
   const handleApproveConcept = () => {
     onUpdate({ ...data, isConceptApproved: true, phase: 2 });
+  };
+
+  const handleReset = () => {
+    if (window.confirm('确定要重置所有缓存并回到 Phase 1 吗？此操作不可撤销。')) {
+      socket?.emit('chat-clear-history', { expertId: 'Director', projectId });
+      onUpdate({ phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] });
+      setLocalChapters(null);
+      setPhase2Logs([]);
+    }
   };
 
   const handleConfirmBRoll = async (types: BRollType[]) => {
@@ -350,7 +359,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
             Phase {phase}: {phaseLabels[phase]}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1 px-2 py-1 mr-2 text-xs rounded text-slate-400 hover:text-red-400 hover:bg-red-900/30 transition-colors"
+            title="重置模块并清空缓存"
+          >
+            <RotateCcw className="w-3 h-3" />
+            重置
+          </button>
           {[1, 2, 3].map(p => (
             <button
               key={p}
