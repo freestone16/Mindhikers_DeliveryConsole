@@ -36,10 +36,14 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
     socket,
 }) => {
     // 状态管理（通过 useExpertState 实现 Socket.IO 持久化同步）
-    const { state: data, updateState } = useExpertState<MarketModule_V3>(
+    const { state: rawData, updateState } = useExpertState<MarketModule_V3>(
         'MarketingMaster',
         defaultMarketV3State,
     );
+
+    // 兼容性修复：合并 defaultMarketV3State，确保 V2 旧格式状态不会导致缺字段
+    // （旧 V2 state 有 phase 字段但缺少 phase1SubStep / candidates 等 V3 字段）
+    const data: MarketModule_V3 = { ...defaultMarketV3State, ...(rawData as Partial<MarketModule_V3>) };
 
     // 默认设置面板开关
     const [showSettings, setShowSettings] = useState(false);

@@ -4,8 +4,8 @@
  * Generates candidate keywords via SSE from LLM analysis of selected script.
  * Supports manual keyword addition and deletion before proceeding to scoring.
  */
-import React, { useState, useRef, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Sparkles, ChevronRight, Languages } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Plus, Trash2, Loader2, Sparkles, ChevronRight, Languages, Clock } from 'lucide-react';
 import type { CandidateKeyword, MarketModule_V3 } from '../../types';
 
 interface CandidateKeywordListProps {
@@ -27,12 +27,37 @@ export const CandidateKeywordList: React.FC<CandidateKeywordListProps> = ({
     const [manualInput, setManualInput] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    // Timing state — Director 模式：开始时间 + 实时经过时间
+    const [startedAt, setStartedAt] = useState<Date | null>(null);
+    const [elapsedSec, setElapsedSec] = useState(0);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Start / stop elapsed timer
+    useEffect(() => {
+        if (isGenerating && startedAt) {
+            timerRef.current = setInterval(() => {
+                setElapsedSec(Math.floor((Date.now() - startedAt.getTime()) / 1000));
+            }, 1000);
+        } else {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [isGenerating, startedAt]);
+
     // Use a ref to accumulate candidates during streaming to avoid stale closure issues
     const accumulatedCandidatesRef = useRef<CandidateKeyword[]>([...data.candidates]);
 
     const handleGenerate = useCallback(async () => {
         if (!scriptPath) return;
 
+        const now = new Date();
+        setStartedAt(now);
+        setElapsedSec(0);
         setIsGenerating(true);
         setError(null);
         accumulatedCandidatesRef.current = [];
@@ -124,6 +149,21 @@ export const CandidateKeywordList: React.FC<CandidateKeywordListProps> = ({
     const canProceed = data.candidates.length > 0 && !isGenerating;
     const hasScript = Boolean(scriptPath);
 
+    // Format elapsed time as "mm:ss"
+    const formatElapsed = (sec: number) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m > 0 ? `${m}分${s.toString().padStart(2, '0')}秒` : `${s}秒`;
+    };
+
+    // Estimate: ~6 seconds per keyword, 10 keywords → ~60s total
+    const ESTIMATED_TOTAL = 60;
+    const progress = Math.min(data.candidates.length / 10, 1);
+    const pct = Math.round(progress * 100);
+    const estRemaining = isGenerating
+        ? Math.max(0, ESTIMATED_TOTAL - elapsedSec)
+        : null;
+
     return (
         <div className="space-y-4">
             {/* Header card */}
@@ -149,7 +189,7 @@ export const CandidateKeywordList: React.FC<CandidateKeywordListProps> = ({
                 {!hasScript && (
                     <div className="mt-4 flex items-center gap-2 px-4 py-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-400 text-sm">
                         <span>⚠️</span>
-                        <span>请先在左侧选择一个脚本文件，才能生成候选关键词</span>
+                        <span>请先在顶部选择一个脚本文件，才能生成候选关键词</span>
                     </div>
                 )}
 
@@ -160,23 +200,69 @@ export const CandidateKeywordList: React.FC<CandidateKeywordListProps> = ({
                     </div>
                 )}
 
-                <button
-                    onClick={handleGenerate}
-                    disabled={!hasScript || isGenerating}
-                    className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                    {isGenerating ? (
-                        <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            正在分析脚本…
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="w-4 h-4" />
-                            分析脚本，生成候选关键词
-                        </>
+                <div className="mt-4 flex items-center gap-4 flex-wrap">
+                    <button
+                        onClick={handleGenerate}
+                        disabled={!hasScript || isGenerating}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                正在分析脚本…
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-4 h-4" />
+                                分析脚本，生成候选关键词
+                            </>
+                        )}
+                    </button>
+
+                    {/* Director-style timing indicator */}
+                    {isGenerating && startedAt && (
+                        <div className="flex items-center gap-3 text-xs text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-orange-400/70" />
+                                <span>开始于 {startedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                            </div>
+                            <span className="text-slate-600">·</span>
+                            <span>已用 <span className="text-orange-300 font-mono">{formatElapsed(elapsedSec)}</span></span>
+                            {estRemaining !== null && estRemaining > 0 && (
+                                <>
+                                    <span className="text-slate-600">·</span>
+                                    <span>预计还需 <span className="text-slate-300 font-mono">~{formatElapsed(estRemaining)}</span></span>
+                                </>
+                            )}
+                            <span className="text-slate-600">·</span>
+                            <span className="text-slate-300">{data.candidates.length}/10 词</span>
+                        </div>
                     )}
-                </button>
+
+                    {/* Completed timing summary */}
+                    {!isGenerating && startedAt && data.candidates.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>生成完成，共用时 <span className="text-slate-400 font-mono">{formatElapsed(elapsedSec)}</span></span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Progress bar (shown during generation) */}
+                {isGenerating && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-slate-500">关键词生成进度</span>
+                            <span className="text-xs text-slate-400 font-mono">{pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Keyword list */}
