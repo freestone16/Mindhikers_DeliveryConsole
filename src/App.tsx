@@ -4,6 +4,7 @@ import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
 import { DirectorSection } from './components/DirectorSection';
 import { ShortsSection } from './components/ShortsSection';
+import { MarketingSection } from './components/MarketingSection';
 import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
@@ -156,6 +157,12 @@ function App() {
                                         />
                                     ) : activeExpertId === 'ShortsMaster' ? (
                                         <ShortsSection
+                                            projectId={state.projectId}
+                                            scriptPath={state.selectedScript?.path || ''}
+                                            socket={socket}
+                                        />
+                                    ) : activeExpertId === 'MarketingMaster' ? (
+                                        <MarketingSection
                                             projectId={state.projectId}
                                             scriptPath={state.selectedScript?.path || ''}
                                             socket={socket}
