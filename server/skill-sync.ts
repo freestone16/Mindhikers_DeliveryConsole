@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { Server, Socket } from 'socket.io';
 
@@ -9,7 +10,9 @@ const __dirname = path.dirname(__filename);
 
 const EXPERTS = ['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster'];
 
-// Lazy evaluation: SOURCE_ROOT must be resolved after dotenv.config() runs
+const GLOBAL_SKILLS_ROOT = path.join(os.homedir(), '.gemini/antigravity/skills');
+
+// Sync source is intentionally single-root to mirror the user's external skill workspace.
 const getSourceRoot = () => {
     if (process.env.DOCKER_ENV) return '/data/skills';
     if (process.env.SKILLS_BASE) {
@@ -17,7 +20,7 @@ const getSourceRoot = () => {
             ? process.env.SKILLS_BASE
             : path.resolve(__dirname, '..', process.env.SKILLS_BASE);
     }
-    return path.resolve(__dirname, '..', 'skills');
+    return GLOBAL_SKILLS_ROOT;
 };
 const TARGET_ROOT = path.resolve(__dirname, '../skills');
 
@@ -51,8 +54,14 @@ export const syncSkills = async (io: Server) => {
     if (!fs.existsSync(SOURCE_ROOT)) {
         if (fs.existsSync(TARGET_ROOT)) {
             const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
-            lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
-            console.log(`ℹ️ Using local skills. Available: ${available.length}/${EXPERTS.length}`);
+            lastSyncStatus = {
+                status: 'warning',
+                synced: available,
+                count: available.length,
+                timestamp: new Date().toISOString(),
+                message: `Global skills root not found: ${SOURCE_ROOT}`,
+            };
+            console.log(`ℹ️ Global skills root missing, keeping local skills. Available: ${available.length}/${EXPERTS.length}`);
             io.emit('skill-sync-status', lastSyncStatus);
             return;
         }
