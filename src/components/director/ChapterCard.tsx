@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Check, Loader2, Image, Upload, FileVideo } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Check, Loader2, Image, Upload, FileVideo, ZoomIn, X } from 'lucide-react';
 import type { DirectorChapter, SceneOption } from '../../types';
 
 interface ChapterCardProps {
@@ -7,6 +8,7 @@ interface ChapterCardProps {
   projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
+  pendingTaskKeys?: Set<string>;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -50,9 +52,10 @@ interface OptionRowProps {
   projectId: string;
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
+  isPendingBatch?: boolean;
 }
 
-const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck }: OptionRowProps) => {
+const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck, isPendingBatch }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed' | 'failed'>('idle');
@@ -65,12 +68,29 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
   const isChecked = option.isChecked;
 
+  // Lightbox state
+  const [showLightbox, setShowLightbox] = useState(false);
+
   useEffect(() => {
     if (option.previewUrl) {
       setPreviewUrl(option.previewUrl);
       setThumbStatus('completed');
+    } else if (option.previewUrl === null || option.previewUrl === undefined) {
+      // Expert action cleared previewUrl → thumbnail is stale, reset to idle
+      if (thumbStatus === 'completed') {
+        setPreviewUrl(null);
+        setThumbStatus('idle');
+      }
     }
   }, [option.previewUrl]);
+
+  // Auto-start polling when batch render has registered this task as pending
+  useEffect(() => {
+    if (isPendingBatch && thumbStatus === 'idle') {
+      console.log('[BatchPoll] Auto-starting poll for:', taskKey);
+      pollThumbnail(taskKey);
+    }
+  }, [isPendingBatch]);
 
   // Check if material already exists when option is checked
   useEffect(() => {
@@ -81,7 +101,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
 
   const checkMaterialExists = async () => {
     try {
-      const res = await fetch(`http://localhost:3002/api/director/material-exists?projectId=${projectId}&chapterId=${chapter.chapterId}&optionId=${option.id}`);
+      const res = await fetch(`/api/director/material-exists?projectId=${projectId}&chapterId=${chapter.chapterId}&optionId=${option.id}`);
       const data = await res.json();
       if (data.success && data.data.exists) {
         setUploadStatus('completed');
@@ -113,7 +133,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
       formData.append('chapterId', chapter.chapterId);
       formData.append('optionId', option.id);
 
-      const res = await fetch('http://localhost:3002/api/director/upload-material', {
+      const res = await fetch('/api/director/upload-material', {
         method: 'POST',
         body: formData
       });
@@ -138,14 +158,22 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
     fileInputRef.current?.click();
   };
 
-  const handleGenerateThumbnail = async () => {
-    if (!option.imagePrompt && !option.prompt) return;
+  // ESC to close lightbox
+  useEffect(() => {
+    if (!showLightbox) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowLightbox(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showLightbox]);
 
-    console.log('[Thumbnail] Starting generation for:', option.id, option.type);
+  const handleGenerateThumbnailWithPrompt = async (promptOverride?: string) => {
+    const effectivePrompt = promptOverride || option.imagePrompt || option.prompt;
+    if (!effectivePrompt) return;
+
     setThumbStatus('generating');
 
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase2/thumbnail', {
+      const res = await fetch('/api/director/phase2/thumbnail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,36 +184,32 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
             props: option.props,
             name: option.name,
             prompt: option.prompt,
-            imagePrompt: option.imagePrompt,
+            imagePrompt: effectivePrompt,
             rationale: option.rationale,
-            // Infographic specific fields
             infographicLayout: option.infographicLayout,
             infographicStyle: option.infographicStyle,
             infographicUseMode: option.infographicUseMode,
           },
           chapterId: chapter.chapterId,
-          projectId: projectId
+          projectId
         })
       });
-
       const data = await res.json();
-      console.log('[Thumbnail] Response:', { success: data.success, hasImageUrl: !!data.imageUrl, hasTaskId: !!data.taskId, status: data.status });
-
       if (data.success && data.imageUrl) {
-        // 同步直出 (Remotion)
         setPreviewUrl(data.imageUrl);
         setThumbStatus('completed');
       } else if (data.success && data.taskId) {
-        // 异步轮询 (Volcengine)
         pollThumbnail(taskKey);
       } else {
-        console.error('[Thumbnail] Failed:', data.error || data);
         setThumbStatus('failed');
       }
-    } catch (error) {
-      console.error('Thumbnail generation failed:', error);
+    } catch {
       setThumbStatus('failed');
     }
+  };
+
+  const handleGenerateThumbnail = () => {
+    handleGenerateThumbnailWithPrompt();
   };
 
   const pollThumbnail = async (key: string) => {
@@ -193,7 +217,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
 
     const poll = async () => {
       try {
-        const res = await fetch(`http://localhost:3002/api/director/phase2/thumbnail/${key}`);
+        const res = await fetch(`/api/director/phase2/thumbnail/${key}`);
         const data = await res.json();
 
         if (data.status === 'completed' && data.imageUrl) {
@@ -253,10 +277,24 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
       </div>
 
       {/* 预览图 (col 4) */}
-      <div className="col-span-4 flex items-center justify-center">
+      <div className="col-span-4 flex flex-col gap-2">
         <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
           {thumbStatus === 'completed' && previewUrl ? (
-            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+            <>
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setShowLightbox(true)}
+              />
+              {/* Zoom overlay */}
+              <div
+                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 cursor-zoom-in"
+                onClick={() => setShowLightbox(true)}
+              >
+                <ZoomIn className="w-8 h-8 text-white drop-shadow" />
+              </div>
+            </>
           ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
               <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
@@ -348,7 +386,31 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
             </button>
           )}
         </div>
+
       </div>
+
+      {/* Lightbox Portal */}
+      {showLightbox && previewUrl && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 overflow-auto flex items-start justify-center p-8"
+          onClick={() => setShowLightbox(false)}
+        >
+          <button
+            className="fixed top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full z-10"
+            onClick={() => setShowLightbox(false)}
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <img
+            src={previewUrl}
+            alt="Preview fullsize"
+            style={{ maxWidth: 'none', width: 'auto', height: 'auto' }}
+            className="rounded shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
 
       {/* 确认 Checkbox (col 1) */}
       <div className="col-span-1 flex items-center justify-center">
@@ -375,7 +437,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
 const cleanChapterName = (name: string) =>
   name.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
 
-export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck }: ChapterCardProps) => {
+export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendingTaskKeys }: ChapterCardProps) => {
   const isAnyOptionChecked = chapter.options.length > 0 && chapter.options.every(opt => opt.isChecked);
   const displayName = cleanChapterName(chapter.chapterName);
 
@@ -397,17 +459,23 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck }: Cha
         </div>
 
         <div className="flex flex-col gap-2">
-          {chapter.options.map((option, idx) => (
-            <OptionRow
-              key={option.id}
-              chapter={chapter}
-              option={option}
-              index={idx}
-              projectId={projectId}
-              onSelect={onSelect}
-              onToggleCheck={onToggleCheck}
-            />
-          ))}
+          {chapter.options.map((option, idx) => {
+            // Content-based key: when expert action changes imagePrompt/props, OptionRow remounts
+            // with fresh thumbStatus='idle', clearing the stale preview automatically
+            const contentKey = `${(option.imagePrompt || option.prompt || '').slice(0, 60)}|${JSON.stringify(option.props || {}).slice(0, 60)}`;
+            return (
+              <OptionRow
+                key={`${option.id}::${contentKey}`}
+                chapter={chapter}
+                option={option}
+                index={idx}
+                projectId={projectId}
+                onSelect={onSelect}
+                onToggleCheck={onToggleCheck}
+                isPendingBatch={pendingTaskKeys?.has(`${chapter.chapterId}-${option.id}`) ?? false}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

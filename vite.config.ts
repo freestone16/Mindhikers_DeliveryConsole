@@ -13,13 +13,15 @@ export default defineConfig({
     },
   },
   server: {
+    port: parseInt(process.env.VITE_PORT || '5175'),
+    strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3002',
+        target: process.env.VITE_BACKEND_TARGET || 'http://127.0.0.1:3003',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://127.0.0.1:3002',
+        target: process.env.VITE_BACKEND_TARGET || 'http://127.0.0.1:3003',
         ws: true,
         changeOrigin: true,
       },

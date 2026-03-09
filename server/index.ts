@@ -142,6 +142,21 @@ app.get('/api/director/phase3/status/:jobId', director.getRenderStatus);
 
 // Director Phase 2/3 Refactor Routes (SD-202)
 app.post('/api/director/phase2/render_checked', director.phase2RenderChecked);
+app.post('/api/director/phase2/revise-option', director.phase2ReviseOption);
+
+// Director Phase 3 (二审 MP4 Video Render)
+app.post('/api/director/phase3/render-batch', director.phase3RenderBatch);
+app.get('/api/director/phase3/video/:taskKey', director.getVideoStatus);
+app.get('/api/director/phase3/video-file/:projectId/:filename', director.serveVideoFile);
+
+// Director Phase 4 (XML 导出 — 原 Phase 3)
+app.post('/api/director/phase4/align-srt', director.phase3AlignSrt);
+app.post('/api/director/phase4/generate-xml', director.phase3GenerateXml);
+app.get('/api/director/phase4/download-xml/:projectId/:format', director.phase3DownloadXml);
+app.get('/api/director/phase4/scan-srt', director.phase4ScanSrt);
+app.get('/api/director/phase4/read-srt/:filename', director.phase4ReadSrt);
+
+// Keep old phase3 XML routes as aliases for backwards compat
 app.post('/api/director/phase3/align-srt', director.phase3AlignSrt);
 app.post('/api/director/phase3/generate-xml', director.phase3GenerateXml);
 app.get('/api/director/phase3/download-xml/:projectId/:format', director.phase3DownloadXml);
@@ -741,6 +756,22 @@ io.on('connection', (socket) => {
                 if (fs.existsSync(storePath)) {
                     const data = JSON.parse(fs.readFileSync(storePath, 'utf-8'));
                     io.to(projectId).emit('delivery-data', data);
+
+                    // Director: 把 delivery_store 中最新的 items 同步回 director_state，
+                    // 再 push 给前端，确保 ChapterCard 能看到更新（含已清空的 previewUrl）
+                    if (expertId === 'Director') {
+                        const updatedItems = data.modules?.director?.items;
+                        if (updatedItems) {
+                            const directorState = loadExpertState(projectRoot, 'Director');
+                            const mergedState = {
+                                ...(directorState.data || directorState),
+                                items: updatedItems,
+                            };
+                            saveExpertState(projectRoot, 'Director', mergedState);
+                            io.to(projectId).emit('expert-data-update:Director', mergedState);
+                            console.log(`[Chat] Director state synced: ${updatedItems.length} chapters pushed to frontend`);
+                        }
+                    }
                 }
 
                 // For ShortsMaster we also need to broadcast to avoid UI stall if possible, but the reload will handle it

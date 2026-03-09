@@ -1287,45 +1287,158 @@ export const phase2RenderChecked = async (req: Request, res: Response) => {
 
   try {
     const projectRoot = getProjectRoot(projectId);
-    const visualsDir = path.join(projectRoot, '04_Visuals');
-    ensureDir(visualsDir);
+    const outputDir = path.join(projectRoot, '04_Visuals', 'thumbnails');
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-    const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
+    // ── 1. 分类 & 预注册任务 ──────────────────────────────────
+    const triggeredTaskKeys: string[] = [];
+    const remotionQueue: Array<{ chapterId: string; option: any }> = [];
+    const volcQueue: Array<{ chapterId: string; option: any }> = [];
 
     for (const chapter of chapters) {
-      if (!chapter.chapterId) continue;
+      const { chapterId, option } = chapter;
+      if (!chapterId || !option?.id) continue;
 
-      // Skip rendering for non-renderable types (e.g., internet-clip, artlist)
-      if (chapter.type && !RENDERABLE_TYPES.includes(chapter.type)) {
-        console.log(`[Phase2 Render] Skipping non-renderable type: ${chapter.type} for ${chapter.chapterId}`);
-        continue;
+      const taskKey = `${chapterId}-${option.id}`;
+      triggeredTaskKeys.push(taskKey);
+
+      // 预注册为 pending，前端轮询可立即看到状态
+      thumbnailTasks.set(taskKey, {
+        taskId: `batch-${taskKey}`,
+        type: option.type === 'remotion' ? 'remotion' : 'volcengine',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+
+      if (option.type === 'remotion') {
+        remotionQueue.push(chapter);
+      } else if (['seedance', 'generative', 'infographic'].includes(option.type)) {
+        volcQueue.push(chapter);
       }
-
-      // Cleanup old files logic
-      try {
-        const files = fs.readdirSync(visualsDir);
-        files.forEach(f => {
-          if (f.startsWith(chapter.chapterId + '_') && f.endsWith('.mp4')) {
-            const oldPath = path.join(visualsDir, f);
-            fs.unlinkSync(oldPath);
-            console.log(`[Phase2 Render] Deleted old file: ${oldPath}`);
-          }
-        });
-      } catch (e) {
-        // ignore
-      }
-
-      // In a real implementation this would queue the render job async.
-      // For now, we mock the creation of a completed video.
-      const mockOut = path.join(visualsDir, `${chapter.chapterId}_rendered.mp4`);
-      fs.writeFileSync(mockOut, 'Mock video content');
-      console.log(`[Phase2 Render] Mock rendered file at ${mockOut}`);
     }
 
-    res.json({ success: true, message: '渲染已触发' });
+    // ── 2. 立即返回，让前端开始轮询 ────────────────────────────
+    res.json({
+      success: true,
+      taskKeys: triggeredTaskKeys,
+      counts: { remotion: remotionQueue.length, volcengine: volcQueue.length },
+      message: `已触发 ${triggeredTaskKeys.length} 个渲染任务（Remotion×${remotionQueue.length} / Volcengine×${volcQueue.length}）`,
+    });
+
+    // ── 3. Remotion 并发队列（本机限制 3 个同时渲染）────────────
+    const REMOTION_CONCURRENCY = 3;
+    const runRemotionQueue = async () => {
+      let idx = 0;
+      const worker = async () => {
+        while (idx < remotionQueue.length) {
+          const chapter = remotionQueue[idx++];
+          const { chapterId, option } = chapter;
+          const taskKey = `${chapterId}-${option.id}`;
+          const outputPath = path.join(outputDir, `thumb_${taskKey}.png`);
+
+          const task = thumbnailTasks.get(taskKey);
+          if (task) task.status = 'processing';
+
+          console.log(`[Batch Render] ▶ Remotion start: ${taskKey}`);
+          try {
+            const { compositionId, props } = buildRemotionPreview(option);
+            const { renderStillWithApi } = require('./remotion-api-renderer');
+            await renderStillWithApi(compositionId, outputPath, props);
+
+            const imageBuffer = fs.readFileSync(outputPath);
+            const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+            const t = thumbnailTasks.get(taskKey);
+            if (t) { t.status = 'completed'; t.imageUrl = base64Image; }
+            console.log(`[Batch Render] ✅ Remotion done: ${taskKey}`);
+          } catch (err: any) {
+            const t = thumbnailTasks.get(taskKey);
+            if (t) { t.status = 'failed'; t.error = err.message; }
+            console.error(`[Batch Render] ❌ Remotion error: ${taskKey} — ${err.message}`);
+          }
+        }
+      };
+      // 并发启动 N 个 worker，各自顺序领取任务
+      const workers = Array.from(
+        { length: Math.min(REMOTION_CONCURRENCY, remotionQueue.length) },
+        () => worker()
+      );
+      await Promise.all(workers);
+      console.log(`[Batch Render] Remotion queue done (${remotionQueue.length} tasks)`);
+    };
+
+    // ── 4. Volcengine 队列（云端并发，本地 fire-and-forget）──────
+    const runVolcQueue = async () => {
+      const promises = volcQueue.map(async (chapter) => {
+        const { chapterId, option } = chapter;
+        const taskKey = `${chapterId}-${option.id}`;
+        const task = thumbnailTasks.get(taskKey);
+        if (!task) return;
+        task.status = 'processing';
+
+        try {
+          const prompt = option.imagePrompt || option.prompt || '';
+          console.log(`[Batch Render] ▶ Volcengine start: ${taskKey}`);
+          const result = await generateImageWithVolc(prompt);
+          const t = thumbnailTasks.get(taskKey);
+          if (!t) return;
+
+          if (result.image_url) {
+            t.status = 'completed';
+            t.imageUrl = result.image_url;
+            console.log(`[Batch Render] ✅ Volcengine done (direct): ${taskKey}`);
+          } else if (result.task_id) {
+            t.taskId = result.task_id;
+            t.status = 'pending';
+            // 轮询云端任务
+            let pollCount = 0;
+            const maxPolls = 40; // 80秒超时
+            while (pollCount < maxPolls) {
+              pollCount++;
+              await new Promise(r => setTimeout(r, 2000));
+              const pollResult = await pollVolcImageResult(result.task_id as string);
+              const ct = thumbnailTasks.get(taskKey);
+              if (!ct) break;
+              if (pollResult.status === 'completed' && pollResult.image_url) {
+                ct.status = 'completed';
+                ct.imageUrl = pollResult.image_url;
+                console.log(`[Batch Render] ✅ Volcengine done (poll ${pollCount}): ${taskKey}`);
+                break;
+              } else if (pollResult.status === 'failed') {
+                ct.status = 'failed';
+                ct.error = pollResult.error || 'Volcengine task failed';
+                console.error(`[Batch Render] ❌ Volcengine failed: ${taskKey}`);
+                break;
+              }
+            }
+            if (pollCount >= maxPolls) {
+              const t2 = thumbnailTasks.get(taskKey);
+              if (t2) { t2.status = 'failed'; t2.error = 'Timeout after 80s'; }
+              console.error(`[Batch Render] ⏱ Volcengine timeout: ${taskKey}`);
+            }
+          } else {
+            task.status = 'failed';
+            task.error = result.error || 'Unknown Volcengine error';
+          }
+        } catch (err: any) {
+          const t = thumbnailTasks.get(taskKey);
+          if (t) { t.status = 'failed'; t.error = err.message; }
+          console.error(`[Batch Render] ❌ Volcengine error: ${taskKey} — ${err.message}`);
+        }
+      });
+      await Promise.all(promises);
+      console.log(`[Batch Render] Volcengine queue done (${volcQueue.length} tasks)`);
+    };
+
+    // 两条流水线并行跑，互不阻塞
+    Promise.all([runRemotionQueue(), runVolcQueue()]).catch(err => {
+      console.error('[Batch Render] Queue error:', err);
+    });
+
   } catch (error: any) {
-    console.error('[Phase2 Render] Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to trigger render' });
+    if (!res.headersSent) {
+      console.error('[Phase2 Batch Render] Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to trigger renders' });
+    }
   }
 };
 
@@ -1423,6 +1536,439 @@ export const phase3DownloadXml = async (req: Request, res: Response) => {
     } else {
       res.status(404).json({ error: 'XML file not generated yet' });
     }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ============================================================
+// Phase 3 (二审) — 真实 MP4 视频渲染队列
+// ============================================================
+
+// 独立于 thumbnailTasks，避免 key 冲突
+const videoTasks = new Map<string, {
+  taskId: string;
+  type: 'remotion' | 'volcengine' | 'static';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  videoUrl?: string;      // 可访问的 URL
+  videoPath?: string;     // 本地文件路径
+  error?: string;
+  retryCount: number;
+  progress?: number;      // 0-100
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+}>();
+
+// 视频文件 serve endpoint
+export const serveVideoFile = async (req: Request, res: Response) => {
+  const { projectId, filename } = req.params;
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    const videoPath = path.join(projectRoot, '04_Visuals', 'videos', filename);
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({ error: 'Video file not found' });
+    }
+    const stat = fs.statSync(videoPath);
+    const range = req.headers.range;
+
+    if (range) {
+      // Support range requests for video streaming
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+      const chunkSize = end - start + 1;
+      const file = fs.createReadStream(videoPath, { start, end });
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': 'video/mp4',
+      });
+      file.pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': stat.size,
+        'Content-Type': 'video/mp4',
+      });
+      fs.createReadStream(videoPath).pipe(res);
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 轮询视频渲染状态
+export const getVideoStatus = async (req: Request, res: Response) => {
+  const { taskKey } = req.params;
+  const task = videoTasks.get(taskKey);
+  if (!task) {
+    return res.status(404).json({ status: 'not_found', error: 'Task not found' });
+  }
+  res.json({
+    status: task.status,
+    videoUrl: task.videoUrl,
+    error: task.error,
+    retryCount: task.retryCount,
+    progress: task.progress,
+    startedAt: task.startedAt,
+    completedAt: task.completedAt,
+  });
+};
+
+// Remotion 单条视频渲染（含重试）
+async function renderRemotionVideo(
+  chapterId: string,
+  option: any,
+  projectId: string,
+  outputDir: string,
+  maxRetries = 2
+): Promise<void> {
+  const taskKey = `${chapterId}-${option.id}`;
+  const outputFileName = `video_${taskKey}.mp4`;
+  const outputPath = path.join(outputDir, outputFileName);
+  const task = videoTasks.get(taskKey);
+  if (!task) return;
+
+  task.status = 'processing';
+  task.startedAt = new Date().toISOString();
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        task.retryCount = attempt;
+        console.log(`[Video Render] ↻ Remotion retry ${attempt}/${maxRetries}: ${taskKey}`);
+        await new Promise(r => setTimeout(r, 5000 * attempt));
+      }
+
+      const { compositionId, props } = buildRemotionPreview(option);
+      const { renderVideoWithApi } = require('./remotion-api-renderer');
+
+      await renderVideoWithApi(compositionId, outputPath, props, (pct: number) => {
+        const t = videoTasks.get(taskKey);
+        if (t) t.progress = pct;
+      });
+
+      const videoApiUrl = `/api/director/phase3/video-file/${projectId}/${outputFileName}`;
+      const t = videoTasks.get(taskKey);
+      if (t) {
+        t.status = 'completed';
+        t.videoUrl = videoApiUrl;
+        t.videoPath = outputPath;
+        t.progress = 100;
+        t.completedAt = new Date().toISOString();
+      }
+      console.log(`[Video Render] ✅ Remotion done: ${taskKey} (attempt ${attempt + 1})`);
+      return; // success
+    } catch (err: any) {
+      console.error(`[Video Render] ❌ Remotion error (attempt ${attempt + 1}): ${taskKey} — ${err.message}`);
+      if (attempt === maxRetries) {
+        const t = videoTasks.get(taskKey);
+        if (t) { t.status = 'failed'; t.error = err.message; t.completedAt = new Date().toISOString(); }
+      }
+    }
+  }
+}
+
+// Volcengine 单条视频渲染（含重试）
+async function renderVolcengineVideo(
+  chapterId: string,
+  option: any,
+  maxRetries = 2
+): Promise<void> {
+  const taskKey = `${chapterId}-${option.id}`;
+  const task = videoTasks.get(taskKey);
+  if (!task) return;
+
+  task.status = 'processing';
+  task.startedAt = new Date().toISOString();
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        task.retryCount = attempt;
+        console.log(`[Video Render] ↻ Volcengine retry ${attempt}/${maxRetries}: ${taskKey}`);
+        await new Promise(r => setTimeout(r, 5000 * attempt));
+      }
+
+      const prompt = option.imagePrompt || option.prompt || '';
+      console.log(`[Video Render] ▶ Volcengine start: ${taskKey}`);
+      const result = await generateVideoWithVolc(prompt);
+
+      if (result.error) throw new Error(result.error);
+
+      if (result.video_url) {
+        // Direct URL returned
+        const t = videoTasks.get(taskKey);
+        if (t) {
+          t.status = 'completed';
+          t.videoUrl = result.video_url;
+          t.progress = 100;
+          t.completedAt = new Date().toISOString();
+        }
+        console.log(`[Video Render] ✅ Volcengine done (direct): ${taskKey}`);
+        return;
+      }
+
+      if (result.task_id) {
+        // Poll cloud task
+        const maxPolls = 60; // 120s timeout
+        for (let p = 0; p < maxPolls; p++) {
+          await new Promise(r => setTimeout(r, 2000));
+          const poll = await pollVolcVideoResult(result.task_id as string);
+          const t = videoTasks.get(taskKey);
+          if (!t) return;
+          if (poll.status === 'completed' && poll.video_url) {
+            t.status = 'completed';
+            t.videoUrl = poll.video_url;
+            t.progress = 100;
+            t.completedAt = new Date().toISOString();
+            console.log(`[Video Render] ✅ Volcengine done (poll ${p + 1}): ${taskKey}`);
+            return;
+          } else if (poll.status === 'failed' || poll.error) {
+            throw new Error(poll.error || 'Volcengine video task failed');
+          }
+          // Update progress estimate
+          if (t) t.progress = Math.min(90, Math.round((p / maxPolls) * 100));
+        }
+        throw new Error('Volcengine video task timeout after 120s');
+      }
+
+      throw new Error(`No task_id or video_url from Volcengine`);
+    } catch (err: any) {
+      console.error(`[Video Render] ❌ Volcengine error (attempt ${attempt + 1}): ${taskKey} — ${err.message}`);
+      if (attempt === maxRetries) {
+        const t = videoTasks.get(taskKey);
+        if (t) { t.status = 'failed'; t.error = err.message; t.completedAt = new Date().toISOString(); }
+      }
+    }
+  }
+}
+
+// Phase 3 批量视频渲染
+export const phase3RenderBatch = async (req: Request, res: Response) => {
+  const { projectId, chapters } = req.body;
+  if (!projectId || !chapters || !Array.isArray(chapters)) {
+    return res.status(400).json({ error: 'Missing projectId or chapters list' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    const outputDir = path.join(projectRoot, '04_Visuals', 'videos');
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    // 1. 分类 & 预注册
+    const triggeredTaskKeys: string[] = [];
+    const remotionQueue: Array<{ chapterId: string; option: any }> = [];
+    const volcQueue: Array<{ chapterId: string; option: any }> = [];
+    const staticItems: Array<{ chapterId: string; option: any }> = [];
+
+    for (const chapter of chapters) {
+      const { chapterId, option } = chapter;
+      if (!chapterId || !option?.id) continue;
+
+      const taskKey = `${chapterId}-${option.id}`;
+      triggeredTaskKeys.push(taskKey);
+
+      let taskType: 'remotion' | 'volcengine' | 'static' = 'static';
+      if (option.type === 'remotion') taskType = 'remotion';
+      else if (['seedance', 'generative'].includes(option.type)) taskType = 'volcengine';
+
+      videoTasks.set(taskKey, {
+        taskId: `p3-${taskKey}`,
+        type: taskType,
+        status: 'pending',
+        retryCount: 0,
+        progress: 0,
+        createdAt: new Date().toISOString(),
+      });
+
+      if (taskType === 'remotion') remotionQueue.push(chapter);
+      else if (taskType === 'volcengine') volcQueue.push(chapter);
+      else staticItems.push(chapter);
+    }
+
+    // 2. 立即返回，前端开始轮询
+    res.json({
+      success: true,
+      taskKeys: triggeredTaskKeys,
+      counts: { remotion: remotionQueue.length, volcengine: volcQueue.length, static: staticItems.length },
+      message: `已触发 ${triggeredTaskKeys.length} 个视频渲染（Remotion×${remotionQueue.length} / Volcengine×${volcQueue.length} / 静态×${staticItems.length}）`,
+    });
+
+    // Static items: reuse Phase 2 thumbnail as videoUrl
+    for (const { chapterId, option } of staticItems) {
+      const taskKey = `${chapterId}-${option.id}`;
+      const previewUrl = option.previewUrl || option.imagePrompt || null;
+      const t = videoTasks.get(taskKey);
+      if (t) {
+        t.status = 'completed';
+        t.videoUrl = previewUrl;
+        t.progress = 100;
+        t.completedAt = new Date().toISOString();
+      }
+    }
+
+    // 3. Remotion 并发队列（3 workers）
+    const REMOTION_VIDEO_CONCURRENCY = 3;
+    const runRemotionQueue = async () => {
+      let idx = 0;
+      const worker = async () => {
+        while (idx < remotionQueue.length) {
+          const chapter = remotionQueue[idx++];
+          await renderRemotionVideo(chapter.chapterId, chapter.option, projectId, outputDir);
+        }
+      };
+      const workers = Array.from(
+        { length: Math.min(REMOTION_VIDEO_CONCURRENCY, remotionQueue.length) },
+        () => worker()
+      );
+      await Promise.all(workers);
+      console.log(`[Video Render] Remotion queue complete (${remotionQueue.length} tasks)`);
+    };
+
+    // 4. Volcengine 全并发
+    const runVolcQueue = async () => {
+      await Promise.all(volcQueue.map(ch => renderVolcengineVideo(ch.chapterId, ch.option)));
+      console.log(`[Video Render] Volcengine queue complete (${volcQueue.length} tasks)`);
+    };
+
+    Promise.all([runRemotionQueue(), runVolcQueue()]).catch(err => {
+      console.error('[Video Render] Queue error:', err);
+    });
+
+  } catch (error: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+};
+
+// ============================================================
+// Phase 2 — 反馈优化提示词
+// ============================================================
+
+export const phase2ReviseOption = async (req: Request, res: Response) => {
+  const { projectId, chapterId, optionId, userFeedback } = req.body;
+  if (!projectId || !chapterId || !optionId || !userFeedback) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const projectRoot = getProjectRoot(projectId);
+    const storePath = path.join(projectRoot, 'delivery_store.json');
+    let storeData: any = {};
+    if (fs.existsSync(storePath)) {
+      try { storeData = JSON.parse(fs.readFileSync(storePath, 'utf-8')); } catch {}
+    }
+
+    const chapters: any[] = storeData?.modules?.director?.phase2?.chapters || [];
+    const chapter = chapters.find((c: any) => c.chapterId === chapterId);
+    const option = chapter?.options?.find((o: any) => o.id === optionId);
+
+    if (!option) {
+      return res.status(404).json({ error: 'Option not found' });
+    }
+
+    const currentPrompt = option.imagePrompt || option.prompt || '';
+    const scriptText = chapter?.scriptText || '';
+
+    const messages = [
+      {
+        role: 'system' as const,
+        content: `You are a professional visual prompt engineer specializing in video B-roll and AI image generation.
+Your task: given the original script context, current prompt, and user feedback — rewrite the prompt to better match the user's intent.
+Return ONLY the improved prompt text in the same language style as the original prompt (English preferred for image/video AI).
+Keep it concise (under 100 words) and actionable.`
+      },
+      {
+        role: 'user' as const,
+        content: `Script context: "${scriptText.slice(0, 200)}"
+Current prompt: "${currentPrompt}"
+User feedback: "${userFeedback}"
+
+Please rewrite the prompt based on the user's feedback. Return only the new prompt text.`
+      }
+    ];
+
+    const config = await loadConfig();
+    const response = await callLLM(messages, config.provider, config.model);
+    const revisedPrompt = response.content?.trim() || currentPrompt;
+
+    res.json({ success: true, revisedPrompt });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ============================================================
+// Phase 4 — 扫描 SRT 文件目录
+// ============================================================
+
+export const phase4ScanSrt = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+  if (!projectId) return res.status(400).json({ error: 'Missing projectId' });
+
+  try {
+    const projectRoot = getProjectRoot(projectId as string);
+    const srtFiles: Array<{ name: string; path: string; size: number; mtime: string }> = [];
+
+    // Scan common SRT locations
+    const scanDirs = [
+      path.join(projectRoot, '05_Audio'),
+      path.join(projectRoot, 'srt'),
+      path.join(projectRoot, '03_Script'),
+      projectRoot,
+    ];
+
+    for (const dir of scanDirs) {
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.srt'));
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        srtFiles.push({
+          name: file,
+          path: fullPath,
+          size: stat.size,
+          mtime: stat.mtime.toISOString(),
+        });
+      }
+    }
+
+    // Deduplicate by name
+    const seen = new Set<string>();
+    const unique = srtFiles.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; });
+
+    res.json({ success: true, srtFiles: unique, count: unique.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Serve locally stored SRT content
+export const phase4ReadSrt = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+  const { filename } = req.params;
+  if (!projectId || !filename) return res.status(400).json({ error: 'Missing params' });
+
+  try {
+    const projectRoot = getProjectRoot(projectId as string);
+    const scanDirs = [
+      path.join(projectRoot, '05_Audio'),
+      path.join(projectRoot, 'srt'),
+      path.join(projectRoot, '03_Script'),
+      projectRoot,
+    ];
+
+    for (const dir of scanDirs) {
+      const filePath = path.join(dir, filename);
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        return res.json({ success: true, content, filename });
+      }
+    }
+    res.status(404).json({ error: 'SRT file not found' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

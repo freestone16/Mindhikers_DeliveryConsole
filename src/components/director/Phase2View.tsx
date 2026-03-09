@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import type { DirectorChapter, BRollType } from '../../types';
@@ -21,10 +21,10 @@ interface Phase2ViewProps {
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
   onBatchSetCheck: (filterFn: (opt: any) => boolean, checked: boolean) => void;
-  onRenderChecked: () => void;
   onProceed: () => void;
   currentModel?: { provider: string; model: string };
   logs?: LogEntry[];
+  pendingTaskKeys?: Set<string>;
 }
 export const Phase2View = ({
   projectId,
@@ -35,10 +35,10 @@ export const Phase2View = ({
   onSelect,
   onToggleCheck,
   onBatchSetCheck,
-  onRenderChecked,
   onProceed,
   currentModel,
   logs = [],
+  pendingTaskKeys,
 }: Phase2ViewProps) => {
   const [brollConfirmed, setBrollConfirmed] = useState(chapters.length > 0);
   const [brollSelections, setBrollSelections] = useState<BRollType[]>(
@@ -84,7 +84,6 @@ export const Phase2View = ({
     return `${m}:${s}`;
   };
 
-  const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
 
   const isShowAll = brollConfirmed && brollSelections.length === 0;
   const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
@@ -98,9 +97,6 @@ export const Phase2View = ({
   // Total counts for overall progress
   const totalOptions = chapters.reduce((sum, ch) => sum + ch.options.length, 0);
   const checkedCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => o.isChecked).length, 0);
-  const visibleRenderableCheckedCount = chapters.reduce((sum, ch) =>
-    sum + ch.options.filter(o => o.isChecked && matchesFilter(o.type) && RENDERABLE_TYPES.includes(o.type)).length, 0
-  );
   const allChecked = chapters.length > 0 && chapters.every(c => c.options.some(o => o.isChecked));
 
   const handleConfirmBRoll = () => {
@@ -266,22 +262,6 @@ export const Phase2View = ({
             </div>
 
             <div className="flex items-center gap-3">
-              {checkedCount > 0 && (
-                <div className="flex flex-col items-end">
-                  <button
-                    onClick={onRenderChecked}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
-                  >
-                    <Play className="w-4 h-4" />
-                    渲染 AI 条目 ({visibleRenderableCheckedCount})
-                  </button>
-                  {visibleCheckedCount > visibleRenderableCheckedCount && (
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      (其余 {visibleCheckedCount - visibleRenderableCheckedCount} 项为外部素材，无需渲染)
-                    </span>
-                  )}
-                </div>
-              )}
               {allChecked && (
                 <button
                   onClick={onProceed}
@@ -308,6 +288,7 @@ export const Phase2View = ({
                   projectId={projectId}
                   onSelect={onSelect}
                   onToggleCheck={onToggleCheck}
+                  pendingTaskKeys={pendingTaskKeys}
                 />
               );
             })}

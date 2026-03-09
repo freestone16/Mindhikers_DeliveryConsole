@@ -159,6 +159,7 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                         model
                     );
                     opt.imagePrompt = newPromptResponse.content.trim();
+                    opt.previewUrl = undefined; // 提示词更新，旧缩略图过期
                 } catch (e: any) {
                     return { success: false, error: `重新生成提示词失败: ${e.message}` };
                 }
@@ -167,6 +168,7 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
             case 'update_prompt': {
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
                 opt.imagePrompt = args.new_prompt;
+                opt.previewUrl = undefined; // 提示词更新，旧缩略图过期
                 break;
             }
             case 'update_option_fields': {
@@ -183,6 +185,11 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                         ...(opt.props || {}),
                         ...updates.props
                     };
+                }
+
+                // 任何影响渲染内容的修改都清除旧缩略图，让前端知道需要重新生成
+                if (updates.props || updates.imagePrompt || updates.prompt) {
+                    opt.previewUrl = undefined;
                 }
                 break;
             }

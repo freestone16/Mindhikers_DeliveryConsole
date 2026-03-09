@@ -84,3 +84,86 @@ export async function renderStillWithApi(
         });
     });
 }
+
+export async function renderVideoWithApi(
+    compositionId: string,
+    outputPath: string,
+    inputProps: any,
+    onProgress?: (percent: number) => void
+): Promise<{ success: boolean; outputPath: string; size?: number }> {
+    const tmpPropsPath = `/tmp/remotion-video-props-${Date.now()}.json`;
+    fs.writeFileSync(tmpPropsPath, JSON.stringify(inputProps), 'utf-8');
+
+    return new Promise((resolve, reject) => {
+        const remotionBin = path.join(REMOTION_STUDIO_DIR, 'node_modules', '.bin', 'remotion');
+        const args = [
+            'render',
+            'src/index.tsx',
+            compositionId,
+            outputPath,
+            '--concurrency=2',
+            `--props=${tmpPropsPath}`
+        ];
+
+        console.log(`[Remotion Video] Command: ${remotionBin} ${args.join(' ')}`);
+        console.log(`[Remotion Video] Output: ${outputPath}`);
+
+        const proc = spawn(remotionBin, args, {
+            cwd: REMOTION_STUDIO_DIR,
+            env: { ...process.env, NODE_ENV: 'production' }
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        proc.stdout.on('data', (data) => {
+            const output = data.toString();
+            stdout += output;
+            // Parse progress: "Rendering frame X/Y" or "[XX%]"
+            const percentMatch = output.match(/\[(\d+)%\]/);
+            if (percentMatch && onProgress) {
+                onProgress(parseInt(percentMatch[1], 10));
+            }
+            const frameMatch = output.match(/Rendering frame (\d+)\/(\d+)/);
+            if (frameMatch && onProgress) {
+                const pct = Math.round((parseInt(frameMatch[1]) / parseInt(frameMatch[2])) * 100);
+                onProgress(pct);
+            }
+            console.log(`[Remotion Video] ${output.trim()}`);
+        });
+
+        proc.stderr.on('data', (data) => {
+            const output = data.toString();
+            stderr += output;
+            // Remotion writes progress to stderr too
+            const percentMatch = output.match(/\[(\d+)%\]/);
+            if (percentMatch && onProgress) {
+                onProgress(parseInt(percentMatch[1], 10));
+            }
+            console.error(`[Remotion Video Error] ${output.trim()}`);
+        });
+
+        proc.on('close', (code) => {
+            try { fs.unlinkSync(tmpPropsPath); } catch {}
+
+            if (code !== 0) {
+                reject(new Error(`Remotion video render exited with code ${code}${stderr ? ': ' + stderr.slice(0, 500) : ''}`));
+                return;
+            }
+
+            if (!fs.existsSync(outputPath)) {
+                reject(new Error(`Render completed but video file not found: ${outputPath}`));
+                return;
+            }
+
+            const stats = fs.statSync(outputPath);
+            console.log(`[Remotion Video] Success: ${outputPath} (${(stats.size / 1024 / 1024).toFixed(1)} MB)`);
+            resolve({ success: true, outputPath, size: stats.size });
+        });
+
+        proc.on('error', (err) => {
+            try { fs.unlinkSync(tmpPropsPath); } catch {}
+            reject(new Error(`Failed to spawn Remotion video render: ${err.message}`));
+        });
+    });
+}

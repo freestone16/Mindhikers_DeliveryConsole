@@ -216,10 +216,16 @@ export interface SceneOption {
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
     // Infographic specific (BaoyuInfographic)
-    infographicLayout?: string;   // 'pyramid' | 'funnel' | 'iceberg' | 'fishbone' | 'venn' | ...
-    infographicStyle?: string;    // 'cyberpunk-neon' | 'aged-academia' | 'dore-engraving' | ...
-    infographicUseMode?: 'cinematic-zoom' | 'static'; // cinematic-zoom: Ken Burns slow zoom; static: PNG only
+    infographicLayout?: string;
+    infographicStyle?: string;
+    infographicUseMode?: 'cinematic-zoom' | 'static';
     isChecked?: boolean;
+    // Phase 2 (初审) fields
+    phase2Approved?: boolean;
+    // Phase 3 (二审) fields
+    videoUrl?: string;            // MP4 video URL/path after Phase 3 render
+    phase3Approved?: boolean;
+    revisedPrompt?: string;       // AI-rewritten prompt awaiting user confirmation
 }
 
 export interface DirectorChapter {

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MonitorPlay } from 'lucide-react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
+import { Phase4View } from './director/Phase4View';
 import type { DirectorModule, DirectorChapter, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
@@ -12,7 +13,7 @@ interface DirectorSectionProps {
   socket: any;
 }
 
-type Phase = 1 | 2 | 3;
+type Phase = 1 | 2 | 3 | 4;
 
 import { useExpertState } from '../hooks/useExpertState';
 
@@ -28,6 +29,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const chapters = (data.items || []) as DirectorChapter[];
   // Jobs and BrollPaths replaced by Phase3 SRT -> XML flow
   const [isGeneratingConcept, setIsGeneratingConcept] = useState(false);
+  const [pendingBatchTaskKeys, setPendingBatchTaskKeys] = useState<Set<string>>(new Set());
   const [streamingConcept, setStreamingConcept] = useState<string | null>(null);
   const concept = isGeneratingConcept ? streamingConcept : data.conceptProposal;
 
@@ -40,6 +42,38 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
 
   // Phase2 logs for debug panel
   const [phase2Logs, setPhase2Logs] = useState<{ timestamp: number; type: string; message: string }[]>([]);
+
+  // ── 重置：切换项目或脚本时，自动回到 Phase 1 ──────────────────
+  const prevProjectId = useRef(projectId);
+  const prevScriptPath = useRef(scriptPath);
+  useEffect(() => {
+    const projectChanged = projectId !== prevProjectId.current;
+    const scriptChanged = scriptPath !== prevScriptPath.current;
+    prevProjectId.current = projectId;
+    prevScriptPath.current = scriptPath;
+
+    if ((projectChanged || scriptChanged) && (projectId || scriptPath)) {
+      // 重置 expert state (phase/chapters/concept)
+      updateState(projectId, {
+        phase: 1,
+        conceptProposal: '',
+        conceptFeedback: '',
+        isConceptApproved: false,
+        items: [],
+        renderJobs: [],
+      });
+      // 重置所有本地 state
+      setIsGeneratingConcept(false);
+      setStreamingConcept(null);
+      setIsLoading(false);
+      setLocalChapters(null);
+      setStartTime(null);
+      setPhase2Logs([]);
+      setPendingBatchTaskKeys(new Set());
+      console.log('[Director] 🔄 项目/脚本切换，已重置到 Phase 1');
+    }
+  }, [projectId, scriptPath]);
+  // ────────────────────────────────────────────────────────────
 
   const { status } = useLLMConfig();
   const currentModel = status?.global?.provider
@@ -58,7 +92,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     console.log('[Phase1] 🚀 开始生成概念提案...');
 
     try {
-      const response = await fetch('http://localhost:3002/api/director/phase1/generate', {
+      const response = await fetch('/api/director/phase1/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, scriptPath })
@@ -116,7 +150,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     if (!comment.trim()) return;
     setIsGeneratingConcept(true);
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase1/revise', {
+      const res = await fetch('/api/director/phase1/revise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, userComment: comment })
@@ -153,7 +187,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
       // Feature 1: Clear chat history when regenerating Phase 2
       socket?.emit('chat-clear-history', { expertId: 'Director', projectId });
 
-      const response = await fetch('http://localhost:3002/api/director/phase2/start', {
+      const response = await fetch('/api/director/phase2/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, scriptPath, brollTypes: types })
@@ -266,15 +300,28 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const handleRenderChecked = async () => {
     const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
 
-    // Collect all checked options across all chapters, filtered by renderable type
+    // 收集所有勾选的可渲染 option，带完整 option 数据供后端渲染
     const checkedItems = chapters.flatMap(c =>
       c.options
         .filter(o => o.isChecked && RENDERABLE_TYPES.includes(o.type))
-        .map(o => ({ chapterId: c.chapterId, optionId: o.id, type: o.type }))
+        .map(o => ({
+          chapterId: c.chapterId,
+          option: {
+            id: o.id,
+            type: o.type,
+            template: (o as any).template,
+            props: (o as any).props,
+            name: o.name,
+            prompt: (o as any).prompt,
+            imagePrompt: (o as any).imagePrompt,
+            infographicLayout: (o as any).infographicLayout,
+            infographicStyle: (o as any).infographicStyle,
+            infographicUseMode: (o as any).infographicUseMode,
+          },
+        }))
     );
 
     if (!checkedItems.length) {
-      // Check if there are other checked items that were filtered out
       const anyChecked = chapters.some(c => c.options.some(o => o.isChecked));
       if (anyChecked) {
         alert('当前选中的素材（如互联网素材/用户采集）无需触发 AI 渲染，您可以直接进入 Phase 3 进行后续处理。');
@@ -282,20 +329,19 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
       return;
     }
 
-    // We will call the backend to start rendering
     try {
-      const response = await fetch('http://localhost:3002/api/director/phase2/render_checked', {
+      const response = await fetch('/api/director/phase2/render_checked', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          chapters: checkedItems
-        })
+        body: JSON.stringify({ projectId, chapters: checkedItems })
       });
-      if (response.ok) {
-        alert('渲染已触发');
+      const data = await response.json();
+      if (response.ok && data.taskKeys?.length) {
+        // 把所有任务 key 存入 state，通知各卡片开始轮询
+        setPendingBatchTaskKeys(new Set(data.taskKeys));
+        console.log(`[Batch Render] 触发成功：${data.message}`);
       } else {
-        alert('渲染触发失败');
+        alert('渲染触发失败：' + (data.error || '未知错误'));
       }
     } catch (e) {
       console.error(e);
@@ -303,16 +349,18 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     }
   };
 
-  const handleProceed = () => {
-    const newJobs = chapters.map(c => ({
-      jobId: `job-${c.chapterId}`,
-      projectId,
-      chapterId: c.chapterId,
-      status: 'pending' as const,
-      progress: 0,
-    }));
-    onUpdate({ ...data, renderJobs: newJobs, phase: 3 });
+  // Phase 2 → 3
+  const handleProceedToPhase3 = () => {
+    onUpdate({ ...data, phase: 3 });
   };
+
+  // Phase 3 → 4
+  const handleProceedToPhase4 = () => {
+    onUpdate({ ...data, phase: 4 });
+  };
+
+  // Legacy alias
+  const handleProceed = handleProceedToPhase3;
 
   const handleImportChapters = (importedChapters: DirectorChapter[]) => {
     // Normalize and inject defaults
@@ -330,14 +378,16 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
 
   const phaseLabels: Record<Phase, string> = {
     1: 'Concept',
-    2: 'Storyboard',
-    3: 'XML Layout'
+    2: '初审',
+    3: '二审',
+    4: 'XML 导出'
   };
 
   const phaseColors: Record<Phase, string> = {
     1: 'bg-yellow-500/20 text-yellow-300',
     2: 'bg-blue-500/20 text-blue-300',
-    3: 'bg-purple-500/20 text-purple-300'
+    3: 'bg-emerald-500/20 text-emerald-300',
+    4: 'bg-purple-500/20 text-purple-300'
   };
 
   return (
@@ -350,21 +400,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
             Phase {phase}: {phaseLabels[phase]}
           </span>
         </div>
-        <div className="flex gap-2">
-          {[1, 2, 3].map(p => (
+        <div className="flex gap-1">
+          {([1, 2, 3, 4] as Phase[]).map(p => (
             <button
               key={p}
-              onClick={() => {
-                if (p === 1) onUpdate({ ...data, phase: 1 });
-                else if (p === 2 && conceptApproved) onUpdate({ ...data, phase: 2 });
-                // We'll let users proceed to Phase 3 manually if they want for now
-                else if (p === 3) onUpdate({ ...data, phase: 3 });
-              }}
-              disabled={
-                (p === 2 && !conceptApproved)
-              }
-              className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed ${phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                }`}
+              onClick={() => onUpdate({ ...data, phase: p })}
+              disabled={p === 2 && !conceptApproved}
+              className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
+                phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+              }`}
             >
               P{p}
             </button>
@@ -397,18 +441,25 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
             onSelect={handleSelectOption}
             onToggleCheck={handleToggleCheck}
             onBatchSetCheck={handleBatchSetCheck}
-            onRenderChecked={handleRenderChecked}
             onProceed={handleProceed}
             currentModel={currentModel}
             logs={phase2Logs}
+            pendingTaskKeys={pendingBatchTaskKeys}
           />
         )}
 
         {phase === 3 && (
           <Phase3View
             projectId={projectId}
+            chapters={displayedChapters}
+            onProceed={handleProceedToPhase4}
+          />
+        )}
+
+        {phase === 4 && (
+          <Phase4View
+            projectId={projectId}
             chapters={chapters}
-            onProceed={handleProceed}
           />
         )}
       </div>
