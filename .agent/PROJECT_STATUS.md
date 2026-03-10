@@ -1,42 +1,49 @@
 # 📊 DeliveryConsole 项目状态板
 
-> 最后更新: 2026-03-06
-> 分支: `main`
-> 最新里程碑: `v3.9` (Universal Expert Action Engine)
-> 最新 Commit: `checkpoint(Director): 增加重置组件缓存与历史记录按键`
+> 最后更新: 2026-03-10 16:20
+> 当前工作树: `/Users/luzhoua/DeliveryConsole`
+> 分支: `codex/sd208-golden-crucible`
+> 最新里程碑: `SD210` (黄金坩埚 Round 3 Part 1：议题锁定工作台首版)
+> 建议 Commit: `feat(crucible): add round3 topic lock workflow`
 
 ---
 
 ## 模块完成度
 
-| 模块                              | 状态       | 完成度 | 备注                                                                                                      |
-| --------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| **Expert Action Engine (SD-209)** | ✅ **封卷** | 100%   | 实现了分布式适配器架构，支持 FC 和二次确认拦截逻辑                                                        |
-| **全局 LLM 网关 (v3.8)**          | ✅ **完成** | 100%   | 新增批量健康检测，多窗口独立渲染，引入 Yinli                                                              |
-| Director Phase 1 (概念提案)       | ✅ **升级** | 100%   | 支持从 Antigravity 聊天窗口生成的 offline JSON 一键 Bypass 快速导入                                       |
-| Director Phase 2 (分段视觉方案)   | ✅ 完成     | 100%   | 彻底移除了 skill-loader，接入了全局 `Director` Skill 架构，并完成了 Excel 三态 Checkbox UI 重构致竞态修复 |
-| Director Phase 3/4 (渲染)         | ⏸️ 待验证   | 85%    | Remotion 新主题及 CLI 白名单通过；**素材上传闭环已实现**                                                  |
-| **Remotion 组件扩展**             | ✅ **封卷** | 100%   | 包含: Concept防爆/10大组件Theme/打字机/LCD计分板/Director深度联调 (v3.7)                                  |
-| Shorts Master (SD-206)            | ⏸️ 待联调   | 85%    | BGM/Logo素材已就位                                                                                        |
-| Music Director                    | ⏸️ 基础     | 40%    | Phase 1 可用                                                                                              |
-| Thumbnail Master                  | ⏸️ 基础     | 30%    | 火山引擎 API 待接通                                                                                       |
-| Marketing Master                  | ⏸️ 基础     | 30%    | 基本框架在                                                                                                |
-| 项目切换 & 状态管理               | ✅ 修复     | 95%    | 已去除硬编码，切换项目时正确清空前端 state                                                                |
-| 多项目隔离 (SD-208)               | 📝 规划中   | 0%     | 架构设计已出，待实施                                                                                      |
-| 服务器稳定性                      | ✅ 修复     | 100%   | 修复了优雅关闭时 watch 线程挂起的问题，实现干净退出                                                       |
+| 模块                                 | 状态         | 完成度 | 备注                                                                                                  |
+| ------------------------------------ | ------------ | ------ | ----------------------------------------------------------------------------------------------------- |
+| **黄金坩埚工作台 (SD-210)**          | 🚧 进行中     | 92%    | 已完成真实 chat、奶白 UI 精修、宿主层内容分流首版，以及 Round 3 Part 1 议题锁定工作台；下一步是收敛判定与立项弹窗 |
+| Runtime Port Governance              | ✅ 完成       | 100%   | 前后端端口已迁入运行时配置层，黄金坩埚模块现以独立端口运行并登记                                      |
+| 多项目隔离 / 上下文隔离 (SD-208)     | 🚧 推进中     | 65%    | chat 已升级为 `expertId + projectId + scriptPath` scope，当前 delivery expert 已具备首版 reset 机制    |
+| Director Phase 2                     | ✅ 完成       | 100%   | Excel 三态 Checkbox UI 重构已完成                                                                     |
+| Director Phase 3/4                   | ⏸️ 待验证     | 85%    | 渲染闭环仍待后续回归                                                                                  |
+| Shorts Master                        | ⏸️ 待联调     | 85%    | 当前不在本轮主战场                                                                                    |
+| Music Director                       | ⏸️ 基础       | 40%    | 当前不在本轮主战场                                                                                    |
+| Thumbnail Master                     | ⏸️ 基础       | 30%    | 当前不在本轮主战场                                                                                    |
+| Marketing Master                     | ⏸️ 基础       | 30%    | 当前不在本轮主战场                                                                                    |
+| 全局视觉语言升级（奶白 / 米色极简） | 🚧 黄金坩埚先行 | 55%    | Header / Footer / Crucible / Chat 已统一到奶白体系，后续再向其他模块扩散                              |
 
 ---
 
 ## 活跃问题
 
-无显著阻塞性问题（因 Github 网络波动，需手动 push）。
+1. 议题锁定模式已成立，但“议题已收敛”的判断逻辑仍未实现，目前还不能自动进入立项流程。
+2. Header 右上项目 / 文稿已在坩埚阶段置灰，但尚未接上“是否建立新项目 + 用户微调”的前端弹窗。
+3. 宿主层内容分流当前仍是启发式首版，误判率、标题提取和内容命名策略后续还需继续收紧。
+4. 黄金坩埚后续需要接入主动 / 被动互联网搜索，为讨论注入学术与新闻信息，并按类型分流到中区。
+5. 沉浸阶段的大 chat、语音输入、中右动态变形仍未开始开发，应在新窗口中按第二、三部分继续推进。
 
 ## 最新变更
 
-- **2026-03-06**: ✅ 修复了 Phase 2 批量勾选状态的竞态条件问题，并应用了统一的 3 态 Excel 风格 Checkbox。
-- **2026-03-06**: ✅ 新增 `DirectorSection` 的重置缓存功能，支持一键清空记录回到 Phase 1。
-- **2026-03-05**: ✅ 修复了服务器优雅关闭退出卡顿的问题；整理了版本管理规范。
+- **2026-03-10**: ✅ 黄金坩埚右侧已接入真实 chat，前台“黄金冶炼师”已挂载 `Socrates + ThesisWriter + Researcher + FactChecker + Writer` 知识上下文。
+- **2026-03-10**: ✅ 已确认并同步 `ThesisWriter / Writer / Researcher / FactChecker` 到当前项目的 `skills/` 目录。
+- **2026-03-10**: ✅ 已修复当前工作区缺少 `.env` 导致的全局 LLM setting 不生效问题，黄金坩埚 chat 现跟随全局 provider/model/key。
+- **2026-03-10**: ✅ 完成黄金坩埚两轮精修：压缩 header 与三栏框架、缩窄左栏、统一 chat 奶白体系、补足头像归属与 Footer skill 展开。
+- **2026-03-10**: ✅ 落下宿主层内容分流首版：纯对话留 chat，大段参考 / 金句 / 结构资产分送至中区。
+- **2026-03-10**: ✅ 完成 Round 3 Part 1：右侧 chat 降级为状态窗，中区生成 3 个议题澄清问题卡，支持逐题保存与全部提交确认。
+- **2026-03-10**: ✅ 修复问题卡保存后中区滚动失效问题；将 `textarea` 调整为固定高度内部滚动，避免挤坏中区主滚动。
+- **2026-03-10**: ✅ 第三轮协议已落盘：明确“议题锁定 -> 沉浸对话 -> 结晶呈现”三阶段，并记入主动 / 被动互联网搜索能力要求。
 
----
+最新 Dev Log: `docs/dev_logs/2026-03-10_SD210_Crucible_Round3_Part1.md`
 
-最新 Memory Dump: `.agent/memory_dumps/memory_2026-03-06_Phase2_Checkbox.md`
+最新 Memory Dump: `.agent/memory_dumps/memory_2026-03-10_GoldenCrucible_Worktree.md`
