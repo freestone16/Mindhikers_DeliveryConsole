@@ -4,7 +4,7 @@
 - **Project**: DeliveryConsole
 - **Worktree Path**: /Users/luzhoua/DeliveryConsole
 - **Current Branch**: `codex/sd208-golden-crucible`
-- **Focus Module**: 黄金坩埚 / Round 3 议题锁定工作台 / Runtime Port Governance
+- **Focus Module**: 黄金坩埚 / 人格层与工具层架构定稿 / Runtime Port Governance
 
 ## 📍 Action History
 - 完成黄金坩埚真实 chat 接入，并让 chat 跟随全局 LLM setting。
@@ -16,6 +16,10 @@
 - 修复问题卡保存后中区滚动失效问题，改为 `textarea` 固定高度内部滚动。
 - 将第三轮交互协议落盘，明确“议题锁定 -> 沉浸对话 -> 结晶呈现”三阶段。
 - 记录新要求：黄金坩埚后续需具备主动 / 被动互联网搜索能力，为讨论注入真实世界的学术与新闻信息。
+- 明确前台世界只保留：用户 / 老张 / 老卢；黄金冶炼师默认隐身，不作为常规前台角色出现。
+- 明确老张 / 老卢是数字人，其 SSOT 仍是 `docs/02_design/crucible/souls/*.md`，当前未被运行时真正接线。
+- 明确 `Socrates / Researcher / FactChecker / ThesisWriter` 都只是后台工具，不在前台显名。
+- 明确当前阶段的终点先定义为 `ThesisWriter` 论文产出，暂不把 `Writer` 和交付终端纳入本阶段主链。
 
 ## 📂 Active Files
 - `src/App.tsx`
@@ -29,14 +33,17 @@
 - `src/components/crucible/types.ts`
 - `src/components/StatusFooter.tsx`
 - `src/config/runtime.ts`
-- `docs/plans/2026-03-10_SD210_Crucible_Round3_Interaction_Protocol.md`
+- `docs/02_design/crucible/souls/oldlu_soul.md`
+- `docs/02_design/crucible/souls/oldzhang_soul.md`
+- `docs/plans/2026-03-10_SD210_GoldenMetallurgist_Skill_Architecture.md`
+- `docs/dev_logs/2026-03-10_SD210_GoldenMetallurgist_Architecture_Decision.md`
 - `docs/dev_logs/2026-03-10_SD210_Crucible_Round3_Part1.md`
 
 ## 🚀 Next Steps
-- 新窗口优先推进第三轮第二部分：系统判断“议题已收敛”。
-- 接“是否建立新项目”弹窗，并允许用户微调项目名 / 文稿名。
-- 先只跑通前端立项流程，不在同一切片里直接建目录 / 文稿。
-- 后续再继续推进沉浸对话大 chat、语音输入与中右动态变形。
+- 新窗口优先写 `GoldenMetallurgist` skill 的调度草案，而不是继续散改 UI。
+- 将 `oldzhang_soul.md / oldlu_soul.md` 接入运行时，避免人格继续停留在文档层。
+- 将 `Socrates / Researcher / FactChecker / ThesisWriter` 作为后台工具接入黄金坩埚链路。
+- 当前阶段以 `ThesisWriter` 论文产出为终点，暂不把 `Writer` 与交付终端接线拉进来。
 - 把主动 / 被动互联网搜索接入坩埚协议，并把结果分流到中区参考材料 / 金句 / 结构资产。
 
 ## 🔗 Git 状态草案
