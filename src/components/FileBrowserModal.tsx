@@ -30,7 +30,7 @@ export const FileBrowserModal = ({ isOpen, onClose, onSelect }: FileBrowserModal
         setLoading(true);
         setError(null);
         try {
-            const url = `http://localhost:3002/api/files?dir=${encodeURIComponent(dir)}`;
+            const url = `/api/files?dir=${encodeURIComponent(dir)}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error('Failed to load directory');
             const json = await res.json();

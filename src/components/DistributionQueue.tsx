@@ -74,7 +74,7 @@ export const DistributionQueue = () => {
 
     const fetchQueue = async () => {
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/queue');
+            const res = await fetch('/api/distribution/queue');
             const data = await res.json();
             if (data.success) {
                 setTasks(data.queue || []);
@@ -97,7 +97,7 @@ export const DistributionQueue = () => {
         
         setActionLoading(taskId);
         try {
-            const res = await fetch(`http://localhost:3002/api/distribution/queue/${taskId}`, {
+            const res = await fetch(`/api/distribution/queue/${taskId}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
@@ -114,7 +114,7 @@ export const DistributionQueue = () => {
     const handleRetry = async (taskId: string) => {
         setActionLoading(taskId);
         try {
-            const res = await fetch(`http://localhost:3002/api/distribution/queue/${taskId}/retry`, {
+            const res = await fetch(`/api/distribution/queue/${taskId}/retry`, {
                 method: 'POST'
             });
             const data = await res.json();

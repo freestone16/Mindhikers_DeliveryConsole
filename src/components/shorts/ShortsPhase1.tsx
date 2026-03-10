@@ -52,7 +52,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
     const loadScripts = async () => {
         setIsLoadingScripts(true);
         try {
-            const res = await fetch(`http://localhost:3002/api/scripts?projectId=${projectId}`);
+            const res = await fetch(`/api/scripts?projectId=${projectId}`);
             const data = await res.json();
             setScripts(data.scripts || []);
         } catch (e) {
@@ -71,7 +71,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         }
 
         try {
-            const res = await fetch(`http://localhost:3002/api/scripts/content`, {
+            const res = await fetch(`/api/scripts/content`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, path })
@@ -90,7 +90,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         
         setIsRecommending(true);
         try {
-            const res = await fetch('http://localhost:3002/api/shorts/phase1/recommend', {
+            const res = await fetch('/api/shorts/phase1/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, content, count: targetCount })
@@ -141,7 +141,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         setGeneratedScripts([]);
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase1/generate', {
+            const response = await fetch('/api/shorts/phase1/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

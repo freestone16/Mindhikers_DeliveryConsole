@@ -59,7 +59,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     const fetchAssets = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/assets');
+            const res = await fetch('/api/distribution/assets');
             const data = await res.json();
             if (data.success) {
                 setVideos(data.videos || []);
@@ -80,7 +80,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
 
         try {
             const projectDir = propProjectId || 'MindHikers Delivery Console';
-            const res = await fetch(`http://localhost:3002/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
+            const res = await fetch(`/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
             const data = await res.json();
 
             const planFile = data.files?.find((f: any) => f.name === 'marketing_plan.json');
@@ -127,7 +127,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
         setSubmitResult(null);
 
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/queue/create', {
+            const res = await fetch('/api/distribution/queue/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

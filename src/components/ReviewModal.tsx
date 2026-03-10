@@ -71,7 +71,7 @@ export const ReviewModal = ({ item, isOpen, onClose, onApprove, onReject }: Revi
                                     </div>
                                 ) : (
                                     <div className="aspect-[9/16] max-w-xs mx-auto bg-black rounded-lg overflow-hidden border border-slate-800">
-                                        <video className="w-full h-full object-cover" controls src={`http://localhost:3002/video/${item.id}.mp4`}>
+                                        <video className="w-full h-full object-cover" controls src={`/video/${item.id}.mp4`}>
                                             <p className="text-white text-center mt-10">Video Preview Placeholder</p>
                                             <p className="text-xs text-slate-500 text-center">({item.videoPath})</p>
                                         </video>

@@ -23,7 +23,7 @@ export const HeaderComposer = ({ projectId, config, onConfigUpdate }: HeaderComp
         formData.append('centerText', localConfig.centerText || '');
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/header-config', {
+            const response = await fetch('/api/shorts/header-config', {
                 method: 'PUT',
                 body: formData
             });
@@ -39,7 +39,7 @@ export const HeaderComposer = ({ projectId, config, onConfigUpdate }: HeaderComp
 
     const handleSave = async () => {
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/header-config', {
+            const response = await fetch('/api/shorts/header-config', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, ...localConfig })

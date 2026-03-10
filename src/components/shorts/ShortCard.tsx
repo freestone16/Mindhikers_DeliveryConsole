@@ -26,7 +26,7 @@ export const ShortCard = ({ projectId, script, renderUnit, onUpdate }: ShortCard
         formData.append('shortId', renderUnit.id);
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase3/upload-aroll', {
+            const response = await fetch('/api/shorts/phase3/upload-aroll', {
                 method: 'POST',
                 body: formData
             });
@@ -58,7 +58,7 @@ export const ShortCard = ({ projectId, script, renderUnit, onUpdate }: ShortCard
     const handleGenerateBrolls = async () => {
         setIsGeneratingBrolls(true);
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase3/generate-brolls', {
+            const response = await fetch('/api/shorts/phase3/generate-brolls', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, shortId: renderUnit.id })
@@ -111,7 +111,7 @@ export const ShortCard = ({ projectId, script, renderUnit, onUpdate }: ShortCard
 
         setIsTranscribing(true);
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase3/transcribe', {
+            const response = await fetch('/api/shorts/phase3/transcribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, shortId: renderUnit.id })
@@ -144,7 +144,7 @@ export const ShortCard = ({ projectId, script, renderUnit, onUpdate }: ShortCard
     const handleRender = async () => {
         onUpdate({ renderStatus: 'rendering' });
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase3/render', {
+            const response = await fetch('/api/shorts/phase3/render', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, shortId: renderUnit.id })

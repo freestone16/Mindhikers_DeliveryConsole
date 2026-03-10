@@ -49,7 +49,7 @@ export const BGMSelector = ({ projectId, currentBgm, onBgmChange }: BGMSelectorP
         formData.append('projectId', projectId);
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/upload-bgm', {
+            const response = await fetch('/api/shorts/upload-bgm', {
                 method: 'POST',
                 body: formData
             });
