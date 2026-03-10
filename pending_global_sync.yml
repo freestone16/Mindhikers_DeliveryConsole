@@ -1,0 +1,16 @@
+pending_sync:
+  - project: "DeliveryConsole"
+    branch: "codex/sd208-golden-crucible"
+    module: "Golden Crucible - SD210"
+    agent: "codex"
+    agent_capabilities:
+      global_write: "READ_ONLY"
+      skill_symlink: "PILOT_TEST"
+    ports:
+      frontend: 5176
+      backend: 3004
+    pid:
+      frontend: null
+      backend: null
+    status: "synced"
+    notes: "黄金坩埚主现场已切到 5176/3004，并已同步备案到 ~/.vibedir/global_ports_registry.yml。"
