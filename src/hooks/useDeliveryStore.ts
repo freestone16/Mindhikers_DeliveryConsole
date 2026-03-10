@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { DeliveryState } from '../types';
 
-const SOCKET_URL = 'http://127.0.0.1:3002';
-const API_URL = 'http://localhost:3002';
+const SOCKET_URL = ''; // relative — goes through Vite proxy → backend
+const API_URL = '';
 
 export const INITIAL_STATE: DeliveryState = {
     projectId: '',

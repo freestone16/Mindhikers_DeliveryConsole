@@ -41,7 +41,7 @@ const VideoCard = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const taskKey = `${chapterId}::${option.id}`;
+  const taskKey = `${chapterId}-${option.id}`;
 
   const pollStatus = useCallback(async () => {
     try {
@@ -358,7 +358,7 @@ const ChapterBlock = ({
             projectId={projectId}
             chapterId={chapter.chapterId}
             option={opt}
-            isPendingTask={pendingTaskKeys.has(`${chapter.chapterId}::${opt.id}`)}
+            isPendingTask={pendingTaskKeys.has(`${chapter.chapterId}-${opt.id}`)}
             onApprove={(optionId, approved) => onApproveOption(chapter.chapterId, optionId, approved)}
             onUpdateOption={(optionId, updates) => onUpdateOption(chapter.chapterId, optionId, updates)}
             onRetry={(optionId) => onRetryOption(chapter.chapterId, chapter.options.find(o => o.id === optionId)!)}
