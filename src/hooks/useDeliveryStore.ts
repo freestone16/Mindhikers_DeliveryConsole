@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { DeliveryState } from '../types';
-
-const SOCKET_URL = ''; // relative — goes through Vite proxy → backend
-const API_URL = '';
+import { API_BASE, SOCKET_URL } from '../config';
 
 export const INITIAL_STATE: DeliveryState = {
     projectId: '',
@@ -58,7 +56,7 @@ export const useDeliveryStore = () => {
 
     const selectScript = async (projectId: string, scriptPath: string): Promise<boolean> => {
         try {
-            const res = await fetch(`${API_URL}/api/scripts/select`, {
+            const res = await fetch(`${API_BASE}/api/scripts/select`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, path: scriptPath })

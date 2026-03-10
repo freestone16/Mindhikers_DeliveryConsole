@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-
-const SOCKET_URL = 'http://127.0.0.1:3002';
+import { SOCKET_URL } from '../config';
 
 export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
     const [syncStatus, setSyncStatus] = useState<any>(null);
