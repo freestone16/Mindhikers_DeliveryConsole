@@ -20,6 +20,11 @@
 - 明确老张 / 老卢是数字人，其 SSOT 仍是 `docs/02_design/crucible/souls/*.md`，当前未被运行时真正接线。
 - 明确 `Socrates / Researcher / FactChecker / ThesisWriter` 都只是后台工具，不在前台显名。
 - 明确当前阶段的终点先定义为 `ThesisWriter` 论文产出，暂不把 `Writer` 和交付终端纳入本阶段主链。
+- 完成 Round 3 Part 3：中区默认留白，不再预灌 `INITIAL_ASSETS`；第一轮问题改为用户首次提问后再触发。
+- `server/crucible.ts` 已升级为返回 `speaker + reflection + cards`，后续轮次会让老张 / 老卢先读答复再继续追问。
+- `ChatPanel` 已增加发送防抖、外部消息注入去重、chat reset 联动清空，作为“一问双回”首版治理。
+- `hostRouting` 已收紧资产判定，短状态句不再轻易误送中区。
+- 问题卡“已保存 / 未保存”徽标样式已统一为 pill，用户侧不再显示“本地兜底问题集”这类开发词。
 
 ## 📂 Active Files
 - `src/App.tsx`
@@ -38,17 +43,20 @@
 - `docs/plans/2026-03-10_SD210_GoldenMetallurgist_Skill_Architecture.md`
 - `docs/dev_logs/2026-03-10_SD210_GoldenMetallurgist_Architecture_Decision.md`
 - `docs/dev_logs/2026-03-10_SD210_Crucible_Round3_Part1.md`
+ - `docs/dev_logs/2026-03-10_SD210_Crucible_Round3_Part2.md`
+ - `docs/dev_logs/2026-03-10_SD210_Crucible_Round3_Part3.md`
+ - `server/crucible.ts`
 
 ## 🚀 Next Steps
-- 新窗口优先写 `GoldenMetallurgist` skill 的调度草案，而不是继续散改 UI。
-- 将 `oldzhang_soul.md / oldlu_soul.md` 接入运行时，避免人格继续停留在文档层。
-- 将 `Socrates / Researcher / FactChecker / ThesisWriter` 作为后台工具接入黄金坩埚链路。
-- 当前阶段以 `ThesisWriter` 论文产出为终点，暂不把 `Writer` 与交付终端接线拉进来。
+- 优先现场回归三件事：`一问双回` 是否完全压住、Socrates 是否仍频繁掉 fallback、第二轮/第三轮是否还显机械。
+- 将 `GoldenMetallurgist` 真正实现为后台导演，而不是继续依赖前端状态拼出流程感。
+- 将 `oldzhang_soul.md / oldlu_soul.md` 接入更完整运行时，并把 `Socrates / Researcher / FactChecker / ThesisWriter` 接成真实编排链。
+- 当前阶段仍以 `ThesisWriter` 论文产出为终点，暂不把 `Writer` 与交付终端接线拉进来。
 - 把主动 / 被动互联网搜索接入坩埚协议，并把结果分流到中区参考材料 / 金句 / 结构资产。
 
 ## 🔗 Git 状态草案
 - 最新功能提交：
   - `744566b feat(crucible): add round3 topic lock workflow`
-- 当前这次落盘是主现场同步，不继续扩功能。
-- 若后续要提交“阶段存档文档”，建议提交信息：
-  - `docs: save crucible round3 progress 2026-03-10`
+- 当前这次预计提交：
+  - `feat(crucible): refine round3 question flow`
+- 当前这次不是纯文档落盘，而是连同 Round 3 Part 3 代码收口一并提交。

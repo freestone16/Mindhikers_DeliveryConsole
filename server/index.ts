@@ -17,7 +17,9 @@ import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
 import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
+import * as music from './music';
 import * as shorts from './shorts';
+import { generateSocraticQuestions } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -32,6 +34,7 @@ const upload = multer({ dest: 'uploads/' });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 
 const app = express();
 app.use(cors()); // Enable CORS for all routes
@@ -161,6 +164,8 @@ app.post('/api/shorts/phase1/generate', shorts.generateScripts);
 app.post('/api/shorts/phase2/save-script', shorts.saveScript);
 app.post('/api/shorts/phase2/regenerate', shorts.regenerateScript);
 app.post('/api/shorts/phase2/confirm-all', shorts.confirmAll);
+app.post('/api/shorts/upload-bgm', upload.single('bgmFile'), shorts.uploadBgm);
+app.get('/api/shorts/music-assets', shorts.getMusicAssets);
 app.post('/api/shorts/phase3/upload-aroll', upload.single('videoFile'), shorts.uploadAroll);
 app.post('/api/shorts/phase3/generate-brolls', shorts.generateBrolls);
 app.post('/api/shorts/phase3/transcribe', shorts.transcribe);
@@ -175,8 +180,14 @@ app.put('/api/shorts/header-config', upload.fields([
 app.post('/api/shorts/phase3/render', shorts.renderShort);
 app.get('/api/shorts/phase3/render-status/:jobId', shorts.getRenderStatus);
 
+// Music Director Routes
+app.get('/api/music/assets', music.getAssets);
+
 // Market Master Routes (SD-207)
 app.use('/api/market', marketRouter);
+
+// Crucible Routes (SD-210)
+app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');
@@ -622,35 +633,35 @@ io.on('connection', (socket) => {
             if (!projectId) throw new Error('projectId is required for chat-load-context');
             const projectRoot = getProjectRoot(projectId);
             let ctx = loadExpertContext(projectRoot, expertId, clientScriptPath || undefined);
-            socket.emit('chat-context-loaded', { expertId, systemPrompt: ctx.systemPrompt });
+            socket.emit('chat-context-loaded', { expertId, projectId, scriptPath: clientScriptPath, systemPrompt: ctx.systemPrompt });
         } catch (error: any) {
-            socket.emit('chat-error', { error: error.message, expertId });
+            socket.emit('chat-error', { error: error.message, expertId, projectId, scriptPath: clientScriptPath });
         }
     });
 
-    socket.on('chat-load-history', ({ expertId, projectId }) => {
+    socket.on('chat-load-history', ({ expertId, projectId, scriptPath }) => {
         try {
             if (!projectId) throw new Error('projectId is required for chat-load-history');
             const projectRoot = getProjectRoot(projectId);
-            const messages = loadChatHistory(projectRoot, expertId);
-            socket.emit('chat-history', { expertId, messages });
+            const messages = loadChatHistory(projectRoot, expertId, scriptPath || undefined);
+            socket.emit('chat-history', { expertId, projectId, scriptPath, messages });
         } catch (error: any) {
-            socket.emit('chat-error', { error: error.message, expertId });
+            socket.emit('chat-error', { error: error.message, expertId, projectId, scriptPath });
         }
     });
 
-    socket.on('chat-clear-history', ({ expertId, projectId }) => {
+    socket.on('chat-clear-history', ({ expertId, projectId, scriptPath }) => {
         try {
             if (!projectId) throw new Error('projectId is required for chat-clear-history');
             const projectRoot = getProjectRoot(projectId);
-            clearChatHistory(projectRoot, expertId);
-            socket.emit('chat-history', { expertId, messages: [] });
+            clearChatHistory(projectRoot, expertId, scriptPath || undefined);
+            socket.emit('chat-history', { expertId, projectId, scriptPath, messages: [] });
         } catch (error: any) {
-            socket.emit('chat-error', { error: error.message, expertId });
+            socket.emit('chat-error', { error: error.message, expertId, projectId, scriptPath });
         }
     });
 
-    socket.on('chat-stream', async ({ messages, expertId, projectId }) => {
+    socket.on('chat-stream', async ({ messages, expertId, projectId, scriptPath }) => {
         try {
             console.log(`[Chat][V2] === chat-stream ENTRY (code version: 2026-03-05-v5) ===`);
             if (!projectId) throw new Error('projectId is required for chat-stream');
@@ -662,7 +673,7 @@ io.on('connection', (socket) => {
             let tools = adapter?.getToolDefinitions();
 
             // Build system prompt with optional skeleton context
-            const context = loadExpertContext(projectRoot, expertId);
+            const context = loadExpertContext(projectRoot, expertId, scriptPath || undefined);
             let systemContent = context.systemPrompt;
 
             if (adapter) {
@@ -676,7 +687,7 @@ io.on('connection', (socket) => {
 
             const { formatted, warning } = formatMultimodalMessages(messages, provider);
             if (warning) {
-                socket.emit('chat-warning', { warning, expertId });
+                socket.emit('chat-warning', { warning, expertId, projectId, scriptPath });
             }
 
             const messagesWithContext = [
@@ -691,7 +702,7 @@ io.on('connection', (socket) => {
 
             for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl, tools)) {
                 if (typeof chunk === 'string') {
-                    socket.emit('chat-chunk', { chunk, expertId });
+                    socket.emit('chat-chunk', { chunk, expertId, projectId, scriptPath });
                 } else if (chunk.type === 'tool_call') {
                     isToolCallTriggered = true;
                     let parsedArgs: Record<string, any> = {};
@@ -704,6 +715,8 @@ io.on('connection', (socket) => {
                     const desc = generateActionDescription(chunk.functionName, parsedArgs);
                     socket.emit('chat-action-confirm', {
                         expertId,
+                        projectId,
+                        scriptPath,
                         confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
                         actionName: chunk.functionName,
                         actionArgs: parsedArgs,
@@ -714,17 +727,17 @@ io.on('connection', (socket) => {
             }
 
             if (!isToolCallTriggered) {
-                socket.emit('chat-done', { expertId });
-                saveChatHistory(projectRoot, expertId, messages);
+                socket.emit('chat-done', { expertId, projectId, scriptPath });
+                saveChatHistory(projectRoot, expertId, messages, scriptPath || undefined);
             }
 
         } catch (error: any) {
             console.error('[Chat] Stream error:', error.message);
-            socket.emit('chat-error', { error: error.message, expertId });
+            socket.emit('chat-error', { error: error.message, expertId, projectId, scriptPath });
         }
     });
 
-    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, originalMessages }) => {
+    socket.on('chat-action-execute', async ({ expertId, projectId, scriptPath, actionName, actionArgs, originalMessages }) => {
         try {
             console.log(`[Chat][DEBUG] chat-action-execute => action: ${actionName}, args:`, JSON.stringify(actionArgs));
             const projectRoot = getProjectRoot(projectId);
@@ -748,7 +761,7 @@ io.on('connection', (socket) => {
                     io.to(projectId).emit('expert-data-update', { expertId, action: actionName, data: result.data });
                 }
 
-                socket.emit('chat-action-result', { expertId, success: true, message: '✅ 操作执行成功！请在左侧界面查看。' });
+                socket.emit('chat-action-result', { expertId, projectId, scriptPath, success: true, message: '✅ 操作执行成功！请在左侧界面查看。' });
 
                 // Save confirmation interaction silently to history
                 if (originalMessages) {
@@ -758,22 +771,22 @@ io.on('connection', (socket) => {
                         content: '✅ 操作执行成功！',
                         timestamp: new Date().toISOString()
                     };
-                    saveChatHistory(projectRoot, expertId, [...originalMessages, confirmationMsg]);
+                    saveChatHistory(projectRoot, expertId, [...originalMessages, confirmationMsg], scriptPath || undefined);
                 }
             } else {
-                socket.emit('chat-action-result', { expertId, success: false, message: `❌ 操作失败: ${result.error}` });
+                socket.emit('chat-action-result', { expertId, projectId, scriptPath, success: false, message: `❌ 操作失败: ${result.error}` });
             }
         } catch (error: any) {
             console.error('[Chat] Execute action error:', error.message);
-            socket.emit('chat-action-result', { expertId, success: false, message: `❌ 内部错误: ${error.message}` });
+            socket.emit('chat-action-result', { expertId, projectId, scriptPath, success: false, message: `❌ 内部错误: ${error.message}` });
         }
     });
 
-    socket.on('chat-save', ({ expertId, projectId, messages }) => {
+    socket.on('chat-save', ({ expertId, projectId, messages, scriptPath }) => {
         try {
             if (!projectId) throw new Error('projectId is required for chat-save');
             const projectRoot = getProjectRoot(projectId);
-            saveChatHistory(projectRoot, expertId, messages);
+            saveChatHistory(projectRoot, expertId, messages, scriptPath || undefined);
         } catch (error: any) {
             console.error('Chat save error:', error.message);
         }
@@ -822,9 +835,10 @@ app.get('/api/chat/history/:expertId', (req, res) => {
     try {
         const { expertId } = req.params;
         const projectId = req.query.projectId as string;
+        const scriptPath = req.query.scriptPath as string | undefined;
         if (!projectId) throw new Error('projectId is required');
         const projectRoot = getProjectRoot(projectId);
-        const messages = loadChatHistory(projectRoot, expertId);
+        const messages = loadChatHistory(projectRoot, expertId, scriptPath);
         res.json({ messages });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

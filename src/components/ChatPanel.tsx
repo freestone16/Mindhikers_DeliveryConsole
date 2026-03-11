@@ -1,22 +1,138 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Send, Paperclip, Loader2, AlertCircle, Check, Trash2 } from 'lucide-react';
-import type { ChatMessage, Attachment, ToolCallConfirmation } from '../types';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Check, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
+import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
+import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
 
 interface ChatPanelProps {
     isOpen: boolean;
     onToggle: () => void;
     expertId: string;
     projectId: string;
+    scriptPath: string;
+    resetToken: number;
+    displayName?: string;
+    headerBadges?: Array<{
+        id: string;
+        name: string;
+        role: string;
+        avatarText?: string;
+        avatarImage?: string;
+    }>;
+    externalMessages?: ChatMessage[];
+    onUserMessage?: (content: string) => void;
+    onRouteAsset?: (asset: HostRoutedAsset) => void;
     socket: any;
 }
+
+const DEFAULT_ASSISTANT = {
+    authorId: 'assistant',
+    authorName: '助手',
+    authorRole: '默认回复',
+};
+
+const buildDefaultAssistantMeta = (
+    isCrucibleMode: boolean,
+    expertId: string,
+    expertName: string
+): ChatMessageMeta => {
+    if (isCrucibleMode) {
+        return DEFAULT_ASSISTANT;
+    }
+
+    return {
+        authorId: expertId,
+        authorName: expertName,
+        authorRole: '专业助手',
+    };
+};
+
+const getBubbleTone = (msg: ChatMessage) => {
+    if (msg.role === 'user') {
+        return 'border-[rgba(166,117,64,0.18)] bg-[linear-gradient(180deg,#f3dcc2_0%,#eed0ae_100%)] text-[var(--ink-1)]';
+    }
+
+    if (msg.meta?.classification === 'quote') {
+        return 'border-[rgba(177,139,80,0.18)] bg-[linear-gradient(180deg,#fff8ef_0%,#f8ebd9_100%)] text-[var(--ink-1)]';
+    }
+
+    if (msg.meta?.classification === 'reference') {
+        return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffdf8_0%,#f6eee2_100%)] text-[var(--ink-1)]';
+    }
+
+    if (msg.meta?.classification === 'asset') {
+        return 'border-[rgba(191,147,95,0.2)] bg-[linear-gradient(180deg,#fef7ee_0%,#f3e4cf_100%)] text-[var(--ink-1)]';
+    }
+
+    return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] text-[var(--ink-1)]';
+};
+
+const getClassificationLabel = (msg: ChatMessage) => {
+    switch (msg.meta?.classification) {
+        case 'reference':
+            return '已送中区参考';
+        case 'quote':
+            return '已送金句卡';
+        case 'asset':
+            return '已送资产区';
+        default:
+            return msg.role === 'user' ? '命题输入' : '纯对话';
+    }
+};
+
+const getMessageAuthor = (
+    msg: ChatMessage,
+    headerBadges?: ChatPanelProps['headerBadges'],
+    fallbackName?: string
+) => {
+    if (msg.role === 'user') {
+        return headerBadges?.find((badge) => badge.id === 'user') || {
+            id: 'user',
+            name: '你',
+            role: '命题发起',
+            avatarText: '你',
+        };
+    }
+
+    const authorId = msg.meta?.authorId || DEFAULT_ASSISTANT.authorId;
+    return headerBadges?.find((badge) => badge.id === authorId) || {
+        id: authorId,
+        name: msg.meta?.authorName || fallbackName || DEFAULT_ASSISTANT.authorName,
+        role: msg.meta?.authorRole || DEFAULT_ASSISTANT.authorRole,
+        avatarText: (msg.meta?.authorName || fallbackName || DEFAULT_ASSISTANT.authorName).slice(0, 1),
+    };
+};
+
+const getCrucibleStatusMessage = (msg: ChatMessage) => {
+    if (msg.role === 'user') {
+        return msg.content;
+    }
+
+    switch (msg.meta?.classification) {
+        case 'reference':
+            return '主要问题已生成，请在中区逐项回答。';
+        case 'quote':
+            return '已提炼一条可继续锻造的金句，中区同步更新。';
+        case 'asset':
+            return '已生成结构或影像提示，中区资产已更新。';
+        default:
+            return msg.content;
+    }
+};
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
     isOpen,
     onToggle,
     expertId,
     projectId,
-    socket
+    scriptPath,
+    resetToken,
+    displayName,
+    headerBadges,
+    externalMessages = [],
+    onUserMessage,
+    onRouteAsset,
+    socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
@@ -26,143 +142,206 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [streamingContent, setStreamingContent] = useState('');
     const [warning, setWarning] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // 使用 ref 跟踪当前 expertId，避免闭包问题
-    const currentExpertIdRef = useRef(expertId);
-    const prevExpertIdRef = useRef<string | null>(null);
+    const currentScopeRef = useRef({ expertId, projectId, scriptPath });
+    const prevScopeKeyRef = useRef<string | null>(null);
+    const prevResetTokenRef = useRef(resetToken);
     const streamingContentRef = useRef('');
+    const routedMessageIdsRef = useRef<Set<string>>(new Set());
+    const seenExternalMessageIdsRef = useRef<Set<string>>(new Set());
+    const sendGuardRef = useRef(false);
+    const lastSentRef = useRef<{ content: string; at: number } | null>(null);
+    const expert = EXPERTS.find((item) => item.id === expertId);
+    const expertName = displayName || expert?.name || expertId;
+    const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
+    const isCrucibleMode = expertId === 'GoldenMetallurgist';
+    const defaultAssistantMeta = useMemo(
+        () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
+        [isCrucibleMode, expertId, expertName]
+    );
+
+    const resetPanelState = useCallback(() => {
+        setMessages([]);
+        setContextLoaded(false);
+        setInputText('');
+        setAttachments([]);
+        setIsStreaming(false);
+        setStreamingContent('');
+        routedMessageIdsRef.current.clear();
+        seenExternalMessageIdsRef.current.clear();
+        sendGuardRef.current = false;
+        lastSentRef.current = null;
+    }, []);
+
+    const matchesCurrentScope = useCallback((incoming: { expertId: string; projectId?: string; scriptPath?: string }) => (
+        incoming.expertId === currentScopeRef.current.expertId
+        && (incoming.projectId || '') === currentScopeRef.current.projectId
+        && (incoming.scriptPath || '') === currentScopeRef.current.scriptPath
+    ), []);
+
+    useEffect(() => {
+        currentScopeRef.current = { expertId, projectId, scriptPath };
+    }, [expertId, projectId, scriptPath]);
 
     useEffect(() => {
         streamingContentRef.current = streamingContent;
     }, [streamingContent]);
 
-    const expert = EXPERTS.find(e => e.id === expertId);
-    const expertName = expert?.name || expertId;
-
-    // 更新 ref
-    useEffect(() => {
-        currentExpertIdRef.current = expertId;
-    }, [expertId]);
-
-    // Auto scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, streamingContent]);
 
-    // Socket event handlers - 只注册一次
+    useEffect(() => {
+        if (!onRouteAsset) {
+            return;
+        }
+
+        for (const message of messages) {
+            if (message.role !== 'assistant' || !message.meta?.classification || message.meta.classification === 'dialogue') {
+                continue;
+            }
+            if (routedMessageIdsRef.current.has(message.id)) {
+                continue;
+            }
+
+            const routedAsset = toHostRoutedAsset(message);
+            routedMessageIdsRef.current.add(message.id);
+            if (routedAsset) {
+                onRouteAsset(routedAsset);
+            }
+        }
+    }, [messages, onRouteAsset]);
+
+    useEffect(() => {
+        if (externalMessages.length === 0) {
+            return;
+        }
+
+        const freshMessages = externalMessages.filter((message) => !seenExternalMessageIdsRef.current.has(message.id));
+        if (freshMessages.length === 0) {
+            return;
+        }
+
+        freshMessages.forEach((message) => seenExternalMessageIdsRef.current.add(message.id));
+        setMessages((prev) => [...prev, ...freshMessages.map((message) => enrichMessageMeta(message))]);
+    }, [externalMessages]);
+
     useEffect(() => {
         if (!socket) return;
 
-        const handleChatChunk = ({ chunk, expertId: msgExpertId }: { chunk: string; expertId: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
-            setStreamingContent(prev => prev + chunk);
+        const handleChatChunk = ({ chunk, expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { chunk: string; expertId: string; projectId?: string; scriptPath?: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
+            setStreamingContent((prev) => prev + chunk);
         };
 
-        const handleChatDone = ({ expertId: msgExpertId }: { expertId: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
+        const handleChatDone = ({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { expertId: string; projectId?: string; scriptPath?: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
 
-            setStreamingContent(prev => {
+            setStreamingContent((prev) => {
                 if (prev) {
-                    const aiMessage: ChatMessage = {
+                    const aiMessage = enrichMessageMeta({
                         id: `msg_${Date.now()}`,
                         role: 'assistant',
                         content: prev,
                         timestamp: new Date().toISOString(),
-                    };
-                    setMessages(msgs => [...msgs, aiMessage]);
+                        meta: defaultAssistantMeta,
+                    });
+                    setMessages((msgs) => [...msgs, aiMessage]);
                 }
                 return '';
             });
             setIsStreaming(false);
+            sendGuardRef.current = false;
         };
 
-        const handleChatError = ({ error, expertId: msgExpertId }: { error: string; expertId: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
-            console.error('Chat error:', error);
+        const handleChatError = ({ error, expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { error: string; expertId: string; projectId?: string; scriptPath?: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
             setIsStreaming(false);
             setStreamingContent('');
-            // 显示错误
-            const errorMessage: ChatMessage = {
+            sendGuardRef.current = false;
+            setMessages((msgs) => [...msgs, {
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
-                content: `❌ 错误: ${error}`,
+                content: `错误: ${error}`,
                 timestamp: new Date().toISOString(),
-            };
-            setMessages(msgs => [...msgs, errorMessage]);
+                meta: defaultAssistantMeta,
+            }]);
         };
 
-        const handleChatWarning = ({ warning: msg, expertId: msgExpertId }: { warning: string; expertId: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
+        const handleChatWarning = ({ warning: msg, expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { warning: string; expertId: string; projectId?: string; scriptPath?: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
             setWarning(msg);
             setTimeout(() => setWarning(null), 3000);
         };
 
-        const handleChatHistory = ({ expertId: msgExpertId, messages: history }: { expertId: string; messages: ChatMessage[] }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
-            console.log('Received chat history:', history.length, 'messages for', msgExpertId);
-            setMessages(history);
+        const handleChatHistory = ({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath, messages: history }: { expertId: string; projectId?: string; scriptPath?: string; messages: ChatMessage[] }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
+            setMessages(history.map((message) => enrichMessageMeta(message)));
         };
 
-        const handleChatContextLoaded = ({ expertId: msgExpertId }: { expertId: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
+        const handleChatContextLoaded = ({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { expertId: string; projectId?: string; scriptPath?: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
             setContextLoaded(true);
         };
 
-        const handleChatConfirmation = ({ expertId: msgExpertId, message }: { expertId: string; message: string }) => {
-            if (msgExpertId !== currentExpertIdRef.current) return;
-
-            // 直接显示确认消息
-            const confirmMessage: ChatMessage = {
+        const handleChatConfirmation = ({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath, message }: { expertId: string; projectId?: string; scriptPath?: string; message: string }) => {
+            if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
+            setMessages((prev) => [...prev, enrichMessageMeta({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content: message,
                 timestamp: new Date().toISOString(),
-            };
-            setMessages(prev => [...prev, confirmMessage]);
+                meta: defaultAssistantMeta,
+            })]);
             setIsStreaming(false);
+            sendGuardRef.current = false;
         };
 
-        const handleChatActionConfirm = (data: { expertId: string; confirmId: string; actionName: string; actionArgs: any; description: string }) => {
-            if (data.expertId !== prevExpertIdRef.current) return;
+        const handleChatActionConfirm = (data: { expertId: string; projectId?: string; scriptPath?: string; confirmId: string; actionName: string; actionArgs: any; description: string }) => {
+            if (!matchesCurrentScope(data)) return;
 
-            // Fix: If there's streaming content, convert it to a message first so it doesn't disappear
             const currentStreaming = streamingContentRef.current;
             if (currentStreaming) {
-                const textMsg: ChatMessage = {
+                setMessages((prev) => [...prev, enrichMessageMeta({
                     id: `msg_text_${Date.now()}`,
                     role: 'assistant',
                     content: currentStreaming,
                     timestamp: new Date().toISOString(),
-                };
-                setMessages(prev => [...prev, textMsg]);
+                    meta: defaultAssistantMeta,
+                })]);
             }
 
             setIsStreaming(false);
             setStreamingContent('');
-            setMessages(prev => [...prev, {
+            sendGuardRef.current = false;
+            setMessages((prev) => [...prev, {
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content: '',
                 timestamp: new Date().toISOString(),
+                meta: defaultAssistantMeta,
                 actionConfirm: {
                     confirmId: data.confirmId,
                     actionName: data.actionName,
                     actionArgs: data.actionArgs,
                     description: data.description,
-                    status: 'pending'
-                }
+                    status: 'pending',
+                },
             }]);
         };
 
-        const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
-            if (data.expertId !== prevExpertIdRef.current) return;
+        const handleChatActionResult = (data: { expertId: string; projectId?: string; scriptPath?: string; success: boolean; message: string }) => {
+            if (!matchesCurrentScope(data)) return;
             setIsStreaming(false);
-            setMessages(prev => [...prev, {
+            sendGuardRef.current = false;
+            setMessages((prev) => [...prev, enrichMessageMeta({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content: data.message,
-                timestamp: new Date().toISOString()
-            }]);
+                timestamp: new Date().toISOString(),
+                meta: defaultAssistantMeta,
+            })]);
         };
 
         socket.on('chat-chunk', handleChatChunk);
@@ -175,8 +354,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         socket.on('chat-action-confirm', handleChatActionConfirm);
         socket.on('chat-action-result', handleChatActionResult);
 
-        console.log('Chat socket events registered');
-
         return () => {
             socket.off('chat-chunk', handleChatChunk);
             socket.off('chat-done', handleChatDone);
@@ -188,69 +365,84 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.off('chat-action-confirm', handleChatActionConfirm);
             socket.off('chat-action-result', handleChatActionResult);
         };
-    }, [socket]);
+    }, [socket, matchesCurrentScope, defaultAssistantMeta]);
 
-    // Load history when expert changes
     useEffect(() => {
         if (!socket || !isOpen || !projectId) return;
 
-        // 如果 expertId 变化了
-        if (prevExpertIdRef.current !== expertId) {
-            console.log('Expert changed from', prevExpertIdRef.current, 'to', expertId);
-
-            // 重置状态
-            setMessages([]);
-            setContextLoaded(false);
-            setStreamingContent('');
-
-            // 加载新专家的历史
-            socket.emit('chat-load-history', { expertId, projectId });
-
-            prevExpertIdRef.current = expertId;
+        if (prevScopeKeyRef.current !== scopeKey) {
+            queueMicrotask(resetPanelState);
+            socket.emit('chat-load-history', { expertId, projectId, scriptPath });
+            prevScopeKeyRef.current = scopeKey;
         }
-    }, [expertId, projectId, socket, isOpen]);
+    }, [expertId, projectId, scriptPath, socket, isOpen, scopeKey, resetPanelState]);
 
-    // 首次打开时加载历史
     useEffect(() => {
-        if (socket && isOpen && messages.length === 0 && projectId) {
-            console.log('Loading history for', expertId);
-            socket.emit('chat-load-history', { expertId, projectId });
+        if (!socket || !isOpen || !projectId) return;
+
+        if (prevResetTokenRef.current !== resetToken) {
+            prevResetTokenRef.current = resetToken;
+            queueMicrotask(resetPanelState);
+            socket.emit('chat-clear-history', { expertId, projectId, scriptPath });
         }
-    }, [isOpen, projectId]);
+    }, [resetToken, socket, isOpen, expertId, projectId, scriptPath, resetPanelState]);
 
     const handleSend = useCallback(() => {
         if (!inputText.trim() && attachments.length === 0) return;
-        if (isStreaming || !socket) return;
+        if (isStreaming || !socket || sendGuardRef.current) return;
 
-        console.log('Sending message for expert:', expertId);
+        const normalizedInput = inputText.trim();
+        const now = Date.now();
+        if (
+            normalizedInput
+            && attachments.length === 0
+            && lastSentRef.current
+            && lastSentRef.current.content === normalizedInput
+            && now - lastSentRef.current.at < 1200
+        ) {
+            return;
+        }
+        sendGuardRef.current = true;
+        lastSentRef.current = normalizedInput ? { content: normalizedInput, at: now } : lastSentRef.current;
 
         const userMessage: ChatMessage = {
             id: `msg_${Date.now()}`,
             role: 'user',
-            content: inputText,
+            content: normalizedInput,
             timestamp: new Date().toISOString(),
             attachments: attachments.length > 0 ? [...attachments] : undefined,
+            meta: {
+                authorId: 'user',
+                authorName: '你',
+                authorRole: '命题发起',
+                classification: 'dialogue',
+            },
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        if (normalizedInput) {
+            onUserMessage?.(normalizedInput);
+        }
+        setMessages((prev) => [...prev, userMessage]);
         setInputText('');
         setAttachments([]);
         setIsStreaming(true);
         setStreamingContent('');
 
-        // Load context on first message
-        if (!contextLoaded) {
-            socket.emit('chat-load-context', { expertId, projectId });
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '96px';
         }
 
-        // Send to backend
-        const messagesToSend = [...messages, userMessage];
+        if (!contextLoaded) {
+            socket.emit('chat-load-context', { expertId, projectId, scriptPath });
+        }
+
         socket.emit('chat-stream', {
-            messages: messagesToSend,
+            messages: [...messages, userMessage],
             expertId,
             projectId,
+            scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -260,7 +452,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const handleConfirmAction = (actionConfirm: ToolCallConfirmation) => {
-        setMessages(prev => prev.map(msg =>
+        setMessages((prev) => prev.map((msg) =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
                 ? { ...msg, actionConfirm: { ...actionConfirm, status: 'confirmed' } }
                 : msg
@@ -269,18 +461,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         socket?.emit('chat-action-execute', {
             expertId,
             projectId,
+            scriptPath,
             actionName: actionConfirm.actionName,
             actionArgs: actionConfirm.actionArgs,
-            originalMessages: messages.filter(m => m.actionConfirm?.status !== 'pending')
+            originalMessages: messages.filter((msg) => msg.actionConfirm?.status !== 'pending'),
         });
     };
 
     const handleCancelAction = (actionConfirm: ToolCallConfirmation) => {
-        setMessages(prev => prev.map(msg =>
+        setMessages((prev) => prev.map((msg) =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
                 ? { ...msg, actionConfirm: { ...actionConfirm, status: 'cancelled' }, content: '已取消该操作。' }
                 : msg
         ));
+    };
+
+    const processImageFile = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result as string;
+            const previewUrl = URL.createObjectURL(file);
+            setAttachments((prev) => [...prev, {
+                type: 'image',
+                name: file.name,
+                base64,
+                previewUrl,
+            }]);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handlePaste = (e: React.ClipboardEvent) => {
@@ -318,206 +526,247 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         e.target.value = '';
     };
 
-    const processImageFile = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result as string;
-            const previewUrl = URL.createObjectURL(file);
-            setAttachments(prev => [...prev, {
-                type: 'image',
-                name: file.name,
-                base64,
-                previewUrl,
-            }]);
-        };
-        reader.readAsDataURL(file);
-    };
-
     const removeAttachment = (index: number) => {
-        setAttachments(prev => {
+        setAttachments((prev) => {
             URL.revokeObjectURL(prev[index].previewUrl);
-            return prev.filter((_, i) => i !== index);
+            return prev.filter((_, idx) => idx !== index);
         });
     };
 
     const handleClearHistory = () => {
         if (!window.confirm('确定要清空对话历史吗？')) return;
-        socket?.emit('chat-clear-history', { expertId, projectId });
+        socket?.emit('chat-clear-history', { expertId, projectId, scriptPath });
         setMessages([]);
+        routedMessageIdsRef.current.clear();
+        seenExternalMessageIdsRef.current.clear();
+        sendGuardRef.current = false;
+        lastSentRef.current = null;
     };
 
+    const emptyStateText = useMemo(() => {
+        if (isCrucibleMode) {
+            return '先在这里聊纯对话，宿主会把参考内容、金句和资产提示送到中区。';
+        }
+        return `开始和 ${expertName} 对话`;
+    }, [isCrucibleMode, expertName]);
+
     return (
-        <div className="flex flex-col h-full bg-[#0b1529]/80 backdrop-blur-md">
-            {/* Header */}
-            <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                    <span className="text-lg">💬</span>
-                    <span className="font-medium text-white text-sm">{expertName}</span>
-                    {contextLoaded && (
-                        <span className="text-xs text-green-400" title="上下文已加载">●</span>
-                    )}
+        <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,250,244,0.98)_0%,rgba(248,239,226,0.96)_100%)]">
+            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(166,117,64,0.15)] bg-[var(--surface-1)] text-[13px] font-semibold text-[var(--ink-1)]">聊</div>
+                            <div>
+                                <div className="text-sm font-semibold text-[var(--ink-1)]">{displayName || expertName}</div>
+                                <div className="text-[11px] text-[var(--ink-3)]">
+                                    「参考材料 - 议题澄清」会在页面中间显示
+                                    {contextLoaded && <span className="ml-2 text-[var(--accent)]">上下文已加载</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={handleClearHistory}
+                            title="清空对话历史"
+                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                        <button
+                            onClick={onToggle}
+                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={handleClearHistory}
-                        title="清空对话历史"
-                        className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-all"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={onToggle}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
-                    >
-                        <X className="w-4 h-4 text-slate-400" />
-                    </button>
-                </div>
+
+                {headerBadges && headerBadges.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {headerBadges.map((badge) => (
+                            <div key={badge.id} className="flex items-center gap-2 rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[rgba(255,255,255,0.52)] px-2.5 py-2">
+                                {badge.avatarImage ? (
+                                    <div className="h-8 w-8 overflow-hidden rounded-xl bg-[var(--surface-2)]">
+                                        <img src={badge.avatarImage} alt={badge.name} className="h-full w-full object-cover" />
+                                    </div>
+                                ) : (
+                                    <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--surface-2)] text-sm font-semibold text-[var(--ink-1)]">
+                                        {badge.avatarText || badge.name.slice(0, 1)}
+                                    </div>
+                                )}
+                                <div>
+                                    <div className="text-[12px] font-medium text-[var(--ink-1)]">{badge.name}</div>
+                                    <div className="text-[10px] text-[var(--ink-3)]">{badge.role}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            {/* Warning Toast */}
             {warning && (
-                <div className="mx-4 mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                <div className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--ink-2)]">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                     {warning}
                 </div>
             )}
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
+            <div className="flex-1 overflow-y-auto px-4 py-4" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
                 {messages.length === 0 && !streamingContent ? (
-                    <div className="text-center text-slate-500 text-sm mt-8">
-                        <p>开始和 {expertName} 对话</p>
+                    <div className="mt-8 rounded-[24px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.38)] px-4 py-6 text-center text-sm text-[var(--ink-3)]">
+                        {emptyStateText}
                     </div>
                 ) : (
-                    <>
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
-                                <div
-                                    className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${msg.role === 'user'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-slate-800 text-slate-200'
-                                        }`}
-                                >
-                                    {msg.attachments && msg.attachments.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mb-2">
-                                            {msg.attachments.map((att, i) => (
-                                                <img
-                                                    key={i}
-                                                    src={att.previewUrl}
-                                                    alt={att.name}
-                                                    className="w-16 h-16 object-cover rounded"
-                                                />
-                                            ))}
+                    <div className="space-y-4">
+                        {messages.map((msg) => {
+                            const author = getMessageAuthor(msg, headerBadges, expertName);
+                            const isUser = msg.role === 'user';
+
+                            return (
+                                <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                                    {author.avatarImage ? (
+                                        <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)]">
+                                            <img src={author.avatarImage} alt={author.name} className="h-full w-full object-cover" />
+                                        </div>
+                                    ) : (
+                                        <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                                            {author.avatarText || author.name.slice(0, 1)}
                                         </div>
                                     )}
-                                    {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
 
-                                    {msg.actionConfirm && (
-                                        <div className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3">
-                                            <p className="text-amber-200 text-sm mb-3 font-medium">
-                                                🤖 {msg.actionConfirm.description}
-                                            </p>
-                                            {msg.actionConfirm.status === 'pending' ? (
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => handleConfirmAction(msg.actionConfirm!)}
-                                                        className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-green-500"
-                                                    >
-                                                        <Check className="w-3 h-3" /> 确认执行
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCancelAction(msg.actionConfirm!)}
-                                                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-slate-600"
-                                                    >
-                                                        <X className="w-3 h-3" /> 取消
-                                                    </button>
+                                    <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                                        <div className={`mb-1 flex items-center gap-2 text-[11px] ${isUser ? 'flex-row-reverse text-right' : 'text-left'} text-[var(--ink-3)]`}>
+                                            <span className="font-medium text-[var(--ink-2)]">{author.name}</span>
+                                            <span>{author.role}</span>
+                                            <span>·</span>
+                                            <span>{getClassificationLabel(msg)}</span>
+                                        </div>
+
+                                        <div className={`w-full rounded-[22px] border px-3.5 py-3 shadow-[0_8px_20px_rgba(131,103,70,0.04)] ${getBubbleTone(msg)}`}>
+                                            {msg.attachments && msg.attachments.length > 0 && (
+                                                <div className="mb-3 flex flex-wrap gap-2">
+                                                    {msg.attachments.map((att, index) => (
+                                                        <img
+                                                            key={`${msg.id}_${index}`}
+                                                            src={att.previewUrl}
+                                                            alt={att.name}
+                                                            className="h-20 w-20 rounded-2xl object-cover"
+                                                        />
+                                                    ))}
                                                 </div>
-                                            ) : (
-                                                <span className={`text-xs font-medium px-2 py-1 rounded inline-block ${msg.actionConfirm.status === 'confirmed'
-                                                    ? 'bg-green-900/50 text-green-400 border border-green-800'
-                                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
-                                                    }`}>
-                                                    {msg.actionConfirm.status === 'confirmed' ? '✓ 已确认' : '✕ 已取消'}
-                                                </span>
+                                            )}
+
+                                            {(msg.content || isCrucibleMode) && (
+                                                <p className="whitespace-pre-wrap text-[13px] leading-7">
+                                                    {isCrucibleMode ? getCrucibleStatusMessage(msg) : msg.content}
+                                                </p>
+                                            )}
+
+                                            {msg.actionConfirm && (
+                                                <div className="mt-3 rounded-[18px] border border-[rgba(184,144,77,0.24)] bg-[rgba(255,249,236,0.95)] p-3">
+                                                    <p className="mb-3 text-sm font-medium text-[var(--ink-1)]">{msg.actionConfirm.description}</p>
+                                                    {msg.actionConfirm.status === 'pending' ? (
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => handleConfirmAction(msg.actionConfirm!)}
+                                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                                            >
+                                                                <Check className="h-3.5 w-3.5" />
+                                                                确认执行
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleCancelAction(msg.actionConfirm!)}
+                                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-[var(--line-soft)] bg-[var(--surface-0)] px-3 py-2 text-xs font-medium text-[var(--ink-2)]"
+                                                            >
+                                                                <X className="h-3.5 w-3.5" />
+                                                                取消
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="inline-flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] px-2.5 py-1 text-[11px] text-[var(--ink-2)]">
+                                                            {msg.actionConfirm.status === 'confirmed' ? '已确认' : '已取消'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
+
                         {streamingContent && (
-                            <div className="flex justify-start">
-                                <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-slate-800 text-slate-200">
-                                    <p className="whitespace-pre-wrap">{streamingContent}<span className="inline-block w-2 h-4 bg-slate-400 animate-pulse ml-1">▋</span></p>
+                            <div className="flex gap-3">
+                                <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">思</div>
+                                <div className="max-w-[88%]">
+                                    <div className="mb-1 text-[11px] text-[var(--ink-3)]">老张 / 老卢 · 推理中</div>
+                                    <div className="rounded-[22px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
+                                        {isCrucibleMode
+                                            ? '正在判断该由老张继续施压，还是该由老卢开始立结构。请稍等……'
+                                            : streamingContent}
+                                        <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-[rgba(120,93,62,0.45)] align-middle" />
+                                    </div>
                                 </div>
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Attachment Preview */}
             {attachments.length > 0 && (
-                <div className="px-4 py-2 border-t border-slate-700/50 flex flex-wrap gap-2 flex-shrink-0">
-                    {attachments.map((att, i) => (
-                        <div key={i} className="relative">
-                            <img
-                                src={att.previewUrl}
-                                alt={att.name}
-                                className="w-12 h-12 object-cover rounded"
-                            />
-                            <button
-                                onClick={() => removeAttachment(i)}
-                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
-                            >
-                                <X className="w-3 h-3 text-white" />
-                            </button>
-                        </div>
-                    ))}
+                <div className="border-t border-[var(--line-soft)] px-4 py-2">
+                    <div className="flex flex-wrap gap-2">
+                        {attachments.map((att, index) => (
+                            <div key={`${att.name}_${index}`} className="relative">
+                                <img src={att.previewUrl} alt={att.name} className="h-12 w-12 rounded-xl object-cover" />
+                                <button
+                                    onClick={() => removeAttachment(index)}
+                                    className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--accent)] text-white"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {/* Input */}
-            <div className="p-3 border-t border-slate-700/50 flex-shrink-0">
+            <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
                 <div className="flex items-end gap-2">
-                    <label className="p-2 hover:bg-slate-700 rounded transition-colors text-slate-400 cursor-pointer">
-                        <Paperclip className="w-4 h-4" />
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileInput}
-                            className="hidden"
-                        />
+                    <div className="mb-1 flex flex-col items-center gap-1">
+                        <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                            你
+                        </div>
+                        <span className="text-[10px] text-[var(--ink-3)]">用户</span>
+                    </div>
+                    <label className="cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
+                        <Paperclip className="h-4 w-4" />
+                        <input type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
                     </label>
                     <textarea
+                        ref={textareaRef}
                         value={inputText}
                         onChange={(e) => {
                             setInputText(e.target.value);
                             e.target.style.height = 'auto';
-                            e.target.style.height = `${Math.max(88, Math.min(e.target.scrollHeight, 240))}px`;
+                            e.target.style.height = `${Math.max(96, Math.min(e.target.scrollHeight, 240))}px`;
                         }}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder="输入消息或指令（Shift+Enter 换行）..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 overflow-y-auto"
+                        placeholder={isCrucibleMode ? '这里先保留短追问。长篇反馈请转到中区问题卡。' : '先聊问题本身。长参考、金句、结构提示会被宿主自动分流。'}
+                        className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
                         rows={3}
                         disabled={isStreaming}
-                        style={{ height: '88px' }}
                     />
                     <button
                         onClick={handleSend}
                         disabled={isStreaming || (!inputText.trim() && attachments.length === 0)}
-                        className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg transition-colors"
+                        className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
                     >
-                        {isStreaming ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Send className="w-4 h-4" />
-                        )}
+                        {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </button>
                 </div>
             </div>
