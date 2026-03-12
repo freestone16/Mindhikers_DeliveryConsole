@@ -14,12 +14,12 @@ import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
 import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview, closeVisualPlanWatcher } from './visual-plan';
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
-import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections } from './llm-config';
+import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections, resolveChatLlm } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as music from './music';
 import * as shorts from './shorts';
-import { generateSocraticQuestions } from './crucible';
+import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -125,6 +125,10 @@ app.get('/api/version', (req, res) => {
 
 // LLM Config Routes
 app.get('/api/llm-config/status', getConfigStatus);
+app.get('/api/llm-config/chatbox', (req, res) => {
+    const expertId = typeof req.query.expertId === 'string' ? req.query.expertId : '';
+    res.json(resolveChatLlm(expertId));
+});
 app.get('/api/llm-config/keys', getSavedKeys);
 app.post('/api/llm-config/api-key', saveApiKey);
 app.put('/api/llm-config', updateConfig);
@@ -187,6 +191,7 @@ app.get('/api/music/assets', music.getAssets);
 app.use('/api/market', marketRouter);
 
 // Crucible Routes (SD-210)
+app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 
 function normalizeFilename(filename: string): string {

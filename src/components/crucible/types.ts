@@ -1,6 +1,13 @@
-export type SpeakerId = 'user' | 'laozhang' | 'laolu' | 'moderator';
+export type SpeakerId = string;
+export type CrucibleEngineMode = 'roundtable_discovery' | 'socratic_refinement';
 
 export type CanvasAssetType = 'ascii' | 'mindmap' | 'quote' | 'remotion' | 'reference';
+
+export interface CrucibleDialogue {
+    speaker: SpeakerId;
+    utterance: string;
+    focus: string;
+}
 
 export interface CrucibleMessage {
     id: string;
@@ -22,24 +29,26 @@ export interface CanvasAsset {
     summary?: string;
 }
 
-export interface ClarificationCard {
+export interface RoundAnchor {
     id: string;
-    prompt: string;
-    helper: string;
-    answer: string;
-    isSaved: boolean;
+    title: string;
+    summary: string;
+    content: string;
 }
 
 export interface CrucibleSnapshot {
     messages?: CrucibleMessage[];
-    canvasAssets: CanvasAsset[];
-    activeAssetId?: string;
+    presentables: CanvasAsset[];
+    activePresentableId?: string;
     topicTitle?: string;
-    clarificationCards?: ClarificationCard[];
+    openingPrompt?: string;
+    roundAnchors?: RoundAnchor[];
+    lastDialogue?: CrucibleDialogue;
     submittedAt?: string;
     roundIndex?: number;
     isThinking?: boolean;
     questionSource?: 'static' | 'socrates' | 'fallback';
+    engineMode?: CrucibleEngineMode;
 }
 
 export interface CrucibleRound {

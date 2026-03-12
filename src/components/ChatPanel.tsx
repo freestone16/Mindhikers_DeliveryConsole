@@ -70,13 +70,13 @@ const getBubbleTone = (msg: ChatMessage) => {
 const getClassificationLabel = (msg: ChatMessage) => {
     switch (msg.meta?.classification) {
         case 'reference':
-            return '已送中区参考';
+            return '中屏参考同步';
         case 'quote':
-            return '已送金句卡';
+            return '中屏金句同步';
         case 'asset':
-            return '已送资产区';
+            return '中屏结构同步';
         default:
-            return msg.role === 'user' ? '命题输入' : '纯对话';
+            return msg.role === 'user' ? '命题输入' : '右侧主线';
     }
 };
 
@@ -104,20 +104,34 @@ const getMessageAuthor = (
 };
 
 const getCrucibleStatusMessage = (msg: ChatMessage) => {
-    if (msg.role === 'user') {
-        return msg.content;
+    return msg.content;
+};
+
+const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCrucibleMode: boolean) => {
+    const normalizedNext = next.content.trim();
+    if (!normalizedNext) {
+        return false;
     }
 
-    switch (msg.meta?.classification) {
-        case 'reference':
-            return '主要问题已生成，请在中区逐项回答。';
-        case 'quote':
-            return '已提炼一条可继续锻造的金句，中区同步更新。';
-        case 'asset':
-            return '已生成结构或影像提示，中区资产已更新。';
-        default:
-            return msg.content;
+    const recentAssistantMessages = prev.filter((message) => message.role === 'assistant').slice(-4);
+    const isDuplicate = recentAssistantMessages.some((message) => (
+        message.content.trim() === normalizedNext
+        && (message.meta?.authorId || '') === (next.meta?.authorId || '')
+        && (message.meta?.classification || '') === (next.meta?.classification || '')
+    ));
+
+    if (isDuplicate) {
+        return true;
     }
+
+    if (isCrucibleMode) {
+        const userMessageCount = prev.filter((message) => message.role === 'user').length;
+        if (userMessageCount <= 1 && normalizedNext.includes('我看到了你的回答')) {
+            return true;
+        }
+    }
+
+    return false;
 };
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -143,6 +157,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [warning, setWarning] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const isComposingRef = useRef(false);
 
     const currentScopeRef = useRef({ expertId, projectId, scriptPath });
     const prevScopeKeyRef = useRef<string | null>(null);
@@ -224,8 +239,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
 
         freshMessages.forEach((message) => seenExternalMessageIdsRef.current.add(message.id));
-        setMessages((prev) => [...prev, ...freshMessages.map((message) => enrichMessageMeta(message))]);
-    }, [externalMessages]);
+        setMessages((prev) => {
+            const nextMessages = [...prev];
+            for (const message of freshMessages.map((item) => enrichMessageMeta(item))) {
+                if (!shouldSkipAssistantMessage(nextMessages, message, isCrucibleMode)) {
+                    nextMessages.push(message);
+                }
+            }
+            return nextMessages;
+        });
+
+        if (isCrucibleMode && freshMessages.some((message) => message.role === 'assistant')) {
+            setIsStreaming(false);
+            setStreamingContent('');
+            sendGuardRef.current = false;
+        }
+    }, [externalMessages, isCrucibleMode]);
 
     useEffect(() => {
         if (!socket) return;
@@ -247,7 +276,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         timestamp: new Date().toISOString(),
                         meta: defaultAssistantMeta,
                     });
-                    setMessages((msgs) => [...msgs, aiMessage]);
+                    setMessages((msgs) => shouldSkipAssistantMessage(msgs, aiMessage, isCrucibleMode) ? msgs : [...msgs, aiMessage]);
                 }
                 return '';
             });
@@ -260,13 +289,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setIsStreaming(false);
             setStreamingContent('');
             sendGuardRef.current = false;
-            setMessages((msgs) => [...msgs, {
+            const nextMessage = {
                 id: `msg_${Date.now()}`,
-                role: 'assistant',
+                role: 'assistant' as const,
                 content: `错误: ${error}`,
                 timestamp: new Date().toISOString(),
                 meta: defaultAssistantMeta,
-            }]);
+            };
+            setMessages((msgs) => shouldSkipAssistantMessage(msgs, nextMessage, isCrucibleMode) ? msgs : [...msgs, nextMessage]);
         };
 
         const handleChatWarning = ({ warning: msg, expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath }: { warning: string; expertId: string; projectId?: string; scriptPath?: string }) => {
@@ -287,13 +317,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const handleChatConfirmation = ({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath, message }: { expertId: string; projectId?: string; scriptPath?: string; message: string }) => {
             if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
-            setMessages((prev) => [...prev, enrichMessageMeta({
+            const nextMessage = enrichMessageMeta({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content: message,
                 timestamp: new Date().toISOString(),
                 meta: defaultAssistantMeta,
-            })]);
+            });
+            setMessages((prev) => shouldSkipAssistantMessage(prev, nextMessage, isCrucibleMode) ? prev : [...prev, nextMessage]);
             setIsStreaming(false);
             sendGuardRef.current = false;
         };
@@ -303,13 +334,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             const currentStreaming = streamingContentRef.current;
             if (currentStreaming) {
-                setMessages((prev) => [...prev, enrichMessageMeta({
+                const nextMessage = enrichMessageMeta({
                     id: `msg_text_${Date.now()}`,
                     role: 'assistant',
                     content: currentStreaming,
                     timestamp: new Date().toISOString(),
                     meta: defaultAssistantMeta,
-                })]);
+                });
+                setMessages((prev) => shouldSkipAssistantMessage(prev, nextMessage, isCrucibleMode) ? prev : [...prev, nextMessage]);
             }
 
             setIsStreaming(false);
@@ -335,13 +367,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             if (!matchesCurrentScope(data)) return;
             setIsStreaming(false);
             sendGuardRef.current = false;
-            setMessages((prev) => [...prev, enrichMessageMeta({
+            const nextMessage = enrichMessageMeta({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content: data.message,
                 timestamp: new Date().toISOString(),
                 meta: defaultAssistantMeta,
-            })]);
+            });
+            setMessages((prev) => shouldSkipAssistantMessage(prev, nextMessage, isCrucibleMode) ? prev : [...prev, nextMessage]);
         };
 
         socket.on('chat-chunk', handleChatChunk);
@@ -365,7 +398,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.off('chat-action-confirm', handleChatActionConfirm);
             socket.off('chat-action-result', handleChatActionResult);
         };
-    }, [socket, matchesCurrentScope, defaultAssistantMeta]);
+    }, [socket, matchesCurrentScope, defaultAssistantMeta, isCrucibleMode]);
 
     useEffect(() => {
         if (!socket || !isOpen || !projectId) return;
@@ -436,6 +469,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.emit('chat-load-context', { expertId, projectId, scriptPath });
         }
 
+        if (isCrucibleMode) {
+            return;
+        }
+
         socket.emit('chat-stream', {
             messages: [...messages, userMessage],
             expertId,
@@ -445,6 +482,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
+            return;
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -560,7 +601,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <div>
                                 <div className="text-sm font-semibold text-[var(--ink-1)]">{displayName || expertName}</div>
                                 <div className="text-[11px] text-[var(--ink-3)]">
-                                    「参考材料 - 议题澄清」会在页面中间显示
+                                    右侧对话是主线，中屏只同步参考、金句和结构
                                     {contextLoaded && <span className="ml-2 text-[var(--accent)]">上下文已加载</span>}
                                 </div>
                             </div>
@@ -704,7 +745,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     <div className="mb-1 text-[11px] text-[var(--ink-3)]">老张 / 老卢 · 推理中</div>
                                     <div className="rounded-[22px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
                                         {isCrucibleMode
-                                            ? '正在判断该由老张继续施压，还是该由老卢开始立结构。请稍等……'
+                                            ? '正在整理这一轮的追问，中屏会同步当前焦点。'
                                             : streamingContent}
                                         <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-[rgba(120,93,62,0.45)] align-middle" />
                                     </div>
@@ -749,6 +790,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     <textarea
                         ref={textareaRef}
                         value={inputText}
+                        onCompositionStart={() => {
+                            isComposingRef.current = true;
+                        }}
+                        onCompositionEnd={() => {
+                            isComposingRef.current = false;
+                        }}
                         onChange={(e) => {
                             setInputText(e.target.value);
                             e.target.style.height = 'auto';
@@ -756,7 +803,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         }}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder={isCrucibleMode ? '这里先保留短追问。长篇反馈请转到中区问题卡。' : '先聊问题本身。长参考、金句、结构提示会被宿主自动分流。'}
+                        placeholder={isCrucibleMode ? '主回答继续写在这里。中屏只同步这一轮焦点，不抢右侧主线。' : '先聊问题本身。长参考、金句、结构提示会被宿主自动分流。'}
                         className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
                         rows={3}
                         disabled={isStreaming}
