@@ -31,10 +31,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const currentExpertIdRef = useRef(expertId);
     const prevExpertIdRef = useRef<string | null>(null);
     const streamingContentRef = useRef('');
+    const messagesRef = useRef<ChatMessage[]>([]);
 
     useEffect(() => {
         streamingContentRef.current = streamingContent;
     }, [streamingContent]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     const expert = EXPERTS.find(e => e.id === expertId);
     const expertName = expert?.name || expertId;
@@ -53,26 +58,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     useEffect(() => {
         if (!socket) return;
 
+        const appendAssistantMessage = (content: string) => {
+            if (!content) return;
+            setMessages(prev => [...prev, {
+                id: `msg_${Date.now()}`,
+                role: 'assistant',
+                content,
+                timestamp: new Date().toISOString(),
+            }]);
+        };
+
+        const flushStreamingMessage = () => {
+            const currentStreaming = streamingContentRef.current;
+            if (!currentStreaming) return;
+            appendAssistantMessage(currentStreaming);
+            streamingContentRef.current = '';
+            setStreamingContent('');
+        };
+
         const handleChatChunk = ({ chunk, expertId: msgExpertId }: { chunk: string; expertId: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
-            setStreamingContent(prev => prev + chunk);
+            setStreamingContent(prev => {
+                const next = prev + chunk;
+                streamingContentRef.current = next;
+                return next;
+            });
         };
 
         const handleChatDone = ({ expertId: msgExpertId }: { expertId: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
-
-            setStreamingContent(prev => {
-                if (prev) {
-                    const aiMessage: ChatMessage = {
-                        id: `msg_${Date.now()}`,
-                        role: 'assistant',
-                        content: prev,
-                        timestamp: new Date().toISOString(),
-                    };
-                    setMessages(msgs => [...msgs, aiMessage]);
-                }
-                return '';
-            });
+            flushStreamingMessage();
             setIsStreaming(false);
         };
 
@@ -110,35 +125,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const handleChatConfirmation = ({ expertId: msgExpertId, message }: { expertId: string; message: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
-
-            // 直接显示确认消息
-            const confirmMessage: ChatMessage = {
-                id: `msg_${Date.now()}`,
-                role: 'assistant',
-                content: message,
-                timestamp: new Date().toISOString(),
-            };
-            setMessages(prev => [...prev, confirmMessage]);
+            flushStreamingMessage();
+            appendAssistantMessage(message);
             setIsStreaming(false);
         };
 
-        const handleChatActionConfirm = (data: { expertId: string; confirmId: string; actionName: string; actionArgs: any; description: string }) => {
-            if (data.expertId !== prevExpertIdRef.current) return;
-
-            // Fix: If there's streaming content, convert it to a message first so it doesn't disappear
-            const currentStreaming = streamingContentRef.current;
-            if (currentStreaming) {
-                const textMsg: ChatMessage = {
-                    id: `msg_text_${Date.now()}`,
-                    role: 'assistant',
-                    content: currentStreaming,
-                    timestamp: new Date().toISOString(),
-                };
-                setMessages(prev => [...prev, textMsg]);
-            }
-
+        const handleChatActionConfirm = (data: {
+            expertId: string;
+            confirmId: string;
+            actionName: string;
+            actionArgs: any;
+            description: string;
+            title?: string;
+            targetLabel?: string;
+            diffLabel?: string;
+        }) => {
+            if (data.expertId !== currentExpertIdRef.current) return;
+            flushStreamingMessage();
             setIsStreaming(false);
-            setStreamingContent('');
             setMessages(prev => [...prev, {
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
@@ -149,20 +153,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     actionName: data.actionName,
                     actionArgs: data.actionArgs,
                     description: data.description,
+                    title: data.title,
+                    targetLabel: data.targetLabel,
+                    diffLabel: data.diffLabel,
                     status: 'pending'
                 }
             }]);
         };
 
         const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
-            if (data.expertId !== prevExpertIdRef.current) return;
+            if (data.expertId !== currentExpertIdRef.current) return;
             setIsStreaming(false);
-            setMessages(prev => [...prev, {
-                id: `msg_${Date.now()}`,
-                role: 'assistant',
-                content: data.message,
-                timestamp: new Date().toISOString()
-            }]);
+            appendAssistantMessage(data.message);
         };
 
         socket.on('chat-chunk', handleChatChunk);
@@ -202,6 +204,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setMessages([]);
             setContextLoaded(false);
             setStreamingContent('');
+            streamingContentRef.current = '';
+            setIsStreaming(false);
 
             // 加载新专家的历史
             socket.emit('chat-load-history', { expertId, projectId });
@@ -237,6 +241,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setAttachments([]);
         setIsStreaming(true);
         setStreamingContent('');
+        streamingContentRef.current = '';
 
         // Load context on first message
         if (!contextLoaded) {
@@ -244,13 +249,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
 
         // Send to backend
-        const messagesToSend = [...messages, userMessage];
+        const messagesToSend = [...messagesRef.current, userMessage];
         socket.emit('chat-stream', {
             messages: messagesToSend,
             expertId,
             projectId,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId]);
+    }, [inputText, attachments, isStreaming, socket, contextLoaded, expertId, projectId]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -271,7 +276,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             actionName: actionConfirm.actionName,
             actionArgs: actionConfirm.actionArgs,
-            originalMessages: messages.filter(m => m.actionConfirm?.status !== 'pending')
+            originalMessages: messagesRef.current.filter(m => m.actionConfirm?.status !== 'pending')
         });
     };
 
@@ -418,8 +423,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     {msg.actionConfirm && (
                                         <div className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3">
                                             <p className="text-amber-200 text-sm mb-3 font-medium">
-                                                🤖 {msg.actionConfirm.description}
+                                                🤖 {msg.actionConfirm.title || '确认修改'}
                                             </p>
+                                            <p className="text-amber-100 text-sm mb-2">{msg.actionConfirm.description}</p>
+                                            {msg.actionConfirm.targetLabel && (
+                                                <p className="text-amber-300/80 text-xs mb-1">{msg.actionConfirm.targetLabel}</p>
+                                            )}
+                                            {msg.actionConfirm.diffLabel && (
+                                                <p className="text-amber-300/70 text-xs mb-3">{msg.actionConfirm.diffLabel}</p>
+                                            )}
                                             {msg.actionConfirm.status === 'pending' ? (
                                                 <div className="flex gap-2">
                                                     <button
@@ -505,7 +517,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         placeholder="输入消息或指令（Shift+Enter 换行）..."
                         className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 overflow-y-auto"
                         rows={3}
-                        disabled={isStreaming}
                         style={{ height: '88px' }}
                     />
                     <button

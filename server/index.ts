@@ -21,6 +21,7 @@ import * as shorts from './shorts';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
+import { DIRECTOR_BRIDGE_ACTION_NAME, getDirectorBridgeToolDefinitions, resolveDirectorBridgeAction } from './director-bridge';
 import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
@@ -477,6 +478,42 @@ function setupExpertWatchers(projectId: string) {
     console.log(`👁️ Watching ${expertWatchers.length} expert output directories for project ${projectId}`);
 }
 
+function hasMeaningfulDirectorData(stateData: any): boolean {
+    if (!stateData || typeof stateData !== 'object') return false;
+    if (Array.isArray(stateData.items) && stateData.items.length > 0) return true;
+    return Boolean(
+        stateData.phase ||
+        stateData.isConceptApproved ||
+        stateData.conceptProposal ||
+        stateData.conceptFeedback
+    );
+}
+
+function syncDirectorModuleToDeliveryStore(projectRoot: string, directorPayload?: any) {
+    const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+    if (!fs.existsSync(deliveryFile)) return null;
+
+    const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+    const directorState = directorPayload ?? loadExpertState(projectRoot, 'Director');
+    const directorData = directorState?.data !== undefined ? directorState.data : directorState;
+
+    if (!directorPayload && !hasMeaningfulDirectorData(directorData)) {
+        return deliveryData;
+    }
+
+    if (!deliveryData.modules) {
+        deliveryData.modules = {};
+    }
+
+    deliveryData.modules.director = {
+        ...(deliveryData.modules.director || {}),
+        ...(directorData || {}),
+    };
+    deliveryData.lastUpdated = new Date().toISOString();
+    fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
+    return deliveryData;
+}
+
 // Initial setup is now deferred until a project connects
 // ensureDeliveryFile();
 // setupProjectWatcher();
@@ -551,7 +588,7 @@ io.on('connection', (socket) => {
         // 3. Send the current data to the client
         const deliveryFile = path.join(projectRoot, 'delivery_store.json');
         try {
-            const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+            const data = syncDirectorModuleToDeliveryStore(projectRoot) || JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
             socket.emit('delivery-data', data);
 
             // Send expert data explicitly upon connection
@@ -587,6 +624,14 @@ io.on('connection', (socket) => {
         const projectRoot = getProjectRoot(projectId);
         console.log(`Received expert update for ${expertId} in ${projectId}`);
         saveExpertState(projectRoot, expertId, data);
+
+        if (expertId === 'Director') {
+            const deliveryData = syncDirectorModuleToDeliveryStore(projectRoot, data);
+            if (deliveryData) {
+                io.to(projectId).emit('delivery-data', deliveryData);
+            }
+        }
+
         io.to(projectId).emit(`expert-data-update:${expertId}`, data);
     });
 
@@ -674,7 +719,9 @@ io.on('connection', (socket) => {
             const projectRoot = getProjectRoot(projectId);
 
             const adapter = getAdapter(expertId);
-            let tools = adapter?.getToolDefinitions();
+            let tools = expertId === 'Director'
+                ? getDirectorBridgeToolDefinitions()
+                : adapter?.getToolDefinitions();
 
             // Build system prompt with optional skeleton context
             const context = loadExpertContext(projectRoot, expertId);
@@ -703,9 +750,11 @@ io.on('connection', (socket) => {
 
             let isToolCallTriggered = false;
             let toolCallIndex = 0;
+            let assistantResponse = '';
 
             for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl, tools)) {
                 if (typeof chunk === 'string') {
+                    assistantResponse += chunk;
                     socket.emit('chat-chunk', { chunk, expertId });
                 } else if (chunk.type === 'tool_call') {
                     isToolCallTriggered = true;
@@ -716,21 +765,70 @@ io.on('connection', (socket) => {
                         console.error(`[Chat] Failed to parse tool_call[${toolCallIndex}]. Raw: "${chunk.arguments}"`);
                     }
                     console.log(`[Chat] Tool call[${toolCallIndex}] => ${chunk.functionName}(${JSON.stringify(parsedArgs)})`);
-                    const desc = generateActionDescription(chunk.functionName, parsedArgs);
-                    socket.emit('chat-action-confirm', {
-                        expertId,
-                        confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
-                        actionName: chunk.functionName,
-                        actionArgs: parsedArgs,
-                        description: desc
-                    });
+
+                    if (expertId === 'Director' && chunk.functionName === DIRECTOR_BRIDGE_ACTION_NAME) {
+                        const resolution = resolveDirectorBridgeAction(parsedArgs, projectRoot);
+                        const clarification = resolution.clarification?.message;
+
+                        if (resolution.status === 'ready_to_confirm' && resolution.executionPlan && resolution.confirmCard) {
+                            socket.emit('chat-action-confirm', {
+                                expertId,
+                                confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
+                                actionName: resolution.executionPlan.actionName,
+                                actionArgs: resolution.executionPlan.actionArgs,
+                                description: resolution.confirmCard.summary,
+                                title: resolution.confirmCard.title,
+                                targetLabel: resolution.confirmCard.targetLabel,
+                                diffLabel: resolution.confirmCard.diffLabel,
+                            });
+                        } else if (clarification) {
+                            socket.emit('chat-confirmation', {
+                                expertId,
+                                message: clarification,
+                            });
+                            saveChatHistory(projectRoot, expertId, [
+                                ...messages,
+                                {
+                                    id: `msg_${Date.now()}`,
+                                    role: 'assistant',
+                                    content: clarification,
+                                    timestamp: new Date().toISOString(),
+                                },
+                            ]);
+                        } else {
+                            socket.emit('chat-error', {
+                                expertId,
+                                error: 'Director Bridge 未生成可执行结果。',
+                            });
+                        }
+                    } else {
+                        const desc = generateActionDescription(chunk.functionName, parsedArgs);
+                        socket.emit('chat-action-confirm', {
+                            expertId,
+                            confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
+                            actionName: chunk.functionName,
+                            actionArgs: parsedArgs,
+                            description: desc
+                        });
+                    }
                     toolCallIndex++;
                 }
             }
 
             if (!isToolCallTriggered) {
                 socket.emit('chat-done', { expertId });
-                saveChatHistory(projectRoot, expertId, messages);
+                const historyMessages = assistantResponse
+                    ? [
+                        ...messages,
+                        {
+                            id: `msg_${Date.now()}`,
+                            role: 'assistant' as const,
+                            content: assistantResponse,
+                            timestamp: new Date().toISOString(),
+                        },
+                    ]
+                    : messages;
+                saveChatHistory(projectRoot, expertId, historyMessages);
             }
 
         } catch (error: any) {

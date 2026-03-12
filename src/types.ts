@@ -622,6 +622,9 @@ export interface ToolCallConfirmation {
     actionName: string;
     actionArgs: any;
     description: string;
+    title?: string;
+    targetLabel?: string;
+    diffLabel?: string;
     status: 'pending' | 'confirmed' | 'cancelled';
 }
 

@@ -1,8 +1,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExpertActionAdapter } from '../expert-actions';
+import type { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
 import { loadConfig } from '../llm-config';
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMerge(target: Record<string, any>, source: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = { ...target };
+
+    for (const [key, value] of Object.entries(source)) {
+        if (isPlainObject(value) && isPlainObject(result[key])) {
+            result[key] = deepMerge(result[key], value);
+        } else {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
 
 export const DirectorAdapter: ExpertActionAdapter = {
     expertId: 'Director',
@@ -60,7 +78,7 @@ export const DirectorAdapter: ExpertActionAdapter = {
                 type: 'function',
                 function: {
                     name: 'update_option_fields',
-                    description: '万能属性修改器：可以同时修改选项的 name, prompt, imagePrompt，或者覆盖/强制修改组件的 props（如修改 Remotion 文字、设置强制不换行等）',
+                    description: '万能属性修改器：可以同时修改选项的 name, type, template, prompt, imagePrompt 或 props。涉及 Remotion 模板内部字段时，字段名必须来自 Director Skill 注入的模板契约；系统只负责原样写盘，不会自动纠偏。',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -68,7 +86,7 @@ export const DirectorAdapter: ExpertActionAdapter = {
                             optionId: { type: 'string', description: '选项ID' },
                             updates: {
                                 type: 'object',
-                                description: '需要修改的字段键值对，可以是 name, prompt, imagePrompt, 或者是包含需要覆盖的属性的 props 对象。如果要强制某文字不换行，可以将 props 里的文本修改为加入 \n 或者修改对应的控制字段。',
+                                description: '需要修改的字段键值对，可以是 name, type, template, prompt, imagePrompt，或 props 对象。props 支持对象级合并，但不会自动补全非法字段。',
                                 additionalProperties: true
                             }
                         },
@@ -174,21 +192,39 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
             case 'update_option_fields': {
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
                 const updates = args.updates || {};
+                const renderAffectingKeys = new Set([
+                    'type',
+                    'template',
+                    'prompt',
+                    'imagePrompt',
+                    'props',
+                    'infographicLayout',
+                    'infographicStyle',
+                    'infographicUseMode'
+                ]);
+                let shouldInvalidatePreview = false;
 
                 if (updates.name) opt.name = updates.name;
-                if (updates.prompt) opt.prompt = updates.prompt;
-                if (updates.imagePrompt) opt.imagePrompt = updates.imagePrompt;
+                for (const key of ['type', 'template', 'prompt', 'imagePrompt', 'infographicLayout', 'infographicStyle', 'infographicUseMode']) {
+                    if (updates[key] !== undefined) {
+                        opt[key] = updates[key];
+                        if (renderAffectingKeys.has(key)) {
+                            shouldInvalidatePreview = true;
+                        }
+                    }
+                }
 
                 // 深度覆盖 props 属性，用于修改 Remotion 内部的文案排版、不换行等
                 if (updates.props && typeof updates.props === 'object') {
-                    opt.props = {
-                        ...(opt.props || {}),
-                        ...updates.props
-                    };
+                    opt.props = deepMerge(
+                        isPlainObject(opt.props) ? opt.props : {},
+                        updates.props
+                    );
+                    shouldInvalidatePreview = true;
                 }
 
                 // 任何影响渲染内容的修改都清除旧缩略图，让前端知道需要重新生成
-                if (updates.props || updates.imagePrompt || updates.prompt) {
+                if (shouldInvalidatePreview) {
                     opt.previewUrl = undefined;
                 }
                 break;

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
+import { buildDirectorSystemPrompt } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
@@ -228,25 +229,11 @@ export function loadExpertContext(
         }
     }
 
-    const directorHint = expertId === 'Director' ? `
+    const basePrompt = expertId === 'Director'
+        ? (buildDirectorSystemPrompt('chat_edit') || `你是${expertName}的助手。你正在帮助用户完成视频制作任务。`)
+        : `你是${expertName}的助手。你正在帮助用户完成视频制作任务。`;
 
-## 理解用户引用的 B-Roll 层级序号
-用户通常使用诸如 "1-3", "2-1" 的简写来指代视频镜头。这表示：第 X 章的第 Y 个视觉选项。
-系统已在下方为你注入了「B-Roll 数据骨架索引」（JSON 格式）。每个章节和选项都有一个 \`seq\` 字段。
-- "1-3" 指的是：在骨架中寻找 \`seq: 1\` 的 chapter，然后在其 opts 列表中寻找 \`seq: 3\` 的 option。
-
-🔴 **极其重要：工具参数提取规则**
-当你调用任何操作选项的工具（如 \`regenerate_prompt\`, \`update_prompt\`, \`delete_option\`, \`update_option_fields\`）时：
-1. **绝不能自己拼接或猜测 id！**（例如不能把 1-3 想当然地拼成 ch1-opt-3 或 ch3-opt-2）。
-2. 你必须在骨架 JSON 中找到匹配 seq 的那个具体对象，然后**提取它原本就拥有的 \`id\` 字段的值**。
-3. 把骨架中写明的 chapter \`id\` 作为 \`chapterId\`，把 option \`id\` 作为 \`optionId\`，原封不动地传给工具。
-
-🟢 **极其重要：万能修改工具 update_option_fields**
-如果用户要求“**修改文字、改成不换行、加上什么标语**”等涉及具体组件显示效果的操作，请**直接调用 \`update_option_fields\`** 工具！
-你可以通过该工具的 \`updates.props\` 字段深度覆盖原有的配置。例如：强制不换行可以传 \`updates: { props: { text: "当前地表最强的视频生成模型不换行版" } }\`（或者插入 \`\\n\` 强制换行），依实际情况而定。
-` : '';
-
-    const systemPrompt = `你是${expertName}的助手。你正在帮助用户完成视频制作任务。${directorHint}
+    const systemPrompt = `${basePrompt}
 当前专家产出目录: ${outputDir}
 ${contextContent ? `\n以下是该专家已有的产出内容（供参考）:${contextContent}` : ''}
 
@@ -274,7 +261,9 @@ export function loadChatHistory(projectRoot: string, expertId: string, scriptPat
     try {
         const content = fs.readFileSync(chatFile, 'utf-8');
         const history: ChatHistory = JSON.parse(content);
-        return history.messages || [];
+        return (history.messages || []).filter(
+            msg => !(msg.role === 'assistant' && typeof msg.content === 'string' && msg.content.startsWith('[System Log: Executed tool'))
+        );
     } catch {
         return [];
     }
@@ -344,7 +333,7 @@ export function formatMultimodalMessages(
         // If content is empty (common when it was purely a function call), we inject a placeholder
         if (!textContent && msg.role === 'assistant') {
             if (msg.actionConfirm) {
-                textContent = `[System Log: Executed tool ${msg.actionConfirm.actionName}]`;
+                textContent = msg.actionConfirm.description || '已提出一个待确认的操作。';
             } else {
                 textContent = ' ';
             }

@@ -1,0 +1,7 @@
+skills:
+  Director:
+    codex:
+      - path: /Users/luzhoua/.gemini/antigravity/skills/Director/prompts/chat_edit.md
+        snapshot_file: .vibedir/skill_drafts/codex_Director_chat_edit_20260312.md
+        updated_at: 2026-03-12
+        note: Director Chatbox prompt switched from raw patch guidance to Bridge-action guidance

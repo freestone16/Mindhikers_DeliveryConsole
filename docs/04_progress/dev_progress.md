@@ -22,6 +22,7 @@
 | v3.8.0 | 2026-03-03 | 进程健壮性、状态持久化、UI 优化、布局升级                                                            |
 | v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID                 |
 | v4.0.0 | 2026-03-06 | **SD-207 V3 营销大师全量重构** - 5 Sprint 完成；TubeBuddy Playwright、SSE 生成、Phase 2 审阅、双格式导出 |
+| v4.1.0 | 2026-03-11 | **导演大师自动化测试 + Chatbox反馈修复 + 渲染压测** — 详见下方 |
 
 ---
 
@@ -1181,3 +1182,479 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **双格式输出**：.md（结构化存档）/ .plain.txt（分发终端直读）
 - **session_expired 短路**：TubeBuddy 评分时遇 session 过期立即中止整批评分
 - **slugify + stripMarkdown**：confirm 路由中对关键词生成安全文件名，对内容二次清洗
+
+---
+
+## v4.1.0 — 导演大师自动化测试 + Chatbox反馈修复 + 渲染压测 (2026-03-11)
+
+### 🔧 Bug 修复
+
+**1. Phase 2 Chatbox 反馈后缩略图自动刷新**
+- **问题**：右侧 chatbox 提交反馈后，左侧缩略图没有变化
+- **根因**：expert action 清除 `previewUrl = undefined` 后，前端没有自动触发重新生成
+- **修复文件**：`src/components/director/ChapterCard.tsx`
+  - 新增 `prevPreviewUrlRef` 追踪 previewUrl 变化
+  - useEffect 检测 previewUrl 从有值变为 undefined 时，自动调用 `handleGenerateThumbnailWithPrompt()`
+  - 移除 OptionRow 的 content-based key（`contentKey`），改用稳定的 `key={option.id}` 防止 React 重挂载导致 ref 丢失
+
+**2. handleImportChapters 未设置 isConceptApproved**
+- **问题**：通过"导入离线分镜 JSON"导入章节后，P2 按钮仍禁用
+- **根因**：`handleImportChapters` 设置了 `phase: 2` 但没设置 `isConceptApproved: true`
+- **修复文件**：`src/components/DirectorSection.tsx:376`
+- **改动**：`onUpdate({ ...data, items: normalized, phase: 2, isConceptApproved: true })`
+
+### 🤖 Playwright 自动化测试框架
+
+**框架搭建**
+- 工具：Playwright (Python) + headless Chromium
+- 测试脚本：`docs/tests/director_auto_test.py`
+- 测试数据：`docs/tests/test_chapters_fixture.json`（含 2 章 3 个选项 + previewUrl）
+- 验收用例文档：`docs/tests/director_acceptance_tests.md`（20 个用例）
+
+**最终成绩：28/29 PASS, 0 FAIL, 1 SKIP（预期）**
+
+测试覆盖范围：
+| 测试 | 内容 | 结果 |
+|---|---|---|
+| TC-G.4 | 底部状态栏 SYSTEM ONLINE + 版本号 | ✅ |
+| TC-2.8 | P1/P2/P3/P4 导航按钮全部可点击且高亮 | ✅ |
+| TC-1.1 | Phase 1 概念显示 | ✅ |
+| TC-2.1 | 章节卡片布局（2章、表头、编号）| ✅ |
+| TC-2.2 | 选项行（类型标签、模板建议、预览图）| ✅ |
+| TC-2.4 | 缩略图 Lightbox 弹出 + ESC 关闭 | ✅ |
+| TC-2.6 | 勾选框（点击/取消）| ✅ |
+| TC-3.1 | Phase 3 布局（章节分组、通过计数、素材过滤）| ✅ |
+| TC-4.1 | Phase 4 初始状态 | ✅ |
+| TC-G.1 | Phase 导航一致性（数据不丢失）| ✅ |
+| TC-G.2 | Chatbox 基本功能 | ✅ |
+
+**关键技术解决**：
+- `button:text-is('P2')` 精确匹配替代 `has-text` 子串匹配（防止匹配 "CSET-SP2"）
+- `dismiss_dropdowns()` 选择下拉后按 Escape 关闭残留菜单
+- `input[type='file']:not([accept])` 精确定位 Phase1 的导入输入框
+- `force=True` + `scroll_into_view_if_needed` 处理视口外的缩略图点击
+
+### 🔥 渲染管线压测
+
+**压测脚本**：`docs/tests/stress_test_rendering.py`
+
+**Remotion 30 个动画渲染**：
+| 指标 | 结果 |
+|---|---|
+| 成功率 | 26/30 (87%) |
+| 总耗时 | 12.5s |
+| 吞吐量 | 124 任务/分钟 |
+| 并发 Workers | 3 |
+| 失败原因 | ConceptChain 模板 props 格式不兼容 (TypeError) |
+
+**火山引擎 5 个视频生成**：
+| 指标 | 结果 |
+|---|---|
+| 成功率 | 0/5 (全部超时) |
+| 错误 | `timeout after 120s`，重试 2 次后仍超时 |
+| 根因待查 | 120s 超时太短 / 轮询状态字段不匹配 / 并发限制 |
+
+### ❗ 遗留问题（下次会话优先处理）
+
+1. **ConceptChain 模板 props 修复**：压测中 4/30 失败，需查 Remotion ConceptChain 组件期望的 props 结构
+2. **火山引擎视频生成跑通**：
+   - 先单个任务跑通，确认 API 响应格式正确
+   - 查官方文档确认并发/QPS 限制
+   - 调大 `maxPolls` 超时（120s → 300s+）
+   - 根据跑通数据设计合理队列策略（可能只允许 1-2 个并发）
+3. **Phase 2 Chatbox → 缩略图自动刷新**：代码已修复但用户未验证效果
+
+### 文件变更清单
+
+| 文件 | 变更类型 | 说明 |
+|---|---|---|
+| `src/components/director/ChapterCard.tsx` | **修改** | prevPreviewUrlRef + 自动重新生成 + 移除 contentKey |
+| `src/components/DirectorSection.tsx` | **修改** | handleImportChapters 增加 isConceptApproved: true |
+| `docs/tests/director_auto_test.py` | **新建** | Playwright 自动化测试脚本 (28/29 PASS) |
+| `docs/tests/test_chapters_fixture.json` | **新建** | 测试 fixture 数据（2 章 3 选项 + previewUrl）|
+| `docs/tests/director_acceptance_tests.md` | **新建** | 20 个验收测试用例文档 |
+| `docs/tests/stress_test_rendering.py` | **新建** | 渲染管线压测脚本（30 Remotion + 5 火山引擎）|
+
+### 2026-03-11 晚间补充：Phase3 火山视频已跑通
+
+- **真实 smoke test 成功**：`CSET-Seedance2` 的单个 seedance 任务已完成闭环
+- **根因确认**：
+  - 火山查询成功态实际为 `status: succeeded`
+  - 视频地址实际位于 `content.video_url`
+  - 旧代码只识别 `completed` + `output/data.video_url`，导致成功任务被误判超时
+- **后端修复**：
+  - `server/volcengine.ts` 补充 `succeeded` 与 `content.video_url` 解析
+  - `server/director.ts` 将 Phase3 火山轮询上限从 120 秒放宽到 300 秒
+  - Phase3 成功后自动下载 MP4 到项目目录，统一走本地 `video-file` endpoint 播放
+  - Volcengine 批量默认串行（`VOLCENGINE_VIDEO_CONCURRENCY=1`）
+- **实测数据**：
+  - taskKey: `volc-smoke-002-volc-smoke-002-opt1`
+  - startedAt: `2026-03-11T03:08:17.033Z`
+  - completedAt: `2026-03-11T03:10:49.850Z`
+  - 总耗时：约 153 秒
+  - 输出文件：`video_volc-smoke-002-volc-smoke-002-opt1.mp4`
+  - 文件大小：15,855,612 bytes
+  - 视频时长：5.05 秒
+- **并发结论**：
+  - 代码先从“全并发”收敛到“默认串行”
+  - 官方文档已确认异步任务状态包含 `queued/running/succeeded/failed/expired`
+  - 暂未找到官方公开的“最多可同时提交几个视频任务”的明确数值上限，后续如需提速，建议从 2 并发开始压测而不是直接恢复 `Promise.all`
+
+### 2026-03-11 夜间补充：Phase2 Chatbox 更新与缩略图刷新闭环修复
+
+- **用户现场问题**：
+  - 右侧 Chatbox 执行 `update_option_fields` 后，左侧 `1-1` 缩略图仍显示旧图
+  - `2-1 / 2-2` 要切成互联网素材时，Chatbox 显示成功，但左侧类型不变
+- **根因拆分**：
+  - 后端 `server/expert-actions/director.ts` 的 `update_option_fields` 之前没有处理 `updates.type`，导致工具执行成功但结构字段被静默丢弃
+  - 前端 `src/components/director/ChapterCard.tsx` 之前只监听 `option.previewUrl`，但很多预览图只存在卡片本地 state；当 Chatbox 只改 `props/prompt/type` 时，`previewUrl` 常常仍是 `undefined -> undefined`，因此不会自动失效旧图
+- **代码修复**：
+  - `server/expert-actions/director.ts`
+    - `update_option_fields` 现已支持 `type/template/infographic*` 等结构字段更新
+    - 只要渲染输入变化，就统一清除旧 `previewUrl`
+  - `src/components/director/ChapterCard.tsx`
+    - 新增渲染输入签名比较，不再只靠 `previewUrl` 变化判断
+    - 当本地已有旧预览，而 `props/prompt/imagePrompt/type/template` 发生变化时，自动清空旧图并重新生成；若改成 `internet-clip/user-capture`，则直接切到上传素材态
+- **验证结果**：
+  - `src/components/director/ChapterCard.test.tsx`：2/2 通过
+    - 覆盖 `previewUrl` 被清空后自动重生
+    - 覆盖 `previewUrl` 未持久化但渲染输入变化后自动重生
+  - `src/__tests__/director-adapter.test.ts`：1/1 通过
+    - 覆盖 `update_option_fields` 修改 `type` 并失效旧预览
+  - 无头浏览器 UI smoke：通过
+    - 将 Phase2 中第 2 章两条卡片切为 `internet-clip` 后，页面成功出现 `6` 个 `🌐 互联网素材建议` 占位，证明类型切换链路已恢复
+
+### 2026-03-11 深夜补充：Director 状态分叉与模板字段未接线修复
+
+- **新增根因确认**：
+  - Director 当前存在两份状态源：`04_Visuals/director_state.json` 与 `delivery_store.json.modules.director`
+  - Phase2 新生成方案通过 `update-expert-data` 写进 `director_state`，但之前不会同步回 `delivery_store`
+  - Chatbox 的骨架索引与 expert action 却依赖 `delivery_store`，因此出现“左侧看到的是新方案，Chatbox 理解的是旧方案”的分叉
+- **用户现场表现**：
+  - `1-2` 左侧仍显示文生视频，但 Chatbox 却认为它已经是 `internet-clip`
+  - `1-1` 要求“金句一行显示”时，模型在改 `TextReveal` 相关字段，但页面/文件可能还停在旧模板或旧状态
+- **修复内容**：
+  - `server/index.ts`
+    - 新增 Director expert state -> `delivery_store.modules.director` 的同步
+    - 在 `select-project` 时做一次修复性对齐，避免骨架索引继续读旧数据
+  - `src/components/DirectorSection.tsx`
+    - 当服务端 authoritative `items` 更新且当前不在 Phase2 流式生成中时，自动清掉 `localChapters`，避免左侧继续显示旧列表
+  - `server/chat.ts`
+    - 强化 Director Chat 系统提示：用户明确说“改成互联网素材/文生视频/Remotion/和 1-3 一样的互联网素材”时，必须直接调用 `update_option_fields`，不要继续追问
+  - `server/expert-actions/director.ts`
+    - 明确把 `type` 等结构字段写入 tool description，减少模型误判
+  - `RemotionStudio/src/BrollTemplates/TextReveal.tsx`
+    - 补上 `singleLine/noWrap/textStyle/containerWidth/paddingX/paddingY` 支持，让“一行显示 + 缩边距”真正落到模板渲染
+- **当前项目状态已对齐**：
+  - `ch1-opt1` 已改成 `TextReveal` + 单行参数
+  - `ch1-opt2` 已改成 `internet-clip`
+  - `director_state.json` 与 `delivery_store.json` 已一致
+
+### 2026-03-11 深夜补充：刷新误重置到 Phase1 的入口修复与 Phase2 恢复
+
+- **用户现场问题**：
+  - 页面刷新后无法直接回到 Director Phase2，只能从 Phase1 重新开始
+- **根因确认**：
+  - `src/components/DirectorSection.tsx` 之前把 `scriptPath: "" -> "02_Script/..."` 的初始化 hydrate 误判成“切文稿”
+  - 因此在项目和脚本刚加载完成时，前端会立即发一份 `phase: 1, items: []` 的重置状态，把已存在的 Phase2 方案覆盖掉
+- **代码修复**：
+  - Director 的自动重置逻辑已改成只在“已有非空上下文 -> 另一个非空上下文”之间触发
+  - 初始刷新时的空值 hydrate 不再清空 Phase2
+- **状态恢复**：
+  - 使用 `04_Visuals/selection_state.json` 作为恢复源，将 `CSET-Seedance2` 的 Director 状态重新对齐为 `phase: 2 + 7章`
+  - 同时把用户明确要求的两处现场修改一并落回：
+    - `ch1-opt1` 维持 `TextReveal` 单行显示参数
+    - `ch1-opt2` 改成 `internet-clip`
+- **验证结果**：
+  - `director_state.json`：`phase = 2`，`items = 7`
+  - `delivery_store.json.modules.director`：`phase = 2`，`items = 7`
+  - 无头浏览器页面文本已可见 `Phase 2: 初审`、章节列表以及 `1-2` 的 `🌐 互联网素材`
+
+### 2026-03-11 夜间补充：Phase2 统计数字统一 + 一键批量渲染已选预览
+
+- **UI 细节修正**：
+  - `src/components/director/Phase2View.tsx` 中 `筛选结果` 与 `全局总计` 两块数字现统一为同一套 `tabular-nums + 粗体大号` 样式
+  - 避免出现 `22 / 33` 两组数字字号和视觉节奏不一致的问题
+- **新功能**：
+  - 在 Phase2 顶部工具栏右侧新增 `渲染所有已选预览` 按钮
+  - 直接复用既有 `handleRenderChecked()` / `/api/director/phase2/render_checked` 流程
+  - 按钮只统计并触发可渲染类型（`remotion / seedance / generative / infographic`），不会把 `internet-clip / user-capture` 计入渲染数
+  - 批量任务启动后按钮会自动进入 disabled，避免重复触发
+- **验证结果**：
+  - `src/components/director/Phase2View.test.tsx`：1/1 通过
+  - `src/components/director/ChapterCard.test.tsx`：2/2 通过
+
+### 2026-03-11 夜间补充：只修 1-2 TextReveal 不换行 bug
+
+- **现场问题**：
+  - 用户通过 Chatbox 对 `1-2` 提“文字不要换行”，工具显示成功，但预览仍然换行
+- **根因确认**：
+  - 旧提示和工具调用容易把“不换行”写成 `props.whiteSpace = "nowrap"`
+  - 但外部 `TextReveal` 模板真正识别的是 `singleLine / noWrap / textStyle.whiteSpace`，单写 `whiteSpace` 不会稳定生效
+- **修复内容**：
+  - `server/expert-actions/director.ts`
+    - 新增 TextReveal no-wrap 标准化逻辑
+    - 当 update_option_fields 收到 `whiteSpace/noWrap/singleLine` 相关意图时，统一收敛成可渲染的单行 props 组合
+  - `server/chat.ts`
+    - 修正 Director Chat 提示，不再建议写模糊字段，明确要求生成 `singleLine/noWrap/containerWidth/paddingX/textStyle.whiteSpace`
+  - `server/director.ts`
+    - 在 Remotion 预览构建时补一层兼容标准化，自动兜住历史遗留的 `whiteSpace = nowrap` 旧数据
+  - 项目状态修正：
+    - 将 `CSET-Seedance2` 的 `ch1-opt2` 直接改回 `TextReveal` 单行版
+    - 清除旧 previewUrl，并通过 socket 推送给当前在线客户端
+- **验证结果**：
+  - `src/__tests__/director-adapter.test.ts`：2/2 通过
+
+### 2026-03-12 上午补充：Director 问题边界重定义（以 Skill 为主，不在系统层硬编码）
+
+- **用户原则确认**：
+  - Phase2 的 6 类 B-roll 后续会持续出现大量具体修改需求
+  - 这类模板/排版/提示词细节不应由 DeliveryConsole 系统层逐条硬编码兜底
+  - 正确责任层应回到 Skill，系统只负责把 Skill 的结果可靠呈现到中部 UI
+- **本轮 review 结论**：
+  - `RemotionStudio` 渲染层本身具备 `TextReveal` 的单行/不换行能力
+  - 但 `Director` Skill 的 `resources/remotion_catalog.md` 目前没有把这类 props 契约正式暴露给模型
+  - Chatbox 链路也没有完整走 `skill-loader.ts` 这套 Director Skill 资源注入，因此模型执行 `update_option_fields` 时缺少模板契约上下文
+  - 所以当前问题的根因优先级是：
+    1. Director Skill 能力定义不完整
+    2. Chat -> Tool 链路没有完整吃到 Skill 资源
+    3. 中部 UI 只是忠实呈现了前面写入的不标准状态
+- **下一轮正确动作**：
+  - 回退我这轮新增的系统层模板硬编码兜底思路
+  - 改 Director Skill（尤其 `resources/remotion_catalog.md`，必要时补 `prompts/`）
+  - 检查并修正 Chatbox 链路，让它真正使用 Director Skill 的资源知识
+  - 然后重新验证“Skill 正确产出后，中部 UI 是否自然呈现”
+
+### 2026-03-12 中午补充：Director Skill 注入链路整改落地
+
+- **整改目标**：
+  - 不再让 DeliveryConsole 系统层手写 `TextReveal/no-wrap` 纠偏知识
+  - 让 Director Chatbox 真正加载 Antigravity Director Skill 的 `prompts/resources`
+  - 保留系统层通用职责：工具调用、状态写盘、预览失效、前端同步
+- **Skill 侧变更**：
+  - 已备份 Antigravity 原 skill 到当前 worktree：
+    - `.vibedir/skill_drafts/director_20260312_snapshot/`
+  - 为 Director Skill 新增 `prompts/chat_edit.md`
+    - 明确 Chatbox 编辑既有 B-roll 时必须走工具调用
+    - 明确 `chapterId/optionId` 必须从骨架索引提取
+    - 明确 `template/props` 修改必须遵循 `resources/remotion_catalog.md`
+  - 扩充 `resources/remotion_catalog.md`
+    - 为 `TextReveal` 增补单行/不换行的合法 props 示例与字段纪律
+  - 更新 `SKILL.md`
+    - 明确 DeliveryConsole Chatbox 编辑态应走 Skill prompt，而不是依赖系统层兜底
+- **DeliveryConsole 侧变更**：
+  - `server/chat.ts`
+    - Director Chat 的 system prompt 改为 `buildDirectorSystemPrompt('chat_edit')`
+    - 删除原来手写在系统层的 Director 模板提示词
+  - `server/skill-loader.ts`
+    - 支持加载 `chat_edit` prompt
+    - 修复并补齐资源占位符替换：`AESTHETICS_GUIDELINE` / `ARTLIST_DICTIONARY`
+  - `server/expert-actions/director.ts`
+    - 删除 TextReveal/no-wrap 自动标准化
+    - `update_option_fields` 保留为通用写盘工具，新增通用深度合并 props
+  - `server/director.ts`
+    - 删除 Remotion 预览构建时对 TextReveal props 的系统层纠偏
+  - 删除未再使用的 `server/director-option-normalizer.ts`
+- **验证结果**：
+  - `src/__tests__/director-adapter.test.ts`：2/2 通过
+  - `src/components/director/ChapterCard.test.tsx`：2/2 通过
+  - `buildDirectorSystemPrompt('chat_edit')` 运行时验证通过：
+    - 已确认从 `~/.gemini/antigravity/skills/Director/prompts/chat_edit.md` 组装成功
+    - 已确认 `remotion_catalog` 与 `artlist_dictionary` 资源已注入
+- **结论**：
+  - Director Chatbox 现在已经不再依赖手写 system prompt 去解释模板字段
+  - 后续若再出现模板字段错误，优先修 Director Skill 契约，而不是继续往 DeliveryConsole 系统层堆特判
+
+### 2026-03-12 下午补充：基于“Skill + 桥梁层 + UI”边界的 Director 排错方案
+
+- **本轮用户原则进一步澄清**：
+  - DeliveryConsole 不是专家本体，不能把导演大师的修改能力硬编码在系统层
+  - 但 DeliveryConsole 也不是纯透传；它必须理解项目 UI 语义，承担 Skill 与中部 UI 之间的桥梁职责
+  - 因此 Director 问题不能再简单二分为“Skill”或“系统层”，而应拆成三段：
+    1. `Skill` 负责导演语义理解与专业判断
+    2. `DeliveryConsole 桥梁层` 负责把专家意图翻译成项目内部状态和 UI 行为
+    3. `UI` 负责忠实反馈、确认、取消、继续输入与历史展示
+
+- **本轮验收暴露的问题归类**：
+  - `Skill` 侧：
+    - 对 `1-4` 的类型修改语义理解不稳定
+    - 对“互联网素材 / 我自己上传 / D”这类混合表达缺少稳定决策规则
+  - `桥梁层` 侧：
+    - 当前让模型直接生成 `update_option_fields` 的底层参数，桥梁过薄
+    - `A/B/C/D/E/F` 与内部 `type` 没有被系统显式接管
+    - 确认卡片只显示 `update_option_fields`，没有把真实将执行的 UI 修改翻译给用户
+  - `UI` 侧：
+    - ChatPanel 在 streaming 时直接禁用输入框，用户无法边想边改
+    - assistant 回复存在重复追加风险
+    - tool confirm / history 的保存链路会混入 `[System Log: Executed tool ...]` 这类噪音
+
+- **下一轮排错方案（只处理 Director）**：
+  - **第一步：补 Director 桥梁层，而不是继续堆系统层特判**
+    - 为 Director 建立显式语义桥接动作，避免直接让 Skill 产出底层 raw patch
+    - 桥梁层需内建并维护：
+      - `1-4 -> chapterId / optionId`
+      - `A=remotion / B=seedance / C=artlist / D=internet-clip / E=user-capture / F=infographic`
+      - “互联网素材”“用户截图/录屏/自己上传”等别名到内部 `type` 的统一映射
+    - 当用户表达冲突（如“互联网素材，我自己上传”）时，由桥梁层判定为需澄清，而不是盲猜
+  - **第二步：收紧 Director Skill 的职责边界**
+    - Skill 只负责导演语义理解、专业建议、冲突时是否追问
+    - Skill 不再承担猜项目内部枚举、猜 UI 标签、猜 raw patch 结构的责任
+    - `chat_edit` prompt 需要改成面向“桥接动作”的调用，而不是默认直接写 `update_option_fields`
+  - **第三步：修 UI 忠实反馈链路**
+    - 输入框保持可编辑，只禁重复发送，不禁改草稿
+    - assistant 流式消息只落一次，避免重复回复
+    - confirm 卡片必须显示“将把 1-4 改为 D. 互联网素材”这类人类可审阅描述
+    - 历史保存时剔除或压缩内部 system log，避免污染后续对话上下文
+
+- **本轮结论**：
+  - 折行修复成功、预览图自动刷新正常，说明 Director 的“状态落盘 -> 中部 UI 刷新”主干已通
+  - 当前最关键的不是继续补模板字段，而是补厚 Director 桥梁层
+  - 下一轮若继续排错，应优先做“桥梁层动作抽象 + 确认文案 + 输入状态机”，再看 Skill 精调
+
+### 2026-03-12 晚间补充：Director Bridge 第一阶段实现落地
+
+- **本轮实现目标**：
+  - 不再让 Director Chat 直接把 `update_option_fields/chapterId/optionId/updates.*` 暴露给模型
+  - 先把 Director 最痛的 `1-4 / A-F / 类型别名 / 冲突判定 / confirm 文案 / ChatPanel 输入状态机` 接回系统桥梁层
+
+- **代码实现**：
+  - `server/director-bridge.ts`
+    - 新增 `director_bridge_action` 高层工具入口
+    - 新增 `resolveDirectorBridgeAction()`
+    - 当前已支持：
+      - `change_type`
+      - `change_text`
+      - `regenerate_prompt`
+      - `delete_option`
+    - 已接入：
+      - `1-4 -> chapterId/optionId` 解析
+      - `A-F` 到内部 `type` 映射
+      - “互联网素材 / 我自己上传 / 文生视频 / Remotion / 信息图 / Artlist” 等别名映射
+      - 冲突表达判定，例如“互联网素材，我自己上传”
+  - `server/index.ts`
+    - Director Chat 现在只对 LLM 暴露 `director_bridge_action`
+    - tool_call 到来后，先走 Bridge 解析
+    - `ready_to_confirm` 才生成底层 `executionPlan`
+    - `needs_clarification/invalid_target` 直接回 assistant 澄清文本
+    - 正常纯文本回复现在会把 assistant 内容一并落入 chat history
+  - `server/chat.ts`
+    - 历史消息转发给 LLM 时，不再把空 assistant/tool 消息转成 `[System Log: Executed tool ...]`
+    - 旧历史中的 system log 噪音会被过滤
+  - `src/components/ChatPanel.tsx`
+    - streaming 时 textarea 不再整体禁用，用户可继续编辑草稿
+    - assistant 流式文本统一单次落消息，避免重复追加
+    - `chat-action-confirm` 现在显示结构化确认信息：
+      - 标题
+      - 主摘要
+      - 目标卡片标签
+      - diff 摘要
+    - 修正事件过滤，确认与执行结果现在按当前 `expertId` 落点，不再依赖旧 `prevExpertIdRef`
+
+- **Skill 侧同步**：
+  - 外部 Antigravity Director `prompts/chat_edit.md` 已改为 Bridge 契约
+  - 新 prompt 明确：
+    - Director 是导演，不负责项目语义映射
+    - 只能调用 `director_bridge_action`
+    - 不再指导模型直接产出 `update_option_fields/chapterId/optionId/updates.*`
+  - 已按老杨协议落盘 skill 快照与账本：
+    - `.vibedir/skill_drafts/codex_Director_chat_edit_20260312.md`
+    - `.vibedir/skill_registry.yml`
+
+- **测试验证**：
+  - `src/__tests__/director-bridge.test.ts`：4/4 通过
+    - `D -> internet-clip`
+    - “我自己上传” -> `user-capture`
+    - “互联网素材，我自己上传” -> `needs_clarification`
+    - `1-4` 越界 -> `invalid_target`
+  - `src/__tests__/director-adapter.test.ts`：2/2 通过
+  - `src/components/ChatPanel.test.tsx`：2/2 通过
+    - streaming 时输入框仍可编辑
+    - confirm 卡片显示结构化 Bridge 描述
+  - `src/components/director/ChapterCard.test.tsx`：2/2 通过
+
+- **本轮仍未完成**：
+  - `adjust_layout` / `change_template` 还未接入新 Bridge 执行面，当前会返回高层不支持
+  - 还没做真实 Socket 聊天流手测，只完成了单测级和组件级验证
+  - 还没重新覆盖 Director Phase 3/4 渲染回归
+
+- **当前结论**：
+  - Director Chat 已经不再是“模型直连底层 patch”
+  - `Bridge -> confirm -> executionPlan -> adapter` 的主链路已建立
+  - 下一轮应继续补：
+    1. `adjust_layout/change_template` 两类高层意图
+    2. 真实聊天流手测
+    3. Director Phase 3/4 回归验证
+
+### 2026-03-12 深夜补充：Director Bridge 扩到排版与安全模板切换
+
+- **本轮扩展目标**：
+  - 不把 Bridge 停留在“只能改类型/文案/重生/删除”
+  - 先补上最常见、最安全的两类高层意图：
+    - `adjust_layout`
+    - `change_template`
+
+- **本轮实现范围（保守版）**：
+  - `adjust_layout`
+    - 当前只先支持 `TextReveal` 的高频排版诉求：
+      - 一行显示
+      - 不换行
+      - 缩边距
+      - 更紧凑
+    - Bridge 会把高层意图翻译成可执行 props patch：
+      - `singleLine`
+      - `noWrap`
+      - `containerWidth`
+      - `paddingX/paddingY`
+      - `textStyle.whiteSpace/fontSize/letterSpacing`
+  - `change_template`
+    - 当前只先支持“安全模板切换”
+    - 已支持：
+      - `TextReveal`
+      - `CinematicZoom`
+    - 对 `ComparisonSplit / TimelineFlow / ConceptChain / NumberCounter` 这类需要更完整结构化 props 的模板：
+      - Bridge 不再盲写盘
+      - 会明确返回“还需要更多结构信息”或建议先切到安全模板
+
+- **实现细节**：
+  - `server/director-bridge.ts`
+    - `DirectorTarget` 现已带上：
+      - `currentType`
+      - `currentTemplate`
+      - `currentProps`
+      - `quote/prompt/imagePrompt`
+    - `change_template`
+      - 新增模板别名字典
+      - `TextReveal` 切换时会自动补最小安全 `props.text`
+      - 文案优先取：
+        - 现有 `props.text`
+        - `quote`
+        - `optionName`
+        - `imagePrompt`
+        - `prompt`
+    - `adjust_layout`
+      - 新增 TextReveal 排版意图翻译器
+      - 只对 TextReveal 生效；若当前不是 TextReveal，会返回澄清
+
+- **测试补充**：
+  - `src/__tests__/director-bridge.test.ts`
+    - 新增 2 个测试，现共 6/6 通过：
+      - 支持安全切到 `TextReveal`，并自动补基础文案 props
+      - 支持把“一行显示 / 不换行 / 缩边距”翻译成 TextReveal props patch
+  - Director 相关定向测试现已全绿：
+    - `director-bridge` 6/6
+    - `director-adapter` 2/2
+    - `ChatPanel` 2/2
+    - `ChapterCard` 2/2
+    - 合计 12/12 通过
+
+- **仍然刻意没做的事**：
+  - 没让 Bridge 自动生成 `ComparisonSplit/TimelineFlow/ConceptChain/NumberCounter` 的完整结构化 props
+  - 没让 Skill 重新承担模板结构猜测职责
+  - 没把复杂模板切换伪装成“已支持”
+
+- **当前结论**：
+  - Director Bridge 已经从“第一层壳子”进入“可覆盖高频编辑动作”的阶段
+  - 对最常见的类型切换、文案修改、提示词重生、删除、TextReveal 排版、TextReveal/CinematicZoom 安全切换，主链路已具备可执行性
+  - 下一步优先级仍是：
+    1. 真实聊天流手测
+    2. 如有需要，再设计复杂模板结构化切换的二阶段 Bridge

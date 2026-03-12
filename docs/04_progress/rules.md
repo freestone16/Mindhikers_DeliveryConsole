@@ -129,6 +129,8 @@
 48. Remotion 组件预览失败时检查：帧率、分辨率、编码参数
 49. 文字排版遵循红线守则
 50. 预览图生成失败时增强日志输出，记录完整错误
+84. **React key 不要用内容 hash**：`key={contentKey}` 会在 props 变化时导致组件重挂载，丢失所有 ref 和内部状态。用稳定 ID：`key={option.id}`
+85. **ConceptChain 模板 props 待修**：压测中 TypeError，需对照 RemotionStudio 中实际组件检查 nodes 格式
 
 ---
 
@@ -143,6 +145,8 @@
     - 是否更新共享状态（如 thumbnailTasks）？
     - 是否有超时机制防止无限轮询？
     - 前端轮询端点能否读到更新后的状态？
+86. **火山视频查询成功态要认 `succeeded` + `content.video_url`**：不要只判断 `completed` 或只从 `output/data` 取视频地址。
+87. **Seedance Phase3 超时阈值不能写死 120s**：2026-03-11 单任务实测约 153 秒，批量默认串行，轮询上限至少放宽到 300s。
 
 ---
 
@@ -212,6 +216,18 @@
 81. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
 82. worktree 环境需要复制 `.env` 到 worktree 目录
 83. **修改 `.env` 后必须重启服务器** 才能生效
+84. Director Chatbox 的 `update_option_fields` 不能只支持文案字段；`type/template/infographic*` 这类结构字段也必须真正写盘，否则会出现“工具执行成功但左侧完全没变”
+85. Phase2 缩略图刷新不能只依赖 `previewUrl` 字段变化；很多预览图只存在卡片本地状态，chat action 修改 `props/prompt/type` 时必须按渲染输入失效旧图并重生
+86. **Director 切项目/切文稿的重置只能发生在“已有非空上下文 -> 另一个非空上下文”之间**：初始刷新时 `scriptPath` 常会从空值 hydrate 成真实路径，不能把这种初始化误判成切文稿并清空 Phase2
+87. **TextReveal 的“不要换行”不能只写 `props.whiteSpace = "nowrap"`**：模板实际依赖的是 `singleLine/noWrap/textStyle.whiteSpace`，必要时还要补 `containerWidth/paddingX` 才能稳定压成单行
+86. Director 不能同时让 `expert_state` 和 `delivery_store.modules.director` 各自漂移；Phase2 新生成、Chatbox 修改、项目切换后都必须把两边同步到同一份状态
+87. Remotion 模板字段必须和模板实现一一对应；像 `TextReveal` 这类模板如果要支持“不换行/缩边距”，模板代码本身必须显式读取 `singleLine/noWrap/textStyle/containerWidth/paddingX`
+88. **Director Chatbox 不能维护第二套手写系统提示词**：Phase2 生成和 Chatbox 编辑都必须走同一套 Director Skill 注入链路，否则模型会在生成链路“懂模板”、在聊天链路“忘模板”
+89. **Skill prompt 的占位符名必须与 `skill-loader.ts` 一致**：像 `AESTHETICS_GUIDELINE` / `ARTLIST_DICTIONARY` 这类资源占位符只要一处拼错，运行时就会静默退化成“看似加载了 Skill，实际没吃到关键资源”
+90. **Director、MusicDirector、ThumbnailMaster、MarketingMaster、ShortsMaster 等专家的生成与修改能力都必须来源于对应 Skill，本体不应硬编码在 DeliveryConsole 系统层**
+91. **DeliveryConsole 只负责桥梁与宿主职责**：承接 Skill 输出、翻译项目状态、驱动 UI 呈现，不替专家本体做内容判断与专业决策
+92. **Director Skill 不负责项目语义映射**：`1-4 -> chapterId/optionId`、`A-F -> 内部 type`、类型别名与冲突判定都属于 DeliveryConsole 桥梁层；导演 Skill 只负责导演意图理解与专业判断
+93. **Skill 与 Adapter 必须隔着 Bridge 契约**：像 `update_option_fields/chapterId/optionId/updates.type` 这类执行层参数不能直接作为 Director Skill 的一线输出；Skill 只产出高层意图，Bridge 再翻译成底层 patch
 
 ---
 
