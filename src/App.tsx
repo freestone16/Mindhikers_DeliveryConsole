@@ -41,6 +41,8 @@ function App() {
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [hasBootedCrucible, setHasBootedCrucible] = useState(false);
+    const [crucibleHasBoardContent, setCrucibleHasBoardContent] = useState(false);
+    const [crucibleManualSidebarWidth, setCrucibleManualSidebarWidth] = useState<number | null>(null);
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatResetToken, setChatResetToken] = useState(0);
@@ -49,8 +51,10 @@ function App() {
     const [crucibleSeedPrompt, setCrucibleSeedPrompt] = useState('');
     const [crucibleSeedVersion, setCrucibleSeedVersion] = useState(0);
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>([]);
+    const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
+    const crucibleShellRef = useRef<HTMLDivElement | null>(null);
 
     const buildPhaseOneState = useCallback((expertId: string, nextScriptPath: string) => {
         if (expertId === 'Director') {
@@ -89,6 +93,8 @@ function App() {
             setCrucibleSeedPrompt('');
             setCrucibleSeedVersion(0);
             setCrucibleInjectedMessages([]);
+            setCrucibleHasBoardContent(false);
+            setCrucibleTurnSettledToken(0);
             injectedRoundKeysRef.current.clear();
             setChatResetToken((prev) => prev + 1);
             return;
@@ -155,6 +161,8 @@ function App() {
         setCrucibleSeedPrompt('');
         setCrucibleSeedVersion(0);
         setCrucibleInjectedMessages([]);
+        setCrucibleHasBoardContent(false);
+        setCrucibleTurnSettledToken(0);
         injectedRoundKeysRef.current.clear();
         setCrucibleTopicTitle('标题待定');
         setChatResetToken((prev) => prev + 1);
@@ -251,11 +259,50 @@ function App() {
             setCrucibleSeedPrompt('');
             setCrucibleSeedVersion(0);
             setCrucibleInjectedMessages([]);
+            setCrucibleHasBoardContent(false);
+            setCrucibleTurnSettledToken(0);
             injectedRoundKeysRef.current.clear();
         }
 
         previousContextRef.current = currentContext;
     }, [state.projectId, state.selectedScript?.path, resetActiveExpertContext]);
+
+    const handleCrucibleBoardStateChange = useCallback((payload: { hasContent: boolean }) => {
+        setCrucibleHasBoardContent(payload.hasContent);
+    }, []);
+
+    const handleCrucibleTurnSettled = useCallback(() => {
+        setCrucibleTurnSettledToken((prev) => prev + 1);
+    }, []);
+
+    const handleCrucibleDividerMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+        const container = crucibleShellRef.current;
+        if (!container) {
+            return;
+        }
+
+        event.preventDefault();
+        const rect = container.getBoundingClientRect();
+        const minWidth = 420;
+        const maxWidth = Math.max(minWidth, rect.width - 360);
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const nextWidth = Math.min(maxWidth, Math.max(minWidth, rect.right - moveEvent.clientX));
+            setCrucibleManualSidebarWidth(nextWidth);
+        };
+
+        const handleMouseUp = () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    }, []);
+
+    const crucibleSidebarStyle = crucibleManualSidebarWidth
+        ? { width: `${crucibleManualSidebarWidth}px` }
+        : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
 
     if (hashRoute === '/llm-config') {
         return <LLMConfigPage onClose={() => window.location.hash = '/'} />;
@@ -285,6 +332,7 @@ function App() {
 
             {(activeModule === 'crucible' || hasBootedCrucible) && (
                 <div
+                    ref={crucibleShellRef}
                     className={`min-h-0 flex-1 overflow-hidden ${activeModule === 'crucible' ? 'flex' : 'hidden'}`}
                     aria-hidden={activeModule !== 'crucible'}
                 >
@@ -298,9 +346,23 @@ function App() {
                             seedPromptVersion={crucibleSeedVersion}
                             onResetWorkspace={handleCrucibleReset}
                             onRoundGenerated={handleCrucibleRoundGenerated}
+                            onBlackboardStateChange={handleCrucibleBoardStateChange}
+                            onTurnSettled={handleCrucibleTurnSettled}
                         />
                     </div>
-                    <div className="w-[34vw] min-w-[420px] max-w-[560px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md">
+                    <div
+                        role="separator"
+                        aria-orientation="vertical"
+                        onMouseDown={handleCrucibleDividerMouseDown}
+                        onDoubleClick={() => setCrucibleManualSidebarWidth(null)}
+                        className="group relative hidden w-3 cursor-col-resize xl:block"
+                    >
+                        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[rgba(142,99,55,0.12)] transition-colors group-hover:bg-[rgba(142,99,55,0.32)]" />
+                    </div>
+                    <div
+                        style={crucibleSidebarStyle}
+                        className="min-w-[420px] max-w-[760px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
+                    >
                         <ChatPanel
                             isOpen={activeModule === 'crucible'}
                             onToggle={() => undefined}
@@ -313,6 +375,8 @@ function App() {
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
+                            blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
+                            crucibleTurnSettledToken={crucibleTurnSettledToken}
                             socket={socket}
                         />
                     </div>

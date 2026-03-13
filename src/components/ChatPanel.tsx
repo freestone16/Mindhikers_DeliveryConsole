@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -22,6 +22,8 @@ interface ChatPanelProps {
     externalMessages?: ChatMessage[];
     onUserMessage?: (content: string) => void;
     onRouteAsset?: (asset: HostRoutedAsset) => void;
+    blackboardHint?: string | null;
+    crucibleTurnSettledToken?: number;
     socket: any;
 }
 
@@ -65,19 +67,6 @@ const getBubbleTone = (msg: ChatMessage) => {
     }
 
     return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] text-[var(--ink-1)]';
-};
-
-const getClassificationLabel = (msg: ChatMessage) => {
-    switch (msg.meta?.classification) {
-        case 'reference':
-            return '中屏参考同步';
-        case 'quote':
-            return '中屏金句同步';
-        case 'asset':
-            return '中屏结构同步';
-        default:
-            return msg.role === 'user' ? '命题输入' : '右侧主线';
-    }
 };
 
 const getMessageAuthor = (
@@ -146,6 +135,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     externalMessages = [],
     onUserMessage,
     onRouteAsset,
+    blackboardHint,
+    crucibleTurnSettledToken = 0,
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -155,6 +146,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [contextLoaded, setContextLoaded] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
     const [warning, setWarning] = useState<string | null>(null);
+    const [crucibleThinkingStartedAt, setCrucibleThinkingStartedAt] = useState<number | null>(null);
+    const [crucibleThinkingElapsedSec, setCrucibleThinkingElapsedSec] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isComposingRef = useRef(false);
@@ -175,6 +168,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
         [isCrucibleMode, expertId, expertName]
     );
+    const lastOldluMessageId = useMemo(() => {
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+            const message = messages[index];
+            if (message.role === 'assistant' && message.meta?.authorId === 'oldlu') {
+                return message.id;
+            }
+        }
+        return null;
+    }, [messages]);
+    const crucibleThinkingLabel = useMemo(
+        () => `老卢、老张在思索，已用时 ${crucibleThinkingElapsedSec} 秒...`,
+        [crucibleThinkingElapsedSec]
+    );
 
     const resetPanelState = useCallback(() => {
         setMessages([]);
@@ -183,6 +189,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setAttachments([]);
         setIsStreaming(false);
         setStreamingContent('');
+        setCrucibleThinkingStartedAt(null);
+        setCrucibleThinkingElapsedSec(0);
         routedMessageIdsRef.current.clear();
         seenExternalMessageIdsRef.current.clear();
         sendGuardRef.current = false;
@@ -252,9 +260,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (isCrucibleMode && freshMessages.some((message) => message.role === 'assistant')) {
             setIsStreaming(false);
             setStreamingContent('');
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
         }
     }, [externalMessages, isCrucibleMode]);
+
+    useEffect(() => {
+        if (!isCrucibleMode) {
+            return;
+        }
+
+        setIsStreaming(false);
+        setStreamingContent('');
+        setCrucibleThinkingStartedAt(null);
+        setCrucibleThinkingElapsedSec(0);
+        sendGuardRef.current = false;
+    }, [crucibleTurnSettledToken, isCrucibleMode]);
+
+    useEffect(() => {
+        if (!isCrucibleMode || !isStreaming || !crucibleThinkingStartedAt) {
+            return;
+        }
+
+        const tick = () => {
+            setCrucibleThinkingElapsedSec(Math.max(0, Math.floor((Date.now() - crucibleThinkingStartedAt) / 1000)));
+        };
+
+        tick();
+        const timer = window.setInterval(tick, 1000);
+        return () => window.clearInterval(timer);
+    }, [crucibleThinkingStartedAt, isCrucibleMode, isStreaming]);
 
     useEffect(() => {
         if (!socket) return;
@@ -281,6 +317,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 return '';
             });
             setIsStreaming(false);
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
         };
 
@@ -288,6 +326,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             if (!matchesCurrentScope({ expertId: msgExpertId, projectId: msgProjectId, scriptPath: msgScriptPath })) return;
             setIsStreaming(false);
             setStreamingContent('');
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
             const nextMessage = {
                 id: `msg_${Date.now()}`,
@@ -326,6 +366,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             });
             setMessages((prev) => shouldSkipAssistantMessage(prev, nextMessage, isCrucibleMode) ? prev : [...prev, nextMessage]);
             setIsStreaming(false);
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
         };
 
@@ -346,6 +388,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             setIsStreaming(false);
             setStreamingContent('');
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
             setMessages((prev) => [...prev, {
                 id: `msg_${Date.now()}`,
@@ -366,6 +410,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const handleChatActionResult = (data: { expertId: string; projectId?: string; scriptPath?: string; success: boolean; message: string }) => {
             if (!matchesCurrentScope(data)) return;
             setIsStreaming(false);
+            setCrucibleThinkingStartedAt(null);
+            setCrucibleThinkingElapsedSec(0);
             sendGuardRef.current = false;
             const nextMessage = enrichMessageMeta({
                 id: `msg_${Date.now()}`,
@@ -460,6 +506,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setAttachments([]);
         setIsStreaming(true);
         setStreamingContent('');
+        if (isCrucibleMode) {
+            setCrucibleThinkingStartedAt(Date.now());
+            setCrucibleThinkingElapsedSec(0);
+        }
 
         if (textareaRef.current) {
             textareaRef.current.style.height = '96px';
@@ -499,6 +549,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 : msg
         ));
         setIsStreaming(true);
+        if (isCrucibleMode) {
+            setCrucibleThinkingStartedAt(Date.now());
+            setCrucibleThinkingElapsedSec(0);
+        }
         socket?.emit('chat-action-execute', {
             expertId,
             projectId,
@@ -584,9 +638,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         lastSentRef.current = null;
     };
 
+    const handleExportMarkdown = useCallback(() => {
+        const title = (displayName || expertName || '黄金坩埚对话').trim();
+        const lines = [
+            `# ${title}`,
+            '',
+            `导出时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`,
+            '',
+        ];
+
+        for (const message of messages) {
+            const author = getMessageAuthor(message, headerBadges, expertName);
+            if (!message.content.trim()) {
+                continue;
+            }
+            lines.push(`## ${author.name}`);
+            lines.push('');
+            lines.push(message.content.trim());
+            lines.push('');
+        }
+
+        const markdown = lines.join('\n');
+        const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        const safeTitle = title.replace(/[\\/:*?"<>|]+/g, '-');
+        anchor.href = url;
+        anchor.download = `${safeTitle}.md`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    }, [displayName, expertName, messages, headerBadges]);
+
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
-            return '先在这里聊纯对话，宿主会把参考内容、金句和资产提示送到中区。';
+            return '先在这里继续聊，真正需要上黑板的内容会被挂到中区。';
         }
         return `开始和 ${expertName} 对话`;
     }, [isCrucibleMode, expertName]);
@@ -604,6 +691,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
+                        <button
+                            onClick={handleExportMarkdown}
+                            title="导出 Markdown"
+                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                        >
+                            <Download className="h-4 w-4" />
+                        </button>
                         <button
                             onClick={handleClearHistory}
                             title="清空对话历史"
@@ -633,10 +727,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                         {badge.avatarText || badge.name.slice(0, 1)}
                                     </div>
                                 )}
-                                <div>
-                                    <div className="text-[12px] font-medium text-[var(--ink-1)]">{badge.name}</div>
-                                    <div className="text-[10px] text-[var(--ink-3)]">{badge.role}</div>
-                                </div>
+                                <div className="text-[13px] font-medium text-[var(--ink-1)]">{badge.name}</div>
                             </div>
                         ))}
                     </div>
@@ -676,9 +767,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
                                         <div className={`mb-1 flex items-center gap-2 text-[11px] ${isUser ? 'flex-row-reverse text-right' : 'text-left'} text-[var(--ink-3)]`}>
                                             <span className="font-medium text-[var(--ink-2)]">{author.name}</span>
-                                            <span>{author.role}</span>
-                                            <span>·</span>
-                                            <span>{getClassificationLabel(msg)}</span>
                                         </div>
 
                                         <div className={`w-full rounded-[22px] border px-3.5 py-3 shadow-[0_8px_20px_rgba(131,103,70,0.04)] ${getBubbleTone(msg)}`}>
@@ -729,19 +817,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                                 </div>
                                             )}
                                         </div>
+
+                                        {isCrucibleMode && blackboardHint && msg.id === lastOldluMessageId && msg.meta?.authorId === 'oldlu' && (
+                                            <div className="mt-2 px-1 text-[12px] leading-6 text-[var(--ink-3)]">
+                                                {blackboardHint}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
                         })}
 
-                        {streamingContent && (
+                        {(streamingContent || (isCrucibleMode && isStreaming)) && (
                             <div className="flex gap-3">
                                 <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">思</div>
                                 <div className="max-w-[88%]">
-                                    <div className="mb-1 text-[11px] text-[var(--ink-3)]">老张 / 老卢 · 推理中</div>
+                                    <div className="mb-1 text-[11px] text-[var(--ink-3)]">推理中</div>
                                     <div className="rounded-[22px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
                                         {isCrucibleMode
-                                            ? '正在整理这一轮的追问，中屏会同步当前焦点。'
+                                            ? crucibleThinkingLabel
                                             : streamingContent}
                                         <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-[rgba(120,93,62,0.45)] align-middle" />
                                     </div>
@@ -773,11 +867,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
                 <div className="flex items-end gap-2">
-                    <div className="mb-1 flex flex-col items-center gap-1">
+                    <div className="mb-1 flex items-center">
                         <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
                             你
                         </div>
-                        <span className="text-[10px] text-[var(--ink-3)]">用户</span>
                     </div>
                     <label className="cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
                         <Paperclip className="h-4 w-4" />
@@ -799,10 +892,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         }}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        placeholder={isCrucibleMode ? '主回答继续写在这里。中屏只同步这一轮焦点，不抢右侧主线。' : '先聊问题本身。长参考、金句、结构提示会被宿主自动分流。'}
+                        placeholder={isCrucibleMode ? '继续把你的判断往下说。' : '继续输入。'}
                         className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
                         rows={3}
-                        disabled={isStreaming}
+                        disabled={isCrucibleMode ? false : isStreaming}
                     />
                     <button
                         onClick={handleSend}
