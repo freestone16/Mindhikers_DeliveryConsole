@@ -93,7 +93,7 @@ const TYPE_DISPLAY: Record<Exclude<BRollType, 'generative'>, string> = {
   seedance: 'B. 文生视频',
   artlist: 'C. Artlist',
   'internet-clip': 'D. 互联网素材',
-  'user-capture': 'E. 我自己上传',
+  'user-capture': 'E. 用户截图/录屏',
   infographic: 'F. 信息图',
 };
 
@@ -102,9 +102,25 @@ const TYPE_ALIASES: Array<{ type: Exclude<BRollType, 'generative'>; labels: stri
   { type: 'seedance', labels: ['b', 'seedance', '文生视频', 'ai视频', 'ai 视频', '生成视频'] },
   { type: 'artlist', labels: ['c', 'artlist', '素材库', 'stock footage'] },
   { type: 'internet-clip', labels: ['d', '互联网素材', '网素材', '网络素材', '网上找片段', '网络片段'] },
-  { type: 'user-capture', labels: ['e', '我自己上传', '自己上传', '用户素材', '用户截图', '用户录屏', '本地素材'] },
+  { type: 'user-capture', labels: ['e', '用户截图', '用户录屏', '截图录屏', '截图', '录屏', '界面录制', '操作录屏'] },
   { type: 'infographic', labels: ['f', '信息图', 'infographic'] },
 ];
+
+const UPLOAD_INTENT_LABELS = [
+  '我自己上传',
+  '自己上传',
+  '我来上传',
+  '我自己有视频',
+  '我有视频',
+  '已有视频',
+  '现成视频',
+  '待上传',
+  '上传就好',
+  '上传即可',
+  '上传素材',
+];
+
+const TYPE_CHANGE_VERBS = ['改成', '换成', '改为', '变成', '切成', '切到', '转成', '换为', '改'];
 
 const TEMPLATE_ALIASES: Array<{ template: string; labels: string[]; requiresStructuredProps?: boolean }> = [
   { template: 'TextReveal', labels: ['textreveal', 'text reveal', '金句模板', '文字揭示', '文字揭示动画', '金句动画'] },
@@ -242,12 +258,32 @@ export function resolveDirectorBridgeAction(
   }
 }
 
+export function tryResolveDirectorFastPath(
+  userRequest: string,
+  projectRoot: string
+): DirectorBridgeResolution | null {
+  const targetMatch = userRequest.match(/(\d+\s*[-–]\s*\d+)/);
+  if (!targetMatch) return null;
+
+  const hasChangeVerb = TYPE_CHANGE_VERBS.some(verb => userRequest.includes(verb));
+  const hasTypeSignal = extractTypeMatches(userRequest).length > 0 || detectUploadIntent(userRequest);
+  if (!hasChangeVerb || !hasTypeSignal) return null;
+
+  return resolveDirectorBridgeAction({
+    intentType: 'change_type',
+    targetRef: targetMatch[1].replace(/\s+/g, ''),
+    userRequest,
+    requestedTypeLabel: userRequest,
+  }, projectRoot);
+}
+
 function resolveTypeChange(
   input: DirectorBridgeActionInput,
   target: DirectorTarget
 ): DirectorBridgeResolution {
   const labelSource = `${input.requestedTypeLabel || ''} ${input.userRequest || ''}`.trim();
   const matches = extractTypeMatches(labelSource);
+  const hasUploadIntent = detectUploadIntent(labelSource);
 
   if (matches.length === 0) {
     return {
@@ -255,30 +291,37 @@ function resolveTypeChange(
       target,
       clarification: {
         reason: 'ambiguous_alias',
-        message: `我知道你想改 ${target.targetRef} 的类型，但还没识别出明确目标。请直接说 A-F，或说“互联网素材 / 我自己上传 / 文生视频 / Remotion / 信息图”。`,
+        message: hasUploadIntent
+          ? `我知道你这条素材会自己上传，但还需要确认它属于哪一类：如果是现成网络片段，请选 D. 互联网素材；如果是你自己录的界面/截图，请选 E. 用户截图/录屏。`
+          : `我知道你想改 ${target.targetRef} 的类型，但还没识别出明确目标。请直接说 A-F，或说“互联网素材 / 用户截图录屏 / 文生视频 / Remotion / 信息图”。`,
       },
     };
   }
 
-  if (matches.length > 1) {
+  const normalizedMatch = normalizeTypeMatches(matches, hasUploadIntent);
+  if (normalizedMatch.length > 1) {
     return {
       status: 'needs_clarification',
       target,
       clarification: {
         reason: 'type_conflict',
-        message: `你同时表达了 ${matches.map(match => `“${TYPE_DISPLAY[match]}”`).join(' 和 ')}，这些类型互相冲突。请明确保留哪一种。`,
-        choices: matches.map(match => TYPE_DISPLAY[match]),
+        message: `你同时表达了 ${normalizedMatch.map(match => `“${TYPE_DISPLAY[match]}”`).join(' 和 ')}，这些类型互相冲突。请明确保留哪一种。`,
+        choices: normalizedMatch.map(match => TYPE_DISPLAY[match]),
       },
     };
   }
 
-  const resolvedType = matches[0];
+  const resolvedType = normalizedMatch[0];
+  const summary = hasUploadIntent && resolvedType === 'internet-clip'
+    ? `将把 ${target.targetRef} 改为 ${TYPE_DISPLAY[resolvedType]}，并保留用户上传入口`
+    : `将把 ${target.targetRef} 改为 ${TYPE_DISPLAY[resolvedType]}`;
+
   return {
     status: 'ready_to_confirm',
     target,
     confirmCard: {
       title: '确认修改',
-      summary: `将把 ${target.targetRef} 改为 ${TYPE_DISPLAY[resolvedType]}`,
+      summary,
       targetLabel: buildTargetLabel(target),
       diffLabel: `type -> ${resolvedType}`,
     },
@@ -555,6 +598,31 @@ function extractTypeMatches(source: string): Array<Exclude<BRollType, 'generativ
   }
 
   return Array.from(matches);
+}
+
+function detectUploadIntent(source: string): boolean {
+  const normalized = normalizeText(source);
+  return UPLOAD_INTENT_LABELS.some(label => normalized.includes(normalizeText(label)));
+}
+
+function normalizeTypeMatches(
+  matches: Array<Exclude<BRollType, 'generative'>>,
+  hasUploadIntent: boolean
+): Array<Exclude<BRollType, 'generative'>> {
+  const uniqueMatches = Array.from(new Set(matches));
+
+  // "互联网素材 + 我自己上传" is not a real type conflict:
+  // the type is internet-clip, while upload is just the material delivery method.
+  if (
+    hasUploadIntent &&
+    uniqueMatches.includes('internet-clip') &&
+    uniqueMatches.includes('user-capture') &&
+    uniqueMatches.length === 2
+  ) {
+    return ['internet-clip'];
+  }
+
+  return uniqueMatches;
 }
 
 function normalizeText(value: string): string {

@@ -4,6 +4,23 @@ import type { ToolDefinition, ExpertActionResult } from '../src/types';
 import { DirectorAdapter } from './expert-actions/director';
 import { ShortsAdapter } from './expert-actions/shorts';
 
+export interface ExpertFastPathConfirmCard {
+    title?: string;
+    summary: string;
+    targetLabel?: string;
+    diffLabel?: string;
+}
+
+export interface ExpertFastPathExecutionPlan {
+    actionName: string;
+    actionArgs: Record<string, any>;
+}
+
+export interface ExpertFastPathResolution {
+    confirmCard: ExpertFastPathConfirmCard;
+    executionPlan: ExpertFastPathExecutionPlan;
+}
+
 // Expert Action Adapter Interface
 export interface ExpertActionAdapter {
     expertId: string;
@@ -13,6 +30,14 @@ export interface ExpertActionAdapter {
 
     // Generate minimal context skeleton for the LLM
     getContextSkeleton(projectRoot: string): string;
+
+    // Optional fast path for deterministic edit commands.
+    // Only return a result when the adapter can go straight to confirmation.
+    // Otherwise return null and let the expert skill handle the request.
+    tryFastPath?(
+        latestUserMessage: string,
+        projectRoot: string
+    ): ExpertFastPathResolution | null;
 
     // Execute a tool call
     executeAction(

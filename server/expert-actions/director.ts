@@ -3,6 +3,7 @@ import * as path from 'path';
 import type { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
 import { loadConfig } from '../llm-config';
+import { tryResolveDirectorFastPath } from '../director-bridge';
 
 function isPlainObject(value: unknown): value is Record<string, any> {
     return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -24,6 +25,26 @@ function deepMerge(target: Record<string, any>, source: Record<string, any>): Re
 
 export const DirectorAdapter: ExpertActionAdapter = {
     expertId: 'Director',
+
+    tryFastPath(latestUserMessage, projectRoot) {
+        const resolution = tryResolveDirectorFastPath(latestUserMessage, projectRoot);
+        if (!resolution || resolution.status !== 'ready_to_confirm' || !resolution.executionPlan || !resolution.confirmCard) {
+            return null;
+        }
+
+        return {
+            confirmCard: {
+                title: resolution.confirmCard.title,
+                summary: resolution.confirmCard.summary,
+                targetLabel: resolution.confirmCard.targetLabel,
+                diffLabel: resolution.confirmCard.diffLabel,
+            },
+            executionPlan: {
+                actionName: resolution.executionPlan.actionName,
+                actionArgs: resolution.executionPlan.actionArgs,
+            },
+        };
+    },
 
     getToolDefinitions() {
         return [

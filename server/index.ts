@@ -44,6 +44,65 @@ const io = new Server(httpServer, {
     }
 });
 
+function resolveChatGatewayConfig(config: ReturnType<typeof loadConfig>) {
+    // Chatbox follows the global gateway to avoid hidden expert-level model drift.
+    return config.global;
+}
+
+function buildSystemActionHistoryMessage(payload: {
+    confirmId: string;
+    actionName: string;
+    actionArgs: Record<string, any>;
+    description: string;
+    title?: string;
+    targetLabel?: string;
+    diffLabel?: string;
+}) {
+    return {
+        id: `msg_${Date.now()}`,
+        role: 'system' as const,
+        content: '',
+        kind: 'system_action' as const,
+        timestamp: new Date().toISOString(),
+        actionConfirm: {
+            confirmId: payload.confirmId,
+            actionName: payload.actionName,
+            actionArgs: payload.actionArgs,
+            description: payload.description,
+            title: payload.title,
+            targetLabel: payload.targetLabel,
+            diffLabel: payload.diffLabel,
+            status: 'pending' as const,
+        },
+    };
+}
+
+function emitAndPersistActionConfirm(
+    socket: any,
+    projectRoot: string,
+    expertId: string,
+    historyMessages: any[],
+    payload: {
+        confirmId: string;
+        actionName: string;
+        actionArgs: Record<string, any>;
+        description: string;
+        title?: string;
+        targetLabel?: string;
+        diffLabel?: string;
+    }
+) {
+    socket.emit('chat-action-confirm', {
+        expertId,
+        ...payload,
+    });
+
+    saveChatHistory(projectRoot, expertId, [
+        ...historyMessages,
+        buildSystemActionHistoryMessage(payload),
+    ]);
+}
+
 // --- Project Context (Mutable - supports runtime switching) ---
 // Docker: PROJECTS_BASE=/data/projects  |  Local: fallback to ../../Projects
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
@@ -715,10 +774,27 @@ io.on('connection', (socket) => {
             console.log(`[Chat][V2] === chat-stream ENTRY (code version: 2026-03-05-v5) ===`);
             if (!projectId) throw new Error('projectId is required for chat-stream');
             const config = loadConfig();
-            const { provider, model, baseUrl } = config.global;
+            const { provider, model, baseUrl } = resolveChatGatewayConfig(config);
             const projectRoot = getProjectRoot(projectId);
 
             const adapter = getAdapter(expertId);
+            const latestUserMessage = [...messages].reverse().find((message: any) => message.role === 'user' && typeof message.content === 'string');
+            const fastPathResolution = latestUserMessage?.content
+                ? adapter?.tryFastPath?.(latestUserMessage.content, projectRoot)
+                : null;
+
+            if (fastPathResolution) {
+                emitAndPersistActionConfirm(socket, projectRoot, expertId, messages, {
+                    confirmId: `confirm_${Date.now()}_fastpath`,
+                    actionName: fastPathResolution.executionPlan.actionName,
+                    actionArgs: fastPathResolution.executionPlan.actionArgs,
+                    description: fastPathResolution.confirmCard.summary,
+                    title: fastPathResolution.confirmCard.title,
+                    targetLabel: fastPathResolution.confirmCard.targetLabel,
+                    diffLabel: fastPathResolution.confirmCard.diffLabel,
+                });
+                return;
+            }
             let tools = expertId === 'Director'
                 ? getDirectorBridgeToolDefinitions()
                 : adapter?.getToolDefinitions();
@@ -771,8 +847,7 @@ io.on('connection', (socket) => {
                         const clarification = resolution.clarification?.message;
 
                         if (resolution.status === 'ready_to_confirm' && resolution.executionPlan && resolution.confirmCard) {
-                            socket.emit('chat-action-confirm', {
-                                expertId,
+                            emitAndPersistActionConfirm(socket, projectRoot, expertId, messages, {
                                 confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
                                 actionName: resolution.executionPlan.actionName,
                                 actionArgs: resolution.executionPlan.actionArgs,
@@ -790,8 +865,10 @@ io.on('connection', (socket) => {
                                 ...messages,
                                 {
                                     id: `msg_${Date.now()}`,
-                                    role: 'assistant',
+                                    role: 'system',
                                     content: clarification,
+                                    kind: 'system_status',
+                                    systemTitle: '系统澄清',
                                     timestamp: new Date().toISOString(),
                                 },
                             ]);
@@ -803,8 +880,7 @@ io.on('connection', (socket) => {
                         }
                     } else {
                         const desc = generateActionDescription(chunk.functionName, parsedArgs);
-                        socket.emit('chat-action-confirm', {
-                            expertId,
+                        emitAndPersistActionConfirm(socket, projectRoot, expertId, messages, {
                             confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
                             actionName: chunk.functionName,
                             actionArgs: parsedArgs,
@@ -824,6 +900,7 @@ io.on('connection', (socket) => {
                             id: `msg_${Date.now()}`,
                             role: 'assistant' as const,
                             content: assistantResponse,
+                            kind: 'chat' as const,
                             timestamp: new Date().toISOString(),
                         },
                     ]
@@ -837,7 +914,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, originalMessages }) => {
+    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, historyMessages }) => {
         try {
             console.log(`[Chat][DEBUG] chat-action-execute => action: ${actionName}, args:`, JSON.stringify(actionArgs));
             const projectRoot = getProjectRoot(projectId);
@@ -880,14 +957,16 @@ io.on('connection', (socket) => {
                 socket.emit('chat-action-result', { expertId, success: true, message: '✅ 操作执行成功！请在左侧界面查看。' });
 
                 // Save confirmation interaction silently to history
-                if (originalMessages) {
+                if (historyMessages) {
                     const confirmationMsg = {
                         id: `msg_${Date.now()}`,
-                        role: 'assistant' as const,
+                        role: 'system' as const,
                         content: '✅ 操作执行成功！',
+                        kind: 'system_status' as const,
+                        systemTitle: '系统执行结果',
                         timestamp: new Date().toISOString()
                     };
-                    saveChatHistory(projectRoot, expertId, [...originalMessages, confirmationMsg]);
+                    saveChatHistory(projectRoot, expertId, [...historyMessages, confirmationMsg]);
                 }
             } else {
                 socket.emit('chat-action-result', { expertId, success: false, message: `❌ 操作失败: ${result.error}` });

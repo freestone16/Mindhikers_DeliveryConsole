@@ -43,7 +43,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const expert = EXPERTS.find(e => e.id === expertId);
     const expertName = expert?.name || expertId;
+    const getMessageKind = (msg: ChatMessage) => msg.kind || (msg.role === 'system' ? 'system_status' : 'chat');
 
+    const setMessagesWithRef = useCallback((nextMessages: ChatMessage[]) => {
+        messagesRef.current = nextMessages;
+        setMessages(nextMessages);
+    }, []);
     // 更新 ref
     useEffect(() => {
         currentExpertIdRef.current = expertId;
@@ -64,6 +69,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content,
+                kind: 'chat',
+                timestamp: new Date().toISOString(),
+            }]);
+        };
+
+        const appendSystemMessage = (content: string, systemTitle: string) => {
+            if (!content) return;
+            setMessages(prev => [...prev, {
+                id: `msg_${Date.now()}`,
+                role: 'system',
+                content,
+                kind: 'system_status',
+                systemTitle,
                 timestamp: new Date().toISOString(),
             }]);
         };
@@ -96,11 +114,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             console.error('Chat error:', error);
             setIsStreaming(false);
             setStreamingContent('');
+            streamingContentRef.current = '';
             // 显示错误
             const errorMessage: ChatMessage = {
                 id: `msg_${Date.now()}`,
-                role: 'assistant',
+                role: 'system',
                 content: `❌ 错误: ${error}`,
+                kind: 'system_status',
+                systemTitle: '系统错误',
                 timestamp: new Date().toISOString(),
             };
             setMessages(msgs => [...msgs, errorMessage]);
@@ -126,7 +147,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const handleChatConfirmation = ({ expertId: msgExpertId, message }: { expertId: string; message: string }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
             flushStreamingMessage();
-            appendAssistantMessage(message);
+            appendSystemMessage(message, '系统澄清');
             setIsStreaming(false);
         };
 
@@ -145,8 +166,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setIsStreaming(false);
             setMessages(prev => [...prev, {
                 id: `msg_${Date.now()}`,
-                role: 'assistant',
+                role: 'system',
                 content: '',
+                kind: 'system_action',
                 timestamp: new Date().toISOString(),
                 actionConfirm: {
                     confirmId: data.confirmId,
@@ -164,7 +186,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
             if (data.expertId !== currentExpertIdRef.current) return;
             setIsStreaming(false);
-            appendAssistantMessage(data.message);
+            appendSystemMessage(data.message, '系统执行结果');
         };
 
         socket.on('chat-chunk', handleChatChunk);
@@ -232,12 +254,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             id: `msg_${Date.now()}`,
             role: 'user',
             content: inputText,
+            kind: 'chat',
             timestamp: new Date().toISOString(),
-            attachments: attachments.length > 0 ? [...attachments] : undefined,
+            attachments: attachments.length > 0
+                ? attachments.map(att => ({
+                    ...att,
+                    previewUrl: att.base64,
+                }))
+                : undefined,
         };
 
         setMessages(prev => [...prev, userMessage]);
         setInputText('');
+        attachments.forEach(att => {
+            if (att.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(att.previewUrl);
+            }
+        });
         setAttachments([]);
         setIsStreaming(true);
         setStreamingContent('');
@@ -265,27 +298,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const handleConfirmAction = (actionConfirm: ToolCallConfirmation) => {
-        setMessages(prev => prev.map(msg =>
+        const nextMessages = messagesRef.current.map(msg =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
                 ? { ...msg, actionConfirm: { ...actionConfirm, status: 'confirmed' } }
                 : msg
-        ));
+        );
+        setMessagesWithRef(nextMessages);
         setIsStreaming(true);
+        socket?.emit('chat-save', { expertId, projectId, messages: nextMessages });
         socket?.emit('chat-action-execute', {
             expertId,
             projectId,
             actionName: actionConfirm.actionName,
             actionArgs: actionConfirm.actionArgs,
-            originalMessages: messagesRef.current.filter(m => m.actionConfirm?.status !== 'pending')
+            historyMessages: nextMessages
         });
     };
 
     const handleCancelAction = (actionConfirm: ToolCallConfirmation) => {
-        setMessages(prev => prev.map(msg =>
+        const nextMessages = messagesRef.current.map(msg =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
                 ? { ...msg, actionConfirm: { ...actionConfirm, status: 'cancelled' }, content: '已取消该操作。' }
                 : msg
-        ));
+        );
+        setMessagesWithRef(nextMessages);
+        socket?.emit('chat-save', { expertId, projectId, messages: nextMessages });
     };
 
     const handlePaste = (e: React.ClipboardEvent) => {
@@ -379,6 +416,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
             </div>
 
+            <div className="px-4 py-2 border-b border-slate-800/80 bg-slate-950/40">
+                <p className="text-[11px] text-slate-400">
+                    聊天气泡只展示你与 {expertName} Skill 的原话。系统确认、冲突澄清与执行结果会以下方系统卡片呈现。
+                </p>
+            </div>
+
             {/* Warning Toast */}
             {warning && (
                 <div className="mx-4 mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2">
@@ -396,6 +439,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                     <>
                         {messages.map((msg) => (
+                            getMessageKind(msg) === 'chat' ? (
                             <div
                                 key={msg.id}
                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -409,28 +453,48 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     {msg.attachments && msg.attachments.length > 0 && (
                                         <div className="flex flex-wrap gap-1 mb-2">
                                             {msg.attachments.map((att, i) => (
-                                                <img
-                                                    key={i}
-                                                    src={att.previewUrl}
-                                                    alt={att.name}
-                                                    className="w-16 h-16 object-cover rounded"
-                                                />
+                                                att.previewUrl.startsWith('data:') || att.previewUrl.startsWith('blob:')
+                                                    ? (
+                                                        <img
+                                                            key={i}
+                                                            src={att.previewUrl}
+                                                            alt={att.name}
+                                                            className="w-16 h-16 object-cover rounded"
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            key={i}
+                                                            className="min-w-16 max-w-24 rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-300"
+                                                        >
+                                                            {att.name}
+                                                        </div>
+                                                    )
                                             ))}
                                         </div>
                                     )}
                                     {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
+                                </div>
+                            </div>
+                            ) : (
+                            <div key={msg.id} className="flex justify-center">
+                                <div className={`w-full max-w-[92%] rounded-xl border px-4 py-3 text-sm ${
+                                    getMessageKind(msg) === 'system_action'
+                                        ? 'bg-amber-900/20 border-amber-600/50 text-amber-100'
+                                        : 'bg-slate-900/80 border-slate-700 text-slate-200'
+                                }`}>
+                                    <p className={`mb-2 font-medium ${getMessageKind(msg) === 'system_action' ? 'text-amber-200' : 'text-slate-300'}`}>
+                                        {msg.systemTitle || msg.actionConfirm?.title || '系统消息'}
+                                    </p>
+                                    {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
 
                                     {msg.actionConfirm && (
-                                        <div className="mt-2 bg-amber-900/30 border border-amber-600/50 rounded-lg p-3">
-                                            <p className="text-amber-200 text-sm mb-3 font-medium">
-                                                🤖 {msg.actionConfirm.title || '确认修改'}
-                                            </p>
-                                            <p className="text-amber-100 text-sm mb-2">{msg.actionConfirm.description}</p>
+                                        <div className="mt-2">
+                                            <p className="text-sm mb-2">{msg.actionConfirm.description}</p>
                                             {msg.actionConfirm.targetLabel && (
-                                                <p className="text-amber-300/80 text-xs mb-1">{msg.actionConfirm.targetLabel}</p>
+                                                <p className="text-xs mb-1 opacity-80">{msg.actionConfirm.targetLabel}</p>
                                             )}
                                             {msg.actionConfirm.diffLabel && (
-                                                <p className="text-amber-300/70 text-xs mb-3">{msg.actionConfirm.diffLabel}</p>
+                                                <p className="text-xs mb-3 opacity-70">{msg.actionConfirm.diffLabel}</p>
                                             )}
                                             {msg.actionConfirm.status === 'pending' ? (
                                                 <div className="flex gap-2">
@@ -459,6 +523,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     )}
                                 </div>
                             </div>
+                            )
                         ))}
                         {streamingContent && (
                             <div className="flex justify-start">

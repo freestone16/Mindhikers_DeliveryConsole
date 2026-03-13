@@ -1658,3 +1658,410 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
   - 下一步优先级仍是：
     1. 真实聊天流手测
     2. 如有需要，再设计复杂模板结构化切换的二阶段 Bridge
+
+### 2026-03-12 深夜补充：Director 真实 socket smoke 验证
+
+- **验证前提**：
+  - 本地 worktree 后端运行在 `127.0.0.1:3005`
+  - 由于前一轮沙箱会拦本地 socket，这一轮改用提权方式执行本地 smoke，不停后台
+
+- **真实验证结果**：
+  1. 用户消息：`把 1-2 改成 D`
+     - 收到真实 `chat-action-confirm`
+     - 返回内容：
+       - `description = 将把 1-2 改为 D. 互联网素材`
+       - `targetLabel = 第 1 章 · 方案 2`
+       - `diffLabel = type -> internet-clip`
+       - `actionArgs.updates.type = internet-clip`
+  2. 用户消息：`把 1-2 改成互联网素材，我自己上传`
+     - 收到真实 `chat-confirmation`
+     - 返回冲突澄清：
+       - `你同时表达了 “D. 互联网素材” 和 “E. 我自己上传”，这些类型互相冲突。请明确保留哪一种。`
+  3. 用户消息：`把 1-1 改成 TextReveal`
+     - 收到真实 `chat-action-confirm`
+     - 返回内容：
+       - `description = 将把 1-1 改为 TextReveal 模板`
+       - `diffLabel = template -> TextReveal`
+       - `actionArgs.updates.type = remotion`
+       - `actionArgs.updates.template = TextReveal`
+       - 自动补上最小安全 `props.text`
+  4. 用户消息：`把 1-1 调成一行显示，不要换行，缩边距`
+     - 当前项目现场数据里 `1-1` 不是 `TextReveal`
+     - 收到真实 `chat-confirmation`
+     - 返回澄清：
+       - `当前 Bridge 只先支持 TextReveal 的高频排版调整。1-1 现在不是 TextReveal，请先切到 TextReveal 或明确要修改的模板结构。`
+
+- **结论**：
+  - Director Bridge 不只是单测通过，已经在真实 socket 聊天链路上返回了正确的：
+    - confirm 卡片
+    - 冲突澄清
+    - 安全模板切换计划
+  - 当前唯一还没在活体里补完的，是“确认执行后实际写盘 -> 左侧中部 UI 再次回看”的更长链路
+
+### 2026-03-12 深夜补充：用户纠正 Director 沟通逻辑边界
+
+- **用户明确纠正**：
+  - 当前系统把用户理解成“直接和影视导演 Skill 对话”是错的
+  - 正确逻辑应当是：
+    1. 用户在 Phase2 中通过 UI 审阅每个条目
+    2. 用户对某个条目提出修改意见
+    3. Director Skill 只辅助这一个条目的专业修改
+    4. 用户逐条 Pass / 打勾
+    5. 全部确认后进入 Phase3 渲染落盘
+
+- **这条纠正带来的产品边界变化**：
+  - ChatPanel 不是“专家自由对话窗”，而是 `Phase2 条目审阅助手`
+  - 宿主 UI 负责流程推进：
+    - 当前正在审哪一条
+    - 哪些条目已 Pass
+    - 是否允许“全部确认”
+    - 何时进入 Phase3
+  - Director Skill 负责：
+    - 对当前条目给出导演专业修改
+    - 回答“这条怎么改更好”
+    - 生成当前条目的修改动作
+  - Director Skill 不负责：
+    - 决定 Phase2/Phase3 流程
+    - 裁决“全部确认/全部打勾/进入渲染”
+    - 代替宿主维护全局审阅状态
+
+- **对现有 Bridge 设计的影响**：
+  - 现有 Bridge 虽然已经接回了项目语义映射，但仍偏“把一句自然语言翻译成动作”
+  - 下一轮必须把它进一步放进 `Phase2 审阅状态机` 里，而不是继续把 ChatPanel 当作自由聊天入口
+  - 特别是下面这类语义需要重新分层：
+    - “这条 pass”
+    - “先按这个改”
+    - “这一条不要文生视频，改成互联网素材”
+    - “全部确认，进入 Phase3”
+
+- **下一轮必须先澄清的沟通逻辑**：
+  - `条目修改语义`
+    - 面向当前卡片或显式目标卡片
+    - 交给 Director Skill + Bridge
+  - `工作流控制语义`
+    - 面向 Phase2 全局状态
+    - 交给 DeliveryConsole UI/宿主层
+
+- **结论**：
+  - 下一轮不要再只谈“Skill / Bridge / UI”三段式，还要补一层更上位的 `Phase2 Review Workflow`
+  - 否则即使单条修改动作正确，整体产品沟通逻辑仍会继续跑偏
+
+### 2026-03-12 深夜补充：ChatPanel 开始拆分“会话原文”与“系统卡片”
+
+- **本轮实现目标**：
+  - 先不改 Director Skill
+  - 先把宿主侧最容易跑偏的地方拉正：
+    - 用户与导演 Skill 的原话消息
+    - 系统确认卡/执行结果/冲突澄清
+    - 这两类内容必须从数据结构上分开
+
+- **代码实现**：
+  - `src/types.ts`
+    - 为 `ChatMessage` 新增 `kind`
+      - `chat`
+      - `system_action`
+      - `system_status`
+  - `src/components/ChatPanel.tsx`
+    - 用户消息与 assistant 原话消息统一标记为 `kind = chat`
+    - `chat-action-confirm` 进入 `system_action`
+    - `chat-confirmation/chat-action-result/chat-error` 进入 `system_status`
+    - 渲染层开始分开：
+      - `chat` 走聊天气泡
+      - `system_action/system_status` 走系统卡片
+    - 兼容旧历史：没有 `kind` 的旧 `user/assistant` 消息仍按聊天原文渲染
+  - `server/chat.ts`
+    - 发给 LLM 的历史会过滤掉所有非 `chat` 消息
+    - 系统卡片不再污染用户与导演 Skill 的原始会话上下文
+  - `server/index.ts`
+    - Director Bridge 的冲突澄清、执行结果、保存到历史的系统提示，统一改成 `role = system`
+    - 不再伪装成导演 Skill 的 assistant 回复
+
+- **验证结果**：
+  - `src/components/ChatPanel.test.tsx`：2/2 通过
+  - `src/__tests__/director-bridge.test.ts`：6/6 通过
+
+- **这一步的价值**：
+  - 现在至少已经能保证：
+    - 聊天气泡更接近“用户与导演 Skill 原话”
+    - 系统确认和工作流提示不再继续冒充 Skill 会话
+    - 后续做 `Phase2 Review Workflow` 时，消息层不会继续混乱
+
+### 2026-03-12 深夜补充：宿主 UI 语义开始对齐 Phase2 审阅模型
+
+- **本轮目标**：
+  - 在不改 Director Skill 的前提下，先把宿主 UI 的产品语义往正确方向收
+  - 避免界面仍然暗示“自由聊天”或“直接提交”
+
+- **实现内容**：
+  - `src/components/ChatPanel.tsx`
+    - 在 ChatPanel 顶部新增说明：
+      - 聊天气泡只展示用户与影视导演 Skill 原话
+      - 系统确认、冲突澄清、执行结果以下方系统卡片呈现
+  - `src/components/director/Phase2View.tsx`
+    - 在 Phase2 顶部新增流程提示：
+      - 当前是逐条审阅流程
+      - 可针对条目通过 ChatPanel 与导演 Skill 沟通修改
+      - 逐条通过后再统一确认进入 Phase3
+    - 把按钮文案从 `提交 → Phase 3` 改为 `全部确认 → Phase 3`
+
+- **验证结果**：
+  - `src/components/ChatPanel.test.tsx`：3/3 通过
+  - `src/components/director/Phase2View.test.tsx`：1/1 通过
+
+- **当前状态**：
+  - 宿主侧已经开始从“实现层正确”转向“产品语义正确”
+  - 下一步仍然不是先改 Skill，而是补 `Phase2 Review Workflow` 状态机本体
+
+### 2026-03-12 深夜补充 2：Phase2 宿主审阅状态已接到 `App -> DirectorSection -> ChatPanel`
+
+- **本轮目标**：
+  - 不改 Director Skill，先把 Phase2 的“当前审阅条目 / 通过进度 / 全部确认条件”接回宿主状态
+  - 保持 ChatPanel 聊天气泡仍然只展示用户与导演 Skill 的原话
+
+- **实现内容**：
+  - `src/types.ts`
+    - 新增：
+      - `DirectorReviewTarget`
+      - `DirectorReviewWorkflowState`
+  - `src/components/DirectorSection.tsx`
+    - 新增 `currentReviewTarget` 本地状态
+    - 当前点击条目时，宿主会记录当前审阅目标
+    - Phase2 下会自动推导：
+      - 当前审阅条目
+      - 已通过章节数
+      - 剩余待通过章节数
+      - 是否已满足“全部确认 → Phase3”
+    - 通过 `onReviewWorkflowChange` 把这份宿主状态抬给 `App`
+  - `src/App.tsx`
+    - 新增 `directorReviewWorkflow` 宿主状态
+    - 只在 `Director + delivery` 场景下把审阅状态传给 ChatPanel
+  - `src/components/ChatPanel.tsx`
+    - 新增独立的 `Phase 2 宿主审阅状态` 卡片
+    - 展示：
+      - 当前条目（例如 `1-2`）
+      - 通过进度（例如 `1/3`）
+      - 是否已满足全部确认条件
+    - 这部分不进入聊天历史，不伪装成 Skill 原话
+  - `src/components/director/Phase2View.tsx`
+    - 在中部审阅区同步展示当前审阅条目与阶段进度
+    - 明确“已通过 / 待通过”是宿主流程态，不是导演聊天文本
+
+- **验证结果**：
+  - `src/components/ChatPanel.test.tsx`：4/4 通过
+  - `src/components/director/Phase2View.test.tsx`：1/1 通过
+  - `src/__tests__/director-bridge.test.ts`：6/6 通过
+  - `src/components/director/ChapterCard.test.tsx`：2/2 通过
+
+- **这一步的价值**：
+  - Director Chat 现在已经不只是“消息分层正确”，而是开始具备宿主级 Phase2 审阅语义
+  - 用户回来手测时，可以直接看见：
+    - 当前正在审哪一条
+    - 已经通过了几条
+    - 是否达到全部确认进入 Phase3 的条件
+
+### 2026-03-13 上午补充：整体 DC Node 架构治理完成，前后端已恢复可测
+
+- **问题现象**：
+  - `npm run dev` 起前端时直接报错：
+    - `Cannot find module @rollup/rollup-darwin-x64`
+  - 这不是 Director 代码错误，而是整套 DeliveryConsole 本机运行时发生了架构错配
+
+- **根因定位**：
+  - 机器本身：`arm64`
+  - 当前 shell：`arm64`
+  - 但 Codex / 当前环境默认命中的 `node` 是：
+    - `/usr/local/bin/node`
+    - `x64`
+  - 同时 DC 共享依赖位于：
+    - `/Users/luzhoua/DeliveryConsole/node_modules`
+  - worktree 会向上复用这套共享依赖
+  - 导致前端工具链出现：
+    - shell 默认 `node` 架构
+    - 共享 `node_modules` 原生依赖架构
+    - 二者不一致
+
+- **修复动作**：
+  - 修正 `~/.zshrc`
+    - 去掉把 `/usr/local/opt/node@20/bin` 强插到 PATH 最前面的配置
+    - 让 `~/.nvm` 的默认 Node 成为优先命中的 `node`
+  - 验证 `nvm` 默认 Node
+    - `~/.nvm/versions/node/v20.19.5/bin/node`
+    - `arm64 v20.19.5`
+  - 备份旧共享依赖
+    - `node_modules -> node_modules_pre_arm64_rebuild_20260313`
+  - 用 arm64 Node **直接执行** npm CLI 重建共享依赖
+    - 避免出现“调用的是 nvm npm，但实际还是被 x64 node 启动”的假修复
+
+- **修复后验证**：
+  - `zsh -lic 'which node'`
+    - 命中 `~/.nvm/versions/node/v20.19.5/bin/node`
+  - `zsh -lic 'node -p process.arch'`
+    - 返回 `arm64`
+  - `node_modules/@rollup`
+    - 已存在 `rollup-darwin-arm64`
+    - 也补齐了 `rollup-darwin-x64`
+  - 前端启动成功
+    - `http://localhost:5178`
+  - 后端启动成功
+    - `http://0.0.0.0:3005`
+  - HTTP 健康验证通过
+    - `GET http://127.0.0.1:5178 -> 200`
+    - `GET http://127.0.0.1:3005/api/version -> {"version":"v3.8.0"}`
+  - Director 真实 socket smoke 通过
+    - 输入：`把 1-2 改成 D`
+    - 返回正确确认卡：`将把 1-2 改为 D. 互联网素材`
+
+- **这一步的价值**：
+  - 这次治理修复的是**整体 DeliveryConsole 本机环境**，不只是 `director0309` 分支
+  - 后续其他 worktree 也会直接受益
+  - 同时已经把这类坑写进规则，后面的人遇到同类报错会先查运行时架构，而不是先怀疑业务代码
+
+### 2026-03-13 上午补充 2：根据用户手测反馈，纠正 Phase2 头部文案与模型配置边界
+
+- **用户现场反馈**：
+  1. Director Chatbox 在切换全局模型后报 `Model Not Exist`
+  2. ChatPanel 里的 `Phase 2 宿主审阅状态` 头部没有意义，要求删除
+  3. 左侧 `Phase 2 是逐条审阅流程... / 当前审阅条目...` 顶部提示没有意义，要求删除
+  4. `internet-clip` 需要明确的用户上传入口
+  5. 模型配置不能再出现隐藏硬编码，聊天链路应统一跟随系统全局配置
+
+- **根因确认**：
+  - Chatbox 报错并不是 Director Skill 失效，而是全局 LLM 配置出现了 `provider/model` 错配：
+    - `provider = deepseek`
+    - `model = kimi-k2.5`
+  - 配置页此前只改单个 provider 字段，model/baseUrl 没有一起切换，导致请求被远端网关拒绝
+  - 同时 `.agent/config/llm_config.json` 中仍残留 `experts.director.llm`，虽然当前聊天入口并不读取它，但这会误导操作者，以为 Director 还绑着单独模型
+
+- **本轮修正**：
+  - `src/components/LLMConfigPage.tsx`
+    - 切换全局 Provider 时，强制同步写入对应默认 `model + baseUrl`
+    - 专家配置页取消 LLM override 控件，直接显示“Chatbox 跟随全局系统配置”
+  - `server/llm-config.ts`
+    - 服务端加载与保存配置时，对 `provider/model/baseUrl` 做归一化
+    - 同时把残留的 `expert.llm` 统一清空，避免再次出现“界面一套、聊天实际另一套”的误导
+  - `server/index.ts`
+    - 聊天入口新增显式规则：`chat-stream` 统一读取全局网关，不走专家级 LLM 配置
+  - `.agent/config/llm_config.json`
+    - 当前已归一到：
+      - `global.provider = deepseek`
+      - `global.model = deepseek-chat`
+      - `experts.director.llm = null`
+  - `src/components/ChatPanel.tsx`
+    - 已删除 `Phase 2 宿主审阅状态` 卡片
+  - `src/components/director/Phase2View.tsx`
+    - 已删除顶部 `Phase 2 是逐条审阅流程...`
+    - 已删除 `当前审阅条目...` 顶部提示
+  - `src/components/director/ChapterCard.tsx`
+    - `internet-clip / user-capture` 改为始终显示上传入口，不再依赖勾选状态
+
+- **运行时复测**：
+  - Director chat socket smoke：
+    - 输入：`1-2请换成互联网素材`
+    - 返回：`将把 1-2 改为 D. 互联网素材`
+  - Remotion 预览：
+    - 后端日志已确认重新走 arm64 Node
+    - `thumb_ch1-ch1-opt1.png` 现场重新生成成功
+
+- **结论**：
+  - 这轮不是“Skill 坏了”，而是：
+    1. 全局模型切换联动没做完整
+    2. UI 错加了用户明确不认可的宿主提示头
+    3. 外部 Remotion 渲染一度命中旧 x64 进程
+  - 目前三条都已收口，并已写入 rules，避免后续再回退
+
+### 2026-03-13 上午补充 3：Fast Path 只负责直接确认，模糊情况必须回退 Director Skill
+
+- **用户再次明确边界**：
+  - `director-bridge.ts` 应理解 Director Skill 吐出的高层意图，而不是直接替代导演大师理解用户
+  - `Fast Path` 可以存在，但只能在“100%明确”的命令上提前命中
+  - 如果 `Fast Path` 不能稳定确认，就必须回退给 Director Skill 再判断一轮
+
+- **本轮修正**：
+  - `server/index.ts`
+    - 保留 Director `Fast Path`
+    - 但只在 `ready_to_confirm` 时才直接短路返回确认卡
+    - 如果 `Fast Path` 只得到模糊/冲突/待澄清结果，则继续走正常 `Director Skill -> Bridge` 链路
+
+- **最终链路约束**：
+  - 明确操作命令：
+    - `Fast Path -> Bridge -> Confirm`
+  - 非明确或边界不稳命令：
+    - `Director Skill -> Bridge -> Confirm / Clarify`
+
+- **价值**：
+  - 保留了明确改卡命令的速度
+  - 同时避免 `Fast Path` 直接抢答，破坏“导演大师先理解，再交给 Bridge 落盘”的产品感觉
+
+### 2026-03-13 上午补充 4：Fast Path 编排协议上抬为所有 Chatbox 的统一规则
+
+- **用户新增要求**：
+  - 这套 `Fast Path -> Skill fallback -> Bridge` 的逻辑不能只在 Director 生效
+  - 后续 `短视频大师 / 音乐总监 / 其他 Chatbox` 都应自动遵循同一套规则，不能每个场景再重申一遍
+
+- **本轮实现**：
+  - `server/expert-actions.ts`
+    - 为所有专家 adapter 新增可选钩子：
+      - `tryFastPath(latestUserMessage, projectRoot)`
+    - 语义约束：
+      - 只有能直接确认时才返回
+      - 不能确认就返回 `null`，交还给专家 Skill
+  - `server/index.ts`
+    - `chat-stream` 改为统一先尝试：
+      - `adapter?.tryFastPath(...)`
+    - 命中后统一发确认卡
+    - 未命中则继续正常 `Skill -> Tool/Bridge` 流程
+  - `server/expert-actions/director.ts`
+    - Director 的 `Fast Path` 改为 adapter 级实现，不再把特例写死在 chat-stream 里
+
+- **意义**：
+  - 这条规则现在已经从“Director 的特殊修补”升级为“Chatbox 基础编排协议”
+  - 后续给 Shorts/Music/Thumbnail 接 `Fast Path` 时，只需要在各自 adapter 里实现，不必再改一遍总线逻辑
+
+### 2026-03-13 上午补充 5：Chatbox 基础设施第一轮落地
+
+- **本轮目标**：
+  - 不再只修 Director 单点体验，而是把 Chatbox 往“全专家共用底座”推进一轮
+  - 优先收口三件基础设施：
+    1. 待确认卡持久化/恢复
+    2. 所有专家先加载自己的 Skill
+    3. ChatPanel 通用文案与状态机去专家硬编码
+
+- **实现内容**：
+  - `server/index.ts`
+    - 新增 `emitAndPersistActionConfirm(...)`
+    - 无论是 `Fast Path`、Director Bridge 还是普通工具调用，只要发出确认卡，就同步写入 chat history
+    - `chat-action-execute` 改为接收前端传回的 `historyMessages`，执行成功后基于最新历史追加系统执行结果
+  - `src/components/ChatPanel.tsx`
+    - 确认执行时：
+      - 先把卡片状态改成 `confirmed`
+      - 立即 `chat-save`
+      - 再发 `chat-action-execute`
+    - 取消执行时：
+      - 同步把卡片状态改成 `cancelled`
+      - 立即 `chat-save`
+    - 头部说明文案改为动态专家名，不再写死“影视导演 Skill”
+    - 修复流式报错时 `streamingContentRef` 未清空的问题，避免旧半截回答被误刷回聊天历史
+    - 发送带图消息时，将消息内渲染 URL 转为可直接显示的数据 URL，同时释放未发送附件的 blob URL
+    - 历史恢复后若附件只剩占位符，不再渲染坏图，而是显示文件名块
+  - `server/chat.ts`
+    - `saveChatHistory()` 对附件同时清理 `base64` 和 `previewUrl`，避免历史文件里残留大块图片数据或失效 blob URL
+    - `loadExpertContext()` 改为统一走 `buildExpertChatSystemPrompt(expertId)`
+  - `server/skill-loader.ts`
+    - 新增 `buildExpertChatSystemPrompt(expertId)`
+    - Director 继续使用专属 `chat_edit` prompt + resources
+    - Music/Shorts/Thumbnail/Marketing/Writer 至少先加载各自 `SKILL.md`，外加通用 Chatbox 协作包装
+
+- **验证结果**：
+  - 定向测试：
+    - `src/components/ChatPanel.test.tsx`
+    - `src/__tests__/director-bridge.test.ts`
+    - `src/components/director/ChapterCard.test.tsx`
+    - `src/__tests__/schemas/llm-config.test.ts`
+    - 合计 `22/22` 全通过
+  - Director 运行时 smoke：
+    - 输入：`1-2我自己有视频待上传，请改成互联网素材`
+    - 返回：`将把 1-2 改为 D. 互联网素材，并保留用户上传入口`
+
+- **结论**：
+  - 这轮已经不只是 Director 修补，而是 Chatbox 基础设施第一次真正抽成“全专家共用底座”
+  - 即便后续还有瑕疵，这一轮也值得先 checkpoint 保存，方便后续在 Music/Shorts/Marketing 上继续横向扩

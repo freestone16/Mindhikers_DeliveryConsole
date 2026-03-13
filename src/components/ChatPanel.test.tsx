@@ -100,4 +100,88 @@ describe('ChatPanel', () => {
     expect(screen.getByText('第 1 章 · 方案 4')).toBeInTheDocument();
     expect(screen.getByText('type -> internet-clip')).toBeInTheDocument();
   });
+
+  it('renders clarification as a system card instead of an assistant chat bubble', async () => {
+    const socket = createMockSocket();
+
+    render(
+      <ChatPanel
+        isOpen={true}
+        onToggle={() => {}}
+        expertId="Director"
+        projectId="CSET-Seedance2"
+        socket={socket}
+      />
+    );
+
+    await act(async () => {
+      socket.trigger('chat-confirmation', {
+        expertId: 'Director',
+        message: '你同时表达了“D. 互联网素材”和“E. 我自己上传”，请明确保留哪一种。',
+      });
+    });
+
+    expect(screen.getByText('系统澄清')).toBeInTheDocument();
+    expect(screen.getByText('你同时表达了“D. 互联网素材”和“E. 我自己上传”，请明确保留哪一种。')).toBeInTheDocument();
+  });
+
+  it('persists confirm cards before executing actions', async () => {
+    const socket = createMockSocket();
+
+    render(
+      <ChatPanel
+        isOpen={true}
+        onToggle={() => {}}
+        expertId="Director"
+        projectId="CSET-Seedance2"
+        socket={socket}
+      />
+    );
+
+    await act(async () => {
+      socket.trigger('chat-action-confirm', {
+        expertId: 'Director',
+        confirmId: 'confirm_1',
+        actionName: 'update_option_fields',
+        actionArgs: { chapterId: 'ch1', optionId: 'ch1-opt2', updates: { type: 'internet-clip' } },
+        title: '确认修改',
+        description: '将把 1-2 改为 D. 互联网素材',
+      });
+    });
+
+    fireEvent.click(screen.getByText('确认执行'));
+
+    expect(socket.emitted.some(entry => entry.event === 'chat-save')).toBe(true);
+    expect(socket.emitted.some(entry => entry.event === 'chat-action-execute')).toBe(true);
+  });
+
+  it('persists cancelled confirm cards', async () => {
+    const socket = createMockSocket();
+
+    render(
+      <ChatPanel
+        isOpen={true}
+        onToggle={() => {}}
+        expertId="Director"
+        projectId="CSET-Seedance2"
+        socket={socket}
+      />
+    );
+
+    await act(async () => {
+      socket.trigger('chat-action-confirm', {
+        expertId: 'Director',
+        confirmId: 'confirm_2',
+        actionName: 'update_option_fields',
+        actionArgs: { chapterId: 'ch1', optionId: 'ch1-opt2', updates: { type: 'internet-clip' } },
+        title: '确认修改',
+        description: '将把 1-2 改为 D. 互联网素材',
+      });
+    });
+
+    fireEvent.click(screen.getByText('取消'));
+
+    expect(socket.emitted.some(entry => entry.event === 'chat-save')).toBe(true);
+    expect(screen.getByText('✕ 已取消')).toBeInTheDocument();
+  });
 });

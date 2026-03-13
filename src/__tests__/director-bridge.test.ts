@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveDirectorBridgeAction } from '../../server/director-bridge';
+import { resolveDirectorBridgeAction, tryResolveDirectorFastPath } from '../../server/director-bridge';
 
 const tempDirs: string[] = [];
 
@@ -82,7 +82,7 @@ describe('resolveDirectorBridgeAction', () => {
     });
   });
 
-  it('maps 我自己上传 to user-capture', () => {
+  it('asks for clarification when only upload intent is provided', () => {
     const projectRoot = createProjectRoot();
 
     const result = resolveDirectorBridgeAction({
@@ -90,6 +90,21 @@ describe('resolveDirectorBridgeAction', () => {
       targetRef: '1-1',
       userRequest: '把 1-1 改成我自己上传',
       requestedTypeLabel: '我自己上传',
+    }, projectRoot);
+
+    expect(result.status).toBe('needs_clarification');
+    expect(result.clarification?.message).toContain('D. 互联网素材');
+    expect(result.clarification?.message).toContain('E. 用户截图/录屏');
+  });
+
+  it('maps 截图录屏 to user-capture when the type is explicit', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = resolveDirectorBridgeAction({
+      intentType: 'change_type',
+      targetRef: '1-1',
+      userRequest: '把 1-1 改成截图录屏',
+      requestedTypeLabel: '截图录屏',
     }, projectRoot);
 
     expect(result.status).toBe('ready_to_confirm');
@@ -100,7 +115,7 @@ describe('resolveDirectorBridgeAction', () => {
     });
   });
 
-  it('returns needs_clarification when conflicting type aliases appear together', () => {
+  it('treats internet-clip + upload intent as a single internet-clip decision', () => {
     const projectRoot = createProjectRoot();
 
     const result = resolveDirectorBridgeAction({
@@ -110,11 +125,30 @@ describe('resolveDirectorBridgeAction', () => {
       requestedTypeLabel: '互联网素材，我自己上传',
     }, projectRoot);
 
+    expect(result.status).toBe('ready_to_confirm');
+    expect(result.confirmCard?.summary).toContain('保留用户上传入口');
+    expect(result.executionPlan?.actionArgs).toMatchObject({
+      updates: {
+        type: 'internet-clip',
+      },
+    });
+  });
+
+  it('returns needs_clarification when true type aliases still conflict', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = resolveDirectorBridgeAction({
+      intentType: 'change_type',
+      targetRef: '1-1',
+      userRequest: '把 1-1 改成互联网素材，改成截图录屏',
+      requestedTypeLabel: '互联网素材，截图录屏',
+    }, projectRoot);
+
     expect(result.status).toBe('needs_clarification');
     expect(result.clarification?.reason).toBe('type_conflict');
     expect(result.clarification?.choices).toEqual([
       'D. 互联网素材',
-      'E. 我自己上传',
+      'E. 用户截图/录屏',
     ]);
   });
 
@@ -188,5 +222,15 @@ describe('resolveDirectorBridgeAction', () => {
         },
       },
     });
+  });
+
+  it('fast-path resolves direct type change requests before LLM reasoning', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = tryResolveDirectorFastPath('1-2我自己有视频待上传，请改成互联网素材', projectRoot);
+
+    expect(result?.status).toBe('ready_to_confirm');
+    expect(result?.confirmCard?.summary).toContain('D. 互联网素材');
+    expect(result?.confirmCard?.summary).toContain('保留用户上传入口');
   });
 });

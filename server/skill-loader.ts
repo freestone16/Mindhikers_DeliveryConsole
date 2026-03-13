@@ -18,6 +18,15 @@ const SKILL_SEARCH_PATHS = [
 const skillCache = new Map<string, { content: string; loadedAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5分钟缓存
 
+const EXPERT_SKILL_MAP: Record<string, { skillName: string; displayName: string }> = {
+    Director: { skillName: 'Director', displayName: '影视导演大师' },
+    MusicDirector: { skillName: 'MusicDirector', displayName: '音乐总监' },
+    ThumbnailMaster: { skillName: 'ThumbnailMaster', displayName: '缩略图大师' },
+    MarketingMaster: { skillName: 'MarketingMaster', displayName: '营销大师' },
+    ShortsMaster: { skillName: 'ShortsMaster', displayName: '短视频大师' },
+    Writer: { skillName: 'Writer', displayName: '写作大师' },
+};
+
 /**
  * 从 Antigravity 技能库加载指定技能的 SKILL.md 内容
  * @param skillName 技能名称（目录名），如 'RemotionStudio', 'Director' 等
@@ -67,24 +76,24 @@ export function loadMultipleSkills(skillNames: string[]): string {
 
 /**
  * 从 Director Skill 目录加载指定的 prompt 模板文件
- * @param promptName 模板名称（不含扩展名），如 'concept', 'broll', 'revise'
+ * @param promptName 模板名称（不含扩展名），如 'concept', 'broll', 'revise', 'chat_edit'
  * @returns 模板内容，找不到则返回空字符串
  */
-function loadDirectorPrompt(promptName: string): string {
+function loadSkillPrompt(skillName: string, promptName: string): string {
     for (const basePath of SKILL_SEARCH_PATHS) {
         if (!basePath) continue;
-        const promptPath = path.join(basePath, 'Director', 'prompts', `${promptName}.md`);
+        const promptPath = path.join(basePath, skillName, 'prompts', `${promptName}.md`);
         if (fs.existsSync(promptPath)) {
             try {
                 const content = fs.readFileSync(promptPath, 'utf-8');
-                console.log(`[SkillLoader] ✅ Loaded Director prompt "${promptName}" from ${basePath}`);
+                console.log(`[SkillLoader] ✅ Loaded ${skillName} prompt "${promptName}" from ${basePath}`);
                 return content;
             } catch (err: any) {
                 console.warn(`[SkillLoader] ⚠️ Failed to read ${promptPath}:`, err.message);
             }
         }
     }
-    console.warn(`[SkillLoader] ❌ Director prompt "${promptName}" not found`);
+    console.warn(`[SkillLoader] ❌ ${skillName} prompt "${promptName}" not found`);
     return '';
 }
 
@@ -122,24 +131,28 @@ function loadDirectorResource(resourceName: string): string {
  * Prompt 模板中的占位符会被自动替换：
  * - {{DIRECTOR_SKILL}} → SKILL.md 内容
  * - {{REMOTION_CATALOG}} → resources/remotion_catalog.md 内容
- * - {{CANVAS_DESIGN_ESSENCE}} → canvas-design 美学哲学（可选注入）
+ * - {{AESTHETICS_GUIDELINE}} / {{CANVAS_DESIGN_ESSENCE}} → 美学哲学
+ * - {{ARTLIST_DICTIONARY}} → Artlist 词库协议
  */
-export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revise'): string {
+export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revise' | 'chat_edit'): string {
     // 1. 加载 Director 核心知识（SKILL.md）
     const directorSkill = loadSkillKnowledge('Director');
 
     // 2. 加载对应任务的 prompt 模板
-    const promptTemplate = loadDirectorPrompt(taskType);
+    const promptTemplate = loadSkillPrompt('Director', taskType);
 
     if (promptTemplate) {
         // 3. 加载 resources 用于占位符替换
         const remotionCatalog = loadDirectorResource('remotion_catalog');
         const aestheticsGuideline = loadDirectorResource('aesthetics_guideline');
+        const artlistDictionary = loadDirectorResource('artlist_dictionary');
 
         // 4. 替换占位符
         const resolved = promptTemplate
             .replace(/\{\{DIRECTOR_SKILL\}\}/g, directorSkill)
             .replace(/\{\{REMOTION_CATALOG\}\}/g, remotionCatalog)
+            .replace(/\{\{ARTLIST_DICTIONARY\}\}/g, artlistDictionary)
+            .replace(/\{\{AESTHETICS_GUIDELINE\}\}/g, aestheticsGuideline)
             .replace(/\{\{CANVAS_DESIGN_ESSENCE\}\}/g, aestheticsGuideline);
 
         console.log(`[SkillLoader] 🎬 Director prompt "${taskType}" assembled (${resolved.length} chars)`);
@@ -160,6 +173,47 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
     }
     const baseContext = legacyContent || directorSkill || loadSkillKnowledge('RemotionStudio');
     return baseContext;
+}
+
+export function buildExpertChatSystemPrompt(expertId: string): string {
+    if (expertId === 'Director') {
+        return buildDirectorSystemPrompt('chat_edit');
+    }
+
+    const expert = EXPERT_SKILL_MAP[expertId];
+    if (!expert) {
+        return '';
+    }
+
+    const promptTemplate = loadSkillPrompt(expert.skillName, 'chat_edit') || loadSkillPrompt(expert.skillName, 'chat');
+    const skillKnowledge = loadSkillKnowledge(expert.skillName);
+
+    if (promptTemplate) {
+        return promptTemplate
+            .replace(/\{\{SKILL\}\}/g, skillKnowledge)
+            .replace(/\{\{EXPERT_SKILL\}\}/g, skillKnowledge)
+            .replace(/\{\{EXPERT_NAME\}\}/g, expert.displayName);
+    }
+
+    if (skillKnowledge) {
+        return `${skillKnowledge}
+
+================================
+
+你当前处于 DeliveryConsole 的 ${expert.displayName} Chatbox 协作态。
+
+你的任务是：
+1. 先以该专家身份理解用户原话
+2. 如果是明确可执行的修改，就优先调用系统提供的工具
+3. 如果信息不足，再用简短中文追问
+
+注意：
+- 不要冒充系统确认、执行结果或内部日志
+- 不要暴露底层 patch 结构
+- 你的回复应该保持专家本人风格，而不是通用客服口吻`;
+    }
+
+    return '';
 }
 
 /**

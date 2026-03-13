@@ -228,6 +228,24 @@
 91. **DeliveryConsole 只负责桥梁与宿主职责**：承接 Skill 输出、翻译项目状态、驱动 UI 呈现，不替专家本体做内容判断与专业决策
 92. **Director Skill 不负责项目语义映射**：`1-4 -> chapterId/optionId`、`A-F -> 内部 type`、类型别名与冲突判定都属于 DeliveryConsole 桥梁层；导演 Skill 只负责导演意图理解与专业判断
 93. **Skill 与 Adapter 必须隔着 Bridge 契约**：像 `update_option_fields/chapterId/optionId/updates.type` 这类执行层参数不能直接作为 Director Skill 的一线输出；Skill 只产出高层意图，Bridge 再翻译成底层 patch
+94. **Director ChatPanel 的会话原文就是用户与导演 Skill 的原话**：一个字不能差；但这段会话是嵌在 Phase2 宿主审阅工作流里的，不能把工作流控制权错塞给 Skill
+95. **Phase2 的流程控制语义必须由宿主 UI 接管**：像“这条 pass”“全部确认”“全部打勾”“进入 Phase3 渲染落盘”都属于 DeliveryConsole 工作流动作，不应当下沉给导演 Skill 解释或裁决
+96. **ChatPanel 的文本消息必须是用户与导演 Skill 的原话**：系统确认卡、执行结果、冲突澄清、工作流提示都必须作为独立系统卡片呈现，不能伪装成 Skill 聊天气泡
+97. **送回 LLM 的历史必须只包含会话原文**：`system_action/system_status` 这类系统卡片只给 UI 和工作流使用，不能污染用户与 Skill 的原始会话上下文
+98. **Phase2 宿主状态不要默认做成固定头部 banner**：`当前条目 1-2`、`已通过 3/7` 这类信息属于 workflow 数据，但用户已经否定 ChatPanel 头部卡片和左侧顶部提示条；未经再次确认，不要重新加回这些静态头部提示
+99. **Chatbox LLM 必须统一跟随全局系统配置**：DeliveryConsole 的聊天入口只读取 `global.provider/model/baseUrl`；不要保留专家级 LLM override，避免出现“界面显示一套、实际调用另一套”
+100. **切换全局 Provider 时，Provider / Model / BaseURL 必须联动更新**：不能只改单个字段；像 `deepseek + kimi-k2.5` 这种错配必须在 UI 保存时和服务端加载时双重归一化
+101. **`internet-clip` / `user-capture` 必须始终暴露上传入口**：这类非 AI 素材卡片不能等勾选后才显示上传按钮，用户要能先上传再决定是否确认
+102. **“互联网素材”是类型，“我自己上传/已有视频待上传”是交付方式，不是互斥类型**：当用户说“改成互联网素材，我自己上传”时，应落到 `D. 互联网素材` 并保留上传入口；不要把它和 `E. 用户截图/录屏` 判成冲突
+103. **所有 Chatbox 共用同一条 Fast Path 编排协议**：任何专家都允许实现 adapter 级 `tryFastPath`，但只能在“可直接确认”时短路返回确认卡；一旦不够确定，必须回退给对应专家 Skill，再由 Skill 支持 Bridge/Tool，不允许每个专家各写一套例外逻辑
+104. **Director 的显式改卡命令是这条通用协议的首个落地实例**：像 `1-2 改成互联网素材`、`1-2 我自己有视频待上传，请改成互联网素材` 这类清晰编辑请求，可以由 DeliveryConsole 直接解析并返回确认卡；一旦 Fast Path 只得到模糊/冲突/待澄清结果，必须回退给 Director Skill 再理解一轮，不能直接用系统澄清抢答
+105. **待确认卡必须在发出时就持久化到 chat history**：不能等用户点击确认或执行成功后才落盘；否则刷新、切专家或重开面板会丢失待确认动作
+106. **所有专家的 Chatbox 都必须先加载自己的 Skill，再谈统一交互**：不能只有 Director 走专属 Skill 注入，其他专家却退回“通用助手”兜底；Music/Shorts/Thumbnail/Marketing 至少应加载各自 `SKILL.md`
+107. **ChatPanel 文案与身份提示必须专家无关**：不允许再写死“影视导演 Skill”这类单专家文案；任何固定提示都要根据当前 expertId 动态生成，或直接删除
+108. **DeliveryConsole 的共享 `node_modules` 必须与默认 `node` 架构一致**：worktree 会向上复用 `/Users/luzhoua/DeliveryConsole/node_modules`；如果机器是 arm64，却让 shell 默认命中 x64 Node，就会把 Vite/Rollup/esbuild 这类原生依赖带进错架构状态
+109. **定位前端 dev server 原始报错时，先查 Node 架构再查业务代码**：像 `Cannot find module @rollup/rollup-darwin-x64` 这类错误，优先检查 `uname -m`、`node -p process.arch`、`which node` 与共享 `node_modules/@rollup`，不要先误判成分支代码坏了
+110. **用 nvm 修环境时，不能只调 npm，要确认 npm 背后的 node 也一致**：`npm` 脚本可能被当前 PATH 里的别的 `node` 启动；彻底重装依赖时，应直接用目标架构的 `node npm-cli.js install`，避免出现“npm 是 arm64，实际执行 node 仍是 x64”的假修复
+111. **RemotionStudio 这类外部技能渲染要显式走当前服务进程的 Node**：不要再依赖 `.bin` shebang；应直接调用 CLI 入口脚本并记录 `process.execPath`，这样才能看见并规避错架构进程导致的原生绑定失败
 
 ---
 

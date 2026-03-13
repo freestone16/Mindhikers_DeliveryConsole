@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
-import { buildDirectorSystemPrompt } from './skill-loader';
+import { buildExpertChatSystemPrompt } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
@@ -229,9 +229,7 @@ export function loadExpertContext(
         }
     }
 
-    const basePrompt = expertId === 'Director'
-        ? (buildDirectorSystemPrompt('chat_edit') || `你是${expertName}的助手。你正在帮助用户完成视频制作任务。`)
-        : `你是${expertName}的助手。你正在帮助用户完成视频制作任务。`;
+    const basePrompt = buildExpertChatSystemPrompt(expertId) || `你是${expertName}的助手。你正在帮助用户完成视频制作任务。`;
 
     const systemPrompt = `${basePrompt}
 当前专家产出目录: ${outputDir}
@@ -301,6 +299,7 @@ export function saveChatHistory(
         attachments: msg.attachments?.map(att => ({
             ...att,
             base64: `[image: ${att.name}]`,
+            previewUrl: `[image: ${att.name}]`,
         })),
     }));
 
@@ -327,6 +326,10 @@ export function formatMultimodalMessages(
     const supportsImages = ['openai', 'anthropic', 'google', 'siliconflow'].includes(provider);
 
     for (const msg of messages) {
+        if (msg.kind && msg.kind !== 'chat') {
+            continue;
+        }
+
         let textContent = msg.content;
 
         // Fix for Kimi / OpenAI strict validation: message with role 'assistant' must not be empty
