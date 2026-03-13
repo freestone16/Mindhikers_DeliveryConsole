@@ -32,6 +32,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const prevExpertIdRef = useRef<string | null>(null);
     const streamingContentRef = useRef('');
     const messagesRef = useRef<ChatMessage[]>([]);
+    const attachmentsRef = useRef<Attachment[]>([]);
 
     useEffect(() => {
         streamingContentRef.current = streamingContent;
@@ -41,6 +42,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         messagesRef.current = messages;
     }, [messages]);
 
+    useEffect(() => {
+        attachmentsRef.current = attachments;
+    }, [attachments]);
+
     const expert = EXPERTS.find(e => e.id === expertId);
     const expertName = expert?.name || expertId;
     const getMessageKind = (msg: ChatMessage) => msg.kind || (msg.role === 'system' ? 'system_status' : 'chat');
@@ -49,6 +54,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         messagesRef.current = nextMessages;
         setMessages(nextMessages);
     }, []);
+
+    const appendMessage = useCallback((message: ChatMessage) => {
+        const nextMessages = [...messagesRef.current, message];
+        setMessagesWithRef(nextMessages);
+    }, [setMessagesWithRef]);
+
+    const releaseAttachments = useCallback((items: Attachment[]) => {
+        items.forEach(att => {
+            if (att.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(att.previewUrl);
+            }
+        });
+    }, []);
+
     // 更新 ref
     useEffect(() => {
         currentExpertIdRef.current = expertId;
@@ -65,25 +84,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         const appendAssistantMessage = (content: string) => {
             if (!content) return;
-            setMessages(prev => [...prev, {
+            appendMessage({
                 id: `msg_${Date.now()}`,
                 role: 'assistant',
                 content,
                 kind: 'chat',
                 timestamp: new Date().toISOString(),
-            }]);
+            });
         };
 
         const appendSystemMessage = (content: string, systemTitle: string) => {
             if (!content) return;
-            setMessages(prev => [...prev, {
+            appendMessage({
                 id: `msg_${Date.now()}`,
                 role: 'system',
                 content,
                 kind: 'system_status',
                 systemTitle,
                 timestamp: new Date().toISOString(),
-            }]);
+            });
         };
 
         const flushStreamingMessage = () => {
@@ -124,7 +143,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 systemTitle: '系统错误',
                 timestamp: new Date().toISOString(),
             };
-            setMessages(msgs => [...msgs, errorMessage]);
+            appendMessage(errorMessage);
         };
 
         const handleChatWarning = ({ warning: msg, expertId: msgExpertId }: { warning: string; expertId: string }) => {
@@ -136,7 +155,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const handleChatHistory = ({ expertId: msgExpertId, messages: history }: { expertId: string; messages: ChatMessage[] }) => {
             if (msgExpertId !== currentExpertIdRef.current) return;
             console.log('Received chat history:', history.length, 'messages for', msgExpertId);
-            setMessages(history);
+            setMessagesWithRef(history);
         };
 
         const handleChatContextLoaded = ({ expertId: msgExpertId }: { expertId: string }) => {
@@ -164,7 +183,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             if (data.expertId !== currentExpertIdRef.current) return;
             flushStreamingMessage();
             setIsStreaming(false);
-            setMessages(prev => [...prev, {
+            appendMessage({
                 id: `msg_${Date.now()}`,
                 role: 'system',
                 content: '',
@@ -180,7 +199,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     diffLabel: data.diffLabel,
                     status: 'pending'
                 }
-            }]);
+            });
         };
 
         const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
@@ -212,7 +231,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.off('chat-action-confirm', handleChatActionConfirm);
             socket.off('chat-action-result', handleChatActionResult);
         };
-    }, [socket]);
+    }, [socket, appendMessage, setMessagesWithRef]);
+
+    useEffect(() => {
+        return () => {
+            releaseAttachments(attachmentsRef.current);
+        };
+    }, [releaseAttachments]);
 
     // Load history when expert changes
     useEffect(() => {
@@ -224,17 +249,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             // 重置状态
             setMessages([]);
+            messagesRef.current = [];
             setContextLoaded(false);
             setStreamingContent('');
             streamingContentRef.current = '';
             setIsStreaming(false);
+            releaseAttachments(attachments);
+            setAttachments([]);
 
             // 加载新专家的历史
             socket.emit('chat-load-history', { expertId, projectId });
 
             prevExpertIdRef.current = expertId;
         }
-    }, [expertId, projectId, socket, isOpen]);
+    }, [expertId, projectId, socket, isOpen, attachments, releaseAttachments]);
 
     // 首次打开时加载历史
     useEffect(() => {
@@ -264,13 +292,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 : undefined,
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        appendMessage(userMessage);
         setInputText('');
-        attachments.forEach(att => {
-            if (att.previewUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(att.previewUrl);
-            }
-        });
+        releaseAttachments(attachments);
         setAttachments([]);
         setIsStreaming(true);
         setStreamingContent('');
@@ -288,7 +312,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             expertId,
             projectId,
         });
-    }, [inputText, attachments, isStreaming, socket, contextLoaded, expertId, projectId]);
+    }, [inputText, attachments, isStreaming, socket, contextLoaded, expertId, projectId, appendMessage, releaseAttachments]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -385,7 +409,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const handleClearHistory = () => {
         if (!window.confirm('确定要清空对话历史吗？')) return;
         socket?.emit('chat-clear-history', { expertId, projectId });
-        setMessages([]);
+        setMessagesWithRef([]);
     };
 
     return (
@@ -415,13 +439,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </button>
                 </div>
             </div>
-
-            <div className="px-4 py-2 border-b border-slate-800/80 bg-slate-950/40">
-                <p className="text-[11px] text-slate-400">
-                    聊天气泡只展示你与 {expertName} Skill 的原话。系统确认、冲突澄清与执行结果会以下方系统卡片呈现。
-                </p>
-            </div>
-
             {/* Warning Toast */}
             {warning && (
                 <div className="mx-4 mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2">

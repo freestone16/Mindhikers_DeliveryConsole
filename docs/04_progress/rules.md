@@ -246,6 +246,9 @@
 109. **定位前端 dev server 原始报错时，先查 Node 架构再查业务代码**：像 `Cannot find module @rollup/rollup-darwin-x64` 这类错误，优先检查 `uname -m`、`node -p process.arch`、`which node` 与共享 `node_modules/@rollup`，不要先误判成分支代码坏了
 110. **用 nvm 修环境时，不能只调 npm，要确认 npm 背后的 node 也一致**：`npm` 脚本可能被当前 PATH 里的别的 `node` 启动；彻底重装依赖时，应直接用目标架构的 `node npm-cli.js install`，避免出现“npm 是 arm64，实际执行 node 仍是 x64”的假修复
 111. **RemotionStudio 这类外部技能渲染要显式走当前服务进程的 Node**：不要再依赖 `.bin` shebang；应直接调用 CLI 入口脚本并记录 `process.execPath`，这样才能看见并规避错架构进程导致的原生绑定失败
+112. **Chatbox 的持久化待确认卡必须可恢复、可继续执行**：`system_action` 从历史恢复后仍然要保持“确认/取消”可用，不能只把卡渲染出来却丢失最新 `messagesRef/historyMessages`
+113. **ChatPanel 不要再堆固定说明条**：用户已明确否定这类顶部引导 banner；后续若需说明边界，应优先用更轻的空态、占位符或按需提示，而不是长期占位的静态说明条
+114. **附件 blob URL 必须在发送、切专家和卸载时释放**：Chatbox 长时间贴图会频繁创建 `ObjectURL`；若不在这些节点显式 `revokeObjectURL`，前端会持续泄漏内存
 
 ---
 

@@ -184,4 +184,48 @@ describe('ChatPanel', () => {
     expect(socket.emitted.some(entry => entry.event === 'chat-save')).toBe(true);
     expect(screen.getByText('✕ 已取消')).toBeInTheDocument();
   });
+
+  it('executes a pending confirmation restored from chat history', async () => {
+    const socket = createMockSocket();
+
+    render(
+      <ChatPanel
+        isOpen={true}
+        onToggle={() => {}}
+        expertId="Director"
+        projectId="CSET-Seedance2"
+        socket={socket}
+      />
+    );
+
+    await act(async () => {
+      socket.trigger('chat-history', {
+        expertId: 'Director',
+        messages: [
+          {
+            id: 'sys_1',
+            role: 'system',
+            content: '',
+            kind: 'system_action',
+            timestamp: new Date().toISOString(),
+            actionConfirm: {
+              confirmId: 'confirm_from_history',
+              actionName: 'update_option_fields',
+              actionArgs: { chapterId: 'ch1', optionId: 'ch1-opt2', updates: { type: 'internet-clip' } },
+              description: '将把 1-2 改为 D. 互联网素材',
+              title: '确认修改',
+              status: 'pending',
+            },
+          },
+        ],
+      });
+    });
+
+    fireEvent.click(screen.getByText('确认执行'));
+
+    const executePayload = socket.emitted.find(entry => entry.event === 'chat-action-execute')?.payload;
+    expect(executePayload).toBeTruthy();
+    expect(executePayload.historyMessages).toHaveLength(1);
+    expect(executePayload.historyMessages[0].actionConfirm.status).toBe('confirmed');
+  });
 });

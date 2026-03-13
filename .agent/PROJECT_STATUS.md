@@ -3,7 +3,7 @@
 > 最后更新: 2026-03-13  
 > 分支: `director0309`
 > 最新里程碑: `v4.1.0` (Director 主线修复与 Chatbox 基础设施落地)
-> 最新 Commit: `1a7bea5`
+> 最新 Commit: `79d38b0`
 
 ---
 
@@ -47,6 +47,7 @@
 - **2026-03-13**: ✅ 根据用户手测回正产品细节：删除 `Phase 2 宿主审阅状态` 与左侧顶部提示条；`internet-clip/user-capture` 卡片改为始终暴露上传入口。
 - **2026-03-13**: ✅ 聊天模型边界收紧：Chatbox 显式统一跟随全局 LLM 网关，专家级 LLM override 已从配置与配置页清空，避免再次出现 `provider/model` 脱节。
 - **2026-03-13**: ✅ Chatbox 基础设施第一轮落地：待确认卡在发出时即持久化；`chat-action-execute` 改为基于最新历史写回；所有专家 Chatbox 至少先加载各自 `SKILL.md`，不再只有 Director 有专家脑子。
+- **2026-03-13**: ✅ Chatbox 基础设施第二轮收口：移除 ChatPanel 固定说明条；历史恢复的待确认卡继续可执行；附件 blob URL 在发送/切专家/卸载三处统一释放。
 - **2026-03-12**: ✅ Director `chat_edit` prompt 已切到 Bridge 契约，不再指导模型直接产出 `update_option_fields/chapterId/optionId/updates.*` 底层参数。
 - **2026-03-12**: 📝 明确 Director 正确边界应为 `Skill + 桥梁层 + UI` 三段式；下一轮将优先补桥梁层，不再让 Skill 直接承担项目内部 patch 语义。
 - **2026-03-12**: ✅ Director Skill 注入链路整改完成：新增 `chat_edit` prompt，Chatbox 已改为加载 Antigravity Director Skill，系统层 TextReveal/no-wrap 兜底已回退。

@@ -2065,3 +2065,33 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **结论**：
   - 这轮已经不只是 Director 修补，而是 Chatbox 基础设施第一次真正抽成“全专家共用底座”
   - 即便后续还有瑕疵，这一轮也值得先 checkpoint 保存，方便后续在 Music/Shorts/Marketing 上继续横向扩
+
+### 2026-03-13 上午补充 6：Chatbox 基础设施第二轮收口
+
+- **本轮目标**：
+  - 不再扩新功能，先把上一轮通用底座里最容易留下尾巴的状态机问题收紧
+  - 重点是：
+    1. 去掉固定说明条，避免 ChatPanel 再次变成“头部堆提示”的产品形态
+    2. 让从 chat history 恢复出来的待确认卡可以继续确认执行
+    3. 把附件 `ObjectURL` 的释放时机补完整，避免长时间使用 chatbox 时内存继续涨
+
+- **代码实现**：
+  - `src/components/ChatPanel.tsx`
+    - 去掉顶部固定说明条，恢复更轻的面板结构
+    - 把 `setMessagesWithRef` 进一步扩成 `appendMessage`，让 socket 回调、历史恢复、发送消息都同步刷新 `messagesRef`
+    - `chat-history` 改为走 `setMessagesWithRef(history)`，避免“历史卡片渲染了，但 ref 里还是旧消息”的窗口期
+    - `handleClearHistory` 也同步清空 `messagesRef`
+    - 新增 `attachmentsRef` 与统一 `releaseAttachments()`，在以下三处显式释放 blob URL：
+      - 发送后
+      - 切换专家时
+      - 组件卸载时
+  - `src/components/ChatPanel.test.tsx`
+    - 新增回归测试：从 `chat-history` 恢复的 `system_action` 待确认卡仍可点击“确认执行”
+    - 断言 `chat-action-execute.historyMessages` 中会带着最新的 `confirmed` 状态一起发回服务端
+
+- **验证结果**：
+  - `src/components/ChatPanel.test.tsx`：6/6 通过
+
+- **结论**：
+  - 这轮补的是 Chatbox 的“历史恢复可操作性”和“长时间使用稳定性”
+  - 做完后，Chatbox 这块可以先作为第二个基础 checkpoint 存下来，再把注意力切回导演主线
