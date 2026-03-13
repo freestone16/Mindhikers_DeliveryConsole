@@ -121,6 +121,8 @@ const UPLOAD_INTENT_LABELS = [
 ];
 
 const TYPE_CHANGE_VERBS = ['改成', '换成', '改为', '变成', '切成', '切到', '转成', '换为', '改'];
+const TYPE_TARGET_VERBS = ['改成', '换成', '改为', '变成', '切成', '切到', '转成', '换为'];
+const TYPE_NEGATION_PREFIXES = ['不需要', '不要', '不用', '别用', '别再用', '不是', '去掉', '移除'];
 
 const TEMPLATE_ALIASES: Array<{ template: string; labels: string[]; requiresStructuredProps?: boolean }> = [
   { template: 'TextReveal', labels: ['textreveal', 'text reveal', '金句模板', '文字揭示', '文字揭示动画', '金句动画'] },
@@ -284,8 +286,13 @@ function resolveTypeChange(
   const labelSource = `${input.requestedTypeLabel || ''} ${input.userRequest || ''}`.trim();
   const matches = extractTypeMatches(labelSource);
   const hasUploadIntent = detectUploadIntent(labelSource);
+  const negatedMatches = extractNegatedTypeMatches(labelSource);
+  const preferredMatches = filterNegatedTypeMatches(
+    extractPreferredTypeMatches(labelSource),
+    negatedMatches
+  );
 
-  if (matches.length === 0) {
+  if (preferredMatches.length === 0 && matches.length === 0) {
     return {
       status: 'needs_clarification',
       target,
@@ -298,7 +305,25 @@ function resolveTypeChange(
     };
   }
 
-  const normalizedMatch = normalizeTypeMatches(matches, hasUploadIntent);
+  const survivingMatches = preferredMatches.length > 0
+    ? preferredMatches
+    : filterNegatedTypeMatches(matches, negatedMatches);
+
+  if (survivingMatches.length === 0 && negatedMatches.length > 0) {
+    return {
+      status: 'needs_clarification',
+      target,
+      clarification: {
+        reason: 'ambiguous_alias',
+        message: `我理解你是不要 ${negatedMatches.map(match => `“${TYPE_DISPLAY[match]}”`).join(' 和 ')}，但还需要确认要替换成哪一种。请直接说 A-F，或说“互联网素材 / 用户截图录屏 / 文生视频 / Remotion / 信息图”。`,
+      },
+    };
+  }
+
+  const normalizedMatch = normalizeTypeMatches(
+    survivingMatches.length > 0 ? survivingMatches : matches,
+    hasUploadIntent
+  );
   if (normalizedMatch.length > 1) {
     return {
       status: 'needs_clarification',
@@ -600,6 +625,33 @@ function extractTypeMatches(source: string): Array<Exclude<BRollType, 'generativ
   return Array.from(matches);
 }
 
+function extractPreferredTypeMatches(source: string): Array<Exclude<BRollType, 'generative'>> {
+  const matches = new Set<Exclude<BRollType, 'generative'>>();
+
+  for (const verb of TYPE_TARGET_VERBS) {
+    const segments = source.split(verb).slice(1);
+    for (const segment of segments) {
+      extractTypeMatches(segment).forEach(match => matches.add(match));
+    }
+  }
+
+  return Array.from(matches);
+}
+
+function extractNegatedTypeMatches(source: string): Array<Exclude<BRollType, 'generative'>> {
+  const matches = new Set<Exclude<BRollType, 'generative'>>();
+
+  for (const prefix of TYPE_NEGATION_PREFIXES) {
+    const segments = source.split(prefix).slice(1);
+    for (const segment of segments) {
+      const scopedSegment = segment.split(/[，,。；;\n]/)[0] || segment;
+      extractTypeMatches(scopedSegment).forEach(match => matches.add(match));
+    }
+  }
+
+  return Array.from(matches);
+}
+
 function detectUploadIntent(source: string): boolean {
   const normalized = normalizeText(source);
   return UPLOAD_INTENT_LABELS.some(label => normalized.includes(normalizeText(label)));
@@ -623,6 +675,18 @@ function normalizeTypeMatches(
   }
 
   return uniqueMatches;
+}
+
+function filterNegatedTypeMatches(
+  matches: Array<Exclude<BRollType, 'generative'>>,
+  negatedMatches: Array<Exclude<BRollType, 'generative'>>
+): Array<Exclude<BRollType, 'generative'>> {
+  if (negatedMatches.length === 0) {
+    return Array.from(new Set(matches));
+  }
+
+  const negatedSet = new Set(negatedMatches);
+  return Array.from(new Set(matches.filter(match => !negatedSet.has(match))));
 }
 
 function normalizeText(value: string): string {

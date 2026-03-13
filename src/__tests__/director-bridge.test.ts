@@ -134,6 +134,42 @@ describe('resolveDirectorBridgeAction', () => {
     });
   });
 
+  it('treats negated old type + target type as a replacement instead of a conflict', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = resolveDirectorBridgeAction({
+      intentType: 'change_type',
+      targetRef: '1-2',
+      userRequest: '1-2 不需要文生视频，请改成互联网素材，我自己上传',
+      requestedTypeLabel: '不需要文生视频，改成互联网素材，我自己上传',
+    }, projectRoot);
+
+    expect(result.status).toBe('ready_to_confirm');
+    expect(result.confirmCard?.summary).toContain('D. 互联网素材');
+    expect(result.confirmCard?.summary).toContain('保留用户上传入口');
+    expect(result.executionPlan?.actionArgs).toMatchObject({
+      updates: {
+        type: 'internet-clip',
+      },
+    });
+  });
+
+  it('asks for the replacement type when the user only negates the current type', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = resolveDirectorBridgeAction({
+      intentType: 'change_type',
+      targetRef: '1-2',
+      userRequest: '1-2 不要文生视频了',
+      requestedTypeLabel: '不要文生视频了',
+    }, projectRoot);
+
+    expect(result.status).toBe('needs_clarification');
+    expect(result.clarification?.message).toContain('不要');
+    expect(result.clarification?.message).toContain('B. 文生视频');
+    expect(result.clarification?.message).toContain('替换成哪一种');
+  });
+
   it('returns needs_clarification when true type aliases still conflict', () => {
     const projectRoot = createProjectRoot();
 
@@ -228,6 +264,16 @@ describe('resolveDirectorBridgeAction', () => {
     const projectRoot = createProjectRoot();
 
     const result = tryResolveDirectorFastPath('1-2我自己有视频待上传，请改成互联网素材', projectRoot);
+
+    expect(result?.status).toBe('ready_to_confirm');
+    expect(result?.confirmCard?.summary).toContain('D. 互联网素材');
+    expect(result?.confirmCard?.summary).toContain('保留用户上传入口');
+  });
+
+  it('fast-path understands replacement syntax with negated old type', () => {
+    const projectRoot = createProjectRoot();
+
+    const result = tryResolveDirectorFastPath('1-2不需要文生视频，请改成互联网素材，我自己上传', projectRoot);
 
     expect(result?.status).toBe('ready_to_confirm');
     expect(result?.confirmCard?.summary).toContain('D. 互联网素材');

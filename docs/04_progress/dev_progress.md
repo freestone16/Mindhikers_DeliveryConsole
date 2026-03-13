@@ -2095,3 +2095,91 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **结论**：
   - 这轮补的是 Chatbox 的“历史恢复可操作性”和“长时间使用稳定性”
   - 做完后，Chatbox 这块可以先作为第二个基础 checkpoint 存下来，再把注意力切回导演主线
+
+### 2026-03-13 中午补充：Director 类型替换语义修正
+
+- **触发背景**：
+  - 用户真实手测句式：`1-2 不需要文生视频，请改成互联网素材，我自己上传`
+  - 现场错误表现：
+    - 系统把 `文生视频` 和 `互联网素材` 同时记成候选类型
+    - 直接报 `B / D` 类型冲突
+  - 用户当场纠正的边界是对的：
+    - Director Skill 不应该负责理解 DeliveryConsole 的项目语义
+    - 宿主/Bridge 必须自己理解“不要 X，改成 Y”这类编辑命令
+
+- **代码修正**：
+  - `server/director-bridge.ts`
+    - 新增 `TYPE_TARGET_VERBS` 与 `TYPE_NEGATION_PREFIXES`
+    - 新增：
+      - `extractPreferredTypeMatches()`
+      - `extractNegatedTypeMatches()`
+      - `filterNegatedTypeMatches()`
+    - `resolveTypeChange()` 现在改成三步：
+      1. 先提取被明确指定的目标类型（如 `改成互联网素材`）
+      2. 再提取被否定/被替换掉的旧类型（如 `不需要文生视频`）
+      3. 冲突判定前先扣除旧类型和上传意图
+    - 如果用户只说“不要文生视频”，但没说换成什么，则改为追问“替换成哪一种”，不再误报冲突
+  - `src/__tests__/director-bridge.test.ts`
+    - 补了 3 条回归：
+      - `不需要文生视频，请改成互联网素材，我自己上传` -> 直接 ready_to_confirm
+      - `不要文生视频了` -> needs_clarification，追问新类型
+      - fast path 也要支持这类替换句式
+
+- **验证结果**：
+  - `src/__tests__/director-bridge.test.ts`：12/12 通过
+  - 本地 `3005` 真实 socket smoke：
+    - 输入：`1-2 不需要文生视频，请改成互联网素材，我自己上传`
+    - 返回：`将把 1-2 改为 D. 互联网素材，并保留用户上传入口`
+
+- **结论**：
+  - 这次修复不是“再让导演大师兜底”
+  - 而是把宿主层对项目编辑语义的理解补正确了
+  - 后续这套“否定旧值 + 指定新值”的替换解析应继续抽成所有 chatbox 的通用宿主能力
+
+### 2026-03-13 下午补充：Director Phase2 从“无限卡死”推进到“超时兜底”
+
+- **现场症状**：
+  - 用户在 `5178` 上重新触发 Director Phase2 视觉方案生成时，界面长时间停在：
+    - `正在为你的剧本生成视觉方案...`
+    - 仅有一条起始日志
+  - 项目真实磁盘状态显示：
+    - `.claude/Projects/CSET-Seedance2/04_Visuals/` 下没有 `phase2_review_state.json`
+    - [delivery_store.json](/Users/luzhoua/DeliveryConsole/.claude/Projects/CSET-Seedance2/delivery_store.json) 仍是 `director.phase = 1 / items = []`
+  - 说明这不是“已经生成了但没显示”，而是后端根本没走到 `chapter_ready/done`
+
+- **根因定位**：
+  - `server/director.ts -> startPhase2()` 在发出第一条日志后，卡在：
+    - `generateGlobalBRollPlan()`
+    - `callLLM()`
+  - 当前全局配置确认为：
+    - `provider = deepseek`
+    - `model = deepseek-chat`
+  - `deepseek` 连通性测试通过，但旧版 `server/llm.ts` 的 `callLLM()` 全链路没有超时控制
+  - 所以上游模型只要这次响应悬住，前端就会无限转圈，没有明确错误
+
+- **本轮修正**：
+  - `server/llm.ts`
+    - 新增 `fetchWithTimeout()`
+    - 所有老式非 streaming 的 LLM 请求统一接入 `AbortController`
+    - 默认超时：`90s`
+    - 超时错误标准化为：
+      - `LLM request timeout after 90s`
+  - 这样 `startPhase2()` 原有的 `catch` 就能真正捕获超时，并把错误回前端，而不是无限挂着
+
+- **最新现场结果**：
+  - 用户再次触发后，Phase2 不再一直卡死
+  - 当前界面已进入 `兜底方案（LLM 生成失败）`
+  - 说明系统行为已从：
+    - `无限等待`
+    - 推进为
+    - `可超时、可失败、可回退`
+
+- **现阶段判断**：
+  - “卡死”问题已被压下去
+  - 但真正的上游问题还在：
+    - 要么模型这次生成质量不稳定
+    - 要么返回结构不稳定，被 schema/retry/fallback 吃掉
+  - 下一轮再查时，应优先盯：
+    1. `generateGlobalBRollPlanWithRetry()` 的真实失败原因
+    2. 是否需要把 DeepSeek 从 Phase2 全局规划链路切到更稳定的 provider
+    3. 是否要把 fallback 原因直接展示到前端 debug 面板，而不是只写 `兜底方案（LLM 生成失败）`
