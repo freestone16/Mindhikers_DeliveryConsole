@@ -609,6 +609,19 @@ export interface ChatMessage {
     timestamp: string;
     attachments?: Attachment[];
     actionConfirm?: ToolCallConfirmation;
+    meta?: ChatMessageMeta;
+}
+
+export type ChatMessageClassification = 'dialogue' | 'reference' | 'quote' | 'asset';
+
+export interface ChatMessageMeta {
+    authorId?: string;
+    authorName?: string;
+    authorRole?: string;
+    classification?: ChatMessageClassification;
+    summary?: string;
+    routedAssetId?: string;
+    routedAssetTitle?: string;
 }
 
 export interface ToolCallConfirmation {
@@ -638,6 +651,15 @@ export interface ExpertContextMap {
         outputDir: string;
         keyFiles: string[];
     };
+}
+
+export interface HostRoutedAsset {
+    id: string;
+    type: 'reference' | 'quote' | 'mindmap' | 'remotion';
+    title: string;
+    subtitle: string;
+    content: string;
+    summary: string;
 }
 
 // ============================================================

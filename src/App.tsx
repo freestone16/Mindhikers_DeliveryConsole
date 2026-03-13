@@ -17,6 +17,7 @@ import { CrucibleWorkspace } from './components/CrucibleWorkspace';
 import { LLMConfigPage } from './components/LLMConfigPage';
 import { buildApiUrl } from './config/runtime';
 import type { ChatMessage, HostRoutedAsset } from './types';
+import { CRUCIBLE_HEADER_BADGES, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
@@ -39,6 +40,7 @@ function App() {
     const { state, isConnected, selectScript, socket, setState } = useDeliveryStore();
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
+    const [hasBootedCrucible, setHasBootedCrucible] = useState(false);
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatResetToken, setChatResetToken] = useState(0);
@@ -48,6 +50,7 @@ function App() {
     const [crucibleSeedVersion, setCrucibleSeedVersion] = useState(0);
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>([]);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
+    const injectedRoundKeysRef = useRef<Set<string>>(new Set());
 
     const buildPhaseOneState = useCallback((expertId: string, nextScriptPath: string) => {
         if (expertId === 'Director') {
@@ -86,6 +89,7 @@ function App() {
             setCrucibleSeedPrompt('');
             setCrucibleSeedVersion(0);
             setCrucibleInjectedMessages([]);
+            injectedRoundKeysRef.current.clear();
             setChatResetToken((prev) => prev + 1);
             return;
         }
@@ -123,6 +127,9 @@ function App() {
 
     const handleModuleChange = (module: ModuleType) => {
         setActiveModule(module);
+        if (module === 'crucible') {
+            setHasBootedCrucible(true);
+        }
     };
 
     const handleCrucibleRouteAsset = useCallback((asset: HostRoutedAsset) => {
@@ -148,19 +155,27 @@ function App() {
         setCrucibleSeedPrompt('');
         setCrucibleSeedVersion(0);
         setCrucibleInjectedMessages([]);
+        injectedRoundKeysRef.current.clear();
         setCrucibleTopicTitle('标题待定');
         setChatResetToken((prev) => prev + 1);
     }, []);
 
     const handleCrucibleRoundGenerated = useCallback((payload: {
-        speaker: 'laozhang' | 'laolu';
+        speaker: string;
         reflection: string;
         source: 'socrates' | 'fallback';
         roundIndex: number;
     }) => {
-        const meta = payload.speaker === 'laolu'
-            ? { authorId: 'laolu', authorName: '老卢', authorRole: '立结构', classification: 'dialogue' as const }
-            : { authorId: 'laozhang', authorName: '老张', authorRole: '拆概念', classification: 'dialogue' as const };
+        const roundKey = `${payload.roundIndex}`;
+        if (injectedRoundKeysRef.current.has(roundKey)) {
+            return;
+        }
+        injectedRoundKeysRef.current.add(roundKey);
+
+        const meta = {
+            ...getCrucibleSpeakerMeta(payload.speaker),
+            classification: 'dialogue' as const,
+        };
 
         setCrucibleInjectedMessages((prev) => [
             ...prev,
@@ -236,6 +251,7 @@ function App() {
             setCrucibleSeedPrompt('');
             setCrucibleSeedVersion(0);
             setCrucibleInjectedMessages([]);
+            injectedRoundKeysRef.current.clear();
         }
 
         previousContextRef.current = currentContext;
@@ -267,10 +283,15 @@ function App() {
                 onModuleChange={handleModuleChange}
             />
 
-            {activeModule === 'crucible' ? (
-                <div className="flex min-h-0 flex-1 overflow-hidden">
+            {(activeModule === 'crucible' || hasBootedCrucible) && (
+                <div
+                    className={`min-h-0 flex-1 overflow-hidden ${activeModule === 'crucible' ? 'flex' : 'hidden'}`}
+                    aria-hidden={activeModule !== 'crucible'}
+                >
                     <div className="min-h-0 flex-1 overflow-hidden">
                         <CrucibleWorkspace
+                            projectId={crucibleProjectId}
+                            scriptPath={state.selectedScript?.path || ''}
                             incomingAssets={crucibleRoutedAssets}
                             topicTitle={crucibleTopicTitle}
                             seedPrompt={crucibleSeedPrompt}
@@ -281,18 +302,14 @@ function App() {
                     </div>
                     <div className="w-[34vw] min-w-[420px] max-w-[560px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md">
                         <ChatPanel
-                            isOpen={true}
+                            isOpen={activeModule === 'crucible'}
                             onToggle={() => undefined}
                             expertId={CRUCIBLE_EXPERT_ID}
                             projectId={crucibleProjectId}
                             scriptPath={state.selectedScript?.path || ''}
                             resetToken={chatResetToken}
                             displayName={crucibleTopicTitle}
-                            headerBadges={[
-                                { id: 'user', name: '你', role: '抛出命题', avatarText: '你' },
-                                { id: 'laozhang', name: '老张', role: '拆概念', avatarText: '张' },
-                                { id: 'laolu', name: '老卢', role: '立结构', avatarImage: '/logo.png' },
-                            ]}
+                            headerBadges={CRUCIBLE_HEADER_BADGES}
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
@@ -300,7 +317,9 @@ function App() {
                         />
                     </div>
                 </div>
-            ) : activeModule === 'delivery' ? (
+            )}
+
+            {activeModule === 'delivery' ? (
                 <div className="flex-1 flex overflow-hidden">
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <ExpertNav
@@ -363,14 +382,19 @@ function App() {
                         />
                     </div>
                 </div>
-            ) : (
+            ) : null}
+
+            {activeModule === 'distribution' ? (
                 <DistributionLayout
                     activePage={activeDistributionPage}
                     onPageChange={setActiveDistributionPage}
                 />
-            )}
+            ) : null}
 
-            <StatusFooter isConnected={isConnected} />
+            <StatusFooter
+                isConnected={isConnected}
+                activeChatExpertId={activeModule === 'crucible' ? CRUCIBLE_EXPERT_ID : activeExpertId}
+            />
         </div>
     );
 }

@@ -1,22 +1,13 @@
 import type { ChatMessage, ChatMessageClassification, HostRoutedAsset } from '../../types';
+import { CRUCIBLE_SPEAKER_PATTERNS } from './soulRegistry';
 
 const nowId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-const CRUCIBLE_SPEAKERS = [
-    {
-        match: /^(?:\*\*)?\s*老张\s*[:：](?:\*\*)?\s*/u,
-        meta: { authorId: 'laozhang', authorName: '老张', authorRole: '拆概念' },
-    },
-    {
-        match: /^(?:\*\*)?\s*老卢\s*[:：](?:\*\*)?\s*/u,
-        meta: { authorId: 'laolu', authorName: '老卢', authorRole: '立结构' },
-    },
-] as const;
 
 const normalize = (content: string) => content.trim();
 
 const parseCrucibleSpeaker = (content: string) => {
     const text = content.trim();
-    for (const speaker of CRUCIBLE_SPEAKERS) {
+    for (const speaker of CRUCIBLE_SPEAKER_PATTERNS) {
         if (speaker.match.test(text)) {
             const stripped = text.replace(speaker.match, '').trim();
             return {
@@ -36,10 +27,21 @@ export function classifyAssistantMessage(content: string): ChatMessageClassifica
     const text = normalize(content);
     const lines = text.split('\n').filter(Boolean);
     const visualPattern = /(remotion|镜头|分镜|结构图|脑图|流程图|时间线|可视化|视觉稿|动画|画面)/i;
-    const quotePattern = /(金句|一句话|slogan|标题句|海报句|“.+”|「.+」)/i;
+    const explicitQuotePattern = /(金句|一句话|slogan|标题句|海报句)/i;
+    const quotedSpanPattern = /[“"「][^”"」]{6,48}[”"」]/g;
     const structuralPattern = /[├└│─]{2,}|^\s*[-*+]\s+/m;
+    const questionPattern = /[?？]/;
+    const quoteSpans = text.match(quotedSpanPattern) || [];
+    const isQuestionLike = questionPattern.test(text);
+    const hasExplicitQuoteIntent = explicitQuotePattern.test(text);
+    const looksLikeLongDialogue = isQuestionLike && lines.length <= 4 && text.length <= 240;
 
-    if (quotePattern.test(text) && text.length <= 180) {
+    // 苏格拉底式长追问不应因为夹了几个引号就被当成“金句资产”送到中屏。
+    if (looksLikeLongDialogue) {
+        return 'dialogue';
+    }
+
+    if ((hasExplicitQuoteIntent || quoteSpans.length > 0) && text.length <= 96 && lines.length <= 2) {
         return 'quote';
     }
 

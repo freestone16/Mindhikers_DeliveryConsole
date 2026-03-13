@@ -121,6 +121,61 @@
 - 不是解释器
 - 而是右侧当前追问的黑板摘要
 
+### 8. `GoldenMetallurgist` orchestrator contract 已开始独立
+
+继续推进时，又补了一刀结构性收口：
+
+1. 新增 `server/crucible-orchestrator.ts`
+2. 将以下内容从 `server/crucible.ts` 抽离：
+   - `engineMode` 决策
+   - `phase` 决策
+   - roundtable / socratic prompt 生成
+   - 对应 fallback 策略
+3. 新增 `createCrucibleTurnPlan()` 作为坩埚回合的最小 orchestrator contract
+
+当前意义不是“导演层已经完成”，而是：
+
+1. `server/crucible.ts` 退回成接口壳
+2. `GoldenMetallurgist` 的回合策略第一次有了独立 policy 文件
+3. 后续再接真实导演调度、tool routing 或 soul handoff 时，不必继续把逻辑塞进接口层
+
+### 9. orchestrator 已开始产出 tool routing
+
+继续推进后，当前 orchestrator 不再只返回：
+
+1. `engineMode`
+2. `phase`
+
+而是开始显式产出每轮的最小 `toolRoutes`，包括：
+
+- `Socrates`
+- `Researcher`
+- `FactChecker`
+- `ThesisWriter`
+
+当前还不是“真实多工具执行链”，但已经先把：
+
+1. 谁是本轮主工具
+2. 谁是支援位
+3. 谁暂时挂起
+4. 为什么这样排
+
+写进了 turn plan、接口响应和 turn log。
+
+这一步的意义在于：
+
+后续接真实工具调用时，不再从“phase 名字”硬跳到“直接执行”，而是中间已有一层明确的导演决策。
+
+### 10. 前端坩埚 turn contract 再收一层
+
+本轮也顺手把前端对坩埚回合返回的消费，从匿名内联结构收成显式类型：
+
+- `CrucibleTurnResponse`
+- `CrucibleOrchestratorState`
+- `CrucibleToolRoute`
+
+这样宿主层后续继续接 orchestrator 信息时，不需要再一边猜字段、一边手抄匿名对象。
+
 ## 本轮没有做的事
 
 为避免“文案先行把实现吹过头”，本轮明确没有做：
@@ -156,3 +211,85 @@
 1. 更明确的 phase 切换条件
 2. 更完整的圆桌发散阶段编排
 3. `GoldenMetallurgist` 的真正后台 orchestrator 输入输出
+
+## 11. 坩埚模块切换卡顿的首刀收口
+
+针对“本地切到黄金坩埚也要等几秒”的体感问题，本轮先没有误判为后端慢，而是先拆启动链：
+
+1. `chat-load-context` 并不是切模块即触发，而是首条用户消息发送时才触发
+2. 坩埚聊天历史文件很小，不构成主要延迟来源
+3. soul 文档与 profile 解析量级只有毫秒级
+
+因此首刀先收前端装配策略，而不是去乱动后端协议。
+
+本次改动：
+
+1. `src/App.tsx` 不再在每次切入坩埚时都重新 cold mount 整棵坩埚子树
+2. 首次进入坩埚后，`CrucibleWorkspace + ChatPanel` 保活；后续只做显示/隐藏切换
+3. 坩埚右侧 `ChatPanel` 的 `isOpen` 改为跟随当前模块状态，避免隐藏态仍按“当前可见”心智继续初始化
+
+这一步的目标很克制：
+
+- 先压掉“切模块像重新开页面”的体感延迟
+- 不在这一刀里同时改 socket 协议、上下文装载、视觉层或 soul 注册方式
+
+如果这刀还不够，再继续往下拆：
+
+1. 坩埚空态黑板的重视觉层
+2. `soulRegistry` 客户端顶层 YAML parse
+3. 首挂载阶段的 observer / snapshot 副作用
+
+## 12. 中屏重新收回“黑板”边界
+
+验收后发现中屏出现了两类回退：
+
+1. 又开始用多块提示卡解释“中屏是什么”
+2. 又把右侧会话内容改写后同步到了中屏，造成黑板和 chatbox 的边界变糊
+
+这轮修正只围绕一个原则：
+
+- 中屏是黑板，不是第二个会话区
+
+本次收口：
+
+1. `server/crucible.ts`
+   - `presentables` 默认只保留 1 条
+   - 上板内容统一压成 2-3 个板书 bullet
+   - 如果板书内容和右侧 utterance 只是近似复述，则直接过滤不上板
+2. `src/components/crucible/CrucibleWorkspaceView.tsx`
+   - 删除中屏里多余的“我是谁 / 我不同步什么 / 我现在在干嘛”说明块
+   - 删除“对应右侧这句”复述区
+   - 黑板正文改成更短的标题 + bullets，不再像一篇小文章
+
+这刀的目标不是美化，而是重新把认知负担压回去：
+
+1. 右侧负责对话推进
+2. 中屏只负责挂结论性板书
+3. 用户一眼就能看出两者不是同一层东西
+
+## 13. 继续按奥卡姆剃刀压 header 和板书文案
+
+进一步验收后，又暴露出两处“信息没有继续收干净”的问题：
+
+1. 中屏 `Blackboard Focus` 下方的几行板书有时不够完整，像被切碎
+2. 左中右 header 还在讲太多不必要的话，风格不统一
+
+本轮继续压缩：
+
+1. `server/crucible.ts`
+   - 黑板内容优先按原始换行分条，而不是粗暴按标点切句
+   - 这样能保住“冲突地图 / 左侧 / 右侧 / 下一刀”这种更完整的板书语义
+2. `src/components/crucible/CrucibleWorkspaceView.tsx`
+   - 整块删除“议题锁定中”那层中间 header
+   - 中屏只保留顶部总 header 和黑板主体
+   - `Blackboard Focus` 改成中文标签 `黑板焦点`
+   - 左侧目录标题也切到同一套小标签样式
+3. `src/components/ChatPanel.tsx`
+   - 删除“右侧对话是主线...”和“上下文已加载”小字
+   - 保留 `标题待定`，并把标题字级抬高到更像一个真正的右侧标题
+
+这轮的目标很明确：
+
+1. 黑板文字先求完整、再求短
+2. header 只保留定位，不承担解释
+3. 左中右用同一套“标签 + 标题”层级说话

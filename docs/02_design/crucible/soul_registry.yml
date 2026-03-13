@@ -1,0 +1,24 @@
+version: "0.1"
+
+default_pair:
+  challenger: "oldzhang"
+  synthesizer: "oldlu"
+
+souls:
+  - id: "crucible_oldzhang"
+    slug: "oldzhang"
+    display_name: "老张"
+    file: "docs/02_design/crucible/souls/oldzhang_soul.profile.yml"
+    source_document: "docs/02_design/crucible/souls/oldzhang_soul.md"
+    status: "active"
+    tier: "core"
+    default_enabled: true
+
+  - id: "crucible_oldlu"
+    slug: "oldlu"
+    display_name: "老卢"
+    file: "docs/02_design/crucible/souls/oldlu_soul.profile.yml"
+    source_document: "docs/02_design/crucible/souls/oldlu_soul.md"
+    status: "active"
+    tier: "core"
+    default_enabled: true

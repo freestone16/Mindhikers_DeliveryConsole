@@ -1,12 +1,39 @@
 export type SpeakerId = string;
 export type CrucibleEngineMode = 'roundtable_discovery' | 'socratic_refinement';
+export type CrucibleRuntimePhase = 'topic_lock' | 'deep_dialogue' | 'crystallization';
+export type CrucibleToolName = 'Socrates' | 'Researcher' | 'FactChecker' | 'ThesisWriter';
+export type CrucibleToolRouteMode = 'primary' | 'support' | 'hold';
 
 export type CanvasAssetType = 'ascii' | 'mindmap' | 'quote' | 'remotion' | 'reference';
+
+export interface CrucibleToolRoute {
+    tool: CrucibleToolName;
+    mode: CrucibleToolRouteMode;
+    reason: string;
+}
+
+export interface CrucibleOrchestratorState {
+    engineMode: CrucibleEngineMode;
+    phase: CrucibleRuntimePhase;
+    toolRoutes: CrucibleToolRoute[];
+}
 
 export interface CrucibleDialogue {
     speaker: SpeakerId;
     utterance: string;
     focus: string;
+}
+
+export interface CrucibleTurnResponse {
+    source?: 'socrates' | 'fallback';
+    warning?: string;
+    searchRequested?: boolean;
+    searchConnected?: boolean;
+    dialogue?: CrucibleDialogue;
+    presentables?: Array<{ type?: 'reference' | 'quote' | 'asset'; title?: string; summary?: string; content?: string }>;
+    engineMode?: CrucibleEngineMode;
+    phase?: CrucibleRuntimePhase;
+    orchestrator?: CrucibleOrchestratorState;
 }
 
 export interface CrucibleMessage {

@@ -3,13 +3,10 @@ import path from 'path';
 import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
+import { loadCrucibleSoulRegistry, loadSoulProfile, resolveSoulProfilePath } from './crucible-soul-loader';
 
 const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
 const REPO_ROOT = path.resolve(__dirname, '..');
-const CRUCIBLE_SOUL_FILES = {
-    laozhang: path.join(REPO_ROOT, 'docs/02_design/crucible/souls/oldzhang_soul.md'),
-    laolu: path.join(REPO_ROOT, 'docs/02_design/crucible/souls/oldlu_soul.md'),
-};
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -310,46 +307,73 @@ function loadGoldenCrucibleContext(
     projectRoot: string,
     scriptPath?: string
 ): { systemPrompt: string; contextMap: ExpertContextMap } {
-    const laozhangSoul = readOptionalText(CRUCIBLE_SOUL_FILES.laozhang);
-    const laoluSoul = readOptionalText(CRUCIBLE_SOUL_FILES.laolu);
     const scriptExcerpt = loadSelectedScriptExcerpt(projectRoot, scriptPath);
+
+    let foregroundSoulNames = ['老张', '老卢'];
+    let outputPrefixLines = '   - 老张：...\n   - 老卢：...';
+    let roleSummary = '5. 老张负责拆概念、查前提、打反方压力；老卢负责立结构、托举、收束骨架。';
+    let personaSections = `### 老张人格档案\n${readOptionalText(path.join(REPO_ROOT, 'docs/02_design/crucible/souls/oldzhang_soul.md')) || '老张人格档案缺失，请保持冷静、锐利、拆解导向。'}\n\n### 老卢人格档案\n${readOptionalText(path.join(REPO_ROOT, 'docs/02_design/crucible/souls/oldlu_soul.md')) || '老卢人格档案缺失，请保持温暖、克制、结构化导向。'}`;
+    let keyFiles: string[] = [];
+
+    try {
+        const registry = loadCrucibleSoulRegistry();
+        const foregroundEntries = registry.souls.filter((entry) => entry.status !== 'disabled').map((entry) => ({
+            entry,
+            profile: loadSoulProfile(resolveSoulProfilePath(entry)),
+        })).filter(({ profile }) => profile.runtime.visibility === 'foreground' && profile.runtime.default_enabled);
+
+        foregroundSoulNames = foregroundEntries.map(({ profile }) => profile.identity.display_name);
+        outputPrefixLines = foregroundEntries.map(({ profile }) => `   - ${profile.identity.display_name}：...`).join('\n');
+        roleSummary = foregroundEntries.map(({ profile }, index) => `5.${index + 1} ${profile.identity.display_name}负责${profile.identity.role_label}：${profile.positioning.mission}`).join('\n');
+        personaSections = foregroundEntries.map(({ entry, profile }) => {
+            const sourceDocs = profile.knowledge_binding.source_documents
+                .map((docPath) => path.join(REPO_ROOT, docPath))
+                .map((absolutePath) => readOptionalText(absolutePath))
+                .filter(Boolean);
+
+            return `### ${profile.identity.display_name}人格档案\n- slug: ${profile.identity.slug}\n- archetype: ${profile.identity.archetype}\n- role: ${profile.identity.role_label}\n- mission: ${profile.positioning.mission}\n- primary_functions: ${profile.positioning.primary_functions.join(', ')}\n- non_goals: ${profile.positioning.non_goals.join(', ')}\n- must_preserve: ${profile.evaluation.must_preserve.join(', ')}\n\n${sourceDocs.join('\n\n') || `${profile.identity.display_name}人格档案缺失，请遵守其结构化配置。`}`;
+        }).join('\n\n');
+
+        keyFiles = [
+            'docs/02_design/crucible/soul_registry.yml',
+            ...foregroundEntries.flatMap(({ entry, profile }) => [entry.file, ...profile.knowledge_binding.source_documents]),
+        ];
+    } catch (error: any) {
+        console.warn('[Crucible] Failed to load structured soul registry, falling back to legacy soul docs:', error.message);
+        keyFiles = [
+            'docs/02_design/crucible/souls/oldzhang_soul.md',
+            'docs/02_design/crucible/souls/oldlu_soul.md',
+        ];
+    }
 
     const systemPrompt = `你是黄金坩埚的后台导演 GoldenMetallurgist。
 
 你的身份约束：
 1. 你是后台调度器，不是前台常驻角色。
-2. 前台只允许出现两个数字人：老张、老卢。
+2. 前台只允许出现以下默认前台灵魂：${foregroundSoulNames.join('、')}。
 3. 你可以在后台借用 Socrates / Researcher / FactChecker / ThesisWriter 的方法，但绝不能把这些工具当作前台人物说出来。
 4. 你本轮的目标不是写视频文案，而是帮助用户完成议题锁定、深度对话与论文级收束。
 
 你的输出约束：
 1. 每次回复只能选择一个前台说话人。
-2. 输出必须以以下二选一格式开头：
-   - 老张：...
-   - 老卢：...
+2. 输出必须以下列格式之一开头：
+${outputPrefixLines}
 3. 不要输出“黄金冶炼师：”“GoldenMetallurgist：”“Socrates：”“Researcher：”“FactChecker：”“ThesisWriter：”。
 4. 不要把自己暴露为系统、导演、调度器或工具调用器。
-5. 老张负责拆概念、查前提、打反方压力；老卢负责立结构、托举、收束骨架。
-6. 如果当前更适合抛问题，就让老张或老卢用一小段高密度话语推进，而不是写成流程说明。
+${roleSummary}
+6. 如果当前更适合抛问题，就让上述前台灵魂中的一位用一小段高密度话语推进，而不是写成流程说明。
 7. 只有当内容适合被送去中区时，才输出较长的结构化内容；否则优先保持短句推进。
 
 以下是前台人格单一事实源，请严格服从：
 
-### 老张人格档案
-${laozhangSoul || '老张人格档案缺失，请保持冷静、锐利、拆解导向。'}
-
-### 老卢人格档案
-${laoluSoul || '老卢人格档案缺失，请保持温暖、克制、结构化导向。'}
+${personaSections}
 ${scriptExcerpt}
 `;
 
     const contextMap: ExpertContextMap = {
         GoldenMetallurgist: {
             outputDir: 'crucible',
-            keyFiles: [
-                path.relative(projectRoot, CRUCIBLE_SOUL_FILES.laozhang),
-                path.relative(projectRoot, CRUCIBLE_SOUL_FILES.laolu),
-            ],
+            keyFiles: keyFiles.map((filePath) => path.relative(projectRoot, path.join(REPO_ROOT, filePath))),
         },
     };
 

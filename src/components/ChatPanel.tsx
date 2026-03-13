@@ -599,11 +599,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <div className="flex items-center gap-2">
                             <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(166,117,64,0.15)] bg-[var(--surface-1)] text-[13px] font-semibold text-[var(--ink-1)]">聊</div>
                             <div>
-                                <div className="text-sm font-semibold text-[var(--ink-1)]">{displayName || expertName}</div>
-                                <div className="text-[11px] text-[var(--ink-3)]">
-                                    右侧对话是主线，中屏只同步参考、金句和结构
-                                    {contextLoaded && <span className="ml-2 text-[var(--accent)]">上下文已加载</span>}
-                                </div>
+                                <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{displayName || expertName}</div>
                             </div>
                         </div>
                     </div>
