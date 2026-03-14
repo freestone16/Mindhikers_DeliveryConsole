@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Lifecycle Governance"
+  short_description: "Govern structure, execution, and Linear sync"
+  default_prompt: "Use $project-lifecycle-governance to structure this project lifecycle, execution plan, and Linear mapping."
