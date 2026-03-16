@@ -1,5 +1,9 @@
 # Delivery Console 搬迁记录
 
+> 2026-03-14 补充：
+> 当前 Director 正式开发新家位于 `/Users/luzhoua/MHSDC/DeliveryConsole/Director`。
+> 新家的运行时口径以全局端口账本和 `.env.local` 为准，当前使用前端 `5178`、后端 `3005`。
+
 **日期：** 2025-02-20  
 **执行人：** AI Assistant  
 **状态：** ✅ 已完成
@@ -80,7 +84,7 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ## ✅ 验证清单
 
-搬迁后已验证：
+历史搬迁后已验证：
 
 - [x] 备份创建成功（`delivery_console_backup_20260220_221808`）
 - [x] 代码成功移动到新位置
@@ -97,9 +101,13 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ### 1. 启动项目
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
 npm run dev
 ```
+
+当前新家端口：
+- 前端：`http://localhost:5178`
+- 后端：`http://localhost:3005`
 
 ### 2. 切换项目
 编辑 `.env` 中的 `PROJECT_NAME`，或在界面中使用项目切换功能。
@@ -145,8 +153,8 @@ npm run dev
 
 ## 📚 相关文档
 
-- **项目 README：** `/Users/luzhoua/DeliveryConsole/README.md`
-- **Makefile 帮助：** `cd /Users/luzhoua/DeliveryConsole && make help`
+- **项目 README：** `/Users/luzhoua/MHSDC/DeliveryConsole/Director/README.md`
+- **Makefile 帮助：** `cd /Users/luzhoua/MHSDC/DeliveryConsole/Director && make help`
 - **项目数据：** `/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/`
 
 ---

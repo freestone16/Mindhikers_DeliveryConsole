@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseSRT, SubtitleSegment, timecodeToMs, msToTimecode, formatDuration } from './srt-parser';
 import { RenderJob_V2, ExternalAsset } from '../src/types';
+import { getProjectRoot } from './project-paths';
 
 // Final Cut Pro XML 结构
 interface FCPXML {
@@ -89,12 +90,6 @@ interface Clip {
     ref?: string;
     src?: string;
 }
-
-// 项目路径管理
-const getProjectRoot = (projectId: string): string => {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-    return path.join(PROJECTS_BASE, projectId);
-};
 
 function ensureDir(dir: string) {
     if (!fs.existsSync(dir)) {

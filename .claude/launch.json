@@ -3,33 +3,33 @@
   "configurations": [
     {
       "name": "Full Dev (Frontend + Backend)",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "PORT=3003 npm run dev"],
-      "port": 5175
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5178
     },
     {
       "name": "Frontend Only (Vite)",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--host"],
-      "port": 5175
+      "port": 5178
     },
     {
       "name": "Backend Only (TSX Server)",
       "runtimeExecutable": "tsx",
       "runtimeArgs": ["watch", "server/index.ts"],
-      "port": 3003
+      "port": 3005
     },
     {
       "name": "backend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3003
+      "port": 3005
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "vite", "--", "--host"],
-      "port": 5175
+      "port": 5178
     }
   ]
 }

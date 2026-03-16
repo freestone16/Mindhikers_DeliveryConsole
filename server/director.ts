@@ -3,13 +3,20 @@ import fs from 'fs';
 import path from 'path';
 import { generateBRollOptions, generateGlobalBRollPlan, generateFallbackOptions, BRollOption, callLLM } from './llm';
 import { generateImageWithVolc, pollVolcImageResult, generateVideoWithVolc, pollVolcVideoResult, downloadVideo } from './volcengine';
-import { loadConfig } from './llm-config';
+import { getProviderCredentialStatus, loadConfig } from './llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
+import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
+import { getProjectRoot } from './project-paths';
 
-const getProjectRoot = (projectId: string): string => {
-  const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-  return path.join(PROJECTS_BASE, projectId);
-};
+function ensureGlobalLLMReady(provider: string, model: string) {
+  const status = getProviderCredentialStatus(provider);
+  if (status.configured) {
+    return;
+  }
+
+  const missingVars = status.missingVars.join(', ');
+  throw new Error(`全局模型 ${provider}/${model} 未配置 API Key（缺少 ${missingVars}）。请先在“全局模型网关配置”补全对应 Key，或切换到已配置的全局 Provider。`);
+}
 
 export interface DirectorChapter {
   chapterId: string;
@@ -242,8 +249,8 @@ export const generatePhase1 = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('concept');
     console.log('[Phase1] Generating concept with Director skill knowledge...');
 
-    const config = loadConfig();
-    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
+    const globalConfig = resolveGlobalLLMConfig(loadConfig());
+    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
 
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
@@ -296,8 +303,8 @@ export const reviseConcept = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('revise');
     console.log('[Phase1 Revise] Revising with Director skill knowledge...');
 
-    const config = loadConfig();
-    const globalConfig = config.global;
+    const globalConfig = resolveGlobalLLMConfig(loadConfig());
+    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
 
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
@@ -398,8 +405,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({ type: 'taskId', taskId })}\n\n`);
 
   try {
-    const config = loadConfig();
-    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
+    const globalConfig = resolveGlobalLLMConfig(loadConfig());
+    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
 
     res.write(`data: ${JSON.stringify({ type: 'log', level: 'info', message: `开始生成 B-roll 方案，使用模型: ${globalConfig.provider}/${globalConfig.model}` })}\n\n`);
 
@@ -1482,8 +1489,9 @@ Return a JSON array of matched alignments:
 ]
 Reply ONLY with the valid JSON array, no markdown.`;
 
-    const config = loadConfig();
-    const resultText = await callLLM([{ role: 'user', content: prompt }], config.global.provider as any, config.global.model);
+    const globalConfig = resolveGlobalLLMConfig(loadConfig());
+    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
+    const resultText = await callLLM([{ role: 'user', content: prompt }], globalConfig.provider as any, globalConfig.model);
 
     let alignments = [];
     try {
@@ -1891,8 +1899,9 @@ Please rewrite the prompt based on the user's feedback. Return only the new prom
       }
     ];
 
-    const config = await loadConfig();
-    const response = await callLLM(messages, config.provider, config.model);
+    const globalConfig = resolveGlobalLLMConfig(loadConfig());
+    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
+    const response = await callLLM(messages, globalConfig.provider as any, globalConfig.model);
     const revisedPrompt = response.content?.trim() || currentPrompt;
 
     res.json({ success: true, revisedPrompt });

@@ -54,6 +54,12 @@
 | ----- | -------------------------------------------- | ---------------------------------------------------------- |
 | L-013 | Phase2 LLM 调用不稳定（缺少超时）            | [L-013-llm-timeout-fix.md](./L-013-llm-timeout-fix.md)     |
 | L-014 | 业务代码硬编码 Provider，Global 配置形同虚设 | [L-014-config-driven-llm.md](./L-014-config-driven-llm.md) |
+| L-015 | 项目路径解析分散实现，worktree 冷启动时漂移  | [L-015-project-path-centralization.md](./L-015-project-path-centralization.md) |
+| L-016 | 未自测主链路就交给用户，现场暴露配置与服务问题 | [L-016-handoff-selftest-before-user.md](./L-016-handoff-selftest-before-user.md) |
+| L-017 | 软冒烟不足以证明主链路通过，必须验证真实产物 | [L-017-real-validation-over-soft-smoke.md](./L-017-real-validation-over-soft-smoke.md) |
+| L-018 | 浏览器验收优先使用 Agent Browser | [L-018-agent-browser-for-web-validation.md](./L-018-agent-browser-for-web-validation.md) |
+| L-019 | OpenCode `database is locked` 的安全恢复 | [L-019-opencode-database-locked-recovery.md](./L-019-opencode-database-locked-recovery.md) |
+| L-020 | OpenCode 的 Agent Browser 需要 skill + CLI + Chrome 三件套 | [L-020-opencode-agent-browser-needs-cli.md](./L-020-opencode-agent-browser-needs-cli.md) |
 
 ### 服务器启动
 | ID    | 问题                    | 文件                                             |
@@ -74,6 +80,11 @@
 | 2026-03-03 | L-001, L-002, L-003, L-004, L-005, L-006, L-007, L-008 |
 | 2026-03-04 | L-009, L-010, L-011, L-012, L-013                      |
 | 2026-03-05 | L-014                                                  |
+| 2026-03-15 | L-015, L-016                                           |
+| 2026-03-16 | L-017                                                  |
+| 2026-03-16 | L-018                                                  |
+| 2026-03-16 | L-019                                                  |
+| 2026-03-16 | L-020                                                  |
 
 ---
 

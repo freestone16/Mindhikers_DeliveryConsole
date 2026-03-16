@@ -2,18 +2,27 @@
 
 # MindHikers Delivery Console - 启动脚本
 
+resolve_runtime_value() {
+    local key="$1"
+    node -e "import('./scripts/runtime-env.js').then(({ getRuntimePorts }) => { const ports = getRuntimePorts(); console.log(ports['$key']); })"
+}
+
+BACKEND_PORT="$(resolve_runtime_value backendPort)"
+FRONTEND_PORT="$(resolve_runtime_value frontendPort)"
+
 echo "🚀 启动 MindHikers Delivery Console..."
 
-# 检查并清理端口占用
-if lsof -Pi :56153 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  端口 56153 被占用，正在清理..."
-    lsof -ti:56153 | xargs kill -9 2>/dev/null || true
-    sleep 2
-fi
+for PORT in "$BACKEND_PORT" "$FRONTEND_PORT"; do
+    if lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "⚠️  端口 $PORT 被占用，正在清理..."
+        lsof -ti:"$PORT" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+done
 
 # 启动后端
 echo "📡 启动后端服务..."
-node node_modules/tsx/dist/cli.mjs watch server/index.ts > /tmp/delivery-console-server.log 2>&1 &
+node --env-file=.env.local node_modules/tsx/dist/cli.mjs watch server/index.ts > /tmp/delivery-console-server.log 2>&1 &
 SERVER_PID=$!
 echo "✅ 后端 PID: $SERVER_PID"
 
@@ -22,7 +31,7 @@ sleep 3
 
 # 启动前端
 echo "🎨 启动前端服务..."
-node node_modules/vite/bin/vite.js --host > /tmp/delivery-console-client.log 2>&1 &
+node --env-file=.env.local node_modules/vite/bin/vite.js --host --port "$FRONTEND_PORT" > /tmp/delivery-console-client.log 2>&1 &
 CLIENT_PID=$!
 echo "✅ 前端 PID: $CLIENT_PID"
 
@@ -30,8 +39,8 @@ echo ""
 echo "✅ 所有服务已启动！"
 echo ""
 echo "📱 前端地址:"
-echo "   - Local:   http://localhost:5173/"
-echo "   - Network: http://$(hostname -I | awk '{print $1}'):5173/"
+echo "   - Local:   http://localhost:${FRONTEND_PORT}/"
+echo "   - Network: http://$(hostname -I | awk '{print $1}'):${FRONTEND_PORT}/"
 echo ""
 echo "📝 日志查看:"
 echo "   - 后端: tail -f /tmp/delivery-console-server.log"

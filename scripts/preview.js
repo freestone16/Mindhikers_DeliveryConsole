@@ -8,9 +8,9 @@
 
 import { spawn } from 'child_process';
 import http from 'http';
+import { getRuntimePorts } from './runtime-env.js';
 
-const FRONTEND_PORT = 5173;
-const BACKEND_PORT = 3002;
+const { backendPort, frontendPort } = getRuntimePorts();
 
 /**
  * 检查端口是否可用
@@ -28,8 +28,8 @@ async function checkPort(port) {
 
 async function main() {
   // 检查端口
-  const frontendFree = await checkPort(FRONTEND_PORT);
-  const backendFree = await checkPort(BACKEND_PORT);
+  const frontendFree = await checkPort(frontendPort);
+  const backendFree = await checkPort(backendPort);
 
   if (!frontendFree || !backendFree) {
     console.error('❌ 端口被占用，请先运行 npm run dev:clean');
@@ -44,10 +44,10 @@ async function main() {
     cwd: process.cwd(),
     env: { ...process.env, NODE_ENV: 'production' }
   });
-  console.log(`✅ 后端服务器启动: http://localhost:${BACKEND_PORT}`);
+  console.log(`✅ 后端服务器启动: http://localhost:${backendPort}`);
 
   // 启动前端
-  const frontend = spawn('npx', ['vite', 'preview', '--host'], {
+  const frontend = spawn('npx', ['vite', 'preview', '--host', '--port', String(frontendPort)], {
     stdio: 'inherit',
     cwd: process.cwd(),
     env: { ...process.env, NODE_ENV: 'production' }

@@ -1,6 +1,6 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-03 CST
+> **更新日期**: 2026-03-16 CST
 
 ---
 
@@ -23,6 +23,18 @@
 | v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID                 |
 | v4.0.0 | 2026-03-06 | **SD-207 V3 营销大师全量重构** - 5 Sprint 完成；TubeBuddy Playwright、SSE 生成、Phase 2 审阅、双格式导出 |
 | v4.1.0 | 2026-03-11 | **导演大师自动化测试 + Chatbox反馈修复 + 渲染压测** — 详见下方 |
+| v4.1.1 | 2026-03-15 | **导演大师 LLM 网关统一** - Phase1/2/3、反馈改写、Chatbox 动作提示词重生统一跟随 `global` 模型配置，修复局部代码误读 `config.provider/model` 的漂移问题 |
+| v4.1.2 | 2026-03-15 | **项目根目录动态解析修复** - 修复 `chat.ts` 在 dotenv 生效前缓存 `PROJECTS_BASE`，导致 `/api/scripts` 等链路误判 `02_Script` 不存在、右上角文稿下拉为空 |
+| v4.1.3 | 2026-03-15 | **项目路径解析正式收口** - 新增 `server/project-paths.ts` 作为共享路径 SSOT，统一替换 `index/chat/director/shorts/market/assets/xml/distribution/upload/youtube-auth` 等模块内分散的 `PROJECTS_BASE/getProjectRoot` 实现，杜绝不同链路各自 fallback 导致的路径漂移 |
+| v4.1.4 | 2026-03-15 | **导演主链路前置校验 + worktree 环境基线恢复** - 从旧主仓恢复当前 worktree 的 `.env`，为 Director Phase1/Phase2 和动作改写链路增加全局 provider key 前置校验，并把“交给用户测试前必须先自测主链路、保持服务在线”写入规约 |
+| v4.1.5 | 2026-03-16 | **Director × OpenCode 测试协作试点** - 新增 `testing/director` 请求/认领/回报/状态目录协议、OpenCode worker 脚本与启动命令，建立“Codex/Claude 写 request、OpenCode 执行测试、规划端读取报告”的零中继工作流，并落地首个 Phase1 smoke request |
+| v4.1.6 | 2026-03-16 | **Director 真实验收协议收紧** - 将 OpenCode 执行 prompt、操作手册与 Director 队列规则升级为“硬通过判据”，新增 `TREQ-2026-03-16-DIRECTOR-003-phase1-real-validation`，要求同时验证页面完成态、提案正文与 `phase1_视觉概念提案` 写盘时间戳，避免再用“无报错”冒充通过 |
+| v4.1.7 | 2026-03-16 | **浏览器验收切换到 Agent Browser** - 根据用户纠正，将测试协议里所有真实页面交互默认收紧为 `agent browser` 优先，并新增 `TREQ-2026-03-16-DIRECTOR-004-phase1-real-validation-agent-browser` 作为当前 Director Phase1 权威 request |
+| v4.1.8 | 2026-03-16 | **OpenCode 锁库恢复流程固化** - 排查并确认 `database is locked` 并非活进程占用，而是异常退出后的 SQLite WAL 残留；通过 `pragma wal_checkpoint(full)` 恢复数据库可读，并将恢复步骤写入 OpenCode 初始化手册、rules 与 lessons |
+| v4.1.9 | 2026-03-16 | **OpenCode Agent Browser 真链路补齐** - 确认仅安装 skill 不足以启用浏览器执行，补装 `agent-browser` CLI 与 Chrome 二进制，并用本地 `5178` 页面完成最小烟雾验证与截图取证，正式打通 OpenCode 侧 Agent Browser 基础能力 |
+| v4.2.0 | 2026-03-16 | **“协调opencode测试”统一口令落地** - 把 OpenCode 协作测试协议上收到项目级规则：以后在项目目录里只要说“协调opencode测试”，代理默认读取 `testing/README.md`、`testing/OPENCODE_INIT.md` 和模块级 `testing/<module>/README.md`，直接接管测试队列 |
+| v4.2.1 | 2026-03-16 | **“协调opencode测试”语义纠偏** - 根据用户纠正，将该口令收紧为“只做环境 ready，不自动开跑”；代理完成 testing 文档读取与队列接管后，必须等待用户明确说明下一步计划 |
+| v4.2.2 | 2026-03-16 | **Director 冷启动项目态恢复修复** - 修复页面刷新后新 socket 未自动恢复 active project，导致右上角文稿下拉空白、Phase2 测试未开始的问题；统一复用 socket 项目态 hydrate 逻辑，并以 Agent Browser 完成真实页面验证 |
 
 ---
 
@@ -2183,3 +2195,117 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
     1. `generateGlobalBRollPlanWithRetry()` 的真实失败原因
     2. 是否需要把 DeepSeek 从 Phase2 全局规划链路切到更稳定的 provider
     3. 是否要把 fallback 原因直接展示到前端 debug 面板，而不是只写 `兜底方案（LLM 生成失败）`
+
+### 2026-03-14 夜间补充：Director 新家运行时端口收口第一轮
+
+- **触发背景**：
+  - `MHSDC/DeliveryConsole/Director` 已作为 Director 新家开始承接后续开发
+  - 现场仍存在多套历史端口口径并存：
+    - `.env.local` 是 `3009 / 5182`
+    - `.claude/launch.json` 仍是 `3003 / 5175`
+    - `scripts/check-port.js` / `scripts/preview.js` 仍写死 `3002 / 5173`
+    - `server/index.ts` / `server/youtube-auth.ts` 仍保留 `3002` fallback
+- **本轮收口原则**：
+  - 端口按全局账本纪律治理
+  - 运行时链路统一为：
+    - `global_ports_registry.yml`
+    - `-> .env.local`
+    - `-> vite/server/scripts/runtime`
+  - 不再让脚本和业务代码各自维护一套旧端口
+- **代码改动**：
+  - 新增 `scripts/runtime-env.js`
+    - 集中读取 `.env` + `.env.local`
+    - 统一导出 `backendPort / frontendPort / backendTarget`
+  - `scripts/check-port.js`
+    - 改为按 runtime env 检查当前工作区端口
+    - 区分 `EADDRINUSE` 与 `EPERM/EACCES`，不再把沙盒限制误报为端口占用
+  - `scripts/preview.js`
+    - 改为从 runtime env 读取预览端口
+  - `start.sh`
+    - 改为动态读取当前端口并清理对应占用
+    - 不再写死 `5173`
+  - `ecosystem.config.cjs`
+    - 去掉旧目录 `cwd=/Users/luzhoua/DeliveryConsole`
+    - 改为随当前工作区与 `.env.local` 走
+  - `.claude/launch.json`
+    - 去掉 `PORT=3003 npm run dev`
+    - 当前口径改为前端 `5182` / 后端 `3009`
+  - `.env.example`
+    - 改成 Director 新家模板，明确“账本 -> .env.local -> runtime”纪律
+  - `README.md` / `RELOCATION.md` / `.agent/PROJECT_STATUS.md`
+    - 补齐当前新家路径与当前端口口径
+- **当前结论**：
+  - Director 新家已完成第一轮 runtime 收口
+  - 全局端口账本已新增：
+    - 这轮随后被用户纠正：账本已有 Director 端口 `3005 / 5178`，不应自行新增 `3009 / 5182`
+  - 依赖层已恢复：
+    - `npm install` 完成
+    - `package-lock.json` 已落盘
+  - 本轮验证结果：
+    - `npm run dev:check`：通过
+      - 当前沙盒环境返回 `EPERM`
+      - 但脚本已能正确区分“环境限制”与“真实端口占用”
+    - `npm run test:run -- src/__tests__/director-bridge.test.ts`：12/12 通过
+    - 硬编码扫描：
+      - `src/server/scripts/start.sh/ecosystem/.claude` 范围内已清空 `3002/5173/3003/5175` 旧运行时端口残留
+    - `npm run build`：未通过，但判定为存量 TypeScript 红灯，不属于本轮端口迁移回归
+      - 主要集中在：
+        - `server/llm-config.ts`
+        - `src/components/ChatPanel.tsx`
+        - `src/components/market/*`
+        - `src/components/ScheduleModal.tsx`
+        - `src/components/StatusDashboard.tsx`
+  - **收口判断**：
+    - Director 新家 runtime 端口治理在用户纠正后，必须以账本现有 Director 端口 `3005 / 5178` 为唯一事实来源
+  - 但若要宣称“整仓 build 已恢复健康”，还需另开一轮 TypeScript 存量清红任务
+
+### 2026-03-16 晚间补充：Director 右上角文稿下拉恢复，Phase2 前置阻塞解除
+
+- **现场问题**：
+  - OpenCode 的 `TREQ-2026-03-16-DIRECTOR-006-phase2-business-acceptance` 报告把 Phase2 标成 `blocked`
+  - 页面进入 `5178` 后，顶部项目列表里虽然能看到 `CSET-Seedance2` 被标记为 `ACTIVE`
+  - 但右上角项目标题实际为空，文稿区显示 `Script: 未选择`
+  - 点开文稿下拉后出现 `暂无文稿`
+  - 结果不是“Phase2 生成失败”，而是测试根本没跨过“选择项目/文稿”这道前置门槛
+
+- **根因定位**：
+  - `/api/scripts?projectId=CSET-Seedance2` 实际能正常返回两份 `.md` 文稿，说明磁盘与接口都没坏
+  - 真正断的是页面冷启动时的 socket 恢复链路：
+    - 用户刷新页面后，会新建一个 socket
+    - 旧代码只在 `select-project` 时才把 socket 加入项目 room、补发 `delivery-data`
+    - 若服务端内存里已经有 `currentProjectName`，新 socket 连接时只会收到一条 `active-project`
+    - 前端并没有单独消费这条事件来设置 `projectId`
+  - 于是前端本地 `state.projectId` 继续为空，`Header.tsx` 的 `fetchScripts()` 因 `!projectId` 直接返回，最终把“已有 active project”渲染成“暂无文稿”
+
+- **修复方案**：
+  - 在 [`server/index.ts`](/Users/luzhoua/MHSDC/DeliveryConsole/Director/server/index.ts) 新增统一 helper：
+    - `hydrateSocketProjectContext(socket, projectId)`
+  - 该 helper 负责一次性完成：
+    - socket 加入项目 room
+    - `ensureDeliveryFile`
+    - `ensureExpertState`
+    - 重挂 `delivery/expert/visual-plan` watchers
+    - 补发 `delivery-data`
+    - 补发各专家 `expert-data-update`
+    - 再确认发送 `active-project`
+  - 首次连接时，只要服务端已有 `currentProjectName`，立即自动 hydrate
+  - `select-project` 路径也改成复用同一 helper，避免以后再次出现“连接时一套、切项目时一套”的漂移
+
+- **验证结果**：
+  - 已优雅重启本地 dev 服务，并保持在线：
+    - 前端：`5178`
+    - 后端：`3005`
+  - 使用 `agent-browser` 对真实页面完成验收：
+    - 顶部项目按钮显示 `CSET-Seedance2`
+    - 顶部文稿按钮显示 `Script: CSET-seedance2_深度文稿_v2.1.md`
+    - 页面 DOM 中可见另一份文稿 `CSET-seedance2_深度文稿_v2.1 1.md`
+    - 页面不再出现 `暂无文稿`
+  - 同时验证接口：
+    - `/api/scripts?projectId=CSET-Seedance2` 返回两份文稿
+  - 结论：
+    - 这次解除的是 Phase2 测试的前置阻塞，不是 Phase2 业务逻辑本身的最终验收
+    - 下一步可以回到真实的 Phase2 业务验收 request，继续测“生成 -> 勾选 -> 提交 Phase3”
+
+- **协议纠偏**：
+  - 根据用户当场纠正，已把“网页验收默认优先 Agent Browser，不要先手用 Playwright MCP”写入 `rules.md`
+  - 后续 Director 页面验证统一按这条协议执行

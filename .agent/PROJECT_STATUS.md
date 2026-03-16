@@ -1,9 +1,10 @@
 # 📊 DeliveryConsole 项目状态板
 
-> 最后更新: 2026-03-13  
-> 分支: `director0309`
+> 最后更新: 2026-03-14  
+> 分支: `codex/director-main`
+> 当前工作区: `/Users/luzhoua/MHSDC/DeliveryConsole/Director`
+> 当前运行时端口: 前端 `5178` / 后端 `3005`
 > 最新里程碑: `v4.1.0` (Director 主线修复与 Chatbox 基础设施落地)
-> 最新 Commit: `79d38b0`
 
 ---
 
@@ -31,6 +32,7 @@
 
 ## 活跃问题
 
+- **整仓 TypeScript build 仍有存量红灯**：`npm run build` 当前失败集中在 `server/llm-config.ts`、`src/components/ChatPanel.tsx`、`src/components/market/*`、`ScheduleModal/StatusDashboard` 等旧问题；已确认不是本轮端口收口引入。
 - **Director Bridge 仍待扩到更复杂模板**：当前已接入 `change_type/change_text/regenerate_prompt/delete_option`，并补上 `adjust_layout/change_template` 的保守版本；复杂模板结构化切换仍未接入。
 - **Director Chat 真实手测待补**：Director 基础 socket smoke 已跑通，但还没覆盖更长链路和确认后实际写盘回放。
 - **Chatbox 多专家专属 prompt 仍不完整**：这轮已把所有专家至少接上自己的 `SKILL.md`，但只有 Director 拥有专属 `chat_edit` prompt/resources；Music/Shorts/Thumbnail/Marketing 仍待补更细的 chat prompt 契约。
@@ -39,6 +41,7 @@
 
 ## 最新变更
 
+- **2026-03-14**: ✅ Director 新家运行时收口第一轮已落地：端口按账本统一为 `.env.local -> runtime`，`check-port/preview/start.sh/PM2/launch` 不再保留 `3002/5173/3003/5175` 旧口径。
 - **2026-03-12**: ✅ Director Bridge 第一阶段已落地：新增 `director_bridge_action`，接入 `1-4` 目标解析、`A-F/类型别名` 映射、冲突判定与可审阅确认卡。
 - **2026-03-12**: ✅ Director Bridge 第二步已补：`adjust_layout/change_template` 已接入最小安全支持，先覆盖 TextReveal 单行/不换行/缩边距与安全模板切换。
 - **2026-03-12**: ✅ Director 运行时 smoke 已跑通：`改成 D`、类型冲突澄清、`改成 TextReveal` 均已在本地 3005 服务上验证到真实 socket 返回。

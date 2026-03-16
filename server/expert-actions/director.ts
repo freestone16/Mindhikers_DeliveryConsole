@@ -2,8 +2,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
-import { loadConfig } from '../llm-config';
+import { getProviderCredentialStatus, loadConfig } from '../llm-config';
 import { tryResolveDirectorFastPath } from '../director-bridge';
+import { resolveGlobalLLMConfig } from '../../src/schemas/llm-config';
+
+function ensureGlobalLLMReady(provider: string, model: string) {
+    const status = getProviderCredentialStatus(provider);
+    if (status.configured) {
+        return;
+    }
+
+    const missingVars = status.missingVars.join(', ');
+    throw new Error(`全局模型 ${provider}/${model} 未配置 API Key（缺少 ${missingVars}）。请先在“全局模型网关配置”补全对应 Key，或切换到已配置的全局 Provider。`);
+}
 
 function isPlainObject(value: unknown): value is Record<string, any> {
     return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -176,9 +187,8 @@ export const DirectorAdapter: ExpertActionAdapter = {
             case 'regenerate_prompt': {
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
 
-                const config = loadConfig() as Record<string, any>;
-                const provider = config?.global?.provider || 'openai';
-                const model = config?.global?.model || 'gpt-4o';
+                const globalConfig = resolveGlobalLLMConfig(loadConfig());
+                ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
 
                 const promptTemplate = `
 You are an expert Midjourney / Video AI prompt engineer.
@@ -194,8 +204,8 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                 try {
                     const newPromptResponse = await callLLM(
                         [{ role: 'user', content: promptTemplate.trim() }],
-                        provider,
-                        model
+                        globalConfig.provider as any,
+                        globalConfig.model
                     );
                     opt.imagePrompt = newPromptResponse.content.trim();
                     opt.previewUrl = undefined; // 提示词更新，旧缩略图过期

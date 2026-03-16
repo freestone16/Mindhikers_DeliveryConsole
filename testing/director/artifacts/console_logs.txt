@@ -1,0 +1,7 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] Connected to local backend
+[log] Chat socket events registered
+[log] Chat socket events registered
+[log] Sync status: {status: done, synced: Array(5), count: 5, timestamp: 2026-03-16T01:10:18.639Z}

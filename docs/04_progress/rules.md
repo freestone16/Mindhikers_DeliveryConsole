@@ -19,23 +19,25 @@
 4. **.env 文件只使用英文注释**，中文会导致 dotenv 解析失败
 5. 使用 `path.join()` 而不是 `path.resolve()` 处理 `..` 相对路径
 6. 服务器启动后验证关键环境变量是否正确加载
+7. **ESM 模块不要在顶层缓存依赖 dotenv 的环境变量**；像 `PROJECTS_BASE` 这类值必须在函数调用时读取，否则 import 先于 `dotenv.config()` 会拿到错误 fallback
+8. **项目路径解析必须统一走共享 helper**（如 `server/project-paths.ts`）；禁止在 `server/*` 里各自实现 `getProjectRoot()` 或各自写 `PROJECTS_BASE` fallback
 
 ---
 
 ## 文件操作
 
-7. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
-8. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
-9. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
-10. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
+9. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
+10. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
+11. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
+12. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
 
 ---
 
 ## 版本恢复
 
-11. 恢复版本时不要同时添加新修改，先验证恢复是否成功
-12. 版本回滚步骤：git checkout → 重启 → 验证 → 再添加新功能
-13. 在 dev_progress.md 记录已知正常工作的 commit hash
+13. 恢复版本时不要同时添加新修改，先验证恢复是否成功
+14. 版本回滚步骤：git checkout → 重启 → 验证 → 再添加新功能
+15. 在 dev_progress.md 记录已知正常工作的 commit hash
 
 ---
 
@@ -191,6 +193,8 @@
 71. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
 72. 不要假设修改生效，用实际命令验证
 73. 验证清单：`lsp_diagnostics` → build → test → 功能测试
+74. **交给用户测试前，必须先自测主链路**：至少跑通用户当前要点的主按钮/主入口，不能只验证局部 API 或日志就让用户接盘
+75. **自测完成后再交接**：确认 dev 服务仍在运行、端口可访问、页面可打开；不要在验证后把服务关掉再让用户测试
 
 ---
 
@@ -238,6 +242,7 @@
 101. **`internet-clip` / `user-capture` 必须始终暴露上传入口**：这类非 AI 素材卡片不能等勾选后才显示上传按钮，用户要能先上传再决定是否确认
 102. **“互联网素材”是类型，“我自己上传/已有视频待上传”是交付方式，不是互斥类型**：当用户说“改成互联网素材，我自己上传”时，应落到 `D. 互联网素材` 并保留上传入口；不要把它和 `E. 用户截图/录屏` 判成冲突
 103. **所有 Chatbox 共用同一条 Fast Path 编排协议**：任何专家都允许实现 adapter 级 `tryFastPath`，但只能在“可直接确认”时短路返回确认卡；一旦不够确定，必须回退给对应专家 Skill，再由 Skill 支持 Bridge/Tool，不允许每个专家各写一套例外逻辑
+104. **`~/.vibedir/global_ports_registry.yml` 是端口唯一事实来源**：迁移到新目录/新 worktree 时，先读取账本里该模块现有端口并原样执行；没有用户明确批准，绝不能自创一组新端口再反写回账本。
 104. **Director 的显式改卡命令是这条通用协议的首个落地实例**：像 `1-2 改成互联网素材`、`1-2 我自己有视频待上传，请改成互联网素材` 这类清晰编辑请求，可以由 DeliveryConsole 直接解析并返回确认卡；一旦 Fast Path 只得到模糊/冲突/待澄清结果，必须回退给 Director Skill 再理解一轮，不能直接用系统澄清抢答
 105. **待确认卡必须在发出时就持久化到 chat history**：不能等用户点击确认或执行成功后才落盘；否则刷新、切专家或重开面板会丢失待确认动作
 106. **所有专家的 Chatbox 都必须先加载自己的 Skill，再谈统一交互**：不能只有 Director 走专属 Skill 注入，其他专家却退回“通用助手”兜底；Music/Shorts/Thumbnail/Marketing 至少应加载各自 `SKILL.md`
@@ -253,6 +258,15 @@
 116. **类型冲突判定前先扣除否定语义和上传意图**：`我自己上传 / 我有现成视频 / 待上传` 属于交付方式，不是目标类型；`不要/不需要/去掉` 后面的旧类型是被移除项，不应继续和目标类型打冲突
 117. **Director Phase2 的全局 LLM 生成链路必须有硬超时**：`generateGlobalBRollPlan -> callLLM` 这条链路如果没有 `AbortController`，一旦上游模型悬住，前端就会无限停在“正在为你的剧本生成视觉方案...”
 118. **Phase2 从“卡死”变成“兜底方案”是进展，不是完结**：如果界面最终出现 `兜底方案（LLM 生成失败）`，说明后端已经从无限等待推进到了可恢复失败，但真正问题已从“无超时”转成“上游模型质量/结构化输出不稳定”
+119. **自动化测试的 `passed` 不能等于“页面没报错”**：像 Director Phase1 这类主链路，必须至少证明页面完成态或目标文件写盘成功；只验证按钮可点、页面可开、等待数秒无异常，不足以帮助排错，也不能交给用户当真实回归结果
+120. **测试协议里凡是需要真实页面交互的环节，执行端优先使用 `agent browser`**：不要把页面验收退化成随意脚本或弱浏览器代理；尤其是 Director Phase1 这类需要观察 loading、完成态、截图和 network 证据的主链路，必须尽量贴近真实用户操作
+121. **request 明确要求 `agent browser` 时，不能用自写 Playwright 脚本冒充完成**：做不到就如实写 `blocked/failed`；否则报告会把“浏览器自动化”误包装成“Agent Browser 已验证”，破坏协议可信度
+122. **OpenCode 出现 `database is locked` 时，先查遗留进程，再做 SQLite WAL checkpoint**：确认没有存活 `opencode` 进程后，优先执行 `sqlite3 ~/.local/share/opencode/opencode.db 'pragma wal_checkpoint(full);'`；不要一上来删库或删状态目录
+123. **测试 worker 不能和用户的交互式 `opencode` 会话并发抢库**：检测到已有 `opencode` 活进程时，worker 必须自动避让并把 request 标成 `blocked`，而不是继续启动 `opencode run` 把用户环境再锁死
+124. **OpenCode 侧“装了 agent-browser skill”不等于浏览器链已可用**：还必须同时具备 `agent-browser` CLI 和已安装的 Chrome 二进制；只有 skill 没有命令本体时，执行端会退回别的浏览器路径，破坏协议口径
+125. **用户在项目目录里说“协调opencode测试”时，代理必须自动接管测试协议**：默认先读取 `testing/README.md`、`testing/OPENCODE_INIT.md`，再读取当前模块的 `testing/<module>/README.md`；不要再要求用户重复解释 OpenCode 协作流程
+126. **“协调opencode测试”只表示环境 ready，不表示自动开跑**：代理完成 request / claim / report / status 的协议接管后，必须停下来等待用户明确说明下一步测试计划，不能擅自挑模块或直接发起 request
+127. **本项目凡是网页验收/页面交互验证，默认优先 Agent Browser，不要先手用 Playwright MCP**：只有在 Agent Browser 明确不可用且已向用户说明是 fallback 时，才允许改用 Playwright；否则会偏离当前测试协议
 
 ---
 

@@ -18,7 +18,7 @@ import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import { DIRECTOR_BRIDGE_ACTION_NAME, getDirectorBridgeToolDefinitions, resolveDirectorBridgeAction } from './director-bridge';
@@ -26,6 +26,8 @@ import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
+import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
+import { getProjectRoot, getProjectsBase } from './project-paths';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -33,6 +35,7 @@ const upload = multer({ dest: 'uploads/' });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 
 const app = express();
 app.use(cors()); // Enable CORS for all routes
@@ -46,7 +49,7 @@ const io = new Server(httpServer, {
 
 function resolveChatGatewayConfig(config: ReturnType<typeof loadConfig>) {
     // Chatbox follows the global gateway to avoid hidden expert-level model drift.
-    return config.global;
+    return resolveGlobalLLMConfig(config);
 }
 
 function buildSystemActionHistoryMessage(payload: {
@@ -105,7 +108,6 @@ function emitAndPersistActionConfirm(
 
 // --- Project Context (Mutable - supports runtime switching) ---
 // Docker: PROJECTS_BASE=/data/projects  |  Local: fallback to ../../Projects
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
 // No longer globally hardcoded. Projects are specified per request.
 let currentProjectName: string | null = null; // Track active project for server-side operations
 
@@ -573,6 +575,35 @@ function syncDirectorModuleToDeliveryStore(projectRoot: string, directorPayload?
     return deliveryData;
 }
 
+function hydrateSocketProjectContext(socket: any, projectId: string) {
+    currentProjectName = projectId;
+    socket.join(projectId);
+    socketToProjectMap.set(socket, projectId);
+    console.log(`Socket ${socket.id} joined room: ${projectId}`);
+
+    ensureDeliveryFile(projectId);
+
+    const projectRoot = getProjectRoot(projectId);
+    Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
+        ensureExpertState(projectRoot, expertId);
+    });
+
+    setupProjectWatcher(projectId);
+    setupExpertWatchers(projectId);
+    setupVisualPlanWatcher(io, projectRoot);
+
+    const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+    const data = syncDirectorModuleToDeliveryStore(projectRoot) || JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+    socket.emit('delivery-data', data);
+
+    Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
+        const expertData = loadExpertState(projectRoot, expertId);
+        socket.emit(`expert-data-update:${expertId}`, expertData);
+    });
+
+    socket.emit('active-project', { name: projectId });
+}
+
 // Initial setup is now deferred until a project connects
 // ensureDeliveryFile();
 // setupProjectWatcher();
@@ -601,6 +632,14 @@ io.on('connection', (socket) => {
     // Also send active project name (if any)
     socket.emit('active-project', { name: currentProjectName });
 
+    if (currentProjectName) {
+        try {
+            hydrateSocketProjectContext(socket, currentProjectName);
+        } catch (e) {
+            console.error(`Failed to hydrate socket ${socket.id} for active project ${currentProjectName}:`, e);
+        }
+    }
+
     // Send skill sync status to newly connected client
     sendSyncStatusToSocket(socket);
 
@@ -627,36 +666,8 @@ io.on('connection', (socket) => {
             }
         }
 
-        socket.join(projectId);
-        socketToProjectMap.set(socket, projectId);
-        console.log(`Socket ${socket.id} joined room: ${projectId}`);
-        // 1. Ensure file exists for this project
-        ensureDeliveryFile(projectId);
-
-        // Ensure all expert states exist
-        const projectRoot = getProjectRoot(projectId);
-        Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
-            ensureExpertState(projectRoot, expertId);
-        });
-
-        // 2. Set up watchers for this specific project
-        setupProjectWatcher(projectId);
-        setupExpertWatchers(projectId); // Needs refactor to take projectRoot if needed globally
-        setupVisualPlanWatcher(io, projectRoot);
-
-        // 3. Send the current data to the client
-        const deliveryFile = path.join(projectRoot, 'delivery_store.json');
         try {
-            const data = syncDirectorModuleToDeliveryStore(projectRoot) || JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-            socket.emit('delivery-data', data);
-
-            // Send expert data explicitly upon connection
-            Object.keys(EXPERT_OUTPUT_DIRS).forEach((expertId) => {
-                const expertData = loadExpertState(projectRoot, expertId);
-                socket.emit(`expert-data-update:${expertId}`, expertData);
-            });
-
-            socket.emit('active-project', { name: projectId }); // Confirm active project to client
+            hydrateSocketProjectContext(socket, projectId);
         } catch (e) {
             console.error('Failed to read delivery file:', e);
         }
@@ -1006,7 +1017,7 @@ setTimeout(() => {
 }, 1000);
 */
 
-const PORT = parseInt(process.env.PORT || '3002', 10);
+const PORT = parseInt(process.env.PORT || process.env.VITE_BACKEND_PORT || '3005', 10);
 
 // ============================================================
 // REST API Endpoints
@@ -1044,16 +1055,17 @@ app.get('/api/chat/history/:expertId', (req, res) => {
 // List all available projects under Projects/
 app.get('/api/projects', (req, res) => {
     try {
-        if (!fs.existsSync(PROJECTS_BASE)) {
+        const projectsBase = getProjectsBase();
+        if (!fs.existsSync(projectsBase)) {
             return res.json({ projects: [], active: currentProjectName });
         }
-        const dirs = fs.readdirSync(PROJECTS_BASE, { withFileTypes: true })
+        const dirs = fs.readdirSync(projectsBase, { withFileTypes: true })
             .filter(d => d.isDirectory() && !d.name.startsWith('.'))
             .map(d => ({
                 name: d.name,
                 isActive: d.name === currentProjectName,
                 hasDeliveryStore: fs.existsSync(
-                    path.join(PROJECTS_BASE, d.name, 'delivery_store.json')
+                    path.join(projectsBase, d.name, 'delivery_store.json')
                 )
             }));
         res.json({ projects: dirs, active: currentProjectName });
@@ -1070,7 +1082,7 @@ app.post('/api/projects/switch', (req, res) => {
         return res.status(400).json({ error: 'Missing projectName' });
     }
 
-    const newRoot = path.resolve(PROJECTS_BASE, projectName);
+    const newRoot = getProjectRoot(projectName);
     if (!fs.existsSync(newRoot)) {
         return res.status(404).json({ error: `项目目录不存在: Projects/${projectName}` });
     }
@@ -1110,7 +1122,7 @@ app.get('/api/files', async (req, res) => {
         dir = path.resolve(dir);
 
         // Security Audit Fix: Path Traversal
-        const resolvedBase = path.resolve(PROJECTS_BASE);
+        const resolvedBase = path.resolve(getProjectsBase());
         const resolvedCurrent = path.resolve(process.cwd());
         if (!dir.startsWith(resolvedBase) && !dir.startsWith(resolvedCurrent)) {
             return res.status(403).json({ error: 'Access denied: Directory traversal detected' });
@@ -1462,7 +1474,7 @@ app.post('/api/experts/run', (req, res) => {
 // Start Server
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🔒 Server running on http://0.0.0.0:${PORT} (Docker Friendly)`);
-    console.log(`📂 Projects Base: ${PROJECTS_BASE}`);
+    console.log(`📂 Projects Base: ${getProjectsBase()}`);
     //    console.log(`🎬 A-roll dir: ${SHORTS_AROLL_DIR}`);
 });
 

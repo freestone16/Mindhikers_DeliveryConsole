@@ -2,11 +2,15 @@
 
 MindHikers 项目的内容交付管理控制台。用于管理视频项目的制作流程，包括导演、音乐、缩略图、营销等模块。
 
+> 当前 Director 新家工作区：`/Users/luzhoua/MHSDC/DeliveryConsole/Director`
+> 端口 SSOT：`~/.vibedir/global_ports_registry.yml` -> `.env.local` -> runtime
+> 当前账本口径：前端 `5178`，后端 `3005`
+
 ---
 
 ## 📁 项目结构
 
-**⚠️ 重要变更（2025-02-20）：项目已分离到独立目录**
+**⚠️ 历史搬迁（2025-02-20）+ 当前开发新家（2026-03-14）**
 
 ```
 /Users/luzhoua/
@@ -37,18 +41,18 @@ MindHikers 项目的内容交付管理控制台。用于管理视频项目的制
 ### 方式 1：本地开发（推荐）
 
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
 npm run dev
 ```
 
 服务启动后：
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:3002`
+- 前端：`http://localhost:5178`
+- 后端：`http://localhost:3005`
 
 ### 方式 2：Docker（网络稳定时使用）
 
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
 make dev
 ```
 
@@ -58,26 +62,27 @@ make dev
 
 ## ⚙️ 环境配置
 
-### 关键配置文件：`.env`
+### 关键配置文件：`.env.local`
 
 ```bash
-# 当前激活的项目名称
-PROJECT_NAME=CSET-SP3
+# 当前工作区名称
+PROJECT_NAME=MindHikers Delivery Console
 
-# 服务端口
-PORT=3002
+# 端口以账本为准
+PORT=3005
+VITE_BACKEND_PORT=3005
+VITE_APP_PORT=5178
 
 # 项目数据基础路径（⚠️ 关键配置）
-# delivery_console 和数据已分离，必须指定完整路径
+# DeliveryConsole 代码与项目数据已分离，必须指定完整路径
 PROJECTS_BASE=/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects
 
-# LLM 配置
-LLM_PROVIDER=deepseek
-DEEPSEEK_API_KEY=sk-9372b8945e474177bc55ace85176bf19
+# 开发时留空走 Vite proxy
+VITE_API_BASE=
 ```
 
 **修改项目：**
-1. 编辑 `.env` 中的 `PROJECT_NAME`
+1. 编辑 `.env.local` 中的运行时配置
 2. 重启服务
 3. 或使用界面上的项目切换功能
 
@@ -141,8 +146,9 @@ make logs
 
 | 文件 | 说明 |
 |------|------|
-| `.env` | 环境变量配置（项目路径、API Key 等） |
+| `.env.local` | 当前工作区运行时配置（端口、项目数据路径） |
 | `server/index.ts` | 后端主入口 |
+| `scripts/runtime-env.js` | 脚本共享的运行时端口解析 |
 | `src/App.tsx` | 前端主组件 |
 | `skills/executor.py` | Skill 执行器 |
 | `skills/connectors/registry.py` | LLM 连接器注册表 |
@@ -198,7 +204,14 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 2. **数据位置：** `/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/`
 3. **启动方式：** `cd /Users/luzhoua/DeliveryConsole && npm run dev`
 4. **关键配置：** 检查 `.env` 中的 `PROJECTS_BASE` 路径是否正确
-5. **注意事项：** 不要移动 Projects/ 数据目录，只需修改 `.env` 即可
+5. **注意事项：** 不要移动 Projects/ 数据目录，只需修改 `.env.local` 即可
+
+## 运行时纪律
+
+- 端口以全局账本 `~/.vibedir/global_ports_registry.yml` 为单一事实来源
+- `.env.local` 承接当前工作区被分配的端口
+- `vite.config.ts`、`scripts/check-port.js`、`scripts/preview.js`、`start.sh`、PM2/launch 配置都必须跟随 `.env.local`
+- 业务代码不应再写死 `localhost:3002` / `5173`
 
 ---
 

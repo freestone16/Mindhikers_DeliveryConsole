@@ -80,9 +80,26 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     ? { provider: status.global.provider, model: status.global.model || 'default' }
     : undefined;
 
+  const getGlobalLLMConfigError = () => {
+    if (!status?.global?.provider) return null;
+
+    const providerStatus = status.providers?.[status.global.provider];
+    if (providerStatus?.configured) {
+      return null;
+    }
+
+    return `当前全局模型 ${status.global.provider}/${status.global.model || 'default'} 未配置可用 API Key。请先到“全局模型网关配置”补全对应 Key，或切换到已配置的全局 Provider。`;
+  };
+
   const handleGenerateConcept = async () => {
     if (!scriptPath) {
       alert('Please select a script first in the header.');
+      return;
+    }
+
+    const llmConfigError = getGlobalLLMConfigError();
+    if (llmConfigError) {
+      alert(llmConfigError);
       return;
     }
 
@@ -148,6 +165,13 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
 
   const handleReviseConcept = async (comment: string) => {
     if (!comment.trim()) return;
+
+    const llmConfigError = getGlobalLLMConfigError();
+    if (llmConfigError) {
+      alert(llmConfigError);
+      return;
+    }
+
     setIsGeneratingConcept(true);
     try {
       const res = await fetch('/api/director/phase1/revise', {
@@ -175,6 +199,12 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const handleConfirmBRoll = async (types: BRollType[]) => {
     if (!scriptPath) {
       alert('Please select a script first');
+      return;
+    }
+
+    const llmConfigError = getGlobalLLMConfigError();
+    if (llmConfigError) {
+      alert(llmConfigError);
       return;
     }
 

@@ -4,20 +4,29 @@
  * 生产环境进程管理配置
  */
 
+const path = require('path');
+const dotenv = require('dotenv');
+
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '.env.local'), override: true });
+
+const backendPort = Number(process.env.PORT || process.env.VITE_BACKEND_PORT || 3005);
+const frontendPort = Number(process.env.VITE_APP_PORT || process.env.VITE_PORT || 5178);
+
 module.exports = {
   apps: [
     {
       name: 'delivery-backend',
       script: 'node',
       args: 'dist/server/index.js',
-      cwd: '/Users/luzhoua/DeliveryConsole',
+      cwd: __dirname,
       instances: 1,
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3002
+        PORT: backendPort
       },
       error_file: './logs/pm2-backend-error.log',
       out_file: './logs/pm2-backend-out.log',
@@ -33,8 +42,8 @@ module.exports = {
     {
       name: 'delivery-frontend',
       script: 'npx',
-      args: 'vite preview --host',
-      cwd: '/Users/luzhoua/DeliveryConsole/dist',
+      args: `vite preview --host --port ${frontendPort}`,
+      cwd: path.join(__dirname, 'dist'),
       instances: 1,
       autorestart: true,
       watch: false,

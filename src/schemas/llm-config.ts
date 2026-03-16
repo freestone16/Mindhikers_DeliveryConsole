@@ -84,6 +84,17 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   },
 };
 
+export const resolveGlobalLLMConfig = (config?: Partial<LLMConfig> | null) => {
+  const hasGlobalConfig = Boolean(config?.global);
+  const provider = config?.global?.provider || DEFAULT_LLM_CONFIG.global.provider;
+  const model = config?.global?.model || DEFAULT_LLM_CONFIG.global.model;
+  const baseUrl = hasGlobalConfig
+    ? (config?.global?.baseUrl ?? null)
+    : DEFAULT_LLM_CONFIG.global.baseUrl;
+
+  return { provider, model, baseUrl };
+};
+
 export const PROVIDER_INFO: Record<string, {
   name: string;
   type: 'llm' | 'generation';

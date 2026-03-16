@@ -2,13 +2,13 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getProjectRoot, getProjectsBase } from './project-paths';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
 
-const PROJECTS_BASE = process.env.PROJECTS_BASE || '/data/projects';
 const AUTH_FILE = path.join(__dirname, '../../.mindhikers/auth.json');
 
 function log(module: string, stage: string, status: string, detail: string = '') {
@@ -137,7 +137,9 @@ router.post('/auth/revoke', (req, res) => {
     }
 });
 
-const DISTRIBUTION_QUEUE_FILE = path.join(PROJECTS_BASE, '_distribution_queue.json');
+function getDistributionQueueFile(): string {
+    return path.join(getProjectsBase(), '_distribution_queue.json');
+}
 
 interface DistributionTask {
     taskId: string;
@@ -161,12 +163,13 @@ interface DistributionTask {
 }
 
 function ensureQueueFile(): DistributionTask[] {
-    if (!fs.existsSync(DISTRIBUTION_QUEUE_FILE)) {
+    const queueFile = getDistributionQueueFile();
+    if (!fs.existsSync(queueFile)) {
         const initialQueue: DistributionTask[] = [];
-        fs.writeFileSync(DISTRIBUTION_QUEUE_FILE, JSON.stringify(initialQueue, null, 2));
+        fs.writeFileSync(queueFile, JSON.stringify(initialQueue, null, 2));
         return initialQueue;
     }
-    return JSON.parse(fs.readFileSync(DISTRIBUTION_QUEUE_FILE, 'utf-8'));
+    return JSON.parse(fs.readFileSync(queueFile, 'utf-8'));
 }
 
 router.get('/queue', (req, res) => {
@@ -227,7 +230,7 @@ router.post('/queue/create', (req, res) => {
         };
         
         queue.push(newTask);
-        fs.writeFileSync(DISTRIBUTION_QUEUE_FILE, JSON.stringify(queue, null, 2));
+        fs.writeFileSync(getDistributionQueueFile(), JSON.stringify(queue, null, 2));
         
         res.json({
             success: true,
@@ -254,7 +257,7 @@ router.delete('/queue/:taskId', (req, res) => {
         }
         
         queue.splice(taskIndex, 1);
-        fs.writeFileSync(DISTRIBUTION_QUEUE_FILE, JSON.stringify(queue, null, 2));
+        fs.writeFileSync(getDistributionQueueFile(), JSON.stringify(queue, null, 2));
         
         res.json({ success: true, message: 'Task cancelled' });
     } catch (error: any) {
@@ -280,7 +283,7 @@ router.post('/queue/:taskId/retry', (req, res) => {
         queue[taskIndex].error = undefined;
         queue[taskIndex].createdAt = new Date().toISOString();
         
-        fs.writeFileSync(DISTRIBUTION_QUEUE_FILE, JSON.stringify(queue, null, 2));
+        fs.writeFileSync(getDistributionQueueFile(), JSON.stringify(queue, null, 2));
         
         res.json({ success: true, task: queue[taskIndex] });
     } catch (error: any) {
@@ -294,7 +297,7 @@ router.get('/assets', (req, res) => {
         if (!projectId) {
             return res.status(400).json({ success: false, error: 'Missing project parameter' });
         }
-        const projectRoot = path.join(PROJECTS_BASE, projectId);
+        const projectRoot = getProjectRoot(projectId);
         
         const shortsDir = path.join(projectRoot, '05_Shorts_Output');
         const marketingDir = path.join(projectRoot, '05_Marketing');

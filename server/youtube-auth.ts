@@ -3,13 +3,14 @@ import express, { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getProjectRoot } from './project-paths';
 
 // ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
-const AUTH_PORT = process.env.PORT || '3002';
+const AUTH_PORT = process.env.PORT || process.env.VITE_BACKEND_PORT || '3005';
 
 // Configuration paths - expecting secrets folder at project root
 const SECRETS_DIR = path.resolve(__dirname, '../secrets');
@@ -135,8 +136,7 @@ router.post('/shorts/upload', async (req, res) => {
 
     try {
         const PROJECT_NAME = process.env.PROJECT_NAME || 'MindHikers Delivery Console';
-        const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
-        const PROJECT_ROOT = path.resolve(PROJECTS_BASE, PROJECT_NAME);
+        const PROJECT_ROOT = getProjectRoot(PROJECT_NAME);
         const DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
 
         if (!fs.existsSync(DELIVERY_FILE)) {

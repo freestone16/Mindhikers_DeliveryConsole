@@ -4,8 +4,7 @@ import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 import { buildExpertChatSystemPrompt } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
-
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
+import { getProjectRoot as resolveProjectRoot } from './project-paths';
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -401,7 +400,7 @@ export function formatMultimodalMessages(
 }
 
 export function getProjectRoot(projectId: string): string {
-    return path.resolve(PROJECTS_BASE, projectId);
+    return resolveProjectRoot(projectId);
 }
 
 // End of file
