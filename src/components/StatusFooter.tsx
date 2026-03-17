@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { buildApiUrl, runtimeConfig } from '../config/runtime';
 
-const SOCKET_URL = 'http://127.0.0.1:3002';
+const SOCKET_URL = runtimeConfig.socketUrl;
 
 export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
     const [syncStatus, setSyncStatus] = useState<any>(null);
@@ -23,7 +24,7 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
 
     // Fetch version from backend
     useEffect(() => {
-        fetch('/api/version')
+        fetch(buildApiUrl('/api/version'))
             .then(res => res.json())
             .then(data => {
                 if (data.version) {

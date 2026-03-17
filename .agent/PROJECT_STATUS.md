@@ -1,10 +1,10 @@
 # 📊 DeliveryConsole 项目状态板
 
-> 最后更新: 2026-03-13 09:46 CST
-> 当前工作树: `/Users/luzhoua/DeliveryConsole`
-> 分支: `codex/sd208-golden-crucible`
+> 最后更新: 2026-03-14 23:20 CST
+> 当前工作树: `/Users/luzhoua/MHSDC/GoldenCrucible`
+> 分支: `codex/crucible-main`
 > 最新里程碑: `SD210` (黄金坩埚人格层 / 工具层架构定稿)
-> 建议 Commit: `docs: save crucible persona architecture 2026-03-10`
+> 建议 Commit: `chore: close GoldenCrucible migration runtime gap`
 
 ---
 
@@ -34,6 +34,9 @@
 5. 当前工作区是重度脏状态，本轮仅继续收黄金坩埚链路并保存进度，不对其他模块改动做清理或归并。
 
 ## 最新变更
+
+- **2026-03-14**: ✅ 完成 GoldenCrucible 迁移收口首轮：统一前端 runtime 入口、清除旧 host/port 与 Docker 路径硬编码、修复 `dev:check` 的 `EPERM` 假阳性、恢复依赖层。
+- **2026-03-14**: ⚠️ 全仓 `build` 仍被 unrelated 存量问题阻塞，当前已确认主要集中在营销大师 `TubeBuddyScore` 类型债与旧 `DeliveryState.modules` 兼容层，未在本轮混修。
 
 - **2026-03-10**: ✅ 黄金坩埚右侧已接入真实 chat，前台“黄金冶炼师”已挂载 `Socrates + ThesisWriter + Researcher + FactChecker + Writer` 知识上下文。
 - **2026-03-10**: ✅ 已确认并同步 `ThesisWriter / Writer / Researcher / FactChecker` 到当前项目的 `skills/` 目录。

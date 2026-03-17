@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Loader2, Download, CheckCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Loader2, Download, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import type { DirectorChapter } from '../../types';
+import { buildApiUrl } from '../../config/runtime';
 
 interface AlignResult {
   brollId: string;
@@ -18,7 +19,7 @@ interface Phase3ViewProps {
   onProceed: () => void;
 }
 
-export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) => {
+export const Phase3View = ({ projectId, chapters, onProceed: _onProceed }: Phase3ViewProps) => {
   const [srtFile, setSrtFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [alignResults, setAlignResults] = useState<AlignResult[]>([]);
@@ -75,7 +76,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
         throw new Error('没有检测到已确认并选择方案的视觉条目');
       }
 
-      const res = await fetch('http://localhost:3002/api/director/phase3/align-srt', {
+      const res = await fetch(buildApiUrl('/api/director/phase3/align-srt'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,7 +103,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     setError(null);
 
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase3/generate-xml', {
+      const res = await fetch(buildApiUrl('/api/director/phase3/generate-xml'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,7 +125,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
   };
 
   const handleDownload = (format: 'premiere' | 'jianying') => {
-    window.open(`http://localhost:3002/api/director/phase3/download-xml/${projectId}/${format}`, '_blank');
+    window.open(buildApiUrl(`/api/director/phase3/download-xml/${projectId}/${format}`), '_blank');
   };
 
   return (

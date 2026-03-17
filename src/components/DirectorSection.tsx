@@ -5,6 +5,7 @@ import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
 import type { DirectorModule, DirectorChapter, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
+import { buildApiUrl } from '../config/runtime';
 
 interface DirectorSectionProps {
   projectId: string;
@@ -58,7 +59,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     console.log('[Phase1] 🚀 开始生成概念提案...');
 
     try {
-      const response = await fetch('http://localhost:3002/api/director/phase1/generate', {
+      const response = await fetch(buildApiUrl('/api/director/phase1/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, scriptPath })
@@ -116,7 +117,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     if (!comment.trim()) return;
     setIsGeneratingConcept(true);
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase1/revise', {
+      const res = await fetch(buildApiUrl('/api/director/phase1/revise'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, userComment: comment })
@@ -162,7 +163,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
       // Feature 1: Clear chat history when regenerating Phase 2
       socket?.emit('chat-clear-history', { expertId: 'Director', projectId });
 
-      const response = await fetch('http://localhost:3002/api/director/phase2/start', {
+      const response = await fetch(buildApiUrl('/api/director/phase2/start'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, scriptPath, brollTypes: types })
@@ -293,7 +294,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
 
     // We will call the backend to start rendering
     try {
-      const response = await fetch('http://localhost:3002/api/director/phase2/render_checked', {
+      const response = await fetch(buildApiUrl('/api/director/phase2/render_checked'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

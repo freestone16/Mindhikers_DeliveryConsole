@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Rocket, Loader2, FileText, Sparkles } from 'lucide-react';
 import type { ShortScript, CTA } from '../../types';
+import { buildApiUrl } from '../../config/runtime';
 
 interface ShortsPhase1Props {
     projectId: string;
@@ -52,7 +53,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
     const loadScripts = async () => {
         setIsLoadingScripts(true);
         try {
-            const res = await fetch(`http://localhost:3002/api/scripts?projectId=${projectId}`);
+            const res = await fetch(buildApiUrl(`/api/scripts?projectId=${projectId}`));
             const data = await res.json();
             setScripts(data.scripts || []);
         } catch (e) {
@@ -71,7 +72,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         }
 
         try {
-            const res = await fetch(`http://localhost:3002/api/scripts/content`, {
+            const res = await fetch(buildApiUrl('/api/scripts/content'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, path })
@@ -90,7 +91,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         
         setIsRecommending(true);
         try {
-            const res = await fetch('http://localhost:3002/api/shorts/phase1/recommend', {
+            const res = await fetch(buildApiUrl('/api/shorts/phase1/recommend'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, content, count: targetCount })
@@ -141,7 +142,7 @@ export const ShortsPhase1 = ({ projectId, onGenerated }: ShortsPhase1Props) => {
         setGeneratedScripts([]);
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase1/generate', {
+            const response = await fetch(buildApiUrl('/api/shorts/phase1/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

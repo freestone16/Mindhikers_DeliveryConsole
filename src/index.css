@@ -2,10 +2,20 @@
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --shell-bg: #08101d;
+  --surface-0: #fffaf3;
+  --surface-1: #f8ecdc;
+  --surface-2: #f0d8b6;
+  --ink-1: #342214;
+  --ink-2: #6f5237;
+  --ink-3: #a1805f;
+  --line-soft: rgba(154, 114, 70, 0.16);
+  --line-strong: rgba(154, 114, 70, 0.34);
+  --accent: #ea8a1a;
 }
 
 body {
-  background-color: #060b14;
+  background-color: var(--shell-bg);
   color: #e2e8f0;
 }
 

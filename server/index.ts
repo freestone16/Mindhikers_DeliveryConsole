@@ -17,7 +17,6 @@ import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
 import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections, resolveChatLlm } from './llm-config';
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
-import * as music from './music';
 import * as shorts from './shorts';
 import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
@@ -183,9 +182,6 @@ app.put('/api/shorts/header-config', upload.fields([
 ]), shorts.updateHeaderConfig);
 app.post('/api/shorts/phase3/render', shorts.renderShort);
 app.get('/api/shorts/phase3/render-status/:jobId', shorts.getRenderStatus);
-
-// Music Director Routes
-app.get('/api/music/assets', music.getAssets);
 
 // Market Master Routes (SD-207)
 app.use('/api/market', marketRouter);
@@ -816,7 +812,7 @@ setTimeout(() => {
 }, 1000);
 */
 
-const PORT = parseInt(process.env.PORT || '3002', 10);
+const PORT = parseInt(process.env.PORT || '3004', 10);
 
 // ============================================================
 // REST API Endpoints

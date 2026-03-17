@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Music, Upload } from 'lucide-react';
+import { buildApiUrl } from '../../config/runtime';
 
 interface BGMSelectorProps {
     projectId: string;
@@ -49,7 +50,7 @@ export const BGMSelector = ({ projectId, currentBgm, onBgmChange }: BGMSelectorP
         formData.append('projectId', projectId);
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/upload-bgm', {
+            const response = await fetch(buildApiUrl('/api/shorts/upload-bgm'), {
                 method: 'POST',
                 body: formData
             });

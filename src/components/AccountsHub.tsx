@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Unlink, CheckCircle, XCircle, AlertCircle, QrCode, ExternalLink } from 'lucide-react';
+import { buildApiUrl } from '../config/runtime';
 
 interface PlatformAccount {
     platform: string;
@@ -82,7 +83,7 @@ export const AccountsHub = () => {
 
     const fetchAuthStatus = async () => {
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/auth/status');
+            const res = await fetch(buildApiUrl('/api/distribution/auth/status'));
             const data = await res.json();
             if (data.success) {
                 setGroups(data.data);
@@ -101,7 +102,7 @@ export const AccountsHub = () => {
     const handleRefresh = async (platform: string) => {
         setRefreshing(platform);
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/auth/refresh', {
+            const res = await fetch(buildApiUrl('/api/distribution/auth/refresh'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ platform })
@@ -121,7 +122,7 @@ export const AccountsHub = () => {
         if (!confirm('确定要解除该平台的授权吗？')) return;
         
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/auth/revoke', {
+            const res = await fetch(buildApiUrl('/api/distribution/auth/revoke'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ platform })

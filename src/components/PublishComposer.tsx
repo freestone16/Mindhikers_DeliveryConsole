@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Film, Globe, Send, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { buildApiUrl } from '../config/runtime';
 
 interface VideoAsset {
     name: string;
@@ -59,7 +60,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     const fetchAssets = async () => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/assets');
+            const res = await fetch(buildApiUrl('/api/distribution/assets'));
             const data = await res.json();
             if (data.success) {
                 setVideos(data.videos || []);
@@ -79,20 +80,10 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
         }
 
         try {
-            const projectDir = propProjectId || 'MindHikers Delivery Console';
-            const res = await fetch(`http://localhost:3002/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
-            const data = await res.json();
-
-            const planFile = data.files?.find((f: any) => f.name === 'marketing_plan.json');
-            if (planFile) {
-                setTitle('AI 如何重构工作方式 (#Short)');
-                setContent('今天聊聊底层逻辑...');
-                setTags('#AI #MindHikers #科技创新 #个人成长');
-            } else {
-                setTitle('AI 如何重构工作方式 (#Short)');
-                setContent('今天聊聊底层逻辑...');
-                setTags('#AI #MindHikers #科技创新 #个人成长');
-            }
+            const hasMarketingPlan = marketingFiles.some(file => file.name === 'marketing_plan.json');
+            setTitle('AI 如何重构工作方式 (#Short)');
+            setContent(hasMarketingPlan ? '今天聊聊底层逻辑...' : '请先完善营销方案后再生成最终文案。');
+            setTags('#AI #MindHikers #科技创新 #个人成长');
         } catch (e) {
             console.error('Failed to fill from marketing:', e);
         }
@@ -127,7 +118,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
         setSubmitResult(null);
 
         try {
-            const res = await fetch('http://localhost:3002/api/distribution/queue/create', {
+            const res = await fetch(buildApiUrl('/api/distribution/queue/create'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

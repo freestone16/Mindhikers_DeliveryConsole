@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { DeliveryState } from '../types';
+import { buildApiUrl, runtimeConfig } from '../config/runtime';
 
-const SOCKET_URL = 'http://127.0.0.1:3002';
-const API_URL = 'http://localhost:3002';
+const SOCKET_URL = runtimeConfig.socketUrl;
 
 export const INITIAL_STATE: DeliveryState = {
     projectId: '',
@@ -58,7 +58,7 @@ export const useDeliveryStore = () => {
 
     const selectScript = async (projectId: string, scriptPath: string): Promise<boolean> => {
         try {
-            const res = await fetch(`${API_URL}/api/scripts/select`, {
+            const res = await fetch(buildApiUrl('/api/scripts/select'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, path: scriptPath })

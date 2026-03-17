@@ -267,14 +267,6 @@ function App() {
         previousContextRef.current = currentContext;
     }, [state.projectId, state.selectedScript?.path, resetActiveExpertContext]);
 
-    const handleCrucibleBoardStateChange = useCallback((payload: { hasContent: boolean }) => {
-        setCrucibleHasBoardContent(payload.hasContent);
-    }, []);
-
-    const handleCrucibleTurnSettled = useCallback(() => {
-        setCrucibleTurnSettledToken((prev) => prev + 1);
-    }, []);
-
     const handleCrucibleDividerMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
         const container = crucibleShellRef.current;
         if (!container) {
@@ -346,8 +338,6 @@ function App() {
                             seedPromptVersion={crucibleSeedVersion}
                             onResetWorkspace={handleCrucibleReset}
                             onRoundGenerated={handleCrucibleRoundGenerated}
-                            onBlackboardStateChange={handleCrucibleBoardStateChange}
-                            onTurnSettled={handleCrucibleTurnSettled}
                         />
                     </div>
                     <div
@@ -455,10 +445,7 @@ function App() {
                 />
             ) : null}
 
-            <StatusFooter
-                isConnected={isConnected}
-                activeChatExpertId={activeModule === 'crucible' ? CRUCIBLE_EXPERT_ID : activeExpertId}
-            />
+            <StatusFooter isConnected={isConnected} />
         </div>
     );
 }

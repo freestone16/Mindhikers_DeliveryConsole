@@ -18,6 +18,10 @@ function ensureDir(dir: string) {
     }
 }
 
+function sanitizeFilename(filename: string) {
+    return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 function loadShortsState(projectRoot: string): any {
     const statePath = path.join(projectRoot, '05_Shorts_Output', 'shorts_state.json');
     if (fs.existsSync(statePath)) {
@@ -375,6 +379,78 @@ export const confirmAll = (req: Request, res: Response) => {
 
     saveShortsState(projectRoot, state);
     res.json({ success: true, mergedFilePath: mergedPath, shortCount: state.scripts.length });
+};
+
+export const uploadBgm = async (req: Request, res: Response) => {
+    const { projectId } = req.body;
+    const file = (req as any).file;
+
+    if (!projectId) {
+        return res.status(400).json({ error: 'Missing projectId' });
+    }
+
+    if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const projectRoot = getProjectRoot(projectId);
+    const bgmDir = path.join(projectRoot, '05_Shorts_Output', '_assets', 'bgm');
+    ensureDir(bgmDir);
+
+    const originalExt = path.extname(file.originalname || '').toLowerCase() || '.mp3';
+    const safeBaseName = sanitizeFilename(path.basename(file.originalname || `bgm_${Date.now()}`, originalExt));
+    const finalName = `${safeBaseName}_${Date.now()}${originalExt}`;
+    const finalPath = path.join(bgmDir, finalName);
+
+    try {
+        await fs.promises.rename(file.path, finalPath);
+        return res.json({
+            success: true,
+            name: file.originalname,
+            path: finalPath,
+        });
+    } catch (error: any) {
+        console.error('Upload BGM error:', error);
+        return res.status(500).json({ error: error.message || 'Upload failed' });
+    }
+};
+
+export const getMusicAssets = async (req: Request, res: Response) => {
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : '';
+
+    if (!projectId) {
+        return res.status(400).json({ error: 'Missing projectId' });
+    }
+
+    const projectRoot = getProjectRoot(projectId);
+    const bgmDir = path.join(projectRoot, '05_Shorts_Output', '_assets', 'bgm');
+
+    try {
+        if (!fs.existsSync(bgmDir)) {
+            return res.json({ assets: [] });
+        }
+
+        const entries = await fs.promises.readdir(bgmDir, { withFileTypes: true });
+        const assets = await Promise.all(
+            entries
+                .filter((entry) => entry.isFile())
+                .map(async (entry) => {
+                    const filePath = path.join(bgmDir, entry.name);
+                    const stat = await fs.promises.stat(filePath);
+                    return {
+                        name: entry.name,
+                        path: filePath,
+                        size: stat.size,
+                        modifiedAt: stat.mtime.toISOString(),
+                    };
+                })
+        );
+
+        return res.json({ assets });
+    } catch (error: any) {
+        console.error('Get music assets error:', error);
+        return res.status(500).json({ error: error.message || 'Failed to load music assets' });
+    }
 };
 
 export const uploadAroll = async (req: Request, res: Response) => {

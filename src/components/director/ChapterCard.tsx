@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Check, Loader2, Image, Upload, FileVideo } from 'lucide-react';
 import type { DirectorChapter, SceneOption } from '../../types';
+import { buildApiUrl } from '../../config/runtime';
 
 interface ChapterCardProps {
   chapter: DirectorChapter;
@@ -81,7 +82,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
 
   const checkMaterialExists = async () => {
     try {
-      const res = await fetch(`http://localhost:3002/api/director/material-exists?projectId=${projectId}&chapterId=${chapter.chapterId}&optionId=${option.id}`);
+      const res = await fetch(buildApiUrl(`/api/director/material-exists?projectId=${projectId}&chapterId=${chapter.chapterId}&optionId=${option.id}`));
       const data = await res.json();
       if (data.success && data.data.exists) {
         setUploadStatus('completed');
@@ -113,7 +114,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
       formData.append('chapterId', chapter.chapterId);
       formData.append('optionId', option.id);
 
-      const res = await fetch('http://localhost:3002/api/director/upload-material', {
+      const res = await fetch(buildApiUrl('/api/director/upload-material'), {
         method: 'POST',
         body: formData
       });
@@ -145,7 +146,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
     setThumbStatus('generating');
 
     try {
-      const res = await fetch('http://localhost:3002/api/director/phase2/thumbnail', {
+      const res = await fetch(buildApiUrl('/api/director/phase2/thumbnail'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -193,7 +194,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck 
 
     const poll = async () => {
       try {
-        const res = await fetch(`http://localhost:3002/api/director/phase2/thumbnail/${key}`);
+        const res = await fetch(buildApiUrl(`/api/director/phase2/thumbnail/${key}`));
         const data = await res.json();
 
         if (data.status === 'completed' && data.imageUrl) {

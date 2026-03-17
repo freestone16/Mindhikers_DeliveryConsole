@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
-const AUTH_PORT = process.env.PORT || '3002';
+const AUTH_PORT = process.env.PORT || '3004';
 
 // Configuration paths - expecting secrets folder at project root
 const SECRETS_DIR = path.resolve(__dirname, '../secrets');

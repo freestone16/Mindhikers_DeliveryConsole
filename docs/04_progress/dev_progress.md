@@ -1,6 +1,81 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-03 CST
+> **更新日期**: 2026-03-15 CST
+
+---
+
+## 0.3 2026-03-15 黄金坩埚启动链抢修
+
+### ✅ 本轮已完成
+- 修复 `server/index.ts` 启动阻塞：移除不存在的 `./music` 导入与僵尸路由 `/api/music/assets`
+- 在 `server/shorts.ts` 补齐 `uploadBgm` 与 `getMusicAssets`，避免 Shorts 路由把 `undefined` handler 挂到 Express 导致服务启动即崩
+- 重新拉起开发环境后，确认前端 `5176` 与后端 `3004` 均恢复监听
+
+### 🔍 根因判断
+- 本次“打不开”不是前端渲染问题，而是后端入口存在两处失效链路：一处引用了不存在的模块，一处注册了未导出的 handler
+- Vite 前端可以单独成功启动，所以浏览器端体感会误判成“页面打不开/页面坏了”，实际是 API 与 Socket 后端先崩
+
+### ✅ 本轮验证
+- `npm run dev` 重新启动后，Vite 正常暴露 `http://localhost:5176/`
+- `lsof -nP -iTCP:3004 -sTCP:LISTEN` 确认后端监听恢复
+- `lsof -nP -iTCP:5176 -sTCP:LISTEN` 确认前端监听恢复
+
+---
+
+## 0.2 2026-03-15 黄金坩埚主题变量补齐
+
+### ✅ 本轮已完成
+- 修复黄金坩埚工作台与右侧对话面板的主题色异常，补齐 `--shell-bg`、`--surface-*`、`--ink-*`、`--line-*`、`--accent` 这组实际已被引用但未定义的 CSS token
+- 将主题 token 收敛到 `src/index.css`，避免黄金坩埚页面落回浏览器继承色，导致浅底区域文字过白、整体对比失真
+
+### 🔍 根因判断
+- 黄金坩埚 UI 已经改为变量驱动配色，但仓库中只有 `var(--xxx)` 的使用点，没有对应定义点
+- 变量缺失后，浅色卡片和暖纸聊天区会继承全局浅字色，形成“色彩不对、内容发灰发白”的体感故障
+
+### ✅ 本轮验证
+- `npm run test:run -- src/components/crucible/hostRouting.test.ts` 通过（3 tests）
+- `rg -o "var\\(--[A-Za-z0-9-]+\\)" src | sort -u` 核对后，黄金坩埚当前实际引用的主题变量已全部补齐定义
+
+---
+
+## 0.0 2026-03-15 黄金坩埚接入 Socrates v0.2.0 一期方案
+
+### ✅ 本轮新增文档
+- 新增一期实施方案：`docs/plans/2026-03-15_SD210_Crucible_Socrates_v0.2_Adoption_Phase1_Plan.md`
+
+### 🎯 当前判断
+- 一期先接只读式 `EXPERIENCE.md` 上下文，让黄金坩埚先吃到“更准追问”的质量红利
+- 前端只做最小可感知提示与日志可观测，不提前做经验库后台
+- 自动写回、月度 Review、用户级 Experience 账户与更重的前端产品化统一放入二期
+
+## 0.1 2026-03-15 黄金坩埚生成式黑板支线实验方案
+
+### ✅ 本轮新增文档
+- 新增支线实验实施方案：`docs/plans/2026-03-15_SD210_Crucible_Generative_Blackboard_Experiment_Plan.md`
+
+### 🎯 当前判断
+- 先以独立 worktree + 实验分支验证“结构化可视化黑板”价值，不直接侵入黄金坩埚主线
+- 第一阶段坚持奥卡姆剃刀：固定 widget schema + React/SVG 渲染，不上任意 HTML / iframe / 流式脚本执行
+- 若实验明确提升理解效率，再进入单独 integration 分支做最小桥接
+
+---
+
+## 0. 2026-03-14 迁移收口更新
+
+### ✅ 本轮已完成
+- 统一前端 API / Socket / 下载 / 视频预览入口到 runtime config，清除 `src/` 内功能路径上的旧 `3002` 主机硬编码
+- 修复 `PublishComposer` 对 `/data/projects/...` Docker 路径的写死假设
+- 新增 `scripts/runtime-env.js`，让 `dev:check` 与 `preview` 读取 `.env.local` / `.env`
+- 修复端口检查脚本在沙盒内把 `EPERM` 误报为“端口占用”的问题
+- 恢复依赖层，补齐 `node_modules` 与 `package-lock.json`
+
+### ✅ 本轮验证
+- `npm run dev:check` 通过；当前环境会显示 `restricted [EPERM]`，已明确为环境限制而非端口冲突
+- `npm run test:run -- src/components/crucible/hostRouting.test.ts` 通过（3 tests）
+- `rg` 扫描确认 `src/`、`scripts/`、`.claude/`、`server/` 中不再残留功能路径级别的 `localhost:3002` / `127.0.0.1:3002` / `/data/projects/` 硬编码
+
+### ⚠️ 仍待专项处理
+- `npm run build` 仍被 unrelated 存量类型债阻塞，主要在营销大师 `TubeBuddyScore` 口径与旧 `DeliveryState.modules` 兼容层；本轮不跨模块混修
 
 ---
 

@@ -45,6 +45,7 @@
 15. 分开写 `import { Component }` 和 `import type { Type }`
 16. 遇到模块导出错误时检查：是 `export type` 还是普通 `export`
 17. Vite 中类型导入错误只在运行时暴露，tsc 会通过
+18. **新增 CSS 主题 token 时，必须同时 `rg "var\\(--"` 校对引用全集，确认每个 `var(--xxx)` 都有定义**；缺失变量会让页面静默回落到继承色，最容易出现“浅底白字/深底暗字”的整页配色异常
 
 ---
 
@@ -143,6 +144,7 @@
     - 是否更新共享状态（如 thumbnailTasks）？
     - 是否有超时机制防止无限轮询？
     - 前端轮询端点能否读到更新后的状态？
+56. **改 `server/index.ts` 路由表后必须真实启动一次服务**；要同时核对 import 的模块文件存在、挂到 `app.get/app.post` 的 handler 不是 `undefined`，否则前端常表现为“页面打不开”，根因其实是后端入口启动即崩
 
 ---
 
@@ -168,7 +170,7 @@
 
 63. `npm run dev` 启动多个子进程（concurrently），要用 Ctrl+C 正确停止
 64. 直接关闭终端会残留进程，下次启动会端口冲突
-65. 检查端口占用：`lsof -i :3002 -i :5173`
+65. 检查端口占用前先读取 `.env.local` / `.env` 中的 `PORT` 和 `VITE_APP_PORT`，再执行 `lsof`
 66. 强制杀进程：`kill -9 <PID>`
 
 ---
@@ -187,31 +189,32 @@
 71. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
 72. 不要假设修改生效，用实际命令验证
 73. 验证清单：`lsp_diagnostics` → build → test → 功能测试
+74. 收口/迁移任务若被 build 暴露出 unrelated 模块报错，先按模块边界隔离；不要顺手改进到其他业务域（例如营销大师类型债不应混入坩埚/运行时收口）
 
 ---
 
 ## 性能优化
 
-74. 长时间运行的请求必须有超时
-75. 大文件读取要分块，不要一次性加载到内存
-76. 频繁操作考虑加 debounce/throttle
+75. 长时间运行的请求必须有超时
+76. 大文件读取要分块，不要一次性加载到内存
+77. 频繁操作考虑加 debounce/throttle
 
 ---
 
 ## 安全考虑
 
-77. API Key 不要硬编码在代码里，使用环境变量
-78. `.env` 文件要在 `.gitignore` 中
-79. 敏感日志输出前脱敏处理
+78. API Key 不要硬编码在代码里，使用环境变量
+79. `.env` 文件要在 `.gitignore` 中
+80. 敏感日志输出前脱敏处理
 
 ---
 
 ## 项目特定
 
-80. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
-81. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
-82. worktree 环境需要复制 `.env` 到 worktree 目录
-83. **修改 `.env` 后必须重启服务器** 才能生效
+81. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
+82. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
+83. worktree 环境需要复制 `.env` 到 worktree 目录
+84. **修改 `.env` 后必须重启服务器** 才能生效
 
 ---
 

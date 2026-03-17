@@ -6,11 +6,11 @@
  * 支持优雅关闭
  */
 
-import { spawn } from 'child_process';
-import http from 'http';
+const { spawn } = require('child_process');
+const http = require('http');
+const { loadRuntimeEnv } = require('./runtime-env');
 
-const FRONTEND_PORT = 5173;
-const BACKEND_PORT = 3002;
+const { frontendPort, backendPort } = loadRuntimeEnv();
 
 /**
  * 检查端口是否可用
@@ -22,14 +22,20 @@ async function checkPort(port) {
       server.once('close', () => resolve(true));
       server.close();
     });
-    server.on('error', () => resolve(false));
+    server.on('error', (error) => {
+      if (error?.code === 'EPERM' || error?.code === 'EACCES') {
+        resolve(true);
+        return;
+      }
+      resolve(false);
+    });
   });
 }
 
 async function main() {
   // 检查端口
-  const frontendFree = await checkPort(FRONTEND_PORT);
-  const backendFree = await checkPort(BACKEND_PORT);
+  const frontendFree = await checkPort(frontendPort);
+  const backendFree = await checkPort(backendPort);
 
   if (!frontendFree || !backendFree) {
     console.error('❌ 端口被占用，请先运行 npm run dev:clean');
@@ -42,15 +48,24 @@ async function main() {
   const backend = spawn('node', ['dist/server/index.js'], {
     stdio: 'inherit',
     cwd: process.cwd(),
-    env: { ...process.env, NODE_ENV: 'production' }
+    env: { ...process.env, NODE_ENV: 'production', PORT: String(backendPort) }
   });
-  console.log(`✅ 后端服务器启动: http://localhost:${BACKEND_PORT}`);
+  console.log(`✅ 后端服务器启动: http://localhost:${backendPort}`);
 
   // 启动前端
-  const frontend = spawn('npx', ['vite', 'preview', '--host'], {
+  const frontend = spawn('npx', ['vite', 'preview', '--host', '--port', String(frontendPort)], {
     stdio: 'inherit',
     cwd: process.cwd(),
-    env: { ...process.env, NODE_ENV: 'production' }
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      PORT: String(backendPort),
+      VITE_APP_PORT: String(frontendPort),
+      VITE_BACKEND_PORT: String(backendPort),
+      VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || `http://localhost:${backendPort}`,
+      VITE_SOCKET_URL: process.env.VITE_SOCKET_URL || `http://127.0.0.1:${backendPort}`,
+      VITE_BACKEND_TARGET: process.env.VITE_BACKEND_TARGET || `http://127.0.0.1:${backendPort}`,
+    }
   });
 
   // 优雅关闭

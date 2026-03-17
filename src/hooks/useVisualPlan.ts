@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import type { VisualPlan } from '../types';
+import { buildApiUrl, runtimeConfig } from '../config/runtime';
 
-const SOCKET_URL = 'http://127.0.0.1:3002';
-const API_URL = 'http://localhost:3002';
+const SOCKET_URL = runtimeConfig.socketUrl;
 
 export const useVisualPlan = () => {
     const [plan, setPlan] = useState<VisualPlan | null>(null);
@@ -35,7 +35,7 @@ export const useVisualPlan = () => {
 
     const updateSceneStatus = async (sceneId: string, status: 'approved' | 'rejected', comment?: string) => {
         try {
-            const res = await fetch(`${API_URL}/api/visual-plan/scene/review`, {
+            const res = await fetch(buildApiUrl('/api/visual-plan/scene/review'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sceneId, status, comment })

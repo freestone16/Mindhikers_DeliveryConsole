@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
 import type { ShortScript } from '../../types';
+import { buildApiUrl } from '../../config/runtime';
 
 interface ShortsPhase2Props {
     projectId: string;
@@ -22,7 +23,7 @@ export const ShortsPhase2 = ({ projectId, scripts, onScriptsUpdate, onConfirmAll
 
     const handleSaveEdit = async (scriptId: string) => {
         try {
-            await fetch('http://localhost:3002/api/shorts/phase2/save-script', {
+            await fetch(buildApiUrl('/api/shorts/phase2/save-script'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, shortId: scriptId, scriptText: editText })
@@ -55,7 +56,7 @@ export const ShortsPhase2 = ({ projectId, scripts, onScriptsUpdate, onConfirmAll
         ));
 
         try {
-            const response = await fetch('http://localhost:3002/api/shorts/phase2/regenerate', {
+            const response = await fetch(buildApiUrl('/api/shorts/phase2/regenerate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, shortId: scriptId, userComment: comment })

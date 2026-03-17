@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
+import { buildApiUrl } from '../config/runtime';
 
 interface Project {
     name: string;
@@ -34,7 +35,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
     // ... (fetch logic remains same)
     const fetchProjects = async () => {
         try {
-            const res = await fetch('http://localhost:3002/api/projects');
+            const res = await fetch(buildApiUrl('/api/projects'));
             const data = await res.json();
             setProjects(data.projects);
         } catch (e) {
@@ -45,7 +46,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
     const fetchScripts = async () => {
         if (!projectId) return;
         try {
-            const res = await fetch(`http://localhost:3002/api/scripts?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`);
+            const res = await fetch(buildApiUrl(`/api/scripts?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`));
             const data = await res.json();
             setScripts(data.scripts || []);
         } catch (e) {

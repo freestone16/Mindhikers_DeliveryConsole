@@ -4,32 +4,32 @@
     {
       "name": "Full Dev (Frontend + Backend)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "PORT=3002 npm run dev"],
-      "port": 5173
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env.local ] && . ./.env.local; [ -f ./.env ] && . ./.env; set +a; npm run dev"],
+      "port": 5181
     },
     {
       "name": "Frontend Only (Vite)",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--host"],
-      "port": 5173
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env.local ] && . ./.env.local; [ -f ./.env ] && . ./.env; set +a; npx vite --host --port ${VITE_APP_PORT:-5176}"],
+      "port": 5181
     },
     {
       "name": "Backend Only (TSX Server)",
       "runtimeExecutable": "tsx",
       "runtimeArgs": ["watch", "server/index.ts"],
-      "port": 3002
+      "port": 3008
     },
     {
       "name": "backend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3002
+      "port": 3008
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "vite", "--", "--host"],
-      "port": 5173
+      "port": 5181
     }
   ]
 }
