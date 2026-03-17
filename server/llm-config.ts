@@ -357,3 +357,37 @@ export const getSavedKeys = (req: Request, res: Response) => {
 
   res.json(savedKeys);
 };
+
+export const resolveChatLlm = (expertId?: string | null) => {
+  const config = loadConfig();
+
+  const expertMap: Record<string, keyof LLMConfig['experts']> = {
+    GoldenMetallurgist: 'crucible',
+    Writer: 'writer',
+    Director: 'director',
+    MusicDirector: 'music',
+    ThumbnailMaster: 'thumbnail',
+    MarketingMaster: 'marketing',
+    ShortsMaster: 'shorts',
+  };
+
+  const expertKey = expertId ? expertMap[expertId] : undefined;
+  const expertConfig = expertKey ? config.experts[expertKey] : null;
+  const provider = expertConfig?.llm?.provider || config.global.provider;
+  const model = expertConfig?.llm?.model || config.global.model;
+  const providerInfo = PROVIDER_INFO[provider];
+  const mismatch = Boolean(
+    providerInfo
+    && providerInfo.type === 'llm'
+    && model
+    && !providerInfo.models.includes(model)
+  );
+
+  return {
+    provider,
+    model,
+    label: `${PROVIDER_INFO[provider]?.name || provider} / ${model}`,
+    source: expertConfig?.llm?.provider ? 'expert' : 'global',
+    mismatch,
+  };
+};
