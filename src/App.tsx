@@ -445,7 +445,10 @@ function App() {
                 />
             ) : null}
 
-            <StatusFooter isConnected={isConnected} />
+            <StatusFooter
+                isConnected={isConnected}
+                activeChatExpertId={activeModule === 'crucible' ? CRUCIBLE_EXPERT_ID : activeExpertId}
+            />
         </div>
     );
 }
