@@ -8,7 +8,17 @@ import { Server, Socket } from 'socket.io';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const EXPERTS = ['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster'];
+const SKILLS_TO_SYNC = [
+    'Director',
+    'MusicDirector',
+    'ThumbnailMaster',
+    'ShortsMaster',
+    'MarketingMaster',
+    'Writer',
+    'ThesisWriter',
+    'Researcher',
+    'FactChecker',
+];
 
 const GLOBAL_SKILLS_ROOT = path.join(os.homedir(), '.gemini/antigravity/skills');
 
@@ -43,9 +53,9 @@ export const syncSkills = async (io: Server) => {
 
     // If source and target resolve to the same directory, skip copy
     if (sourceResolved === targetResolved) {
-        const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
+        const available = SKILLS_TO_SYNC.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
         lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
-        console.log(`✅ Skills in-place. Available: ${available.length}/${EXPERTS.length}`);
+        console.log(`✅ Skills in-place. Available: ${available.length}/${SKILLS_TO_SYNC.length}`);
         io.emit('skill-sync-status', lastSyncStatus);
         return;
     }
@@ -53,7 +63,7 @@ export const syncSkills = async (io: Server) => {
     // If source doesn't exist, fall back to target if it has skills
     if (!fs.existsSync(SOURCE_ROOT)) {
         if (fs.existsSync(TARGET_ROOT)) {
-            const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
+            const available = SKILLS_TO_SYNC.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
             lastSyncStatus = {
                 status: 'warning',
                 synced: available,
@@ -61,7 +71,7 @@ export const syncSkills = async (io: Server) => {
                 timestamp: new Date().toISOString(),
                 message: `Global skills root not found: ${SOURCE_ROOT}`,
             };
-            console.log(`ℹ️ Global skills root missing, keeping local skills. Available: ${available.length}/${EXPERTS.length}`);
+            console.log(`ℹ️ Global skills root missing, keeping local skills. Available: ${available.length}/${SKILLS_TO_SYNC.length}`);
             io.emit('skill-sync-status', lastSyncStatus);
             return;
         }
@@ -76,7 +86,7 @@ export const syncSkills = async (io: Server) => {
     }
 
     const syncedSkills: string[] = [];
-    for (const expert of EXPERTS) {
+    for (const expert of SKILLS_TO_SYNC) {
         const srcDir = path.join(SOURCE_ROOT, expert);
         const destDir = path.join(TARGET_ROOT, expert);
         if (fs.existsSync(srcDir)) {
@@ -89,7 +99,9 @@ export const syncSkills = async (io: Server) => {
         }
     }
 
-    console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${EXPERTS.length}`);
-    lastSyncStatus = { status: 'done', synced: syncedSkills, count: syncedSkills.length, timestamp: new Date().toISOString() };
+    const available = SKILLS_TO_SYNC.filter((skill) => fs.existsSync(path.join(TARGET_ROOT, skill)));
+
+    console.log(`✅ Skill Sync Complete. Synced: ${available.length}/${SKILLS_TO_SYNC.length}`);
+    lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
     io.emit('skill-sync-status', lastSyncStatus);
 };
