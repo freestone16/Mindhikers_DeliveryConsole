@@ -418,6 +418,13 @@ export const startPhase2 = async (req: Request, res: Response) => {
       globalConfig.model
     );
 
+    // 如果 LLM 生成失败，把原因吐到 SSE 流
+    if ((globalPlan as any)._failureReason) {
+      const reason = (globalPlan as any)._failureReason;
+      console.error(`[Phase2] ⚠️ LLM 生成失败，使用兜底方案。原因: ${reason}`);
+      res.write(`data: ${JSON.stringify({ type: 'log', level: 'warn', message: `⚠️ LLM 生成失败（${reason}），使用兜底方案` })}\n\n`);
+    }
+
     // 调试：打印每章生成的 options 数量
     globalPlan.chapters?.forEach(ch => {
       console.log(`[Phase2] 章节 ${ch.chapterName}: ${ch.options?.length || 0} 个方案`);

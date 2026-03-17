@@ -138,7 +138,7 @@ export async function* callLLMStream(
                         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
                         if (text) yield text;
                     } else {
-                        // Handle OpenAI-compatible providers (openai, deepseek, kimi, siliconflow, etc.)
+                        // Handle OpenAI-compatible providers (openai, deepseek, siliconflow, etc.)
                         const delta = json.choices?.[0]?.delta;
                         if (delta?.content) {
                             yield delta.content;

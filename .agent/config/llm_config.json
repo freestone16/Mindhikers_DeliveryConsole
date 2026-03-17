@@ -1,8 +1,8 @@
 {
   "global": {
-    "provider": "kimi",
-    "model": "kimi-k2.5",
-    "baseUrl": null
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "baseUrl": "https://api.deepseek.com/v1"
   },
   "generation": {
     "imageModel": "doubao-seedream-4-5-251128",
@@ -23,11 +23,7 @@
     },
     "director": {
       "enabled": true,
-      "llm": {
-        "provider": "siliconflow",
-        "model": null,
-        "baseUrl": null
-      },
+      "llm": null,
       "imageModel": "doubao-image-01",
       "videoModel": "doubao-video-01"
     },

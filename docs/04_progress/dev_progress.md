@@ -35,6 +35,7 @@
 | v4.2.0 | 2026-03-16 | **“协调opencode测试”统一口令落地** - 把 OpenCode 协作测试协议上收到项目级规则：以后在项目目录里只要说“协调opencode测试”，代理默认读取 `testing/README.md`、`testing/OPENCODE_INIT.md` 和模块级 `testing/<module>/README.md`，直接接管测试队列 |
 | v4.2.1 | 2026-03-16 | **“协调opencode测试”语义纠偏** - 根据用户纠正，将该口令收紧为“只做环境 ready，不自动开跑”；代理完成 testing 文档读取与队列接管后，必须等待用户明确说明下一步计划 |
 | v4.2.2 | 2026-03-16 | **Director 冷启动项目态恢复修复** - 修复页面刷新后新 socket 未自动恢复 active project，导致右上角文稿下拉空白、Phase2 测试未开始的问题；统一复用 socket 项目态 hydrate 逻辑，并以 Agent Browser 完成真实页面验证 |
+| v4.2.3 | 2026-03-16 | **MIN-89 测试治理父任务补强** - 将 `Director 协调测试与验收治理` 从简短条目扩成真正的父 issue：补齐仓库文档索引、用途、当前状态、边界、验收目标，并挂载配套 Linear 文档与子 issue，便于后续 handoff 和跨模块复用 |
 
 ---
 
@@ -2309,3 +2310,61 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **协议纠偏**：
   - 根据用户当场纠正，已把“网页验收默认优先 Agent Browser，不要先手用 Playwright MCP”写入 `rules.md`
   - 后续 Director 页面验证统一按这条协议执行
+
+### 2026-03-16 深夜补充：MIN-89 补强为可复用的测试治理父任务
+
+- **触发背景**：
+  - 用户指出 `MIN-89 Director 协调测试与验收治理` 不能只停留在一句摘要
+  - 作为后续给其他模块项目组复用的母任务，它必须显式包含：
+    - 当前测试协调工作的完整总结
+    - 仓库内关键文档清单
+    - 每份文档的用途与当前状态
+    - 与业务 issue / handoff issue 的边界
+  - 同时，Linear 中所谓“父 issue”本质上仍是一条普通 issue，需要靠描述结构和子 issue 组织，而不是靠额外类型
+
+- **本轮补强动作**：
+  - 更新 `MIN-89` 描述，补齐：
+    - 父任务定位
+    - 边界定义
+    - 协调口令与执行纪律
+    - 文档索引清单（路径 / 用途 / 当前状态 / 使用时机）
+    - 验收目标
+    - 与 `MIN-90`、`MIN-63` 等业务线的边界
+  - 在 `MIN-89` 下挂载配套 Linear 文档：
+    - `Director 测试协调总览与文档索引`
+  - 新建并挂上 3 个子 issue：
+    - `MIN-91`：Director 测试协议与文档固化
+    - `MIN-92`：Director Agent Browser 验收标准化
+    - `MIN-93`：Director OpenCode worker 与环境恢复治理
+
+- **纳入索引的关键文档**：
+  - 项目级：
+    - `testing/README.md`
+    - `testing/OPENCODE_INIT.md`
+    - `testing/CROSS_ENDPOINTS.md`
+    - `testing/prompts/OPENCODE_TEST_RUNNER.md`
+  - Director 模块级：
+    - `testing/director/README.md`
+    - `testing/director/requests/REQUEST_TEMPLATE.md`
+    - `testing/director/claims/CLAIM_TEMPLATE.md`
+    - `testing/director/reports/REPORT_TEMPLATE.md`
+  - 状态与脚本：
+    - `testing/director/status/BOARD.md`
+    - `testing/director/status/latest.json`
+    - `testing/scripts/opencode-test-worker.mjs`
+    - `testing/scripts/print-status.mjs`
+  - 研发规约：
+    - `docs/04_progress/rules.md`
+    - `docs/04_progress/dev_progress.md`
+
+- **额外发现**：
+  - 在整理索引时发现：
+    - `testing/director/status/latest.json` 当前把 `TREQ-2026-03-16-DIRECTOR-006-phase2-business-acceptance` 标成 `passed`
+    - 但对应 report 实际是 `blocked`
+  - 这说明状态汇总链路仍存在一致性风险，应后续作为 `MIN-89` 下的治理项继续处理
+
+- **当前判断**：
+  - `MIN-89` 现在已经不只是一个标题，而是：
+    - 可交接的测试治理母任务
+    - 可供 Director 后续接力参考的索引中心
+    - 可被其他模块照抄的测试协作样板

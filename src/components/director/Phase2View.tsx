@@ -127,11 +127,10 @@ export const Phase2View = ({
             <div className="flex items-center gap-2 text-sm">
               <span className="text-slate-400">模型:</span>
               <span className="text-white font-medium">
-                {currentModel.provider === 'siliconflow' ? 'SiliconFlow / Kimi-K2.5' :
+                {currentModel.provider === 'siliconflow' ? 'SiliconFlow' :
                   currentModel.provider === 'deepseek' ? 'DeepSeek' :
-                    currentModel.provider === 'kimi' ? 'Kimi' :
-                      currentModel.provider === 'yinli' ? 'Yinli / Claude-Sonnet-4-6-Th' :
-                        'Unknown'}
+                    currentModel.provider === 'yinli' ? 'Yinli' :
+                      currentModel.provider || 'Unknown'}
               </span>
               <span className="text-slate-500 text-xs">({currentModel.model})</span>
             </div>

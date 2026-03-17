@@ -5,7 +5,6 @@ export const LLMProviderSchema = z.enum([
   'deepseek',
   'zhipu',
   'siliconflow',
-  'kimi',
   'volcengine',
   'yinli'
 ]);
@@ -129,13 +128,6 @@ export const PROVIDER_INFO: Record<string, {
     envVars: ['SILICONFLOW_API_KEY'],
     baseUrl: 'https://api.siliconflow.cn/v1',
     models: ['Pro/moonshotai/Kimi-K2.5', 'Pro/deepseek-ai/DeepSeek-V3.2'],
-  },
-  kimi: {
-    name: 'Kimi (Moonshot)',
-    type: 'llm',
-    envVars: ['KIMI_API_KEY'],
-    baseUrl: 'https://api.moonshot.cn/v1',
-    models: ['kimi-k2.5'],
   },
   yinli: {
     name: 'Yinli的引力',

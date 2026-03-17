@@ -77,7 +77,6 @@ const PROVIDER_ENV_MAP: Record<string, string[]> = {
   deepseek: ['DEEPSEEK_API_KEY'],
   zhipu: ['ZHIPU_API_KEY'],
   siliconflow: ['SILICONFLOW_API_KEY'],
-  kimi: ['KIMI_API_KEY'],
   volcengine: ['VOLCENGINE_ACCESS_KEY'],
   yinli: ['YINLI_API_KEY'],
 };
@@ -168,7 +167,16 @@ export const updateConfig = (req: Request, res: Response) => {
   const { global, generation, experts } = req.body;
 
   if (global) {
-    config.global = { ...config.global, ...global };
+    const merged = { ...config.global, ...global };
+    // 切换 provider 时联动归一化 model 和 baseUrl，防止错配
+    if (global.provider && global.provider !== config.global.provider) {
+      const providerInfo = PROVIDER_INFO[global.provider];
+      if (providerInfo) {
+        if (!global.model) merged.model = providerInfo.models[0];
+        if (!global.baseUrl) merged.baseUrl = providerInfo.baseUrl;
+      }
+    }
+    config.global = merged;
   }
 
   if (generation) {
