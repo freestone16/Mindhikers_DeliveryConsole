@@ -1,7 +1,7 @@
 {
   "name": "deliver",
   "private": true,
-  "version": "3.8.0",
+  "version": "4.0.0",
   "scripts": {
     "dev": "concurrently \"tsx watch server/index.ts\" \"vite --host\" --kill-others --kill-others-on-fail",
     "dev:clean": "pkill -f \"tsx watch server/index.ts\" 2>/dev/null || true && pkill -f \"vite.*--host\" 2>/dev/null || true",

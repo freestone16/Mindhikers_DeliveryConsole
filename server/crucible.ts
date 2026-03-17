@@ -52,6 +52,28 @@ function getDefaultCruciblePair(): CruciblePair {
 
 const DEFAULT_PAIR = getDefaultCruciblePair();
 
+const SOUL_DOCS_DIR = path.resolve(__dirname, '../docs/02_design/crucible/souls');
+const soulDocCache = new Map<string, string>();
+
+function loadSpeakerSoul(roundIndex: number, pair: CruciblePair): string {
+    const slug = roundIndex % 2 === 1 ? pair.challengerSlug : pair.synthesizerSlug;
+    const cached = soulDocCache.get(slug);
+    if (cached) return cached;
+
+    const soulPath = path.join(SOUL_DOCS_DIR, `${slug}_soul.md`);
+    try {
+        if (fs.existsSync(soulPath)) {
+            const content = fs.readFileSync(soulPath, 'utf-8');
+            soulDocCache.set(slug, content);
+            console.log(`[Crucible] ✅ Loaded soul: ${slug} (${content.length} chars)`);
+            return content;
+        }
+    } catch (err: any) {
+        console.warn(`[Crucible] ⚠️ Failed to load soul ${slug}:`, err.message);
+    }
+    return '';
+}
+
 const buildEnvKeyMap = () => Object.fromEntries(
     Object.entries(PROVIDER_INFO).map(([id, info]) => [id, info.envVars[0]])
 );
@@ -366,12 +388,13 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
     };
     const turnPlan = createCrucibleOrchestratorPlan(promptContext);
     const skillSummary = loadSkillKnowledge('Socrates');
+    const speakerSoul = loadSpeakerSoul(roundIndex, DEFAULT_PAIR);
 
     try {
         const promptStartedAt = Date.now();
         const prompt = turnPlan.engineMode === 'roundtable_discovery'
-            ? buildRoundtableDiscoveryPrompt(promptContext, DEFAULT_PAIR)
-            : buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary);
+            ? buildRoundtableDiscoveryPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul)
+            : buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul);
         console.log(`[CrucibleTiming] prompt round=${roundIndex} mode=${turnPlan.engineMode} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
 
         const parseStartedAt = Date.now();
