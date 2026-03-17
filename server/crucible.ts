@@ -26,6 +26,9 @@ interface MaterializedPresentable extends PresentableDraft {
     type: 'reference' | 'quote' | 'asset';
 }
 
+const VISUAL_TITLE_PATTERN = /(地图|图谱|图示|示意图|结构图|关系图|可视化|表格|象限图|流程图|脑图|冲突图|比较图)/;
+const STRUCTURED_ASSET_PATTERN = /[│├└─]|^\s*(左列|右列|左侧|右侧|第一列|第二列|步骤|阶段|节点|路径|对照|结论|断层)[:：]/m;
+
 function getDefaultCruciblePair(): CruciblePair {
     try {
         const registry = loadCrucibleSoulRegistry();
@@ -76,6 +79,18 @@ const summarizeText = (value: string, maxLength = 48) => {
     }
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
 };
+
+const stripVisualWords = (value: string) => value
+    .replace(/冲突地图/g, '核心断层')
+    .replace(/关系图/g, '关系梳理')
+    .replace(/结构图/g, '结构梳理')
+    .replace(/示意图/g, '重点梳理')
+    .replace(/图谱/g, '结构梳理')
+    .replace(/可视化/g, '重点梳理')
+    .replace(/表格/g, '对照要点')
+    .replace(/脑图/g, '要点梳理')
+    .replace(/流程图/g, '步骤梳理')
+    .trim();
 
 const normalizeComparableText = (value: string) => value
     .replace(/^[^：:\n]{1,12}[：:]\s*/u, '')
@@ -155,31 +170,69 @@ const compressBoardContent = (draft: PresentableDraft) => {
     return uniqueSentences.map((sentence) => `• ${summarizeText(sentence, 54)}`).join('\n');
 };
 
+const canRenderAsStructuredAsset = (draft: PresentableDraft) => {
+    const content = draft.content || '';
+    const lines = toBoardLines(content);
+    if (lines.length < 2) {
+        return false;
+    }
+
+    const hasVisualTitle = VISUAL_TITLE_PATTERN.test(`${draft.title} ${draft.summary}`);
+    const hasStructuredContent = STRUCTURED_ASSET_PATTERN.test(content) || content.includes('|');
+
+    return hasVisualTitle && hasStructuredContent;
+};
+
 const classifyPresentableType = (draft: PresentableDraft): MaterializedPresentable['type'] => {
+    if (draft.type === 'quote' || draft.type === 'reference') {
+        return draft.type;
+    }
+    if (draft.type === 'asset') {
+        return canRenderAsStructuredAsset(draft) ? 'asset' : 'reference';
+    }
+
     const text = `${draft.title}\n${draft.summary}\n${draft.content}`;
     if (text.length <= 88) {
         return 'quote';
     }
-    if (/[├└│─]|^\s*[-*+]\s+/m.test(text) || /(结构|框架|分层|路径|步骤|阶段|维度)/.test(text)) {
+    if (canRenderAsStructuredAsset(draft)) {
         return 'asset';
     }
     return 'reference';
 };
 
+const normalizePresentableDraft = (draft: PresentableDraft, type: MaterializedPresentable['type']): PresentableDraft => {
+    if (type === 'asset') {
+        return draft;
+    }
+
+    return {
+        ...draft,
+        title: stripVisualWords(draft.title),
+        summary: stripVisualWords(draft.summary),
+    };
+};
+
 const materializePresentables = (drafts: PresentableDraft[], utterance: string): MaterializedPresentable[] => {
     return drafts
         .filter((draft) => draft?.title && draft?.summary && draft?.content)
-        .map((draft) => ({
-            title: normalizeText(draft.title, '当前上板内容'),
-            summary: summarizeText(draft.summary, 32) || '本轮焦点',
-            content: compressBoardContent(draft),
-            type: classifyPresentableType(draft),
-        }))
+        .map((draft) => {
+            const type = classifyPresentableType(draft);
+            const normalizedDraft = normalizePresentableDraft(draft, type);
+
+            return {
+                title: normalizeText(normalizedDraft.title, '当前上板内容'),
+                summary: summarizeText(normalizedDraft.summary, 32) || '本轮焦点',
+                content: compressBoardContent(normalizedDraft),
+                type,
+            };
+        })
         .filter((draft) => !isBoardDuplicateOfDialogue(draft.content, utterance))
         .slice(0, 1);
 };
 
 const sanitizeFileSegment = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, '_');
+const formatDurationMs = (startedAt: number) => `${Date.now() - startedAt}ms`;
 
 const appendTurnLog = (params: {
     projectId: string;
@@ -260,6 +313,7 @@ const callConfiguredLlm = async (prompt: string) => {
     const model = config.experts.crucible?.llm?.model || config.global.model;
     const baseUrl = config.experts.crucible?.llm?.baseUrl || config.global.baseUrl || PROVIDER_INFO[provider]?.baseUrl;
     const apiKey = process.env[PROVIDER_ENV_KEYS[provider] || ''];
+    const llmStartedAt = Date.now();
 
     if (!provider || !model || !baseUrl) {
         throw new Error('黄金坩埚当前缺少可用的 LLM 配置');
@@ -290,10 +344,12 @@ const callConfiguredLlm = async (prompt: string) => {
     }
 
     const data = await response.json();
+    console.log(`[CrucibleTiming] llm provider=${provider} model=${model} promptChars=${prompt.length} duration=${formatDurationMs(llmStartedAt)}`);
     return data.choices?.[0]?.message?.content || '';
 };
 
 export const generateCrucibleTurn = async (req: Request, res: Response) => {
+    const startedAt = Date.now();
     const topicTitle = normalizeText(req.body?.topicTitle || '', '标题待定');
     const roundIndex = Number(req.body?.roundIndex || 1);
     const previousCards = Array.isArray(req.body?.previousCards) ? req.body.previousCards as InputCard[] : [];
@@ -312,9 +368,13 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
     const skillSummary = loadSkillKnowledge('Socrates');
 
     try {
+        const promptStartedAt = Date.now();
         const prompt = turnPlan.engineMode === 'roundtable_discovery'
             ? buildRoundtableDiscoveryPrompt(promptContext, DEFAULT_PAIR)
             : buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary);
+        console.log(`[CrucibleTiming] prompt round=${roundIndex} mode=${turnPlan.engineMode} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
+
+        const parseStartedAt = Date.now();
         const raw = await callConfiguredLlm(prompt);
         const jsonText = extractJsonObject(raw);
         const parsed = JSON.parse(jsonText) as Partial<SkillOutputPayload>;
@@ -336,7 +396,9 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
         if (presentables.length === 0) {
             throw new Error('模型返回的 presentables 为空');
         }
+        console.log(`[CrucibleTiming] transform round=${roundIndex} duration=${formatDurationMs(parseStartedAt)} presentables=${presentables.length}`);
 
+        const writeStartedAt = Date.now();
         appendTurnLog({
             projectId,
             scriptPath,
@@ -355,6 +417,8 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             presentables,
             skillPresentables: Array.isArray(parsed.presentables) ? parsed.presentables : [],
         });
+        console.log(`[CrucibleTiming] turn-log round=${roundIndex} duration=${formatDurationMs(writeStartedAt)}`);
+        console.log(`[CrucibleTiming] total round=${roundIndex} source=socrates duration=${formatDurationMs(startedAt)}`);
 
         res.json({
             engineMode: turnPlan.engineMode,
@@ -371,7 +435,7 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             presentables,
         });
     } catch (error: any) {
-        console.error('[Crucible] Turn generation failed:', error.message);
+        console.error(`[Crucible] Turn generation failed after ${formatDurationMs(startedAt)}:`, error.message);
         const fallback = turnPlan.engineMode === 'roundtable_discovery'
             ? buildRoundtableFallbackPayload(promptContext, DEFAULT_PAIR)
             : buildSocraticFallbackPayload(promptContext, DEFAULT_PAIR);
@@ -414,6 +478,7 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             dialogue,
             presentables,
         });
+        console.log(`[CrucibleTiming] total round=${roundIndex} source=fallback duration=${formatDurationMs(startedAt)}`);
     }
 };
 
