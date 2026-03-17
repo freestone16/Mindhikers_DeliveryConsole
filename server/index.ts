@@ -18,6 +18,8 @@ import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys
 import * as director from './director';
 import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
+import * as music from './music';
+import { generateCrucibleRemotionPreview } from './crucible-remotion';
 import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
@@ -186,9 +188,13 @@ app.get('/api/shorts/phase3/render-status/:jobId', shorts.getRenderStatus);
 // Market Master Routes (SD-207)
 app.use('/api/market', marketRouter);
 
+// Music Director Routes
+app.get('/api/music/assets', music.getAssets);
+
 // Crucible Routes (SD-210)
 app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
+app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');

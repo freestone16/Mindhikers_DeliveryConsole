@@ -46,7 +46,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
     const fetchScripts = async () => {
         if (!projectId) return;
         try {
-            const res = await fetch(buildApiUrl(`/api/scripts?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`));
+            const res = await fetch(`${buildApiUrl('/api/scripts')}?projectId=${encodeURIComponent(projectId)}&t=${Date.now()}`);
             const data = await res.json();
             setScripts(data.scripts || []);
         } catch (e) {
@@ -95,90 +95,94 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
     const selectedScript = scripts.find(s => s.path === selectedScriptPath);
     const formatSize = (bytes: number) => bytes > 1000 ? `${(bytes / 1000).toFixed(1)}k` : `${bytes}`;
+    const isCrucibleLocked = activeModule === 'crucible';
 
     return (
         <>
-            <header className="bg-[#0b1529]/80 backdrop-blur-xl border-b border-blue-900/40 px-6 py-4 relative z-[100]">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="MindHikers Logo" className="w-10 h-10 rounded-lg shadow-sm object-cover overflow-hidden" />
+            <header className="relative z-[100] border-b border-[var(--line-soft)] bg-[rgba(255,250,242,0.84)] px-4 py-2.5 backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                        <img src="/logo.png" alt="MindHikers Logo" className="h-9 w-9 rounded-2xl border border-[var(--line-soft)] object-cover shadow-[0_8px_20px_rgba(130,102,70,0.08)]" />
                         <div>
-                            <h1 className="text-xl font-bold text-white tracking-tight">MindHikers Delivery Console</h1>
+                            <h1 className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">MindHikers Delivery Console</h1>
                         </div>
                     </div>
 
-                    {/* Module Switcher */}
-                    <div className="flex bg-[#060b14]/80 p-1 rounded-lg border border-blue-900/30">
+                    <div className="flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-1 shadow-[0_10px_24px_rgba(130,102,70,0.05)]">
                         <button
                             onClick={() => onModuleChange('crucible')}
-                            className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'crucible'
-                                ? 'bg-amber-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'crucible'
+                                ? 'bg-[var(--accent)] text-white'
+                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
                                 }`}
                         >
-                            🔥 黄金坩埚
+                            黄金坩埚
                         </button>
                         <button
                             onClick={() => onModuleChange('delivery')}
-                            className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'delivery'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'delivery'
+                                ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
+                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
                                 }`}
                         >
-                            🏭 交付终端
+                            交付终端
                         </button>
                         <button
                             onClick={() => onModuleChange('distribution')}
-                            className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'distribution'
-                                ? 'bg-emerald-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'distribution'
+                                ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
+                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
                                 }`}
                         >
-                            📡 分发终端
+                            分发终端
                         </button>
                     </div>
 
-                    {/* Right Section: Project & Script Selector */}
-                    <div className="flex items-center gap-4">
-                        {/* Project Selector */}
+                    <div className="flex items-center gap-2.5">
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => {
+                                    if (isCrucibleLocked) return;
                                     setIsDropdownOpen(!isDropdownOpen);
                                     if (!isDropdownOpen) fetchProjects();
                                 }}
-                                className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-white transition-colors cursor-pointer group"
+                                disabled={isCrucibleLocked}
+                                title={isCrucibleLocked ? '议题尚未定稿，暂不可创建项目' : undefined}
+                                className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] transition-colors ${isCrucibleLocked
+                                    ? 'cursor-not-allowed border-[var(--line-soft)] bg-[rgba(237,231,222,0.82)] text-[var(--ink-3)]'
+                                    : 'cursor-pointer border-[var(--line-soft)] bg-[var(--surface-0)] text-[var(--ink-2)] hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]'
+                                    }`}
                             >
                                 <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                                <span className="text-slate-300 group-hover:text-white max-w-[120px] truncate">{projectId}</span>
+                                <span className="max-w-[120px] truncate">{projectId || '项目'}</span>
                                 <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {isDropdownOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
-                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
+                            {isDropdownOpen && !isCrucibleLocked && (
+                                <div className="absolute top-full right-0 z-[9999] mt-2 w-72 overflow-hidden rounded-3xl border border-[var(--line-soft)] bg-[var(--surface-1)] shadow-[0_24px_50px_rgba(117,88,55,0.14)]">
+                                    <div className="border-b border-[var(--line-soft)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)]">
                                         Available Projects
                                     </div>
                                     {projects.length === 0 ? (
-                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">加载中...</div>
+                                        <div className="px-3 py-4 text-center text-sm text-[var(--ink-3)]">加载中...</div>
                                     ) : (
                                         <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {projects.map(p => (
                                                 <button
                                                     key={p.name}
                                                     onClick={() => handleSwitch(p.name)}
-                                                    className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${p.isActive
-                                                        ? 'bg-blue-600/10 text-blue-400 border-l-2 border-blue-500'
-                                                        : 'text-slate-300 hover:bg-slate-700/50 border-l-2 border-transparent'
+                                                    className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${p.isActive
+                                                        ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--ink-1)]'
+                                                        : 'border-transparent text-[var(--ink-2)] hover:bg-[var(--surface-2)]'
                                                         }`}
                                                 >
                                                     <FolderOpen className="w-4 h-4 flex-shrink-0 opacity-60" />
                                                     <span className="flex-1 truncate font-mono">{p.name}</span>
                                                     {p.hasDeliveryStore && (
-                                                        <Database className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                                                        <Database className="h-3.5 w-3.5 flex-shrink-0 text-[var(--accent-muted)]" />
                                                     )}
                                                     {p.isActive && (
-                                                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded flex-shrink-0">ACTIVE</span>
+                                                        <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] text-[var(--ink-1)]">ACTIVE</span>
                                                     )}
                                                 </button>
                                             ))}
@@ -188,44 +192,49 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             )}
                         </div>
 
-                        {/* Script Selector */}
                         <div className="relative" ref={scriptDropdownRef}>
                             <button
                                 onClick={() => {
+                                    if (isCrucibleLocked) return;
                                     setIsScriptDropdownOpen(!isScriptDropdownOpen);
                                     if (!isScriptDropdownOpen) fetchScripts();
                                 }}
-                                className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-emerald-400 transition-colors cursor-pointer group"
+                                disabled={isCrucibleLocked}
+                                title={isCrucibleLocked ? '议题尚未定稿，暂不可创建文稿' : undefined}
+                                className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] transition-colors ${isCrucibleLocked
+                                    ? 'cursor-not-allowed border-[var(--line-soft)] bg-[rgba(237,231,222,0.82)] text-[var(--ink-3)]'
+                                    : 'cursor-pointer border-[var(--line-soft)] bg-[var(--surface-0)] text-[var(--ink-2)] hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]'
+                                    }`}
                             >
                                 <FileText className="w-4 h-4 flex-shrink-0" />
                                 <span className="flex items-center whitespace-nowrap">
-                                    Script: <span className="text-emerald-400 group-hover:text-emerald-300 ml-1 max-w-[180px] inline-block truncate align-bottom">{selectedScript?.name || '未选择'}</span>
+                                    文稿: <span className="ml-1 inline-block max-w-[180px] truncate align-bottom text-[var(--accent)]">{selectedScript?.name || '未选择'}</span>
                                 </span>
                                 <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isScriptDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {isScriptDropdownOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
-                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
+                            {isScriptDropdownOpen && !isCrucibleLocked && (
+                                <div className="absolute top-full right-0 z-[9999] mt-2 w-80 overflow-hidden rounded-3xl border border-[var(--line-soft)] bg-[var(--surface-1)] shadow-[0_24px_50px_rgba(117,88,55,0.14)]">
+                                    <div className="border-b border-[var(--line-soft)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)]">
                                         02_Script 文稿
                                     </div>
                                     {scripts.length === 0 ? (
-                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">暂无文稿</div>
+                                        <div className="px-3 py-4 text-center text-sm text-[var(--ink-3)]">暂无文稿</div>
                                     ) : (
                                         <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {scripts.map(s => (
                                                 <button
                                                     key={s.path}
                                                     onClick={() => handleScriptSelect(s.path)}
-                                                    className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${s.path === selectedScriptPath
-                                                        ? 'bg-emerald-600/10 text-emerald-400 border-l-2 border-emerald-500'
-                                                        : 'text-slate-300 hover:bg-slate-700/50 border-l-2 border-transparent'
+                                                    className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${s.path === selectedScriptPath
+                                                        ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--ink-1)]'
+                                                        : 'border-transparent text-[var(--ink-2)] hover:bg-[var(--surface-2)]'
                                                         }`}
                                                 >
                                                     <FileText className="w-4 h-4 flex-shrink-0 opacity-60" />
                                                     <span className="flex-1 truncate">{s.name}</span>
-                                                    <span className="text-xs text-slate-500">{formatSize(s.size)}</span>
-                                                    <span className="text-xs text-slate-500">{s.modifiedAt}</span>
+                                                    <span className="text-xs text-[var(--ink-3)]">{formatSize(s.size)}</span>
+                                                    <span className="text-xs text-[var(--ink-3)]">{s.modifiedAt}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -234,10 +243,9 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             )}
                         </div>
 
-                        {/* Settings Button */}
                         <button
                             onClick={() => window.open('/#/llm-config', '_blank')}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                            className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-2)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]"
                             title="LLM Configuration"
                         >
                             <Settings className="w-5 h-5" />

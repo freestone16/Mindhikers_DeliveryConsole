@@ -3,7 +3,14 @@ import { BookOpenText, Boxes, BrainCircuit, Quote, RotateCcw, Sparkles } from 'l
 import type { HostRoutedAsset } from '../../types';
 import { buildApiUrl } from '../../config/runtime';
 import { clearCrucibleSnapshot, readCrucibleSnapshot, writeCrucibleSnapshot } from './storage';
-import type { CanvasAsset, CrucibleDialogue, CrucibleEngineMode, CrucibleTurnResponse, RoundAnchor } from './types';
+import type {
+    CanvasAsset,
+    CrucibleDialogue,
+    CrucibleEngineMode,
+    CrucibleRemotionPreviewResponse,
+    CrucibleTurnResponse,
+    RoundAnchor,
+} from './types';
 import { CRUCIBLE_DEFAULT_PAIR } from './soulRegistry';
 
 const ASSET_META = {
@@ -13,6 +20,8 @@ const ASSET_META = {
     remotion: { icon: Sparkles, label: '影像' },
     reference: { icon: BookOpenText, label: '参考' },
 };
+
+const PREVIEW_RENDER_VERSION = 'structure-v2';
 
 interface CrucibleWorkspaceProps {
     projectId: string;
@@ -28,6 +37,8 @@ interface CrucibleWorkspaceProps {
         source: 'socrates' | 'fallback';
         roundIndex: number;
     }) => void;
+    onBlackboardStateChange?: (payload: { hasContent: boolean }) => void;
+    onTurnSettled?: () => void;
 }
 
 const toCanvasAsset = (asset: HostRoutedAsset): CanvasAsset => ({
@@ -74,20 +85,60 @@ const toReadableSentences = (content: string) => formatAssetContent(content)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
 
+const normalizeComparableText = (value: string) => value
+    .replace(/\s+/g, '')
+    .replace(/[，。！？；、“”"'`()（）【】\[\]\-—,!.?:;：]/g, '')
+    .trim();
+
 const truncateText = (value: string, maxLength: number) => (
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
 );
 
 const buildReferenceSections = (asset: CanvasAsset) => {
-    const sentences = toReadableSentences(asset.content);
-    const lead = truncateText(asset.summary || sentences[0] || '当前这轮内容正在围绕一个更清晰的问题定义收束。', 48);
-    const bulletsSource = sentences.length > 0 ? sentences.slice(0, 3) : [];
-    const bullets = bulletsSource.map((sentence) => truncateText(sentence.replace(/^•\s*/, ''), 36));
+    const summary = asset.summary?.trim() || '';
+    const summaryKey = normalizeComparableText(summary);
+    const uniqueSentences = toReadableSentences(asset.content)
+        .map((sentence) => sentence.replace(/^•\s*/, '').trim())
+        .filter((sentence, index, array) => {
+            const currentKey = normalizeComparableText(sentence);
+            if (!currentKey) {
+                return false;
+            }
+            return array.findIndex((item) => normalizeComparableText(item) === currentKey) === index;
+        });
+
+    const filteredSentences = uniqueSentences.filter((sentence) => normalizeComparableText(sentence) !== summaryKey);
+    const lead = summary || filteredSentences[0] || '当前这轮内容正在围绕一个更清晰的问题定义收束。';
+    const bullets = (summary ? filteredSentences : filteredSentences.slice(1)).slice(0, 3);
 
     return {
         lead,
         bullets,
     };
+};
+
+const buildPreviewBullets = (asset: CanvasAsset) => {
+    if (asset.type === 'reference') {
+        const { lead, bullets } = buildReferenceSections(asset);
+        return [lead, ...bullets].filter((item) => item && item.trim().length > 0).slice(0, 3);
+    }
+
+    return toReadableSentences(asset.content)
+        .slice(0, 3)
+        .map((sentence) => truncateText(sentence.replace(/^•\s*/, ''), 30));
+};
+
+const buildPreviewCaption = (asset: CanvasAsset, referenceSections: { lead: string; bullets: string[] } | null) => {
+    const summary = asset.summary?.trim();
+    if (summary) {
+        return truncateText(summary, 88);
+    }
+
+    if (referenceSections?.lead) {
+        return truncateText(referenceSections.lead, 88);
+    }
+
+    return '这张参考图只负责把这一轮的冲突场挂出来，完整板书不再在这里重复展开。';
 };
 
 const normalizeTopic = (topicTitle?: string) => {
@@ -180,6 +231,8 @@ export const CrucibleWorkspace = ({
     seedPromptVersion = 0,
     onResetWorkspace,
     onRoundGenerated,
+    onBlackboardStateChange,
+    onTurnSettled,
 }: CrucibleWorkspaceProps) => {
     const snapshot = useMemo(() => readCrucibleSnapshot(), []);
     const [presentables, setPresentables] = useState<CanvasAsset[]>(() => snapshot?.presentables?.length ? snapshot.presentables : []);
@@ -199,7 +252,10 @@ export const CrucibleWorkspace = ({
     const mainScrollRef = useRef<HTMLElement | null>(null);
     const thinkingTimerRef = useRef<number | null>(null);
     const requestSeqRef = useRef(0);
+    const previewCacheRef = useRef<Map<string, string>>(new Map());
     const [mainScrollIndicator, setMainScrollIndicator] = useState({ visible: false, height: 0, offset: 0 });
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
     const activePresentable = useMemo(
         () => presentables.find((asset) => asset.id === activePresentableId) ?? presentables[0] ?? null,
@@ -209,6 +265,27 @@ export const CrucibleWorkspace = ({
         () => activePresentable?.type === 'reference' ? buildReferenceSections(activePresentable) : null,
         [activePresentable]
     );
+    const shouldRenderPreview = activePresentable?.type === 'remotion';
+    const previewCaption = useMemo(
+        () => activePresentable ? buildPreviewCaption(activePresentable, referenceSections) : '',
+        [activePresentable, referenceSections]
+    );
+    const previewKey = useMemo(() => (
+        activePresentable && shouldRenderPreview
+            ? JSON.stringify({
+                version: PREVIEW_RENDER_VERSION,
+                id: activePresentable.id,
+                type: activePresentable.type,
+                title: activePresentable.title,
+                summary: activePresentable.summary,
+                content: activePresentable.content,
+            })
+            : ''
+    ), [activePresentable, shouldRenderPreview]);
+
+    useEffect(() => {
+        onBlackboardStateChange?.({ hasContent: presentables.length > 0 });
+    }, [presentables.length, onBlackboardStateChange]);
 
     useEffect(() => {
         writeCrucibleSnapshot({
@@ -242,7 +319,10 @@ export const CrucibleWorkspace = ({
         setQuestionSource('static');
         setEngineMode('socratic_refinement');
         setLastDialogue(null);
-    }, [topicTitle]);
+        previousSeedVersionRef.current = seedPromptVersion;
+        setPreviewImageUrl(null);
+        setPreviewStatus('idle');
+    }, [topicTitle, seedPromptVersion]);
 
     useEffect(() => () => {
         if (thinkingTimerRef.current) {
@@ -313,6 +393,7 @@ export const CrucibleWorkspace = ({
                 source: data.source === 'socrates' ? 'socrates' : 'fallback',
                 roundIndex: nextRoundIndex,
             });
+            onTurnSettled?.();
             mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (error: any) {
             if (requestId !== requestSeqRef.current) {
@@ -342,8 +423,9 @@ export const CrucibleWorkspace = ({
                 source: 'fallback',
                 roundIndex: nextRoundIndex,
             });
+            onTurnSettled?.();
         }
-    }, [projectId, scriptPath, topicTitle, onRoundGenerated]);
+    }, [projectId, scriptPath, topicTitle, onRoundGenerated, onTurnSettled]);
 
     useEffect(() => {
         if (!seedPrompt?.trim()) {
@@ -370,6 +452,12 @@ export const CrucibleWorkspace = ({
             openingSeedPrompt
         );
     }, [seedPrompt, seedPromptVersion, roundIndex, roundAnchors, isThinking, requestCrucibleTurn, openingPrompt]);
+
+    useEffect(() => {
+        if (seedPromptVersion < previousSeedVersionRef.current) {
+            previousSeedVersionRef.current = seedPromptVersion;
+        }
+    }, [seedPromptVersion]);
 
     useEffect(() => {
         if (incomingAssets.length === 0) {
@@ -441,6 +529,67 @@ export const CrucibleWorkspace = ({
         };
     }, [activePresentableId, presentables, roundAnchors, topicTitle]);
 
+    useEffect(() => {
+        if (!activePresentable || !previewKey || !shouldRenderPreview) {
+            setPreviewImageUrl(null);
+            setPreviewStatus('idle');
+            return;
+        }
+
+        const cachedPreview = previewCacheRef.current.get(previewKey);
+        if (cachedPreview) {
+            setPreviewImageUrl(cachedPreview);
+            setPreviewStatus('ready');
+            return;
+        }
+
+        const controller = new AbortController();
+        const bullets = buildPreviewBullets(activePresentable);
+        const subtitle = truncateText(activePresentable.summary || bullets[0] || normalizeTopic(topicTitle), 40);
+
+        setPreviewStatus('loading');
+        setPreviewImageUrl(null);
+
+        void fetch(buildApiUrl('/api/crucible/remotion-preview'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId,
+                renderVersion: PREVIEW_RENDER_VERSION,
+                topicTitle: normalizeTopic(topicTitle),
+                title: activePresentable.title,
+                subtitle,
+                bullets,
+            }),
+            signal: controller.signal,
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || '中屏预览生成失败');
+                }
+                return response.json() as Promise<CrucibleRemotionPreviewResponse>;
+            })
+            .then((data) => {
+                if (controller.signal.aborted || !data.imageUrl) {
+                    return;
+                }
+                previewCacheRef.current.set(previewKey, data.imageUrl);
+                setPreviewImageUrl(data.imageUrl);
+                setPreviewStatus('ready');
+            })
+            .catch((error) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+                console.error('[Crucible] Remotion preview failed:', error);
+                setPreviewStatus('error');
+                setPreviewImageUrl(null);
+            });
+
+        return () => controller.abort();
+    }, [activePresentable, previewKey, projectId, shouldRenderPreview, topicTitle]);
+
     const handleResetWorkspace = () => {
         if (thinkingTimerRef.current) {
             window.clearTimeout(thinkingTimerRef.current);
@@ -457,6 +606,9 @@ export const CrucibleWorkspace = ({
         setQuestionSource('static');
         setEngineMode('socratic_refinement');
         setLastDialogue(null);
+        previousSeedVersionRef.current = seedPromptVersion;
+        setPreviewImageUrl(null);
+        setPreviewStatus('idle');
         onResetWorkspace?.();
     };
 
@@ -470,7 +622,7 @@ export const CrucibleWorkspace = ({
                     <div className="max-h-full space-y-1.5 overflow-y-auto pr-1">
                         {presentables.length === 0 ? (
                             <div className="rounded-[18px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,252,248,0.86)] px-3 py-4 text-[12px] leading-6 text-[var(--ink-3)]">
-                                先在右侧抛出命题。等老张或老卢真的把焦点挂上黑板时，这里才会亮起来。
+                                黑板内容会出现在这里。
                             </div>
                         ) : presentables.map((asset) => {
                             const meta = ASSET_META[asset.type];
@@ -487,9 +639,8 @@ export const CrucibleWorkspace = ({
                                         : 'border-transparent bg-transparent hover:border-[var(--line-soft)] hover:bg-[var(--surface-1)]'
                                         }`}
                                 >
-                                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
+                                    <div className="text-[var(--ink-3)]">
                                         <Icon className="h-3.5 w-3.5" />
-                                        {meta.label}
                                     </div>
                                     <div className="mt-1 text-[12px] font-medium leading-5 text-[var(--ink-1)]">{asset.title}</div>
                                 </button>
@@ -505,10 +656,7 @@ export const CrucibleWorkspace = ({
                     >
                         <section className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.84)] px-4 py-3 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
                         <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">议题锁定阶段 · 第 {roundIndex} 轮</div>
-                                <div className="mh-display mt-2 text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{normalizeTopic(topicTitle)}</div>
-                            </div>
+                            <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{normalizeTopic(topicTitle)}</div>
                             <button
                                 type="button"
                                 onClick={handleResetWorkspace}
@@ -522,8 +670,8 @@ export const CrucibleWorkspace = ({
                             <div className="mt-4 rounded-[18px] border border-[rgba(166,117,64,0.14)] bg-[rgba(255,248,238,0.7)] px-4 py-3">
                                 <div className="text-[12px] leading-6 text-[var(--ink-2)]">
                                     {engineMode === 'roundtable_discovery'
-                                        ? '正在找这一轮最值得继续追的那根刺。'
-                                        : '正在继续收紧这一轮焦点。'}
+                                        ? '正在整理这一轮最值得挂上黑板的冲突。'
+                                        : '正在继续收紧这一轮黑板焦点。'}
                                 </div>
                             </div>
                         )}
@@ -532,25 +680,53 @@ export const CrucibleWorkspace = ({
                         <section className="rounded-[24px] border border-[var(--line-soft)] bg-[var(--surface-0)] p-4 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
                         {!activePresentable ? (
                             <div className="rounded-[20px] border border-dashed border-[var(--line-soft)] bg-[#fffdf9] px-4 py-8 text-center text-[13px] leading-7 text-[var(--ink-3)]">
-                                暂无中区资产。等右侧对话里真的长出参考、金句或结构后，这里才会刷新。
+                                暂无黑板内容。
                             </div>
                         ) : (
                         <>
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">黑板焦点</div>
-                                <h2 className="mh-display mt-2 text-[22px] font-semibold text-[var(--ink-1)]">{activePresentable.title}</h2>
-                            </div>
+                        <div>
+                            <h2 className="mh-display text-[22px] font-semibold text-[var(--ink-1)]">{activePresentable.title}</h2>
+                            {activePresentable.summary && (
+                                <p className="mt-2 text-[13px] leading-6 text-[var(--ink-2)]">{activePresentable.summary}</p>
+                            )}
                         </div>
 
+                        {shouldRenderPreview && (previewStatus !== 'error' || previewImageUrl) && (
+                            <div className="mt-4 overflow-hidden rounded-[22px] border border-[rgba(146,118,82,0.12)] bg-[linear-gradient(180deg,#fffdf9_0%,#f8eedf_100%)]">
+                                <div className="aspect-[16/9] w-full">
+                                    {previewImageUrl ? (
+                                        <img
+                                            src={previewImageUrl}
+                                            alt={`${activePresentable.title} 的中屏预览`}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,rgba(248,239,226,0.92)_0%,rgba(236,217,191,0.72)_100%)] text-[13px] text-[var(--ink-3)]">
+                                            {previewStatus === 'loading' ? '正在生成参考图...' : '参考图稍后挂出'}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {activePresentable.type === 'reference' && referenceSections ? (
-                            <article className="mt-4 max-h-[calc(100vh-420px)] overflow-y-auto rounded-[22px] border border-[rgba(146,118,82,0.12)] bg-[linear-gradient(180deg,#fffdf9_0%,#fbf4e8_100%)] px-5 py-5">
-                                {referenceSections.lead && (
-                                    <div className="text-[13px] leading-6 text-[var(--ink-2)]">{referenceSections.lead}</div>
+                            previewImageUrl ? (
+                                <article className="mt-4 rounded-[20px] border border-[rgba(146,118,82,0.12)] bg-[#fffdf9] px-4 py-3">
+                                    <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">图注</div>
+                                    <div className="mt-2 text-[13px] leading-6 text-[var(--ink-2)]">
+                                        {previewCaption}
+                                    </div>
+                                </article>
+                            ) : (
+                            <article className="mt-4 max-h-[calc(100vh-460px)] overflow-y-auto rounded-[22px] border border-[rgba(146,118,82,0.12)] bg-[linear-gradient(180deg,#fffdf9_0%,#fbf4e8_100%)] px-5 py-5">
+                                {referenceSections.lead && normalizeComparableText(referenceSections.lead) !== normalizeComparableText(activePresentable.summary || '') && (
+                                    <div className="text-[13px] leading-6 text-[var(--ink-2)]">
+                                        {referenceSections.lead}
+                                    </div>
                                 )}
 
                                 {referenceSections.bullets.length > 0 && (
-                                    <div className={`${referenceSections.lead ? 'mt-4' : 'mt-0'} space-y-3 ${referenceSections.lead ? 'border-t border-[rgba(146,118,82,0.12)] pt-4' : ''}`}>
+                                    <div className={`${referenceSections.lead && normalizeComparableText(referenceSections.lead) !== normalizeComparableText(activePresentable.summary || '') ? 'mt-4 border-t border-[rgba(146,118,82,0.12)] pt-4' : ''} space-y-3`}>
                                         {referenceSections.bullets.map((bullet, index) => (
                                             <div key={`${activePresentable.id}_bullet_${index}`} className="flex gap-3">
                                                 <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]"></div>
@@ -560,9 +736,10 @@ export const CrucibleWorkspace = ({
                                     </div>
                                 )}
                             </article>
+                            )
                         ) : (
-                            <div className="mt-4 max-h-[calc(100vh-420px)] overflow-y-auto rounded-[20px] border border-[var(--line-soft)] bg-[#fffdf9] p-4">
-                                <div className="whitespace-pre-wrap text-[12px] leading-7 text-[var(--ink-1)]">
+                            <div className="mt-4 max-h-[calc(100vh-460px)] overflow-y-auto rounded-[20px] border border-[var(--line-soft)] bg-[#fffdf9] p-4">
+                                <div className="whitespace-pre-wrap text-[13px] leading-7 text-[var(--ink-1)]">
                                     {formatAssetContent(activePresentable.content)}
                                 </div>
                             </div>

@@ -292,6 +292,14 @@ function App() {
         window.addEventListener('mouseup', handleMouseUp);
     }, []);
 
+    const handleCrucibleBoardStateChange = useCallback((payload: { hasContent: boolean }) => {
+        setCrucibleHasBoardContent(payload.hasContent);
+    }, []);
+
+    const handleCrucibleTurnSettled = useCallback(() => {
+        setCrucibleTurnSettledToken((prev) => prev + 1);
+    }, []);
+
     const crucibleSidebarStyle = crucibleManualSidebarWidth
         ? { width: `${crucibleManualSidebarWidth}px` }
         : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
@@ -338,6 +346,8 @@ function App() {
                             seedPromptVersion={crucibleSeedVersion}
                             onResetWorkspace={handleCrucibleReset}
                             onRoundGenerated={handleCrucibleRoundGenerated}
+                            onBlackboardStateChange={handleCrucibleBoardStateChange}
+                            onTurnSettled={handleCrucibleTurnSettled}
                         />
                     </div>
                     <div
