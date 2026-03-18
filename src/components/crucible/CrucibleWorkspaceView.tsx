@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpenText, Boxes, BrainCircuit, Quote, RotateCcw, Sparkles } from 'lucide-react';
+import { BookOpenText, Boxes, BrainCircuit, Quote, Sparkles } from 'lucide-react';
 import type { HostRoutedAsset } from '../../types';
 import { buildApiUrl } from '../../config/runtime';
 import { clearCrucibleSnapshot, readCrucibleSnapshot, writeCrucibleSnapshot } from './storage';
@@ -262,8 +262,10 @@ export const CrucibleWorkspace = ({
     const [suggestedTitle, setSuggestedTitle] = useState<string>('');
 
     const activePresentable = useMemo(
-        () => presentables.find((asset) => asset.id === activePresentableId) ?? presentables[0] ?? null,
-        [activePresentableId, presentables]
+        () => presentables.find((asset) => asset.id === activePresentableId)
+            ?? crystallizedQuotes.find((asset) => asset.id === activePresentableId)
+            ?? presentables[0] ?? null,
+        [activePresentableId, presentables, crystallizedQuotes]
     );
     const referenceSections = useMemo(
         () => activePresentable?.type === 'reference' ? buildReferenceSections(activePresentable) : null,
@@ -643,7 +645,7 @@ export const CrucibleWorkspace = ({
                 <aside className="order-2 flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] p-2.5 shadow-[0_14px_32px_rgba(131,103,70,0.04)] xl:order-1">
                     {crystallizedQuotes.length > 0 && (
                         <div className="mb-2 flex-shrink-0">
-                            <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">结晶金句</div>
+                            <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">结晶内容</div>
                             <div className="space-y-1">
                                 {crystallizedQuotes.map((quote) => {
                                     const roundMatch = quote.id.match(/^turn_(\d+)_/);
@@ -712,17 +714,7 @@ export const CrucibleWorkspace = ({
                         className="h-full min-h-0 space-y-2 overflow-y-scroll pr-2"
                     >
                         <section className="rounded-[12px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.84)] px-4 py-3 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{suggestedTitle || normalizeTopic(topicTitle)}</div>
-                            <button
-                                type="button"
-                                onClick={handleResetWorkspace}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-1)] px-3 py-1.5 text-[12px] text-[var(--ink-2)] transition hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]"
-                            >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                重置
-                            </button>
-                        </div>
+                        <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{suggestedTitle || normalizeTopic(topicTitle)}</div>
                         {isThinking && (
                             <div className="mt-4 rounded-[8px] border border-[rgba(166,117,64,0.14)] bg-[rgba(255,248,238,0.7)] px-4 py-3">
                                 <div className="text-[12px] leading-6 text-[var(--ink-2)]">

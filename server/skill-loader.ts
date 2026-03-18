@@ -37,7 +37,7 @@ export function loadSkillKnowledge(skillName: string): string {
             try {
                 const raw = fs.readFileSync(skillPath, 'utf-8');
                 // 提取核心内容：跳过 YAML frontmatter，截取合理长度（避免 token 爆炸）
-                const content = extractCoreContent(raw, 4000);
+                const content = extractCoreContent(raw, 24000);
                 skillCache.set(skillName, { content, loadedAt: Date.now() });
                 console.log(`[SkillLoader] ✅ Loaded ${skillName} from ${basePath}`);
                 return content;

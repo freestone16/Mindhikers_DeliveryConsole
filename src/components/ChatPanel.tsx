@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Settings, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
 import { buildApiUrl } from '../config/runtime';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
@@ -24,6 +24,7 @@ interface ChatPanelProps {
     externalMessages?: ChatMessage[];
     onUserMessage?: (content: string) => void;
     onRouteAsset?: (asset: HostRoutedAsset) => void;
+    onResetAll?: () => void;
     blackboardHint?: string | null;
     crucibleTurnSettledToken?: number;
     socket: any;
@@ -138,6 +139,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     externalMessages = [],
     onUserMessage,
     onRouteAsset,
+    onResetAll,
     blackboardHint,
     crucibleTurnSettledToken = 0,
     socket,
@@ -167,9 +169,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const expertName = displayName || expert?.name || expertId;
     const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
     const isCrucibleMode = expertId === 'GoldenMetallurgist';
-    const draftKey = `chatpanel_draft_${expertId}_${projectId}`;
     const confirmKey = `chatpanel_confirm_send_${expertId}`;
     const [showSettings, setShowSettings] = useState(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const toastTimerRef = useRef<number | null>(null);
     const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
         try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
     });
@@ -179,17 +182,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         try { localStorage.setItem(confirmKey, String(value)); } catch { /* ignore */ }
     };
 
-    const handleSaveDraft = useCallback(() => {
-        if (!inputText.trim()) return;
-        try { localStorage.setItem(draftKey, inputText); } catch { /* ignore */ }
-    }, [inputText, draftKey]);
-
-    const handleRestoreDraft = useCallback(() => {
-        try {
-            const draft = localStorage.getItem(draftKey);
-            if (draft) setInputText(draft);
-        } catch { /* ignore */ }
-    }, [draftKey, setInputText]);
+    const showToast = useCallback((msg: string) => {
+        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+        setToastMessage(msg);
+        toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2000);
+    }, []);
 
     const defaultAssistantMeta = useMemo(
         () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
@@ -499,7 +496,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const handleSend = useCallback(() => {
         if (!inputText.trim() && attachments.length === 0) return;
-        if (isStreaming || !socket || sendGuardRef.current) return;
+        if (!socket || sendGuardRef.current) return;
+        if (isStreaming && !isCrucibleMode) return;
         if (confirmBeforeSend && !window.confirm('确认发送这条消息？')) return;
 
         const normalizedInput = inputText.trim();
@@ -670,6 +668,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         lastSentRef.current = null;
     };
 
+    const handleResetAll = useCallback(() => {
+        if (!window.confirm('确定要重置工作区并清空对话吗？')) return;
+        onResetAll?.();
+    }, [onResetAll]);
+
     const handleExportMarkdown = useCallback(() => {
         const title = (displayName || expertName || '黄金坩埚对话').trim();
         const lines = [
@@ -701,31 +704,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         anchor.click();
         anchor.remove();
         URL.revokeObjectURL(url);
-    }, [displayName, expertName, messages, headerBadges]);
+        showToast('对话已下载');
+    }, [displayName, expertName, messages, headerBadges, showToast]);
 
     const SNAPSHOT_BACKUP_KEY = 'golden-crucible-manual-backup-v8';
 
     const handleSaveAutosave = useCallback(() => {
         try {
             const raw = localStorage.getItem('golden-crucible-workspace-v8');
-            if (!raw) { alert('当前没有对话状态可保存'); return; }
+            if (!raw) { showToast('当前没有状态可保存'); return; }
             localStorage.setItem(SNAPSHOT_BACKUP_KEY, raw);
-        } catch { alert('保存失败'); }
-    }, []);
+            showToast('快照已保存');
+        } catch { showToast('保存失败'); }
+    }, [showToast]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
             const raw = localStorage.getItem(SNAPSHOT_BACKUP_KEY);
-            if (!raw) { alert('还没有手动保存过快照'); return; }
+            if (!raw) { showToast('还没有保存过快照'); return; }
             const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.presentables)) {
-                alert('快照数据损坏，缺少 presentables 字段');
+                showToast('快照数据损坏');
                 return;
             }
             localStorage.setItem('golden-crucible-workspace-v8', raw);
-            window.location.reload();
-        } catch { alert('载入失败'); }
-    }, []);
+            showToast('快照已载入，刷新中...');
+            setTimeout(() => window.location.reload(), 600);
+        } catch { showToast('载入失败'); }
+    }, [showToast]);
 
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
@@ -736,17 +742,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     return (
         <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,250,244,0.98)_0%,rgba(248,239,226,0.96)_100%)]">
-            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
+            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-2">
+                <div className="flex items-center justify-between gap-3">
+                    {isCrucibleMode && headerBadges && headerBadges.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {headerBadges.map((badge) => (
+                                <div key={badge.id} className="flex items-center gap-1.5 rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[rgba(255,255,255,0.52)] px-2 py-1">
+                                    {badge.avatarImage ? (
+                                        <div className="h-6 w-6 overflow-hidden rounded-lg bg-[var(--surface-2)]">
+                                            <img src={badge.avatarImage} alt={badge.name} className="h-full w-full object-cover" />
+                                        </div>
+                                    ) : (
+                                        <div className="grid h-6 w-6 place-items-center rounded-lg bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-1)]">
+                                            {badge.avatarText || badge.name.slice(0, 1)}
+                                        </div>
+                                    )}
+                                    <div className="text-[12px] font-medium text-[var(--ink-1)]">{badge.name}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : !isCrucibleMode ? (
                         <div className="flex items-center gap-2">
                             <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(166,117,64,0.15)] bg-[var(--surface-1)] text-[13px] font-semibold text-[var(--ink-1)]">聊</div>
-                            <div>
-                                <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{panelTitle || displayName || expertName}</div>
-                            </div>
+                            <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{panelTitle || displayName || expertName}</div>
                         </div>
-                    </div>
-                    <div className="relative flex items-center gap-1">
+                    ) : null}
+                    <div className="relative flex flex-shrink-0 items-center gap-1">
+                        {toastMessage && (
+                            <span className="mr-1 animate-pulse rounded-full bg-[rgba(166,117,64,0.12)] px-2.5 py-1 text-[11px] text-[var(--ink-2)]">{toastMessage}</span>
+                        )}
                         <button
                             onClick={handleExportMarkdown}
                             title="下载 Markdown 对话记录"
@@ -772,13 +796,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 </button>
                             </>
                         )}
-                        <button
-                            onClick={handleClearHistory}
-                            title="清空对话历史"
-                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isCrucibleMode && onResetAll ? (
+                            <button
+                                onClick={handleResetAll}
+                                title="重置工作区并清空对话"
+                                className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span className="text-[11px] font-medium">重置</span>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleClearHistory}
+                                title="清空对话历史"
+                                className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowSettings((prev) => !prev)}
                             title="对话设置"
@@ -809,7 +844,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
                 </div>
 
-                {headerBadges && headerBadges.length > 0 && (
+                {!isCrucibleMode && headerBadges && headerBadges.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                         {headerBadges.map((badge) => (
                             <div key={badge.id} className="flex items-center gap-2 rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[rgba(255,255,255,0.52)] px-2.5 py-2">
@@ -958,13 +993,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
 
             <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
-                <div className="flex items-end gap-2">
-                    <div className="mb-1 flex items-center">
-                        <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
-                            你
-                        </div>
+                <div className="flex items-center gap-2">
+                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                        你
                     </div>
-                    <label className="cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
+                    <label className="flex-shrink-0 cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
                         <Paperclip className="h-4 w-4" />
                         <input type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
                     </label>
@@ -989,22 +1022,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         rows={3}
                         disabled={isCrucibleMode ? false : isStreaming}
                     />
-                    <div className="flex flex-col gap-1.5">
-                        <button
-                            onClick={handleSend}
-                            disabled={isStreaming || (!inputText.trim() && attachments.length === 0)}
-                            className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
-                        >
-                            {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                        </button>
-                        <button
-                            onClick={inputText.trim() ? handleSaveDraft : handleRestoreDraft}
-                            title={inputText.trim() ? '保存草稿' : '恢复草稿'}
-                            className="grid h-8 w-11 place-items-center rounded-xl border border-[var(--line-soft)] bg-[var(--surface-1)] text-[var(--ink-3)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]"
-                        >
-                            {inputText.trim() ? <Upload className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleSend}
+                        disabled={(isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
+                        className="flex-shrink-0 grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
+                    >
+                        {(isStreaming && !isCrucibleMode) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </button>
                 </div>
             </div>
         </div>

@@ -393,6 +393,7 @@ function App() {
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
+                            onResetAll={handleCrucibleReset}
                             blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             socket={socket}
