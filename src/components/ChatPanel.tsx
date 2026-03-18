@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Settings, Trash2, Upload, X } from 'lucide-react';
 import { buildApiUrl } from '../config/runtime';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
