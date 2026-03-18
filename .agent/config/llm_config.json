@@ -1,7 +1,7 @@
 {
   "global": {
-    "provider": "kimi",
-    "model": "kimi-k2.5",
+    "provider": "deepseek",
+    "model": "deepseek-chat",
     "baseUrl": null
   },
   "generation": {

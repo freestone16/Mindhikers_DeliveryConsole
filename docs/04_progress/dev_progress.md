@@ -1,6 +1,44 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-15 CST
+> **更新日期**: 2026-03-18 CST
+
+---
+
+## 0.5 2026-03-18 黄金坩埚 UI 优化 + Linear MCP 接入
+
+### ✅ 本轮已完成
+
+#### 1. 对话面板 S/L/D 按钮重构（commit: `1c89848`）
+- **旧**：JSON 导出/导入按钮（需文件选择对话框）
+- **新**：
+  - **S（Save）**：快照直接写入 `localStorage`，无需文件对话框
+  - **L（Load）**：从 `localStorage` 直接恢复快照，无需文件对话框
+  - **D（Download）**：仅下载 Markdown 对话记录
+- 文件：`src/components/ChatPanel.tsx`
+
+#### 2. 分割线拖拽范围放宽（commit: `1c89848`）
+- 黑板面板与对话面板之间的拖动分隔线可以向更左侧延伸
+- 文件：`src/App.tsx`
+
+#### 3. Linear MCP 接入
+- 安装命令：`claude mcp add --transport http linear-server https://mcp.linear.app/mcp`
+- OAuth 2.1 认证已完成（用户授权）
+- 当前状态：两个 endpoint 均注册
+  - `linear`: `https://mcp.linear.app/sse` (HTTP)
+  - `linear-server`: `https://mcp.linear.app/mcp` (HTTP)
+- 下一步：通过 Linear MCP 工具同步黄金坩埚进展到 MIN-38 父 Issue 及子 Issues
+
+#### 4. 浏览器工具优先级规则写入 AGENTS.md
+- 明确三级优先级：`agent-browser`（最高）→ MCP 工具 → `Claude in Chrome`（最低）
+- `mcp__Claude_in_Chrome__*` 本质是控制用户真实屏幕上的 Chrome，默认禁止使用
+- 文件：`AGENTS.md` §浏览器工具优先级规则
+
+### ⏳ 待完成（下一窗口）
+- 通过 Linear MCP 读取 MIN-38 及子 Issues，评估哪些已完成、哪些需更新
+- 用中文同步黄金坩埚实际进展到 Linear（进度、描述、状态）
+- Commit & push 本轮所有未提交改动（新 Skills、skill-sync、llm_config 等）
+
+---
 
 ---
 

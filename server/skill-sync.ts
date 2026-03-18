@@ -18,6 +18,7 @@ const SKILLS_TO_SYNC = [
     'ThesisWriter',
     'Researcher',
     'FactChecker',
+    'Socrates',
 ];
 
 const GLOBAL_SKILLS_ROOT = path.join(os.homedir(), '.gemini/antigravity/skills');
