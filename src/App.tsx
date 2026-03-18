@@ -292,8 +292,8 @@ function App() {
 
         event.preventDefault();
         const rect = container.getBoundingClientRect();
-        const minWidth = 320;
-        const maxWidth = Math.max(minWidth, rect.width - 180);
+        const minWidth = 280;
+        const maxWidth = Math.max(minWidth, rect.width - 80);
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const nextWidth = Math.min(maxWidth, Math.max(minWidth, rect.right - moveEvent.clientX));
@@ -378,7 +378,7 @@ function App() {
                     </div>
                     <div
                         style={crucibleSidebarStyle}
-                        className="min-w-[320px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
+                        className="min-w-[280px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
                     >
                         <ChatPanel
                             isOpen={activeModule === 'crucible'}

@@ -703,31 +703,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         URL.revokeObjectURL(url);
     }, [displayName, expertName, messages, headerBadges]);
 
-    const handleSaveAutosave = useCallback(async () => {
+    const SNAPSHOT_BACKUP_KEY = 'golden-crucible-manual-backup-v8';
+
+    const handleSaveAutosave = useCallback(() => {
         try {
             const raw = localStorage.getItem('golden-crucible-workspace-v8');
             if (!raw) { alert('当前没有对话状态可保存'); return; }
-            const res = await fetch(buildApiUrl('/api/crucible/autosave'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: raw,
-            });
-            if (!res.ok) throw new Error('server error');
+            localStorage.setItem(SNAPSHOT_BACKUP_KEY, raw);
         } catch { alert('保存失败'); }
     }, []);
 
-    const handleLoadAutosave = useCallback(async () => {
+    const handleLoadAutosave = useCallback(() => {
         try {
-            const res = await fetch(buildApiUrl('/api/crucible/autosave'));
-            if (res.status === 404) { alert('还没有保存过快照'); return; }
-            if (!res.ok) throw new Error('server error');
-            const text = await res.text();
-            const parsed = JSON.parse(text);
+            const raw = localStorage.getItem(SNAPSHOT_BACKUP_KEY);
+            if (!raw) { alert('还没有手动保存过快照'); return; }
+            const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.presentables)) {
                 alert('快照数据损坏，缺少 presentables 字段');
                 return;
             }
-            localStorage.setItem('golden-crucible-workspace-v8', text);
+            localStorage.setItem('golden-crucible-workspace-v8', raw);
             window.location.reload();
         } catch { alert('载入失败'); }
     }, []);
@@ -763,14 +758,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <>
                                 <button
                                     onClick={handleSaveAutosave}
-                                    title="保存快照到服务器"
+                                    title="保存快照到本地（localStorage）"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">S</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从服务器载入快照"
+                                    title="从本地（localStorage）载入快照"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">L</span>
