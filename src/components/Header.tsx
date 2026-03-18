@@ -104,7 +104,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                     <div className="flex items-center gap-2.5">
                         <img src="/logo.png" alt="MindHikers Logo" className="h-9 w-9 rounded-2xl border border-[var(--line-soft)] object-cover shadow-[0_8px_20px_rgba(130,102,70,0.08)]" />
                         <div>
-                            <h1 className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">MindHikers Delivery Console</h1>
+                            <h1 className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">心行者 MindHikers Delivery Console</h1>
                         </div>
                     </div>
 

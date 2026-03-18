@@ -34,6 +34,7 @@ export interface CrucibleTurnResponse {
     engineMode?: CrucibleEngineMode;
     phase?: CrucibleRuntimePhase;
     orchestrator?: CrucibleOrchestratorState;
+    topicSuggestion?: string;
 }
 
 export interface CrucibleMessage {
@@ -66,6 +67,7 @@ export interface RoundAnchor {
 export interface CrucibleSnapshot {
     messages?: CrucibleMessage[];
     presentables: CanvasAsset[];
+    crystallizedQuotes?: CanvasAsset[];
     activePresentableId?: string;
     topicTitle?: string;
     openingPrompt?: string;

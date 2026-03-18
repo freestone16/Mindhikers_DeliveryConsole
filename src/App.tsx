@@ -18,6 +18,7 @@ import { LLMConfigPage } from './components/LLMConfigPage';
 import { buildApiUrl } from './config/runtime';
 import type { ChatMessage, HostRoutedAsset } from './types';
 import { CRUCIBLE_HEADER_BADGES, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
+import { readCrucibleSnapshot } from './components/crucible/storage';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
@@ -47,10 +48,23 @@ function App() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatResetToken, setChatResetToken] = useState(0);
     const [crucibleRoutedAssets, setCrucibleRoutedAssets] = useState<HostRoutedAsset[]>([]);
-    const [crucibleTopicTitle, setCrucibleTopicTitle] = useState('标题待定');
+    const [crucibleTopicTitle, setCrucibleTopicTitle] = useState(() => {
+        const snap = readCrucibleSnapshot();
+        return snap?.topicTitle || '标题待定';
+    });
     const [crucibleSeedPrompt, setCrucibleSeedPrompt] = useState('');
     const [crucibleSeedVersion, setCrucibleSeedVersion] = useState(0);
-    const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>([]);
+    const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => {
+        const snap = readCrucibleSnapshot();
+        if (!snap?.messages?.length) return [];
+        return snap.messages.map((msg) => ({
+            id: msg.id,
+            role: (msg.speaker === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: msg.timestamp || msg.createdAt,
+            meta: msg.speaker !== 'user' ? getCrucibleSpeakerMeta(msg.speaker) : undefined,
+        }));
+    });
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
@@ -254,14 +268,17 @@ function App() {
 
         if (hasContextChanged && currentContext.projectId) {
             resetActiveExpertContext(currentContext.projectId, currentContext.scriptPath);
-            setCrucibleTopicTitle('标题待定');
-            setCrucibleRoutedAssets([]);
-            setCrucibleSeedPrompt('');
-            setCrucibleSeedVersion(0);
-            setCrucibleInjectedMessages([]);
-            setCrucibleHasBoardContent(false);
-            setCrucibleTurnSettledToken(0);
-            injectedRoundKeysRef.current.clear();
+            // Only wipe crucible state on a real project switch (not on initial load from '' → projectId)
+            if (previousContext.projectId !== '') {
+                setCrucibleTopicTitle('标题待定');
+                setCrucibleRoutedAssets([]);
+                setCrucibleSeedPrompt('');
+                setCrucibleSeedVersion(0);
+                setCrucibleInjectedMessages([]);
+                setCrucibleHasBoardContent(false);
+                setCrucibleTurnSettledToken(0);
+                injectedRoundKeysRef.current.clear();
+            }
         }
 
         previousContextRef.current = currentContext;
@@ -275,8 +292,8 @@ function App() {
 
         event.preventDefault();
         const rect = container.getBoundingClientRect();
-        const minWidth = 420;
-        const maxWidth = Math.max(minWidth, rect.width - 360);
+        const minWidth = 320;
+        const maxWidth = Math.max(minWidth, rect.width - 180);
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const nextWidth = Math.min(maxWidth, Math.max(minWidth, rect.right - moveEvent.clientX));
@@ -361,7 +378,7 @@ function App() {
                     </div>
                     <div
                         style={crucibleSidebarStyle}
-                        className="min-w-[420px] max-w-[760px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
+                        className="min-w-[320px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
                     >
                         <ChatPanel
                             isOpen={activeModule === 'crucible'}
@@ -371,6 +388,7 @@ function App() {
                             scriptPath={state.selectedScript?.path || ''}
                             resetToken={chatResetToken}
                             displayName={crucibleTopicTitle}
+                            panelTitle="对话"
                             headerBadges={CRUCIBLE_HEADER_BADGES}
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}

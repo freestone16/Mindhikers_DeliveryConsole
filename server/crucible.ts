@@ -400,7 +400,10 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
         const parseStartedAt = Date.now();
         const raw = await callConfiguredLlm(prompt);
         const jsonText = extractJsonObject(raw);
-        const parsed = JSON.parse(jsonText) as Partial<SkillOutputPayload>;
+        const parsed = JSON.parse(jsonText) as Partial<SkillOutputPayload & { topicSuggestion?: string }>;
+        const topicSuggestion = (roundIndex >= 3 && typeof parsed.topicSuggestion === 'string')
+            ? parsed.topicSuggestion.trim().slice(0, 32) || undefined
+            : undefined;
         const speaker = parsed.speaker === DEFAULT_PAIR.synthesizerSlug ? DEFAULT_PAIR.synthesizerSlug : DEFAULT_PAIR.challengerSlug;
         const reflection = normalizeText(
             parsed.reflection || '',
@@ -456,6 +459,7 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             },
             dialogue,
             presentables,
+            ...(topicSuggestion ? { topicSuggestion } : {}),
         });
     } catch (error: any) {
         console.error(`[Crucible] Turn generation failed after ${formatDurationMs(startedAt)}:`, error.message);

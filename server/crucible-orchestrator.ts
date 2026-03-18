@@ -252,6 +252,10 @@ export const buildSocratesPrompt = (
             `${index + 1}. 问题：${normalizeText(card.prompt || '', '无')} | 用户回答：${normalizeText(card.answer || '', '未填写')}`
         )).join('\n');
 
+    const topicSuggestionField = context.roundIndex >= 3
+        ? `\n  “topicSuggestion”: “可选，当讨论已有足够上下文时，凝练一个 10 字以内的短标题；若不确定则省略此字段”,`
+        : '';
+
     return `## 身份
 
 你是黄金坩埚的隐身导演。你调用苏格拉底方法，通过”${pair.challengerName}”或”${pair.synthesizerName}”的口吻与用户对话。
@@ -276,7 +280,7 @@ ${previousSummary}
 ## 输出格式
 
 输出严格 JSON，不要加任何额外解释。presentables 至少 1 条，是整理后挂到黑板上的焦点/参考/金句，不是 reflection 的复制：
-{
+{${topicSuggestionField}
   “speaker”: “${pair.challengerSlug}” 或 “${pair.synthesizerSlug}”,
   “reflection”: “面向用户的发言（像真人说话）”,
   “focus”: “这一轮真正要咬住的焦点”,

@@ -196,6 +196,31 @@ app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
 
+// Crucible Autosave (S/L buttons — no file dialog)
+const CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
+app.get('/api/crucible/autosave', (_req, res) => {
+    if (!fs.existsSync(CRUCIBLE_AUTOSAVE_PATH)) {
+        return res.status(404).json({ error: 'No autosave found' });
+    }
+    try {
+        const data = fs.readFileSync(CRUCIBLE_AUTOSAVE_PATH, 'utf-8');
+        res.setHeader('Content-Type', 'application/json');
+        res.send(data);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to read autosave' });
+    }
+});
+app.post('/api/crucible/autosave', (req, res) => {
+    try {
+        const dir = path.dirname(CRUCIBLE_AUTOSAVE_PATH);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(CRUCIBLE_AUTOSAVE_PATH, JSON.stringify(req.body, null, 2), 'utf-8');
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to write autosave' });
+    }
+});
+
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');
 }

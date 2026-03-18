@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Loader2, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
+import { buildApiUrl } from '../config/runtime';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -12,6 +13,7 @@ interface ChatPanelProps {
     scriptPath: string;
     resetToken: number;
     displayName?: string;
+    panelTitle?: string;
     headerBadges?: Array<{
         id: string;
         name: string;
@@ -131,6 +133,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     scriptPath,
     resetToken,
     displayName,
+    panelTitle,
     headerBadges,
     externalMessages = [],
     onUserMessage,
@@ -164,6 +167,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const expertName = displayName || expert?.name || expertId;
     const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
     const isCrucibleMode = expertId === 'GoldenMetallurgist';
+    const draftKey = `chatpanel_draft_${expertId}_${projectId}`;
+    const confirmKey = `chatpanel_confirm_send_${expertId}`;
+    const [showSettings, setShowSettings] = useState(false);
+    const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
+        try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
+    });
+
+    const saveConfirmSetting = (value: boolean) => {
+        setConfirmBeforeSend(value);
+        try { localStorage.setItem(confirmKey, String(value)); } catch { /* ignore */ }
+    };
+
+    const handleSaveDraft = useCallback(() => {
+        if (!inputText.trim()) return;
+        try { localStorage.setItem(draftKey, inputText); } catch { /* ignore */ }
+    }, [inputText, draftKey]);
+
+    const handleRestoreDraft = useCallback(() => {
+        try {
+            const draft = localStorage.getItem(draftKey);
+            if (draft) setInputText(draft);
+        } catch { /* ignore */ }
+    }, [draftKey, setInputText]);
+
     const defaultAssistantMeta = useMemo(
         () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
         [isCrucibleMode, expertId, expertName]
@@ -447,6 +474,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [socket, matchesCurrentScope, defaultAssistantMeta, isCrucibleMode]);
 
     useEffect(() => {
+        // Crucible mode manages its own message history via externalMessages; skip socket-based load/reset
+        if (isCrucibleMode) return;
         if (!socket || !isOpen || !projectId) return;
 
         if (prevScopeKeyRef.current !== scopeKey) {
@@ -454,9 +483,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             socket.emit('chat-load-history', { expertId, projectId, scriptPath });
             prevScopeKeyRef.current = scopeKey;
         }
-    }, [expertId, projectId, scriptPath, socket, isOpen, scopeKey, resetPanelState]);
+    }, [expertId, projectId, scriptPath, socket, isOpen, scopeKey, resetPanelState, isCrucibleMode]);
 
     useEffect(() => {
+        // Crucible mode manages its own message history via externalMessages; skip socket-based load/reset
+        if (isCrucibleMode) return;
         if (!socket || !isOpen || !projectId) return;
 
         if (prevResetTokenRef.current !== resetToken) {
@@ -464,11 +495,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             queueMicrotask(resetPanelState);
             socket.emit('chat-clear-history', { expertId, projectId, scriptPath });
         }
-    }, [resetToken, socket, isOpen, expertId, projectId, scriptPath, resetPanelState]);
+    }, [resetToken, socket, isOpen, expertId, projectId, scriptPath, resetPanelState, isCrucibleMode]);
 
     const handleSend = useCallback(() => {
         if (!inputText.trim() && attachments.length === 0) return;
         if (isStreaming || !socket || sendGuardRef.current) return;
+        if (confirmBeforeSend && !window.confirm('确认发送这条消息？')) return;
 
         const normalizedInput = inputText.trim();
         const now = Date.now();
@@ -529,7 +561,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
@@ -671,6 +703,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         URL.revokeObjectURL(url);
     }, [displayName, expertName, messages, headerBadges]);
 
+    const handleSaveAutosave = useCallback(async () => {
+        try {
+            const raw = localStorage.getItem('golden-crucible-workspace-v8');
+            if (!raw) { alert('当前没有对话状态可保存'); return; }
+            const res = await fetch(buildApiUrl('/api/crucible/autosave'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: raw,
+            });
+            if (!res.ok) throw new Error('server error');
+        } catch { alert('保存失败'); }
+    }, []);
+
+    const handleLoadAutosave = useCallback(async () => {
+        try {
+            const res = await fetch(buildApiUrl('/api/crucible/autosave'));
+            if (res.status === 404) { alert('还没有保存过快照'); return; }
+            if (!res.ok) throw new Error('server error');
+            const text = await res.text();
+            const parsed = JSON.parse(text);
+            if (!parsed || !Array.isArray(parsed.presentables)) {
+                alert('快照数据损坏，缺少 presentables 字段');
+                return;
+            }
+            localStorage.setItem('golden-crucible-workspace-v8', text);
+            window.location.reload();
+        } catch { alert('载入失败'); }
+    }, []);
+
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
             return '先在这里继续聊，真正需要上黑板的内容会被挂到中区。';
@@ -686,18 +747,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <div className="flex items-center gap-2">
                             <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(166,117,64,0.15)] bg-[var(--surface-1)] text-[13px] font-semibold text-[var(--ink-1)]">聊</div>
                             <div>
-                                <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{displayName || expertName}</div>
+                                <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{panelTitle || displayName || expertName}</div>
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="relative flex items-center gap-1">
                         <button
                             onClick={handleExportMarkdown}
-                            title="导出 Markdown"
-                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            title="下载 Markdown 对话记录"
+                            className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                         >
-                            <Download className="h-4 w-4" />
+                            <span className="text-[11px] font-bold leading-none">D</span>
                         </button>
+                        {isCrucibleMode && (
+                            <>
+                                <button
+                                    onClick={handleSaveAutosave}
+                                    title="保存快照到服务器"
+                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                >
+                                    <span className="text-[11px] font-bold leading-none">S</span>
+                                </button>
+                                <button
+                                    onClick={handleLoadAutosave}
+                                    title="从服务器载入快照"
+                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                >
+                                    <span className="text-[11px] font-bold leading-none">L</span>
+                                </button>
+                            </>
+                        )}
                         <button
                             onClick={handleClearHistory}
                             title="清空对话历史"
@@ -706,11 +785,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <Trash2 className="h-4 w-4" />
                         </button>
                         <button
+                            onClick={() => setShowSettings((prev) => !prev)}
+                            title="对话设置"
+                            className={`rounded-xl p-2 transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)] ${showSettings ? 'bg-[var(--surface-1)] text-[var(--ink-1)]' : 'text-[var(--ink-3)]'}`}
+                        >
+                            <Settings className="h-4 w-4" />
+                        </button>
+                        <button
                             onClick={onToggle}
                             className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                         >
                             <X className="h-4 w-4" />
                         </button>
+                        {showSettings && (
+                            <div className="absolute right-0 top-10 z-10 w-52 rounded-[10px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.98)] p-3 shadow-[0_8px_24px_rgba(131,103,70,0.12)]">
+                                <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">对话设置</div>
+                                <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
+                                    <span className="text-[13px] text-[var(--ink-1)]">发送前确认</span>
+                                    <div
+                                        className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${confirmBeforeSend ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)]'}`}
+                                        onClick={() => saveConfirmSetting(!confirmBeforeSend)}
+                                    >
+                                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${confirmBeforeSend ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </div>
+                                </label>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -829,16 +929,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         })}
 
                         {(streamingContent || (isCrucibleMode && isStreaming)) && (
-                            <div className="flex gap-3">
-                                <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">思</div>
-                                <div className="max-w-[88%]">
-                                    <div className="mb-1 text-[11px] text-[var(--ink-3)]">推理中</div>
-                                    <div className="rounded-[22px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
-                                        {isCrucibleMode
-                                            ? crucibleThinkingLabel
-                                            : streamingContent}
-                                        <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-[rgba(120,93,62,0.45)] align-middle" />
-                                    </div>
+                            <div className="pl-1">
+                                <div className="mb-1 text-[11px] text-[var(--ink-3)]">{isCrucibleMode ? '老卢、老张在思索' : '推理中'}</div>
+                                <div className="inline-block rounded-[10px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
+                                    {isCrucibleMode
+                                        ? crucibleThinkingLabel
+                                        : streamingContent}
+                                    <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-sm bg-[rgba(120,93,62,0.45)] align-middle" />
                                 </div>
                             </div>
                         )}
@@ -897,13 +994,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         rows={3}
                         disabled={isCrucibleMode ? false : isStreaming}
                     />
-                    <button
-                        onClick={handleSend}
-                        disabled={isStreaming || (!inputText.trim() && attachments.length === 0)}
-                        className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
-                    >
-                        {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    </button>
+                    <div className="flex flex-col gap-1.5">
+                        <button
+                            onClick={handleSend}
+                            disabled={isStreaming || (!inputText.trim() && attachments.length === 0)}
+                            className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
+                        >
+                            {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        </button>
+                        <button
+                            onClick={inputText.trim() ? handleSaveDraft : handleRestoreDraft}
+                            title={inputText.trim() ? '保存草稿' : '恢复草稿'}
+                            className="grid h-8 w-11 place-items-center rounded-xl border border-[var(--line-soft)] bg-[var(--surface-1)] text-[var(--ink-3)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]"
+                        >
+                            {inputText.trim() ? <Upload className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
