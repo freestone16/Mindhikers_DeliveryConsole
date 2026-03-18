@@ -215,6 +215,8 @@
 82. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
 83. worktree 环境需要复制 `.env` 到 worktree 目录
 84. **修改 `.env` 后必须重启服务器** 才能生效
+85. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
+86. **Skill 的业务逻辑绝不在后端硬编码**：deriveRuntimePhase / searchRequested 等只是 prompt 框架辅助，真正的对话节奏应由 LLM 从完整 SKILL.md 自行判断。如果发现后端越俎代庖地写了轮次上限、搜索频率等逻辑，立即删除
 
 ---
 

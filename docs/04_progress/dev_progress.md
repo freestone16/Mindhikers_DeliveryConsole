@@ -1,6 +1,34 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-18 CST
+> **更新日期**: 2026-03-18 CST（晚）
+
+---
+
+## 0.6 2026-03-18（晚）GoldenCrucible 10项修复 + Socrates完整加载
+
+### ✅ 本轮已完成
+
+#### 根本修复：Socrates Skill 截断问题（commits: f1e0ccb, aa93b1b）
+- `skill-loader.ts` maxChars 4000→24000，Socrates 17K SKILL.md 完整注入 LLM
+- 之前 LLM 只能看到 22% 内容，15轮规则/强制搜索/Devil's Advocate 全部丢失
+- 业务逻辑不在后端硬编码，由 Socrates 自己依据完整 SKILL 判断
+
+#### UI 修复（9项）
+- 输入白屏 Bug：补上遗漏的 `Upload` icon import
+- crucible 模式允许连续发送，不再被 `isStreaming` 阻断
+- Header 精简：删除"聊"圆圈+标题，badges（你/老张/老卢）移至顶行与DSL同行
+- 删除底部草稿保存/恢复按钮（冗余）
+- D/S/L 操作加 toast 气泡反馈（已下载/已保存/已载入）
+- 垃圾桶替换为统一"重置"按钮，同时清空 workspace + chat
+- 输入区 items-end→items-center，你/附件/发送三者居中对齐
+- `activePresentable` Bug修复：合并查 crystallizedQuotes，结晶内容点击生效
+- "结晶金句"→"结晶内容"
+
+### ⏳ 待完成（下一窗口）
+- 结晶内容展现形式待设计（用户尚未决策）
+- crystallization 阶段非 quote 类内容的写入逻辑待调整
+- 观察 Socrates 完整加载后 15 轮规则执行情况
+- Linear MCP：同步黄金坩埚实际进展到 MIN-38
 
 ---
 
