@@ -3,20 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import { generateBRollOptions, generateGlobalBRollPlan, generateFallbackOptions, BRollOption, callLLM } from './llm';
 import { generateImageWithVolc, pollVolcImageResult, generateVideoWithVolc, pollVolcVideoResult, downloadVideo } from './volcengine';
-import { getProviderCredentialStatus, loadConfig } from './llm-config';
+import { loadConfig } from './llm-config';
+import type { LLMProvider } from '../src/schemas/llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
-import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
-import { getProjectRoot } from './project-paths';
 
-function ensureGlobalLLMReady(provider: string, model: string) {
-  const status = getProviderCredentialStatus(provider);
-  if (status.configured) {
-    return;
-  }
-
-  const missingVars = status.missingVars.join(', ');
-  throw new Error(`全局模型 ${provider}/${model} 未配置 API Key（缺少 ${missingVars}）。请先在“全局模型网关配置”补全对应 Key，或切换到已配置的全局 Provider。`);
-}
+const getProjectRoot = (projectId: string): string => {
+  const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
+  return path.join(PROJECTS_BASE, projectId);
+};
 
 export interface DirectorChapter {
   chapterId: string;
@@ -249,13 +243,13 @@ export const generatePhase1 = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('concept');
     console.log('[Phase1] Generating concept with Director skill knowledge...');
 
-    const globalConfig = resolveGlobalLLMConfig(loadConfig());
-    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
+    const config = loadConfig();
+    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
 
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `以下是视频脚本全文，请为其生成视觉概念提案：\n\n${scriptContent}` }
-    ], globalConfig.provider as any, globalConfig.model);
+    ], globalConfig.provider as LLMProvider, globalConfig.model);
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
 
@@ -303,8 +297,8 @@ export const reviseConcept = async (req: Request, res: Response) => {
     const systemPrompt = buildDirectorSystemPrompt('revise');
     console.log('[Phase1 Revise] Revising with Director skill knowledge...');
 
-    const globalConfig = resolveGlobalLLMConfig(loadConfig());
-    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
+    const config = loadConfig();
+    const globalConfig = config.global;
 
     const response = await callLLM([
       { role: 'system', content: systemPrompt },
@@ -312,7 +306,7 @@ export const reviseConcept = async (req: Request, res: Response) => {
         role: 'user',
         content: `现有视觉概念提案：\n${existingConcept}\n\n用户反馈意见：\n${userComment}\n\n请根据以上反馈修改提案。`
       }
-    ], globalConfig.provider as any, globalConfig.model);
+    ], globalConfig.provider as LLMProvider, globalConfig.model);
 
     const finalContent = extractMarkdownFromDirectorJson(response.content);
 
@@ -405,8 +399,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
   res.write(`data: ${JSON.stringify({ type: 'taskId', taskId })}\n\n`);
 
   try {
-    const globalConfig = resolveGlobalLLMConfig(loadConfig());
-    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
+    const config = loadConfig();
+    const globalConfig = config.global || { provider: 'deepseek', model: 'deepseek-chat' };
 
     res.write(`data: ${JSON.stringify({ type: 'log', level: 'info', message: `开始生成 B-roll 方案，使用模型: ${globalConfig.provider}/${globalConfig.model}` })}\n\n`);
 
@@ -414,16 +408,9 @@ export const startPhase2 = async (req: Request, res: Response) => {
     const globalPlan = await generateGlobalBRollPlan(
       parsedChapters.map((pc, idx) => ({ id: `ch${idx + 1}`, name: pc.title, text: pc.text })),
       brollTypes as ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
-      globalConfig.provider as any,
+      globalConfig.provider as LLMProvider,
       globalConfig.model
     );
-
-    // 如果 LLM 生成失败，把原因吐到 SSE 流
-    if ((globalPlan as any)._failureReason) {
-      const reason = (globalPlan as any)._failureReason;
-      console.error(`[Phase2] ⚠️ LLM 生成失败，使用兜底方案。原因: ${reason}`);
-      res.write(`data: ${JSON.stringify({ type: 'log', level: 'warn', message: `⚠️ LLM 生成失败（${reason}），使用兜底方案` })}\n\n`);
-    }
 
     // 调试：打印每章生成的 options 数量
     globalPlan.chapters?.forEach(ch => {
@@ -1496,9 +1483,8 @@ Return a JSON array of matched alignments:
 ]
 Reply ONLY with the valid JSON array, no markdown.`;
 
-    const globalConfig = resolveGlobalLLMConfig(loadConfig());
-    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
-    const resultText = await callLLM([{ role: 'user', content: prompt }], globalConfig.provider as any, globalConfig.model);
+    const config = loadConfig();
+    const resultText = await callLLM([{ role: 'user', content: prompt }], config.global.provider as LLMProvider, config.global.model);
 
     let alignments = [];
     try {
@@ -1906,9 +1892,8 @@ Please rewrite the prompt based on the user's feedback. Return only the new prom
       }
     ];
 
-    const globalConfig = resolveGlobalLLMConfig(loadConfig());
-    ensureGlobalLLMReady(globalConfig.provider, globalConfig.model);
-    const response = await callLLM(messages, globalConfig.provider as any, globalConfig.model);
+    const config = await loadConfig();
+    const response = await callLLM(messages, config.provider, config.model);
     const revisedPrompt = response.content?.trim() || currentPrompt;
 
     res.json({ success: true, revisedPrompt });

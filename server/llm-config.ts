@@ -1,14 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
-import { LLMConfigSchema, LLMConfig, DEFAULT_LLM_CONFIG, PROVIDER_INFO, IMAGE_MODELS, VIDEO_MODELS } from '../src/schemas/llm-config';
+import { LLMConfigSchema, LLMConfig, DEFAULT_LLM_CONFIG, PROVIDER_INFO, IMAGE_MODELS, VIDEO_MODELS, normalizeProviderConfig } from '../src/schemas/llm-config';
 
 const CONFIG_DIR = path.join(process.cwd(), '.agent', 'config');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'llm_config.json');
-const ENV_PATHS = [
-  path.join(process.cwd(), '.env.local'),
-  path.join(process.cwd(), '.env'),
-];
 
 const ensureConfigDir = () => {
   if (!fs.existsSync(CONFIG_DIR)) {
@@ -33,6 +29,12 @@ export const loadConfig = (): LLMConfig => {
     experts: parsed.experts || DEFAULT_LLM_CONFIG.experts,
   };
 
+  // 归一化 global provider/model/baseUrl 三字段联动
+  if (merged.global) {
+    const normalized = normalizeProviderConfig(merged.global.provider, merged.global.model, merged.global.baseUrl);
+    merged.global = normalized;
+  }
+
   return LLMConfigSchema.parse(merged);
 };
 
@@ -41,42 +43,12 @@ const saveConfig = (config: LLMConfig) => {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 };
 
-const getLatestEnvValue = (varName: string): string | undefined => {
-  for (const envPath of ENV_PATHS) {
-    if (!fs.existsSync(envPath)) continue;
-
-    const content = fs.readFileSync(envPath, 'utf-8');
-    const match = content.match(new RegExp(`^${varName}=(.+)$`, 'm'));
-    if (match && match[1]?.trim()) {
-      return match[1].trim();
-    }
-  }
-
-  return process.env[varName];
-};
-
-export const getProviderCredentialStatus = (provider: string) => {
-  const info = PROVIDER_INFO[provider];
-  if (!info) {
-    return {
-      configured: false,
-      missingVars: [] as string[],
-    };
-  }
-
-  const missingVars = info.envVars.filter(envVar => !getLatestEnvValue(envVar));
-
-  return {
-    configured: missingVars.length === 0,
-    missingVars,
-  };
-};
-
 const PROVIDER_ENV_MAP: Record<string, string[]> = {
   openai: ['OPENAI_API_KEY'],
   deepseek: ['DEEPSEEK_API_KEY'],
   zhipu: ['ZHIPU_API_KEY'],
   siliconflow: ['SILICONFLOW_API_KEY'],
+  kimi: ['KIMI_API_KEY'],
   volcengine: ['VOLCENGINE_ACCESS_KEY'],
   yinli: ['YINLI_API_KEY'],
 };
@@ -91,9 +63,9 @@ export const getConfigStatus = (req: Request, res: Response) => {
 
   const providers = Object.keys(PROVIDER_INFO).reduce((acc, provider) => {
     const info = PROVIDER_INFO[provider];
-    const credentialStatus = getProviderCredentialStatus(provider);
+    const allConfigured = info.envVars.every(v => process.env[v]);
     acc[provider] = {
-      configured: credentialStatus.configured,
+      configured: allConfigured,
       type: info.type,
       name: info.name,
       models: info.models,
@@ -168,15 +140,9 @@ export const updateConfig = (req: Request, res: Response) => {
 
   if (global) {
     const merged = { ...config.global, ...global };
-    // 切换 provider 时联动归一化 model 和 baseUrl，防止错配
-    if (global.provider && global.provider !== config.global.provider) {
-      const providerInfo = PROVIDER_INFO[global.provider];
-      if (providerInfo) {
-        if (!global.model) merged.model = providerInfo.models[0];
-        if (!global.baseUrl) merged.baseUrl = providerInfo.baseUrl;
-      }
-    }
-    config.global = merged;
+    // 归一化：切 provider 时自动修正 model/baseUrl
+    const normalized = normalizeProviderConfig(merged.provider, merged.model, merged.baseUrl);
+    config.global = normalized;
   }
 
   if (generation) {
@@ -210,7 +176,17 @@ export const testConnection = async (req: Request, res: Response) => {
   }
 
   // 优先从 .env 文件读取最新值（进程启动后新保存的 key 也能实时生效）
-  const apiKey = getLatestEnvValue(info.envVars[0]);
+  const getLatestKey = (varName: string): string | undefined => {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      const match = content.match(new RegExp(`^${varName}=(.+)$`, 'm'));
+      if (match && match[1]?.trim()) return match[1].trim();
+    }
+    return process.env[varName];
+  };
+
+  const apiKey = getLatestKey(info.envVars[0]);
 
   if (!apiKey) {
     return res.json({ success: false, error: `${info.name} API Key not configured` });
@@ -271,11 +247,26 @@ export const testConnection = async (req: Request, res: Response) => {
 
 export const testAllConnections = async (req: Request, res: Response) => {
   const results: Record<string, any> = {};
+  const envPath = path.join(process.cwd(), '.env');
+  let envContent = '';
+  if (fs.existsSync(envPath)) {
+    envContent = fs.readFileSync(envPath, 'utf-8');
+  }
 
   const promises = Object.keys(PROVIDER_INFO).map(async (provider) => {
     const info = PROVIDER_INFO[provider];
-    const { configured } = getProviderCredentialStatus(provider);
-    const apiKey = getLatestEnvValue(info.envVars[0]);
+    const envVars = info.envVars;
+
+    let configured = false;
+    let apiKey = process.env[envVars[0]];
+
+    const match = envContent.match(new RegExp(`${envVars[0]}=(.+)`));
+    if (match && match[1] && match[1].trim()) {
+      configured = true;
+      apiKey = match[1].trim();
+    } else if (apiKey && apiKey.trim()) {
+      configured = true;
+    }
 
     if (!configured || !apiKey) {
       results[provider] = { success: false, configured: false };

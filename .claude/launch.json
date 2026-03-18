@@ -29,7 +29,8 @@
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "vite", "--", "--host"],
-      "port": 5178
+      "port": 5178,
+      "autoPort": false
     }
   ]
 }

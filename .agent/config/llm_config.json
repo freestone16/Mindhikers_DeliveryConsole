@@ -1,8 +1,8 @@
 {
   "global": {
-    "provider": "deepseek",
-    "model": "deepseek-chat",
-    "baseUrl": "https://api.deepseek.com/v1"
+    "provider": "kimi",
+    "model": "kimi-k2.5",
+    "baseUrl": "https://api.moonshot.cn/v1"
   },
   "generation": {
     "imageModel": "doubao-seedream-4-5-251128",
@@ -24,8 +24,8 @@
     "director": {
       "enabled": true,
       "llm": null,
-      "imageModel": "doubao-image-01",
-      "videoModel": "doubao-video-01"
+      "imageModel": "doubao-seedream-5.0-litenew",
+      "videoModel": "doubao-seedance-1-5-pro"
     },
     "music": null,
     "thumbnail": null,

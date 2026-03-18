@@ -1,4 +1,5 @@
 import process from 'process';
+import type { LLMProvider } from '../src/schemas/llm-config';
 
 interface LLMMessage {
   role: 'system' | 'user' | 'assistant';
@@ -14,26 +15,6 @@ interface LLMResponse {
 }
 
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
-const LLM_REQUEST_TIMEOUT_MS = Number(process.env.LLM_REQUEST_TIMEOUT_MS || 600000); // 10 分钟，Phase2 全局规划需要长时间
-
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number = LLM_REQUEST_TIMEOUT_MS): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      throw new Error(`LLM request timeout after ${Math.round(timeoutMs / 1000)}s`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 
 async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LLMResponse> {
   const apiKey = process.env.ZHIPU_API_KEY;
@@ -41,7 +22,7 @@ async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LL
     throw new Error('ZHIPU_API_KEY not configured');
   }
 
-  const response = await fetchWithTimeout(ZHIPU_API_URL, {
+  const response = await fetch(ZHIPU_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -72,7 +53,7 @@ async function callOpenAILLM(messages: LLMMessage[], model = 'gpt-4o'): Promise<
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -103,7 +84,7 @@ async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'):
     throw new Error('DEEPSEEK_API_KEY not configured');
   }
 
-  const response = await fetchWithTimeout('https://api.deepseek.com/v1/chat/completions', {
+  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -134,7 +115,7 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
     throw new Error('SILICONFLOW_API_KEY not configured');
   }
 
-  const response = await fetchWithTimeout('https://api.siliconflow.cn/v1/chat/completions', {
+  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -165,7 +146,7 @@ async function callYinliLLM(messages: LLMMessage[], model = 'claude-sonnet-4-6-t
     throw new Error('YINLI_API_KEY not configured');
   }
 
-  const response = await fetchWithTimeout('https://yinli.one/v1/chat/completions', {
+  const response = await fetch('https://yinli.one/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -191,10 +172,44 @@ async function callYinliLLM(messages: LLMMessage[], model = 'claude-sonnet-4-6-t
   };
 }
 
+async function callKimiLLM(messages: LLMMessage[], model = 'kimi-k2.5'): Promise<LLMResponse> {
+  const apiKey = process.env.KIMI_API_KEY;
+  if (!apiKey) {
+    throw new Error('KIMI_API_KEY not configured');
+  }
+
+  // Kimi K2.5 只允许 temperature = 1，旧版 moonshot 系列支持 0.7
+  const isKimiK25 = model.includes('kimi-k2') || model.includes('k2.5');
+  const temperature = isKimiK25 ? 1 : 0.7;
+
+  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Kimi API error: ${error}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data.choices[0].message.content,
+    usage: data.usage,
+  };
+}
 
 export async function callLLM(
   messages: LLMMessage[],
-  provider: 'zhipu' | 'openai' | 'deepseek' | 'anthropic' | 'siliconflow' | 'yinli' = 'deepseek',
+  provider: LLMProvider = 'deepseek',
   model?: string
 ): Promise<LLMResponse> {
   switch (provider) {
@@ -206,6 +221,8 @@ export async function callLLM(
       return callDeepSeekLLM(messages, model || 'deepseek-chat');
     case 'siliconflow':
       return callSiliconFlowLLM(messages, model || 'Pro/moonshotai/Kimi-K2.5');
+    case 'kimi':
+      return callKimiLLM(messages, model || 'kimi-k2.5');
     case 'yinli':
       return callYinliLLM(messages, model || 'claude-sonnet-4-6-thinking');
     default:
@@ -235,7 +252,6 @@ export interface BRollOption {
 }
 
 export interface GlobalBRollProposal {
-  _failureReason?: string; // LLM 生成失败时的错误原因
   chapters: {
     chapterId: string;
     chapterName: string;
@@ -252,7 +268,7 @@ import { buildDirectorSystemPrompt } from './skill-loader';
 export async function generateGlobalBRollPlan(
   chapters: { id: string; name: string; text: string }[],
   brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
-  provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'yinli' = 'deepseek',
+  provider: LLMProvider = 'deepseek',
   model?: string
 ): Promise<GlobalBRollProposal> {
   return generateGlobalBRollPlanWithRetry(chapters, brollTypes, provider, model, 0);
@@ -277,7 +293,7 @@ function suggestTemplateFromContent(prompt: string, quote: string): string {
 async function generateGlobalBRollPlanWithRetry(
   chapters: { id: string; name: string; text: string }[],
   brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
-  provider: 'zhipu' | 'openai' | 'deepseek' | 'siliconflow' | 'yinli' = 'deepseek',
+  provider: LLMProvider = 'deepseek',
   model?: string,
   retryCount: number = 0,
   overrideUserMessage?: string
@@ -358,8 +374,8 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
-      provider as any,
-      model || (provider === 'deepseek' ? 'deepseek-chat' : undefined)
+      provider,
+      model
     );
 
     let content = response.content.trim();
@@ -444,12 +460,9 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
       return generateGlobalBRollPlanWithRetry(chapters, brollTypes, provider, model, retryCount + 1, retryPrompt);
     }
 
-    const errorMsg = error.message || String(error);
-    console.error(`[llm.ts] Global LLM generation failed after ${MAX_RETRIES} retries: ${errorMsg}`);
-    console.error(`[llm.ts] Provider: ${provider}, Model: ${model}, Chapters: ${chapters.length}`);
-    // Fallback logic — 保留 _failureReason 供上层诊断
+    console.error('[llm.ts] Global LLM generation failed after retries:', error.message || error);
+    // Fallback logic
     return {
-      _failureReason: errorMsg,
       chapters: chapters.map(ch => ({
         chapterId: ch.id,
         chapterName: ch.name,
@@ -463,7 +476,7 @@ export async function generateBRollOptions(
   chapterName: string,
   scriptText: string,
   brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
-  provider: 'zhipu' | 'openai' | 'deepseek' = 'deepseek'
+  provider: LLMProvider = 'deepseek'
 ): Promise<BRollOption[]> {
   const options: BRollOption[] = [];
 
@@ -525,3 +538,4 @@ export function generateFallbackOptions(
     rationale: '兜底方案（LLM 生成失败）',
   }));
 }
+

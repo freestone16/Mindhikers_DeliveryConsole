@@ -5,6 +5,7 @@ export const LLMProviderSchema = z.enum([
   'deepseek',
   'zhipu',
   'siliconflow',
+  'kimi',
   'volcengine',
   'yinli'
 ]);
@@ -129,6 +130,13 @@ export const PROVIDER_INFO: Record<string, {
     baseUrl: 'https://api.siliconflow.cn/v1',
     models: ['Pro/moonshotai/Kimi-K2.5', 'Pro/deepseek-ai/DeepSeek-V3.2'],
   },
+  kimi: {
+    name: 'Kimi (Moonshot AI)',
+    type: 'llm',
+    envVars: ['KIMI_API_KEY'],
+    baseUrl: 'https://api.moonshot.cn/v1',
+    models: ['kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
+  },
   yinli: {
     name: 'Yinli的引力',
     type: 'llm',
@@ -160,6 +168,30 @@ export const VIDEO_MODELS = [
   { id: 'doubao-seedance-1-0-lite', name: '豆包 Seedance 1.0 Lite' },
   { id: 'wan2.1-t2v-14b', name: 'Wan2.1 T2V 14B' },
 ];
+
+/**
+ * 归一化 provider/model/baseUrl 三字段联动
+ * 切换 provider 时自动修正 model 和 baseUrl，防止错配
+ */
+export function normalizeProviderConfig(
+  provider: string,
+  model?: string | null,
+  baseUrl?: string | null
+): { provider: string; model: string; baseUrl: string } {
+  const info = PROVIDER_INFO[provider];
+  if (!info || info.type !== 'llm') {
+    // 未知 provider 或 generation 类型，回退 deepseek
+    const fallback = PROVIDER_INFO['deepseek'];
+    return { provider: 'deepseek', model: fallback.models[0], baseUrl: fallback.baseUrl };
+  }
+
+  // model 不在该 provider 的合法列表里 → 重置为默认
+  const validModel = (model && info.models.includes(model)) ? model : info.models[0];
+  // baseUrl 必须与 provider 一致
+  const validBaseUrl = info.baseUrl;
+
+  return { provider, model: validModel, baseUrl: validBaseUrl };
+}
 
 export const EXPERT_LIST = [
   { id: 'crucible', name: 'Crucible', icon: '🔥', description: '思维拆解' },
