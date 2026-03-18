@@ -2368,3 +2368,32 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
     - 可交接的测试治理母任务
     - 可供 Director 后续接力参考的索引中心
     - 可被其他模块照抄的测试协作样板
+
+### 2026-03-18 LLM 配置链路整体修复
+
+- **触发背景**：
+  - Phase1 和 Phase2 都出现兜底方案，日志显示 LLM 调用失败
+  - 深度排查发现配置链路存在系统性混乱：三字段错配、类型不对齐、`as any` 遮蔽类型检查
+
+- **根因定位**：
+  - `llm_config.json` 存储了错配状态：`provider=kimi` 但 `model=deepseek-chat`、`baseUrl=deepseek`
+  - Phase2 JSON 解析失败根因：`deepseek-chat` 模型在大体积结构化 JSON 输出时不稳定（12KB 处断裂）
+  - `generateBRollOptions()` 只接受 3 种 provider，其余函数接受 5-7 种，不一致
+  - 所有 `callLLM` 调用处用 `as any` 绕过类型检查，runtime 才报错
+  - `expert-actions/director.ts` 用 `as Record<string,any>` + 硬编码 `openai/gpt-4o` 兜底
+
+- **修复内容**（commit `de1ea6d`）：
+  - `src/schemas/llm-config.ts`：新增 Kimi 官方 provider（`api.moonshot.cn/v1`，`kimi-k2.5`）；新增 `normalizeProviderConfig()` 归一化函数
+  - `server/llm-config.ts`：`loadConfig()` 和 `updateConfig()` 均加归一化，切 provider 时自动修正 model/baseUrl
+  - `server/llm.ts`：所有函数 provider 类型统一为 `LLMProvider`，移除 `as any`
+  - `server/director.ts`：4 处 `provider as any` → `provider as LLMProvider`
+  - `server/expert-actions/director.ts`：移除 `as Record<string,any>` 和错误 fallback，直接用 `loadConfig()` 返回类型
+  - `.agent/config/llm_config.json`：修正为 `kimi + kimi-k2.5 + api.moonshot.cn/v1`
+
+- **验证结果**：
+  - Phase1 概念提案通过 Kimi `kimi-k2.5` 成功生成，文件落盘 ✅
+  - 服务端零报错 ✅
+  - 前端控制台无错误 ✅
+
+- **新增规则**（已写入 rules.md Rule 100）：
+  - 切换 Provider 时 provider/model/baseUrl 必须联动归一化，不能只改单字段
