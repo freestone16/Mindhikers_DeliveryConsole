@@ -6,11 +6,7 @@ import { generateImageWithVolc, pollVolcImageResult, generateVideoWithVolc, poll
 import { loadConfig } from './llm-config';
 import type { LLMProvider } from '../src/schemas/llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
-
-const getProjectRoot = (projectId: string): string => {
-  const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-  return path.join(PROJECTS_BASE, projectId);
-};
+import { getProjectRoot } from './project-paths';
 
 export interface DirectorChapter {
   chapterId: string;

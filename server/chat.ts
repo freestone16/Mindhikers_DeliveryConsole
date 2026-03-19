@@ -4,7 +4,7 @@ import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 import { buildExpertChatSystemPrompt } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
-import { getProjectRoot as resolveProjectRoot } from './project-paths';
+import { getProjectRoot } from './project-paths';
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -397,10 +397,6 @@ export function formatMultimodalMessages(
             ? '当前模型不支持图片输入，已忽略附件'
             : undefined,
     };
-}
-
-export function getProjectRoot(projectId: string): string {
-    return resolveProjectRoot(projectId);
 }
 
 // End of file

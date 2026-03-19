@@ -27,7 +27,7 @@ import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
 import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
-import { getProjectRoot, getProjectsBase } from './project-paths';
+import { getProjectRoot, getProjectsBase, ensureProjectsBaseExists } from './project-paths';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -1483,6 +1483,9 @@ app.post('/api/experts/run', (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// Validate PROJECTS_BASE before accepting any requests
+ensureProjectsBaseExists();
 
 // Start Server
 httpServer.listen(PORT, '0.0.0.0', () => {
