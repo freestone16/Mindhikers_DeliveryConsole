@@ -475,18 +475,19 @@ function resolveLayoutAdjustment(
     };
   }
 
-  const effectiveTemplate = target.currentTemplate || resolveRequestedTemplate(input.requestedTemplate || '')?.template;
-  if (effectiveTemplate !== 'TextReveal') {
+  // Layout adjustment supports any remotion template, not just TextReveal
+  if (target.currentType !== 'remotion') {
     return {
       status: 'needs_clarification',
       target,
       clarification: {
         reason: 'missing_required_value',
-        message: `当前 Bridge 只先支持 TextReveal 的高频排版调整。${target.targetRef} 现在不是 TextReveal，请先切到 TextReveal 或明确要修改的模板结构。`,
+        message: `排版调整只适用于 Remotion 动画模板。${target.targetRef} 当前类型是 ${TYPE_DISPLAY[target.currentType as keyof typeof TYPE_DISPLAY] || target.currentType}，请先切换为 Remotion 类型。`,
       },
     };
   }
 
+  const effectiveTemplate = target.currentTemplate || resolveRequestedTemplate(input.requestedTemplate || '')?.template;
   const propsPatch = buildLayoutPatch(layoutIntent);
   if (!propsPatch) {
     return {
@@ -494,17 +495,18 @@ function resolveLayoutAdjustment(
       target,
       clarification: {
         reason: 'ambiguous_alias',
-        message: `我识别到你在调 ${target.targetRef} 的排版，但当前只支持“一行显示 / 不换行 / 缩边距 / 更紧凑”这几类高频诉求。请更明确一点。`,
+        message: `我识别到你在调 ${target.targetRef} 的排版，但当前只支持”一行显示 / 不换行 / 缩边距 / 更紧凑”这几类高频诉求。请更明确一点。`,
       },
     };
   }
 
+  const templateLabel = effectiveTemplate || '当前模板';
   return {
     status: 'ready_to_confirm',
     target,
     confirmCard: {
       title: '确认修改',
-      summary: `将调整 ${target.targetRef} 的 TextReveal 排版：${propsPatch.summary}`,
+      summary: `将调整 ${target.targetRef} 的 ${templateLabel} 排版：${propsPatch.summary}`,
       targetLabel: buildTargetLabel(target),
       diffLabel: propsPatch.diffLabel,
     },
@@ -593,7 +595,8 @@ function loadDirectorChapters(projectRoot: string): DirectorStoreChapter[] {
 }
 
 function getChapterSeq(chapter: DirectorStoreChapter, index: number): number {
-  return chapter.chapterIndex ?? index + 1;
+  // chapterIndex is 0-based internally, but users address chapters as 1-based ("第1章" = chapterIndex 0)
+  return (chapter.chapterIndex !== undefined ? chapter.chapterIndex : index) + 1;
 }
 
 function buildTargetLabel(target: DirectorTarget): string {

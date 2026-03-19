@@ -35,7 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
 const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance', 'infographic'];
 
 // Types that require manual upload (non-AI sources)
-const UPLOAD_REQUIRED_TYPES = ['internet-clip', 'user-capture'];
+const UPLOAD_REQUIRED_TYPES = ['internet-clip', 'user-capture', 'artlist'];
 
 function getScriptPreview(text: string): string {
   const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
@@ -67,6 +67,11 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
   const taskKey = `${chapter.chapterId}-${option.id}`;
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
   const isChecked = option.isChecked;
+
+  // DEBUG: track option type during render
+  if (option.id === 'ch1-opt1' || option.id === 'ch2-opt4') {
+    console.log(`[OptionRow RENDER] ${option.id} type=${option.type} requiresUpload=${requiresUpload} previewUrl=${option.previewUrl}`);
+  }
 
   // Lightbox state
   const [showLightbox, setShowLightbox] = useState(false);
@@ -343,9 +348,9 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                   }}
                   className="flex flex-col items-center hover:bg-slate-700/50 p-3 rounded-lg transition-colors"
                 >
-                  <Upload className="w-6 h-6 text-orange-400 mb-1" />
-                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-orange-400' : 'text-cyan-400'}`}>
-                    {option.type === 'internet-clip' ? '🌐 上传网络素材' : '📸 上传录屏/截图'}
+                  <Upload className={`w-6 h-6 mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'artlist' ? 'text-green-400' : 'text-cyan-400'}`} />
+                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'artlist' ? 'text-green-400' : 'text-cyan-400'}`}>
+                    {option.type === 'internet-clip' ? '🌐 上传网络素材' : option.type === 'artlist' ? '🎬 上传实拍素材' : '📸 上传录屏/截图'}
                   </span>
                   <span className="text-[9px] text-slate-500 mt-1">点击选择视频文件</span>
                 </button>
@@ -354,7 +359,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
           ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80">
               <span className={`text-xs font-medium mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'user-capture' ? 'text-cyan-400' : 'text-green-400'}`}>
-                {option.type === 'internet-clip' ? '🌐 互联网素材建议' : option.type === 'user-capture' ? '📸 截图/录屏建议' : '🎬 实拍素材'}
+                {option.type === 'internet-clip' ? '🌐 互联网素材建议' : option.type === 'user-capture' ? '📸 截图/录屏建议' : '🎬 实拍素材建议'}
               </span>
               <span className="text-slate-500 text-[10px]">确认后上传</span>
             </div>

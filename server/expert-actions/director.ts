@@ -61,7 +61,7 @@ export const DirectorAdapter: ExpertActionAdapter = {
                 type: 'function',
                 function: {
                     name: 'update_option_fields',
-                    description: '万能属性修改器：可以同时修改选项的 name, prompt, imagePrompt，或者覆盖/强制修改组件的 props（如修改 Remotion 文字、设置强制不换行等）',
+                    description: '万能属性修改器：可修改选项的任意业务字段（type / name / prompt / imagePrompt 等），type 可选值：remotion-animation / text-to-video / internet-clip / image-clip / screen-recording。props 会与现有值深度合并（用于修改 Remotion 文字、排版、不换行等）。系统字段 id / isChecked / previewUrl 不可修改。',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -69,7 +69,7 @@ export const DirectorAdapter: ExpertActionAdapter = {
                             optionId: { type: 'string', description: '选项ID' },
                             updates: {
                                 type: 'object',
-                                description: '需要修改的字段键值对，可以是 name, prompt, imagePrompt, 或者是包含需要覆盖的属性的 props 对象。如果要强制某文字不换行，可以将 props 里的文本修改为加入 \n 或者修改对应的控制字段。',
+                                description: '需要修改的字段键值对，可以是任意业务字段（type / name / prompt / imagePrompt 等），或者包含需要深度合并的 props 对象。',
                                 additionalProperties: true
                             }
                         },
@@ -88,9 +88,10 @@ export const DirectorAdapter: ExpertActionAdapter = {
             const chapters = data.modules?.director?.items || [];
 
             // Skeleton with human-readable seq numbers so LLM can map
-            // user's shorthand like "1-3" to chapterIndex=1, optionIndex=3
+            // user's shorthand like "1-3" to chapterIndex=0, optionIndex=3
+            // chapterIndex is 0-based internally, but users address chapters as 1-based ("第1章"=chapterIndex 0)
             const skeleton = chapters.map((ch: any, ci: number) => ({
-                seq: ch.chapterIndex ?? (ci + 1),  // chapter seq number (X in "X-Y")
+                seq: ch.chapterIndex !== undefined ? ch.chapterIndex + 1 : ci + 1,  // 1-based: "第1章"→seq:1, "第2章"→seq:2
                 id: ch.chapterId,
                 title: ch.chapterName?.substring(0, 30),
                 opts: (ch.options || []).map((o: any, oi: number) => ({
@@ -174,16 +175,27 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
                 const updates = args.updates || {};
 
-                if (updates.name) opt.name = updates.name;
-                if (updates.prompt) opt.prompt = updates.prompt;
-                if (updates.imagePrompt) opt.imagePrompt = updates.imagePrompt;
+                // 系统级只读字段，不允许被覆盖（type 变更的级联清理除外）
+                const IMMUTABLE_FIELDS = new Set(['id', 'isChecked']);
 
-                // 深度覆盖 props 属性，用于修改 Remotion 内部的文案排版、不换行等
-                if (updates.props && typeof updates.props === 'object') {
-                    opt.props = {
-                        ...(opt.props || {}),
-                        ...updates.props
-                    };
+                // 当 type 发生变化时，旧的预览图、模板、props 都失去意义，必须级联清理
+                if (updates.type && updates.type !== opt.type) {
+                    opt.previewUrl = null;
+                    opt.previewStatus = null;
+                    opt.template = null;
+                    opt.props = undefined;
+                    console.log(`[Director] Type changed ${opt.type} -> ${updates.type} for ${opt.id}, cleared preview/template/props`);
+                }
+
+                for (const [key, value] of Object.entries(updates)) {
+                    if (IMMUTABLE_FIELDS.has(key)) continue;
+
+                    if (key === 'props' && typeof value === 'object' && value !== null) {
+                        // props 做深度合并，而非整体替换
+                        opt.props = { ...(opt.props || {}), ...(value as Record<string, unknown>) };
+                    } else {
+                        (opt as any)[key] = value;
+                    }
                 }
                 break;
             }

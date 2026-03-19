@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export const useExpertState = <T>(expertId: string, initialState: T) => {
     const [state, setState] = useState<T>(initialState);
@@ -17,22 +17,34 @@ export const useExpertState = <T>(expertId: string, initialState: T) => {
         return () => clearInterval(checkSocket);
     }, []);
 
+    // 使用 useCallback 确保 applyUpdate 引用稳定
+    const applyUpdate = useCallback((newData: any) => {
+        const actualData = newData.data !== undefined ? newData.data : newData;
+        setState(actualData);
+    }, []);
+
     useEffect(() => {
         if (!socket) return;
 
+        // 通道 1: expert-data-update 广播（初始加载 + 正常广播）
         const updateEvent = `expert-data-update:${expertId}`;
-        const handleServerUpdate = (newData: any) => {
-            // newData 可能包含 expertId 等 wrapper，取它的 data，如果没有就当作是全新 data
-            const actualData = newData.data !== undefined ? newData.data : newData;
-            setState(actualData);
-        };
+        socket.on(updateEvent, applyUpdate);
 
-        socket.on(updateEvent, handleServerUpdate);
+        // 通道 2: chat-action-result 携带 expertState（最可靠的更新通道）
+        // chat-action-result 一定会到达（用户能看到"操作执行成功"就证明了）
+        const handleActionResult = (result: any) => {
+            if (result.expertId === expertId && result.success && result.expertState) {
+                console.log(`[useExpertState][${expertId}] 🎯 chat-action-result carrying fresh state, applying directly`);
+                applyUpdate(result.expertState);
+            }
+        };
+        socket.on('chat-action-result', handleActionResult);
 
         return () => {
-            socket.off(updateEvent, handleServerUpdate);
+            socket.off(updateEvent, applyUpdate);
+            socket.off('chat-action-result', handleActionResult);
         };
-    }, [socket, expertId]);
+    }, [socket, expertId, applyUpdate]);
 
     const updateState = (projectId: string, newData: T) => {
         setState(newData);

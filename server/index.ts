@@ -954,8 +954,12 @@ io.on('connection', (socket) => {
                                 items: updatedItems,
                             };
                             saveExpertState(projectRoot, 'Director', mergedState);
+                            // 双重推送：room broadcast + socket direct emit，确保发起者一定收到
+                            const rooms = Array.from(socket.rooms || []);
+                            console.log(`[Chat] Socket ${socket.id} rooms: [${rooms.join(', ')}], broadcasting to room "${projectId}"`);
                             io.to(projectId).emit('expert-data-update:Director', mergedState);
-                            console.log(`[Chat] Director state synced: ${updatedItems.length} chapters pushed to frontend`);
+                            socket.emit('expert-data-update:Director', mergedState);  // 直达保底
+                            console.log(`[Chat] Director state synced: ${updatedItems.length} chapters pushed to frontend (room + direct)`);
                         }
                     }
                 }
@@ -965,7 +969,16 @@ io.on('connection', (socket) => {
                     io.to(projectId).emit('expert-data-update', { expertId, action: actionName, data: result.data });
                 }
 
-                socket.emit('chat-action-result', { expertId, success: true, message: '✅ 操作执行成功！请在左侧界面查看。' });
+                // 在 result 中直接携带最新 expert state，作为最可靠的更新通道
+                const freshState = expertId === 'Director'
+                    ? (() => { const s = loadExpertState(projectRoot, 'Director'); return s.data || s; })()
+                    : undefined;
+                socket.emit('chat-action-result', {
+                    expertId,
+                    success: true,
+                    message: '✅ 操作执行成功！请在左侧界面查看。',
+                    ...(freshState ? { expertState: freshState } : {})
+                });
 
                 // Save confirmation interaction silently to history
                 if (historyMessages) {

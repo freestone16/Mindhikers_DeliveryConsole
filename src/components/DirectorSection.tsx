@@ -37,6 +37,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const [localChapters, setLocalChapters] = useState<DirectorChapter[] | null>(null);
   const displayedChapters = localChapters || chapters;
 
+  // 当服务器广播更新 data.items 时，清除 localChapters 覆盖，让 UI 显示最新数据
+  // 只在非流式生成阶段清除（isLoading 为 true 时表示正在 Phase 2 流式生成，不应清除）
+  useEffect(() => {
+    if (localChapters !== null && !isLoading && chapters.length > 0) {
+      console.log('[DirectorSection] 🔄 Server broadcast arrived, clearing localChapters override');
+      setLocalChapters(null);
+    }
+  }, [data.items]);
+
   // Feature 2: elapsed time tracking
   const [startTime, setStartTime] = useState<number | null>(null);
 
@@ -431,18 +440,26 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
           </span>
         </div>
         <div className="flex gap-1">
-          {([1, 2, 3, 4] as Phase[]).map(p => (
-            <button
-              key={p}
-              onClick={() => onUpdate({ ...data, phase: p })}
-              disabled={p === 2 && !conceptApproved}
-              className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
-                phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-              }`}
-            >
-              P{p}
-            </button>
-          ))}
+          {([1, 2, 3, 4] as Phase[]).map(p => {
+            // Phase 解锁规则：只能前进到已达到过的最高阶段，不能跳级
+            const maxReachedPhase = !conceptApproved ? 1
+              : chapters.length === 0 ? 2
+              : phase >= 3 ? 4  // 到过 Phase 3 则 P3/P4 都解锁
+              : 2;
+            const isDisabled = p > maxReachedPhase;
+            return (
+              <button
+                key={p}
+                onClick={() => onUpdate({ ...data, phase: p })}
+                disabled={isDisabled}
+                className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
+                  phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                P{p}
+              </button>
+            );
+          })}
         </div>
       </div>
 
