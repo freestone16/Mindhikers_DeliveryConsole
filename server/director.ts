@@ -792,9 +792,8 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     }
     const outputPath = path.join(outputDir, outputFileName);
 
-    const { compositionId, props } = buildRemotionPreview(option);
-
     try {
+      const { compositionId, props } = buildRemotionPreview(option);
       console.log(`[Remotion Thumbnail] Starting sync render: ${taskKey} with template ${compositionId}`);
       const { renderStillWithApi } = require('./remotion-api-renderer');
       await renderStillWithApi(compositionId, outputPath, props);

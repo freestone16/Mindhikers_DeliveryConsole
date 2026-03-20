@@ -68,11 +68,6 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
   const isChecked = option.isChecked;
 
-  // DEBUG: track option type during render
-  if (option.id === 'ch1-opt1' || option.id === 'ch2-opt4') {
-    console.log(`[OptionRow RENDER] ${option.id} type=${option.type} requiresUpload=${requiresUpload} previewUrl=${option.previewUrl}`);
-  }
-
   // Lightbox state
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -97,12 +92,12 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
     }
   }, [isPendingBatch]);
 
-  // Check if material already exists when option is checked
+  // Check if material already exists for upload-required types
   useEffect(() => {
-    if (requiresUpload && isChecked) {
+    if (requiresUpload) {
       checkMaterialExists();
     }
-  }, [requiresUpload, isChecked]);
+  }, [requiresUpload]);
 
   const checkMaterialExists = async () => {
     try {
@@ -262,14 +257,18 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
       {/* 设计方案/提示词 (col 4 instead of 3 - more space) */}
       <div
-        className="col-span-4 flex flex-col justify-center gap-1 cursor-pointer hover:bg-slate-700/30 rounded px-2 -mx-2 transition-colors"
-        onClick={() => onSelect(chapter.chapterId, option.id)}
+        className="col-span-4 flex flex-col justify-center gap-1 hover:bg-slate-700/20 rounded px-2 -mx-2 transition-colors"
+        title="点击选中此方案"
       >
         <div className="flex items-center gap-2 mb-1">
-          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type]}`}>
+          <span
+            className={`inline-block px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${TYPE_COLORS[option.type]} ${isSelected ? 'ring-1 ring-blue-400' : ''}`}
+            onClick={() => onSelect(chapter.chapterId, option.id)}
+            title={isSelected ? '已选中' : '点击选中此方案'}
+          >
             {TYPE_LABELS[option.type] || option.type}
+            {isSelected && ' ✓'}
           </span>
-          {isSelected && <Check className="w-4 h-4 text-blue-400" />}
         </div>
         <p className="text-white text-xs leading-relaxed">
           {option.prompt || '暂无方案描述'}
@@ -310,8 +309,8 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">失败</span>
               <button onClick={(e) => { e.stopPropagation(); handleGenerateThumbnail(); }} className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2">重试生成</button>
             </div>
-          ) : requiresUpload && isChecked ? (
-            // Non-AI sources (internet-clip, user-capture) with upload capability
+          ) : requiresUpload ? (
+            // Non-AI sources (internet-clip, user-capture, artlist) — always show upload entry
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80 relative">
               <input
                 type="file"
@@ -355,13 +354,6 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                   <span className="text-[9px] text-slate-500 mt-1">点击选择视频文件</span>
                 </button>
               )}
-            </div>
-          ) : option.type && !PREVIEW_SUPPORTED_TYPES.includes(option.type) ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80">
-              <span className={`text-xs font-medium mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'user-capture' ? 'text-cyan-400' : 'text-green-400'}`}>
-                {option.type === 'internet-clip' ? '🌐 互联网素材建议' : option.type === 'user-capture' ? '📸 截图/录屏建议' : '🎬 实拍素材建议'}
-              </span>
-              <span className="text-slate-500 text-[10px]">确认后上传</span>
             </div>
           ) : option.type === 'infographic' && option.infographicUseMode === 'static' && thumbStatus === 'idle' ? (
             // infographic static 模式：可生成静态预览图
@@ -467,7 +459,7 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendi
           {chapter.options.map((option, idx) => {
             // Content-based key: when expert action changes imagePrompt/props, OptionRow remounts
             // with fresh thumbStatus='idle', clearing the stale preview automatically
-            const contentKey = `${(option.imagePrompt || option.prompt || '').slice(0, 60)}|${JSON.stringify(option.props || {}).slice(0, 60)}`;
+            const contentKey = `${option.type}|${(option.imagePrompt || option.prompt || '').slice(0, 60)}|${JSON.stringify(option.props || {}).slice(0, 60)}`;
             return (
               <OptionRow
                 key={`${option.id}::${contentKey}`}

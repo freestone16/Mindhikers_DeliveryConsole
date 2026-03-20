@@ -53,13 +53,22 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const [phase2Logs, setPhase2Logs] = useState<{ timestamp: number; type: string; message: string }[]>([]);
 
   // ── 重置：切换项目或脚本时，自动回到 Phase 1 ──────────────────
+  // 只在「真实项目切换」时重置，不在「初始加载」时重置
   const prevProjectId = useRef(projectId);
   const prevScriptPath = useRef(scriptPath);
   useEffect(() => {
-    const projectChanged = projectId !== prevProjectId.current;
-    const scriptChanged = scriptPath !== prevScriptPath.current;
+    const prevId = prevProjectId.current;
+    const prevScript = prevScriptPath.current;
     prevProjectId.current = projectId;
     prevScriptPath.current = scriptPath;
+
+    const projectChanged = projectId !== prevId;
+    const scriptChanged = scriptPath !== prevScript;
+
+    // 初始选择（'' → 实际项目）不是"切换"，不重置
+    // 只有从一个真实项目切到另一个真实项目才重置
+    const isInitialSelection = !prevId;
+    if (isInitialSelection) return;
 
     if ((projectChanged || scriptChanged) && (projectId || scriptPath)) {
       // 重置 expert state (phase/chapters/concept)

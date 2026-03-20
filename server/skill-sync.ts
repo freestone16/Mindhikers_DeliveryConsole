@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { Server, Socket } from 'socket.io';
 
@@ -80,7 +81,24 @@ export const syncSkills = async (io: Server) => {
         }
     }
 
+    // RemotionStudio 可达性检查（不复制，只验证路径）
+    const remotionCandidates = [
+        process.env.REMOTION_STUDIO_DIR,
+        process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'RemotionStudio'),
+        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio'),
+    ].filter(Boolean) as string[];
+    const remotionDir = remotionCandidates.find(d => fs.existsSync(path.join(d, 'node_modules', '.bin', 'remotion')));
+    if (remotionDir) {
+        console.log(`✅ RemotionStudio reachable: ${remotionDir}`);
+    } else {
+        console.warn(`⚠️ RemotionStudio not found in: ${remotionCandidates.join(', ')}`);
+    }
+
     console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${EXPERTS.length}`);
-    lastSyncStatus = { status: 'done', synced: syncedSkills, count: syncedSkills.length, timestamp: new Date().toISOString() };
+    lastSyncStatus = {
+        status: 'done', synced: syncedSkills, count: syncedSkills.length,
+        remotionStudio: remotionDir ? { status: 'ok', path: remotionDir } : { status: 'missing' },
+        timestamp: new Date().toISOString()
+    };
     io.emit('skill-sync-status', lastSyncStatus);
 };

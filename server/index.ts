@@ -685,6 +685,16 @@ io.on('connection', (socket) => {
         io.to(newData.projectId).emit('delivery-data', newData); // Send to project room
     });
 
+    // 🔑 前端 listener 注册后主动请求 hydration，解决 socket 事件时序竞态
+    socket.on('request-expert-hydration', ({ expertId }: { expertId: string }) => {
+        const projectId = socketToProjectMap.get(socket);
+        if (!projectId || !expertId) return;
+        const projectRoot = getProjectRoot(projectId);
+        const expertData = loadExpertState(projectRoot, expertId);
+        console.log(`[Hydration] Re-sending ${expertId} state to socket ${socket.id} (project: ${projectId})`);
+        socket.emit(`expert-data-update:${expertId}`, expertData);
+    });
+
     socket.on('update-expert-data', (payload) => {
         const { expertId, projectId, data } = payload || {};
         if (!projectId || !expertId) {
@@ -973,6 +983,11 @@ io.on('connection', (socket) => {
                 const freshState = expertId === 'Director'
                     ? (() => { const s = loadExpertState(projectRoot, 'Director'); return s.data || s; })()
                     : undefined;
+                if (freshState) {
+                    const itemCount = freshState.items?.length || 0;
+                    const sampleTypes = freshState.items?.slice(0, 3).map((ch: any) => ch.options?.map((o: any) => o.type).join(','));
+                    console.log(`[Chat] 📦 expertState attached: ${itemCount} chapters, sample types: [${sampleTypes}]`);
+                }
                 socket.emit('chat-action-result', {
                     expertId,
                     success: true,
@@ -1073,7 +1088,7 @@ app.get('/api/projects', (req, res) => {
             return res.json({ projects: [], active: currentProjectName });
         }
         const dirs = fs.readdirSync(projectsBase, { withFileTypes: true })
-            .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+            .filter(d => d.isDirectory() && !d.name.startsWith('.') && d.name.startsWith('CSET-'))
             .map(d => ({
                 name: d.name,
                 isActive: d.name === currentProjectName,

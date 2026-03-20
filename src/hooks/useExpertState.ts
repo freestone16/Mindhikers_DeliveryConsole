@@ -40,6 +40,11 @@ export const useExpertState = <T>(expertId: string, initialState: T) => {
         };
         socket.on('chat-action-result', handleActionResult);
 
+        // 🔑 解决时序竞态：listener 注册完毕后，主动请求后端重发当前状态
+        // 原因：socket connect 时后端自动发送的 hydration 数据可能在 listener 注册之前就到达了
+        console.log(`[useExpertState][${expertId}] ✅ Listener registered, requesting hydration...`);
+        socket.emit('request-expert-hydration', { expertId });
+
         return () => {
             socket.off(updateEvent, applyUpdate);
             socket.off('chat-action-result', handleActionResult);

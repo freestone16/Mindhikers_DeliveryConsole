@@ -61,7 +61,7 @@ export const DirectorAdapter: ExpertActionAdapter = {
                 type: 'function',
                 function: {
                     name: 'update_option_fields',
-                    description: '万能属性修改器：可修改选项的任意业务字段（type / name / prompt / imagePrompt 等），type 可选值：remotion-animation / text-to-video / internet-clip / image-clip / screen-recording。props 会与现有值深度合并（用于修改 Remotion 文字、排版、不换行等）。系统字段 id / isChecked / previewUrl 不可修改。',
+                    description: '万能属性修改器：可修改选项的任意业务字段（type / name / prompt / imagePrompt 等），type 可选值：remotion / seedance / artlist / internet-clip / user-capture / infographic。props 会与现有值深度合并（用于修改 Remotion 文字、排版、不换行等）。系统字段 id / isChecked / previewUrl 不可修改。',
                     parameters: {
                         type: 'object',
                         properties: {
