@@ -10,9 +10,9 @@
 | 项目 | 状态 |
 |---|---|
 | 分支 | `MHSDC-DT` |
-| 最新 commit | `c51ddce` |
-| 当前任务 | Phase 1 首个里程碑代码已落地，黄金测试 rerun 已证明主链路自验收通过；当前剩余的是 YouTube OAuth 刷新后的 success-path 验收 |
-| 代码状态 | 有未提交代码与文档改动 |
+| 最新 commit | `e1e57f6` ✅ 已推送 |
+| 当前任务 | Phase 1 首个里程碑代码已提交并推送；下一步进入 YouTube success-path 验收与结果回写收口 |
+| 代码状态 | 当前仅剩本次交接文档同步待提交 |
 
 ---
 
@@ -29,6 +29,7 @@
 | Phase 1 首里程碑 | 已完成共享 `YouTube OAuth` 状态、`YouTubeConnector`、`/queue/:taskId/execute`、history/publish package 回写、队列页“立即执行”入口 |
 | 黄金测试首轮 | `TREQ-003` 暴露了验收口径问题，旧结论已被后续 rerun 修正 |
 | 黄金测试 rerun | `TREQ-004` 已证明建任务、入队、执行、失败写回与 UI 反馈成立，当前阶段自验收通过 |
+| 提交与远端同步 | `refs MIN-100 feat(distribution): land phase0 and phase1 baseline` 已推送到 `origin/MHSDC-DT` |
 
 ---
 
@@ -71,25 +72,8 @@
 
 ## 🧾 当前未提交改动
 
-本地未提交文件主要包括：
+当前仅剩本次交接同步文档：
 
-- `server/distribution.ts`
-- `server/distribution-execution-service.ts`
-- `server/distribution-auth-service.ts`
-- `server/distribution-queue-service.ts`
-- `server/distribution-store.ts`
-- `server/distribution-types.ts`
-- `server/youtube-oauth-service.ts`
-- `server/connectors/youtube-connector.ts`
-- `server/sse.ts`
-- `server/market.ts`
-- `src/App.tsx`
-- `src/components/PublishComposer.tsx`
-- `src/components/DistributionQueue.tsx`
-- `src/__tests__/server/distribution-execution-service.test.ts`
-- `src/__tests__/server/distribution-store.test.ts`
-- `src/__tests__/server/distribution-queue-service.test.ts`
-- `docs/plans/2026-03-20_MHSDC_DT_Overall_Design_and_Phase1_Implementation_Plan.md`
 - `docs/dev_logs/2026-03-20.md`
 - `docs/dev_logs/HANDOFF.md`
 
@@ -125,6 +109,17 @@
 - `./node_modules/.bin/tsx --version` 在当前 sandbox 下因 pipe listen 权限被拒绝，和业务代码无关
 - 当前 Distribution 权威验收报告应切到：
   - `testing/distribution/reports/TREQ-2026-03-20-DISTRIBUTION-004-phase1-self-acceptance-rerun.report.md`
+
+---
+
+## 🧾 本次提交信息
+
+```bash
+refs MIN-100 feat(distribution): land phase0 and phase1 baseline
+commit: e1e57f6
+branch: MHSDC-DT
+remote: origin/MHSDC-DT
+```
 
 ---
 
