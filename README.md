@@ -42,8 +42,8 @@ npm run dev
 ```
 
 服务启动后：
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:3002`
+- 前端：`http://localhost:5176`
+- 后端：`http://localhost:3004`
 
 ### 方式 2：Docker（网络稳定时使用）
 
@@ -53,6 +53,8 @@ make dev
 ```
 
 **注意：** 如果遇到 Docker Hub 连接问题，请使用方式 1。
+
+当前 worktree 的本地开发端口以 `~/.vibedir/global_ports_registry.yml` 为准；如存在 `.env.local`，其端口配置会覆盖 `.env`。
 
 ---
 
@@ -65,7 +67,7 @@ make dev
 PROJECT_NAME=CSET-SP3
 
 # 服务端口
-PORT=3002
+PORT=3004
 
 # 项目数据基础路径（⚠️ 关键配置）
 # delivery_console 和数据已分离，必须指定完整路径

@@ -170,53 +170,55 @@
 
 63. `npm run dev` 启动多个子进程（concurrently），要用 Ctrl+C 正确停止
 64. 直接关闭终端会残留进程，下次启动会端口冲突
-65. 检查端口占用前先读取 `.env.local` / `.env` 中的 `PORT` 和 `VITE_APP_PORT`，再执行 `lsof`
+65. **端口判断先查** `~/.vibedir/global_ports_registry.yml`；再读取 `.env.local` / `.env` 中的 `PORT` 和 `VITE_APP_PORT`，最后才执行 `lsof`
 66. 强制杀进程：`kill -9 <PID>`
+67. **worktree 的 `.env` / `.env.local` 端口口径必须一致**；不要残留其他模块的端口号，避免误判当前服务归属
 
 ---
 
 ## 前端组件开发
 
-67. 组件重命名时同步更新所有 import 引用
-68. 检查导入完整性：确保所有使用的组件/图标都已正确导入
-69. React 组件白屏 → 检查浏览器控制台的 Uncaught Error
-70. 热更新失败 → 刷新页面或重启 dev server
+68. 组件重命名时同步更新所有 import 引用
+69. 检查导入完整性：确保所有使用的组件/图标都已正确导入
+70. React 组件白屏 → 检查浏览器控制台的 Uncaught Error
+71. 热更新失败 → 刷新页面或重启 dev server
 
 ---
 
 ## 测试验证
 
-71. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
-72. 不要假设修改生效，用实际命令验证
-73. 验证清单：`lsp_diagnostics` → build → test → 功能测试
-74. 收口/迁移任务若被 build 暴露出 unrelated 模块报错，先按模块边界隔离；不要顺手改进到其他业务域（例如营销大师类型债不应混入坩埚/运行时收口）
+72. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
+73. 不要假设修改生效，用实际命令验证
+74. 验证清单：`lsp_diagnostics` → build → test → 功能测试
+75. 收口/迁移任务若被 build 暴露出 unrelated 模块报错，先按模块边界隔离；不要顺手改进到其他业务域（例如营销大师类型债不应混入坩埚/运行时收口）
+76. **测试“用户请求搜索/联网”时，不能一上来就空口提搜索**；必须先至少铺垫 2 轮具体语境，再在后续轮次基于该语境提出搜索需求，否则结论不可信
 
 ---
 
 ## 性能优化
 
-75. 长时间运行的请求必须有超时
-76. 大文件读取要分块，不要一次性加载到内存
-77. 频繁操作考虑加 debounce/throttle
+77. 长时间运行的请求必须有超时
+78. 大文件读取要分块，不要一次性加载到内存
+79. 频繁操作考虑加 debounce/throttle
 
 ---
 
 ## 安全考虑
 
-78. API Key 不要硬编码在代码里，使用环境变量
-79. `.env` 文件要在 `.gitignore` 中
-80. 敏感日志输出前脱敏处理
+80. API Key 不要硬编码在代码里，使用环境变量
+81. `.env` 文件要在 `.gitignore` 中
+82. 敏感日志输出前脱敏处理
 
 ---
 
 ## 项目特定
 
-81. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
-82. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
-83. worktree 环境需要复制 `.env` 到 worktree 目录
-84. **修改 `.env` 后必须重启服务器** 才能生效
-85. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
-86. **Skill 的业务逻辑绝不在后端硬编码**：deriveRuntimePhase / searchRequested 等只是 prompt 框架辅助，真正的对话节奏应由 LLM 从完整 SKILL.md 自行判断。如果发现后端越俎代庖地写了轮次上限、搜索频率等逻辑，立即删除
+83. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
+84. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
+85. worktree 环境需要复制 `.env` 到 worktree 目录
+86. **修改 `.env` 后必须重启服务器** 才能生效
+87. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
+88. **Skill 的业务逻辑绝不在后端硬编码**：deriveRuntimePhase / searchRequested 等只是 prompt 框架辅助，真正的对话节奏应由 LLM 从完整 SKILL.md 自行判断。如果发现后端越俎代庖地写了轮次上限、搜索频率等逻辑，立即删除
 
 ---
 

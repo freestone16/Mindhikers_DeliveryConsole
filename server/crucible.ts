@@ -6,6 +6,11 @@ import { loadSkillKnowledge } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 import { loadCrucibleSoulRegistry, loadRegisteredSoulProfiles } from './crucible-soul-loader';
 import {
+    buildCrucibleResearchPromptAddon,
+    performCrucibleExternalSearch,
+    type CrucibleSearchResult,
+} from './crucible-research';
+import {
     buildRoundtableDiscoveryPrompt,
     buildRoundtableFallbackPayload,
     buildSocraticFallbackPayload,
@@ -268,6 +273,7 @@ const appendTurnLog = (params: {
     searchRequested: boolean;
     searchConnected: boolean;
     toolRoutes: CrucibleToolRoute[];
+    research?: CrucibleSearchResult;
     speaker: string;
     utterance: string;
     focus: string;
@@ -318,6 +324,14 @@ const appendTurnLog = (params: {
             searchRequested: params.searchRequested,
             searchConnected: params.searchConnected,
         },
+        research: params.research
+            ? {
+                query: params.research.query,
+                connected: params.research.connected,
+                error: params.research.error,
+                sources: params.research.sources,
+            }
+            : undefined,
         orchestrator: {
             engineMode: params.engineMode,
             phase: params.phase,
@@ -389,12 +403,25 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
     const turnPlan = createCrucibleOrchestratorPlan(promptContext);
     const skillSummary = loadSkillKnowledge('Socrates');
     const speakerSoul = loadSpeakerSoul(roundIndex, DEFAULT_PAIR);
+    let researchResult: CrucibleSearchResult | undefined;
 
     try {
         const promptStartedAt = Date.now();
-        const prompt = turnPlan.engineMode === 'roundtable_discovery'
+        if (turnPlan.searchRequested) {
+            const researchStartedAt = Date.now();
+            researchResult = await performCrucibleExternalSearch(promptContext);
+            console.log(
+                `[CrucibleTiming] research round=${roundIndex} connected=${researchResult.connected} duration=${formatDurationMs(researchStartedAt)} query="${researchResult.query}" results=${researchResult.sources.length}`
+            );
+            if (!researchResult.connected && researchResult.error) {
+                console.warn(`[Crucible] External search unavailable: ${researchResult.error}`);
+            }
+        }
+
+        const basePrompt = turnPlan.engineMode === 'roundtable_discovery'
             ? buildRoundtableDiscoveryPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul)
             : buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul);
+        const prompt = `${basePrompt}${researchResult ? buildCrucibleResearchPromptAddon(researchResult) : ''}`;
         console.log(`[CrucibleTiming] prompt round=${roundIndex} mode=${turnPlan.engineMode} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
 
         const parseStartedAt = Date.now();
@@ -435,8 +462,9 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             seedPrompt,
             latestUserReply,
             searchRequested: turnPlan.searchRequested,
-            searchConnected: false,
+            searchConnected: researchResult?.connected || false,
             toolRoutes: turnPlan.toolRoutes,
+            research: researchResult,
             speaker,
             utterance: reflection,
             focus,
@@ -451,7 +479,7 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             phase: turnPlan.phase,
             source: 'socrates',
             searchRequested: turnPlan.searchRequested,
-            searchConnected: false,
+            searchConnected: researchResult?.connected || false,
             orchestrator: {
                 engineMode: turnPlan.engineMode,
                 phase: turnPlan.phase,
@@ -482,8 +510,9 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             seedPrompt,
             latestUserReply,
             searchRequested: turnPlan.searchRequested,
-            searchConnected: false,
+            searchConnected: researchResult?.connected || false,
             toolRoutes: turnPlan.toolRoutes,
+            research: researchResult,
             speaker: fallback.speaker,
             utterance: fallback.reflection,
             focus: fallback.focus,
@@ -496,7 +525,7 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             source: 'fallback',
             warning: error.message,
             searchRequested: turnPlan.searchRequested,
-            searchConnected: false,
+            searchConnected: researchResult?.connected || false,
             orchestrator: {
                 engineMode: turnPlan.engineMode,
                 phase: turnPlan.phase,

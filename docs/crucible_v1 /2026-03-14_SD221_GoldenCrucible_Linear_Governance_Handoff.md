@@ -19,6 +19,25 @@
 3. `Initiative / Project / Parent Issue / Sub-issue / Label` 分别如何使用
 4. 现有 `MIN-*` issue 建议如何迁移或重命名
 
+### 2026-03-19 口径补充
+
+本稿写于 2026-03-14，后续又补充确认了三条更具体的阶段口径，供阅读本稿时一并采用：
+
+1. `MIN-38` 现已明确对应 **本地 `Crucible Phase 1-dev`**
+   - 该父任务可按“本地第一阶段已完成”关闭
+2. 产品层真正的第一阶段
+   - 仍包含 SaaS demo 上线
+   - 不应混进 `MIN-38`
+3. 圆桌多人讨论
+   - 明确归入 `Crucible-0 Phase 2`
+   - 作为第二阶段项目处理
+
+如与本稿个别早期表述冲突，以：
+
+- `docs/plans/2026-03-19_GoldenCrucible_Phase_Definition_Alignment.md`
+
+为新的阶段口径 SSOT。
+
 ---
 
 ## 2. 当前已知现状

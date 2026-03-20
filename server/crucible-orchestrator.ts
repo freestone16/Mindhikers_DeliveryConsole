@@ -88,10 +88,16 @@ export const deriveRuntimePhase = (roundIndex: number): CrucibleRuntimePhase => 
     return 'crystallization';
 };
 
-export const detectSearchIntent = (topicTitle: string, previousCards: InputCard[], seedPrompt?: string) => {
+export const detectSearchIntent = (
+    topicTitle: string,
+    previousCards: InputCard[],
+    seedPrompt?: string,
+    latestUserReply?: string
+) => {
     const corpus = [
         topicTitle,
         seedPrompt || '',
+        latestUserReply || '',
         ...previousCards.flatMap((card) => [card.prompt || '', card.answer || '']),
     ].join('\n');
     return SEARCH_INTENT_PATTERN.test(corpus);
@@ -187,7 +193,12 @@ const buildToolRoutes = (
 export const createCrucibleOrchestratorPlan = (context: PromptContext): CrucibleTurnPlan => {
     const engineMode = resolveEngineMode(context.roundIndex, context.previousCards);
     const phase = deriveRuntimePhase(context.roundIndex);
-    const searchRequested = detectSearchIntent(context.topicTitle, context.previousCards, context.seedPrompt);
+    const searchRequested = detectSearchIntent(
+        context.topicTitle,
+        context.previousCards,
+        context.seedPrompt,
+        context.latestUserReply
+    );
 
     return {
         engineMode,

@@ -1,6 +1,237 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-18 CST（晚）
+> **更新日期**: 2026-03-20 CST（早）
+
+---
+
+## 1.4 2026-03-20（黄金坩埚真实外部搜索接通）
+
+### ✅ 本轮已完成
+
+- 为黄金坩埚新增真实外部搜索桥接：
+  - `server/crucible-research.ts`
+  - 通过 Bing RSS 拉取外部结果，统一产出 `query / connected / sources / error`
+- 将外部搜索接入坩埚回合生成主链：
+  - `server/crucible.ts`
+  - 当 `searchRequested: true` 时先执行检索，再把搜索材料注入 prompt
+  - 回包与 `turn_log.json` 不再把 `searchConnected` 写死为 `false`
+  - `turn_log.json` 新增 `research` 证据块
+- 新增回归测试：
+  - `src/__tests__/crucible-research.test.ts`
+- 更新黄金测试 request 口径：
+  - `testing/golden-crucible/requests/TREQ-2026-03-20-GC-002-crucible-search-request.md`
+  - `testing/golden-crucible/requests/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.md`
+
+### 🎯 本轮验证结论
+
+- 通过 `agent-browser` 真实重放 `GC-003` 三轮对话，第三轮搜索请求已出现真实外部材料痕迹：
+  - 页面回复明确引用外部搜索结果，并提到 MIT 相关材料
+  - 黑板标题更新为：`外部搜索的启示：技术讨论与生态分析的断层`
+- 最新 runtime 证据已确认：
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+  - `roundIndex: 3`
+  - `searchRequested: true`
+  - `searchConnected: true`
+  - `research.query` 已写入
+  - `research.sources` 已落 5 条外部来源
+- 当前浏览器证据：
+  - `testing/golden-crucible/artifacts/TREQ-003-agent-browser-search-connected.png`
+
+### ⚠️ 当前补充说明
+
+- 这次 `agent-browser` 实测已证明真实搜索链路打通，但检索质量仍较粗糙：
+  - 当前返回结果偏向通用 AI 新闻源
+  - 与“中文内容生态稀缺性”主题仍存在一定语义偏移
+- `npm run build` 仍被仓库内既有的 unrelated TypeScript 问题阻塞，本轮未额外处理其他业务域错误
+
+---
+
+## 1.3 2026-03-20（黄金测试 skill 输出契约增强）
+
+### ✅ 本轮已完成
+
+- 更新 `golden-testing` skill：
+  - `/Users/luzhoua/.codex/skills/golden-testing/SKILL.md`
+  - 明确要求每次测试完成后都要落一份**可交接的测试报告**
+  - 新增强制章节：
+    - `Verification Results`
+    - `Bug Follow-up`
+    - `Handoff Notes`
+- 同步升级坩埚报告模板：
+  - `testing/golden-crucible/reports/REPORT_TEMPLATE.md`
+- 已将 `GC-003` 报告补强为后续排错可直接接手的版本：
+  - `testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md`
+
+### 🎯 当前意义
+
+- 后续新窗口不需要先重新还原上下文
+- 测试报告里已经明确拆开：
+  - 已修复的 bug：语境化搜索请求漏检
+  - 待继续处理的 bug：真实外部搜索仍未接通
+
+## 1.2 2026-03-20（语境化搜索诉求漏检修复）
+
+### ✅ 本轮已完成
+
+- 修复黄金坩埚搜索意图判定：
+  - `server/crucible-orchestrator.ts`
+  - 由只检查 `topicTitle / previousCards / seedPrompt`
+  - 改为同时检查 `latestUserReply`
+- 新增回归测试：
+  - `src/__tests__/crucible-orchestrator.test.ts`
+- 更新语境化专项 request：
+  - `testing/golden-crucible/requests/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.md`
+  - 补充“进入后先重置工作区”要求，避免历史黑板污染
+
+### 🎯 根因与验证
+
+- 真实缺陷：当用户前两轮已经进入具体讨论、第三轮才提出“联网搜索”时，旧逻辑不会检查 `latestUserReply`，导致 `searchRequested` 被错误写成 `false`
+- 修复后在干净工作区重新验证，最新第 3 轮 turn 已确认：
+  - `roundIndex: 3`
+  - `latestUserReply` 为语境化搜索请求
+  - `searchRequested: true`
+  - `searchConnected: false`
+  - `Researcher` 路由为 `support`
+- 关键 runtime 证据：
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+
+### ⚠️ 当前补充说明
+
+- OpenCode + `agent-browser` 的正式 `GC-003` 直控链路在本轮仍出现超时/挂起，说明测试执行器本身还有稳定性问题
+- 但应用侧核心行为已通过：
+  - 代码级回归测试
+  - 干净工作区下的真实三轮浏览器验证
+
+## 1.1 2026-03-20（黄金坩埚“用户请求网络搜索”专项测试通过）
+
+### ✅ 本轮已完成
+
+- 新增专项 request：
+  - `testing/golden-crucible/requests/TREQ-2026-03-20-GC-002-crucible-search-request.md`
+- 通过正式入口完成真实验证：
+  - `npm run test:opencode:gc -- --request testing/golden-crucible/requests/TREQ-2026-03-20-GC-002-crucible-search-request.md`
+- 新增专项 report / claim / status：
+  - `testing/golden-crucible/reports/TREQ-2026-03-20-GC-002-crucible-search-request.report.md`
+  - `testing/golden-crucible/claims/TREQ-2026-03-20-GC-002-crucible-search-request.claim.md`
+  - `testing/golden-crucible/status/latest.json`
+
+### 🎯 本轮验证结论
+
+- 当用户明确输入“我想先联网搜索一下这个议题的最新研究现状，再继续讨论。”时，黄金坩埚前端可以正常收消息、返回第一轮回复，并把黑板切到 `Phase 0 / 议题锁定`
+- runtime 证据链已确认：
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+  - 最新 turn 中 `searchRequested: true`
+  - 最新 turn 中 `searchConnected: false`
+  - `Researcher` 路由模式为 `support`
+- 这说明当前版本已经**识别并记录**“用户要求网络搜索”的诉求，但**尚未真实接通外部搜索**
+
+### 📸 本轮证据
+
+- `testing/golden-crucible/artifacts/TREQ-002-01-before-input.png`
+- `testing/golden-crucible/artifacts/TREQ-002-02-message-entered.png`
+- `testing/golden-crucible/artifacts/TREQ-002-03-response-received.png`
+- `testing/golden-crucible/artifacts/TREQ-002-04-final-state.png`
+
+## 1.0 2026-03-20（黄金坩埚 OpenCode 测试闭环已打通）
+
+### ✅ 本轮已完成
+
+- 新增黄金坩埚测试协议入口：
+  - `testing/README.md`
+  - `testing/OPENCODE_INIT.md`
+  - `testing/golden-crucible/README.md`
+- 新增 request / claim / report / status 骨架：
+  - `testing/golden-crucible/requests/REQUEST_TEMPLATE.md`
+  - `testing/golden-crucible/reports/REPORT_TEMPLATE.md`
+  - `testing/golden-crucible/claims/CLAIM_TEMPLATE.md`
+  - `testing/golden-crucible/status/latest.json`
+  - `testing/golden-crucible/status/BOARD.md`
+- 新增直控执行脚本：
+  - `testing/scripts/run-opencode-request.mjs`
+- 新增统一入口命令：
+  - `npm run test:opencode:gc -- --request <request-file>`
+
+### 🎯 当前统一口径
+
+- 黄金坩埚测试链路正式采用：`Codex -> opencode run -> agent-browser -> report/status`
+- 当前测试场景强制模型：`zhipuai-coding-plan/glm-5`
+- 命令层必须显式传 `--model zhipuai-coding-plan/glm-5`
+- wrapper 以“合格 report + 证据链”为准，不再被 OpenCode 自身不稳定退出码误伤
+
+### ✅ 本轮验证
+
+- 本地开发环境拉起成功：前端 `5176`、后端 `3004`
+- 真实 smoke request 跑通：
+  - request: `testing/golden-crucible/requests/TREQ-2026-03-20-GC-001-opencode-workflow-smoke.md`
+  - report: `testing/golden-crucible/reports/TREQ-2026-03-20-GC-001-opencode-workflow-smoke.report.md`
+  - status: `testing/golden-crucible/status/latest.json` 当前为 `passed`
+- 真实证据已生成：
+  - `testing/golden-crucible/artifacts/screenshot-1773968400366.png`
+  - `testing/golden-crucible/artifacts/screenshot-1773968411206.png`
+
+---
+
+## 0.9 2026-03-20（黄金坩埚测试能力整体方案）
+
+### ✅ 本轮新增文档
+
+- 新增测试能力整体实施方案：`docs/plans/2026-03-20_GoldenCrucible_Testing_Capability_Implementation_Plan.md`
+
+### 🎯 当前判断
+
+- 黄金坩埚测试链路的目标形态明确为：`Codex -> opencode run -> agent-browser`
+- 当前测试场景下，OpenCode 执行模型统一强制为：`zhipuai-coding-plan/glm-5`
+- 第一优先级不是直接做复杂 worker，而是先把协议文档、direct-run MVP、证据闭环和通过判据搭稳
+
+### ⏳ 下一步重点
+
+- 补齐仓库内 `testing/` 协议入口与模块文档
+- 新增 `run-opencode-request` 直控脚本与 `package.json` 入口
+- 再决定何时补 queue-worker 与状态板脚本
+
+---
+
+## 0.8 2026-03-19（黄金坩埚阶段口径对齐 + MIN-38 收口）
+
+### ✅ 本轮已完成
+
+- 明确本地第一阶段口径：以黄金坩埚当前本地完成态为准，`Socrates -> Bridge -> UI` 主链、黑板协议、Soul registry 与最小 orchestrator 底盘视为已收口
+- 明确 Linear 对应关系：`MIN-38` 只代表本地 `Crucible Phase 1-dev`，可以按本地开发父任务完成来关闭
+- 明确产品口径：黄金坩埚真正的产品第一阶段仍包含 SaaS demo 上线，用于朋友、合作方与投资人演示
+- 明确下一阶段定义：圆桌多人讨论归入第二阶段，对应 Linear Project `Crucible-0 Phase 2`
+- 本地文档同步更新：
+  - 新增阶段口径 SSOT：`docs/plans/2026-03-19_GoldenCrucible_Phase_Definition_Alignment.md`
+  - 更新 `docs/02_design/crucible/_master.md`
+  - 更新本进度文档
+
+### 🎯 当前统一口径
+
+- **本地 Phase 1-dev**：已完成，对应 `MIN-38`
+- **产品 Phase 1**：仍包含 SaaS demo 上线，当前进入重点讨论区
+- **Phase 2**：圆桌多人讨论，对应 `Crucible-0 Phase 2`
+
+### ⏳ 下一步重点
+
+- 讨论 SaaS demo 的最小上线形态、平台选型与部署约束
+- 判断 SaaS 第一版是否保留登录、会话持久化、Skill 打包与审计链最小集
+- 基于清晰阶段口径，再拆 `Crucible-0 Phase 2` 的 roundtable MVP
+
+### 📌 后续补充（2026-03-19 晚）
+
+- 已新增 SaaS 实施方案：`docs/plans/2026-03-19_GoldenCrucible_SaaS_Implementation_Plan.md`
+- 已在 Linear 新建 launch 父任务：`MIN-94` `Crucible Phase 1-launch`
+- 已拆分本周末联合上线的 5 张执行卡：`MIN-95` ~ `MIN-99`
+- 当前推荐部署路径：Homepage 上 Vercel Hobby，Crucible App 上 Railway；若优先考虑国内支付与控制台体验，且需要兼顾美国/加拿大/香港/台湾访问，则更稳的国内路径是「腾讯云 EdgeOne Pages + 中国香港 Lighthouse/CVM」；CloudBase 云托管因当前官方文档写明支持地域为上海、默认加速偏中国大陆，更适合作为大陆优先备选；若本周强行全上 Vercel，需要额外处理 Vercel Functions 不支持 WebSocket server 的限制
+
+---
+
+## 0.7 2026-03-19（配置校正）
+
+### ✅ 本轮已完成
+
+- worktree 本地环境端口口径校正：按 `~/.vibedir/global_ports_registry.yml` 将 `.env` 中误留的 `PORT=3002` 改为 `3004`，与 `.env.local` 一致
+- README 启动说明同步改为 `5176/3004`，避免把营销大师端口误认成黄金坩埚当前端口
+- rules.md 新增规则：worktree 的 `.env` / `.env.local` 端口口径必须一致，不能残留其他模块端口号
 
 ---
 
@@ -28,7 +259,7 @@
 - 结晶内容展现形式待设计（用户尚未决策）
 - crystallization 阶段非 quote 类内容的写入逻辑待调整
 - 观察 Socrates 完整加载后 15 轮规则执行情况
-- Linear MCP：同步黄金坩埚实际进展到 MIN-38
+- 进入 SaaS demo 形态与低负载部署方案讨论
 
 ---
 
@@ -62,8 +293,8 @@
 - 文件：`AGENTS.md` §浏览器工具优先级规则
 
 ### ⏳ 待完成（下一窗口）
-- 通过 Linear MCP 读取 MIN-38 及子 Issues，评估哪些已完成、哪些需更新
-- 用中文同步黄金坩埚实际进展到 Linear（进度、描述、状态）
+- 继续讨论产品第一阶段中的 SaaS demo 范围与部署路线
+- 基于已明确的阶段口径，整理 `Crucible-0 Phase 2` 的 roundtable MVP 执行计划
 - Commit & push 本轮所有未提交改动（新 Skills、skill-sync、llm_config 等）
 
 ---
