@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Trash2, Loader2, Play, Calendar } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Trash2, Loader2, Play, Calendar, Send } from 'lucide-react';
 
 interface DistributionTask {
     taskId: string;
@@ -18,7 +18,14 @@ interface DistributionTask {
     scheduledAt?: string;
     completedAt?: string;
     error?: string;
-    results?: Record<string, any>;
+    results?: Record<string, {
+        platform: string;
+        status: 'success' | 'failed';
+        remoteId?: string;
+        url?: string;
+        publishedAt?: string;
+        message?: string;
+    }>;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
@@ -44,7 +51,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.Rea
         color: 'text-emerald-400',
         bg: 'bg-emerald-500/10 border-emerald-500/30',
         icon: <CheckCircle className="w-4 h-4" />,
-        label: '已完成'
+        label: '已发布'
     },
     failed: {
         color: 'text-red-400',
@@ -65,7 +72,7 @@ const PLATFORM_ICONS: Record<string, string> = {
     wechat_mp: '📝'
 };
 
-export const DistributionQueue = () => {
+export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
     const [tasks, setTasks] = useState<DistributionTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [todayCount, setTodayCount] = useState(0);
@@ -73,8 +80,16 @@ export const DistributionQueue = () => {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     const fetchQueue = async () => {
+        if (!projectId) {
+            setTasks([]);
+            setTodayCount(0);
+            setUpcomingCount(0);
+            setLoading(false);
+            return;
+        }
         try {
-            const res = await fetch('/api/distribution/queue');
+            const params = new URLSearchParams({ projectId });
+            const res = await fetch(`/api/distribution/queue?${params.toString()}`);
             const data = await res.json();
             if (data.success) {
                 setTasks(data.queue || []);
@@ -89,15 +104,18 @@ export const DistributionQueue = () => {
     };
 
     useEffect(() => {
+        setLoading(true);
         fetchQueue();
-    }, []);
+    }, [projectId]);
 
     const handleDelete = async (taskId: string) => {
         if (!confirm('确定要删除这个任务吗？')) return;
         
         setActionLoading(taskId);
         try {
-            const res = await fetch(`/api/distribution/queue/${taskId}`, {
+            if (!projectId) return;
+            const params = new URLSearchParams({ projectId });
+            const res = await fetch(`/api/distribution/queue/${taskId}?${params.toString()}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
@@ -114,7 +132,9 @@ export const DistributionQueue = () => {
     const handleRetry = async (taskId: string) => {
         setActionLoading(taskId);
         try {
-            const res = await fetch(`/api/distribution/queue/${taskId}/retry`, {
+            if (!projectId) return;
+            const params = new URLSearchParams({ projectId });
+            const res = await fetch(`/api/distribution/queue/${taskId}/retry?${params.toString()}`, {
                 method: 'POST'
             });
             const data = await res.json();
@@ -123,6 +143,30 @@ export const DistributionQueue = () => {
             }
         } catch (e) {
             console.error('Failed to retry task:', e);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleExecute = async (taskId: string) => {
+        setActionLoading(taskId);
+        try {
+            if (!projectId) return;
+            const res = await fetch(`/api/distribution/queue/${taskId}/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ projectId }),
+            });
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.error || '执行发布失败');
+            }
+            await fetchQueue();
+        } catch (e) {
+            console.error('Failed to execute task:', e);
+            alert(e instanceof Error ? e.message : '执行发布失败');
         } finally {
             setActionLoading(null);
         }
@@ -162,6 +206,12 @@ export const DistributionQueue = () => {
                 <h1 className="text-2xl font-bold text-white">Distribution Queue</h1>
                 <p className="text-slate-400 text-sm mt-1">任务队列与发布进度追踪</p>
             </div>
+
+            {!projectId && (
+                <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    请先在顶部选择项目，再查看分发队列。
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -245,9 +295,51 @@ export const DistributionQueue = () => {
                                                     {task.error}
                                                 </div>
                                             )}
+
+                                            {task.results && Object.values(task.results).length > 0 && (
+                                                <div className="mt-2 space-y-1">
+                                                    {Object.values(task.results).map((result) => (
+                                                        <div key={result.platform} className="text-xs text-slate-400">
+                                                            <span className={result.status === 'success' ? 'text-emerald-400' : 'text-red-400'}>
+                                                                {result.platform}
+                                                            </span>
+                                                            {' · '}
+                                                            {result.message || (result.status === 'success' ? '发布成功' : '发布失败')}
+                                                            {result.url && (
+                                                                <>
+                                                                    {' · '}
+                                                                    <a
+                                                                        href={result.url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="text-blue-400 hover:text-blue-300"
+                                                                    >
+                                                                        打开链接
+                                                                    </a>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className="flex items-center gap-2 flex-shrink-0">
+                                            {task.status === 'pending' && (
+                                                <button
+                                                    onClick={() => handleExecute(task.taskId)}
+                                                    disabled={actionLoading === task.taskId}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50"
+                                                >
+                                                    {actionLoading === task.taskId ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Send className="w-3.5 h-3.5" />
+                                                    )}
+                                                    立即执行
+                                                </button>
+                                            )}
+
                                             {task.status === 'failed' && (
                                                 <button
                                                     onClick={() => handleRetry(task.taskId)}

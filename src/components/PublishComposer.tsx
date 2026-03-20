@@ -53,13 +53,22 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
 
     useEffect(() => {
+        if (!propProjectId) {
+            setVideos([]);
+            setMarketingFiles([]);
+            return;
+        }
         fetchAssets();
-    }, []);
+    }, [propProjectId]);
 
     const fetchAssets = async () => {
+        if (!propProjectId) {
+            return;
+        }
         setLoading(true);
         try {
-            const res = await fetch('/api/distribution/assets');
+            const params = new URLSearchParams({ projectId: propProjectId });
+            const res = await fetch(`/api/distribution/assets?${params.toString()}`);
             const data = await res.json();
             if (data.success) {
                 setVideos(data.videos || []);
@@ -73,13 +82,17 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     };
 
     const handleMagicFill = async () => {
+        if (!propProjectId) {
+            alert('请先选择项目');
+            return;
+        }
         if (marketingFiles.length === 0) {
             alert('请先运行 Marketing Master 生成营销方案');
             return;
         }
 
         try {
-            const projectDir = propProjectId || 'MindHikers Delivery Console';
+            const projectDir = propProjectId;
             const res = await fetch(`/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
             const data = await res.json();
 
@@ -111,6 +124,10 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     };
 
     const handleSubmit = async () => {
+        if (!propProjectId) {
+            alert('请先选择项目');
+            return;
+        }
         const selectedPlatforms = platforms.filter(p => p.enabled).map(p => p.id);
 
         if (selectedPlatforms.length === 0) {
@@ -131,7 +148,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    projectId: propProjectId || 'default-project',
+                    projectId: propProjectId,
                     platforms: selectedPlatforms,
                     assets: {
                         mediaUrl: selectedVideo.path,
@@ -183,6 +200,12 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                 <h1 className="text-2xl font-bold text-white">Publish Composer</h1>
                 <p className="text-slate-400 text-sm mt-1">跨平台提稿机 - 一键分发全网</p>
             </div>
+
+            {!propProjectId && (
+                <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    请先在顶部选择项目，再创建发布任务。
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex items-center justify-center h-64">

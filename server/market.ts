@@ -7,6 +7,7 @@ import type { TubeBuddyScore } from '../src/types';
 import { callLLM } from './llm';
 import { loadConfig } from './llm-config';
 import { getProjectRoot } from './project-paths';
+import { setupSSE, writeSSE } from './sse';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -15,9 +16,7 @@ const router = Router();
 export const generateSEO = async (req: Request, res: Response) => {
     const { projectId, scriptPath, count, focusKeywords } = req.body;
     
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    setupSSE(res);
 
     const mockSets: any[] = [];
     for (let i = 0; i < (count || 5); i++) {
@@ -31,30 +30,28 @@ export const generateSEO = async (req: Request, res: Response) => {
         };
         mockSets.push(set);
         
-        res.write(`data: ${JSON.stringify({ type: 'generated', set })}\n\n`);
+        writeSSE(res, { type: 'generated', set });
         await new Promise(r => setTimeout(r, 500));
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'complete', sets: mockSets })}\n\n`);
+    writeSSE(res, { type: 'complete', sets: mockSets });
     res.end();
 };
 
 export const scoreKeyword = async (req: Request, res: Response) => {
     const { setId, keyword, title } = req.body;
     
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    setupSSE(res);
 
-    res.write(`data: ${JSON.stringify({ type: 'scoring', setId })}\n\n`);
+    writeSSE(res, { type: 'scoring', setId });
     
     try {
         const worker = await getTubeBuddyWorker();
         const score = await worker.scoreKeyword(keyword || title);
         
-        res.write(`data: ${JSON.stringify({ type: 'scored', setId, score })}\n\n`);
+        writeSSE(res, { type: 'scored', setId, score });
     } catch (error: any) {
-        res.write(`data: ${JSON.stringify({ type: 'error', setId, error: error.message })}\n\n`);
+        writeSSE(res, { type: 'error', setId, error: error.message });
     }
     
     res.end();
@@ -63,12 +60,10 @@ export const scoreKeyword = async (req: Request, res: Response) => {
 export const scoreAllKeywords = async (req: Request, res: Response) => {
     const { sets } = req.body;
     
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    setupSSE(res);
 
     for (const set of sets) {
-        res.write(`data: ${JSON.stringify({ type: 'scoring', setId: set.id })}\n\n`);
+        writeSSE(res, { type: 'scoring', setId: set.id });
         
         await new Promise(r => setTimeout(r, 800));
         
@@ -83,10 +78,10 @@ export const scoreAllKeywords = async (req: Request, res: Response) => {
             }
         };
 
-        res.write(`data: ${JSON.stringify({ type: 'scored', setId: set.id, score })}\n\n`);
+        writeSSE(res, { type: 'scored', setId: set.id, score });
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+    writeSSE(res, { type: 'complete' });
     res.end();
 };
 
@@ -138,15 +133,6 @@ function readScriptContent(projectId: string, scriptPath: string): string {
     }
     const content = fs.readFileSync(fullPath, 'utf-8');
     return content.length > 8000 ? content.slice(0, 8000) + '\n...(已截断)' : content;
-}
-
-/** Helper: SSE setup */
-function setupSSE(res: Response) {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
 }
 
 /**

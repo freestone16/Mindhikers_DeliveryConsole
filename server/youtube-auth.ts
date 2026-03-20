@@ -1,24 +1,26 @@
 import 'dotenv/config';
-import express, { Router } from 'express';
+import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getProjectRoot } from './project-paths';
+import {
+    buildYoutubeAuthUrl,
+    exchangeYoutubeCode,
+    getYoutubeTokenStatus,
+    requireYoutubeAccessToken,
+} from './youtube-oauth-service';
+import { google } from 'googleapis';
 
 // ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
-const AUTH_PORT = process.env.PORT || process.env.VITE_BACKEND_PORT || '3005';
 
 // Configuration paths - expecting secrets folder at project root
 const SECRETS_DIR = path.resolve(__dirname, '../secrets');
 const CLIENT_SECRET_FILE = path.join(SECRETS_DIR, 'client_id.json');
-
-// In-memory token store (Zero Persistence)
-let activeAccessToken: string | null = null;
-let tokenExpiry = 0;
 
 // Helper to get Google Auth Client config
 function getGoogleConfig() {
@@ -35,19 +37,7 @@ function getGoogleConfig() {
 // 1. Start Auth Flow - Returns the URL to redirect the user to
 router.get('/auth/url', (req, res) => {
     try {
-        const config = getGoogleConfig();
-        const redirectUri = `http://localhost:${AUTH_PORT}/auth/callback`; // Dynamic port from .env
-        const scope = 'https://www.googleapis.com/auth/youtube.upload';
-
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-            `client_id=${config.client_id}&` +
-            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-            `response_type=code&` +
-            `scope=${encodeURIComponent(scope)}&` +
-            `access_type=online&` + // No refresh token needed for temp access
-            `prompt=consent`; // Force consent to ensure we get a fresh token
-
-        res.json({ url: authUrl });
+        res.json({ url: buildYoutubeAuthUrl() });
     } catch (error: any) {
         console.error('Auth Init Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -62,33 +52,7 @@ router.get('/auth/callback', async (req, res) => {
     }
 
     try {
-        const config = getGoogleConfig();
-        const redirectUri = `http://localhost:${AUTH_PORT}/auth/callback`;
-
-        const tokenUrl = 'https://oauth2.googleapis.com/token';
-        const params = new URLSearchParams();
-        params.append('code', code);
-        params.append('client_id', config.client_id);
-        params.append('client_secret', config.client_secret);
-        params.append('redirect_uri', redirectUri);
-        params.append('grant_type', 'authorization_code');
-
-        const response = await fetch(tokenUrl, {
-            method: 'POST',
-            body: params
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Token exchange failed: ${errorText}`);
-        }
-
-        const data: any = await response.json();
-
-        // Save to memory
-        activeAccessToken = data.access_token;
-        tokenExpiry = Date.now() + (data.expires_in * 1000);
-
+        await exchangeYoutubeCode(code);
         console.log('✅ OAuth Success! Access Token received (in-memory only).');
 
         // Simple success page
@@ -116,25 +80,14 @@ router.get('/auth/callback', async (req, res) => {
 
 // 3. Check Token Status
 router.get('/auth/status', (req, res) => {
-    const isValid = activeAccessToken && Date.now() < tokenExpiry;
-    res.json({
-        authenticated: isValid,
-        expiresIn: isValid ? Math.floor((tokenExpiry - Date.now()) / 1000) : 0
-    });
+    res.json(getYoutubeTokenStatus());
 });
 
 // 4. Upload Endpoint (Stub)
-import { google } from 'googleapis';
-
-// ... imports
-
 // 4. Upload Endpoint - Real Implementation
 router.post('/shorts/upload', async (req, res) => {
-    if (!activeAccessToken || Date.now() > tokenExpiry) {
-        return res.status(401).json({ error: 'No active access token. Please authorize again.' });
-    }
-
     try {
+        const accessToken = requireYoutubeAccessToken();
         const PROJECT_NAME = process.env.PROJECT_NAME || 'MindHikers Delivery Console';
         const PROJECT_ROOT = getProjectRoot(PROJECT_NAME);
         const DELIVERY_FILE = path.join(PROJECT_ROOT, 'delivery_store.json');
@@ -165,7 +118,7 @@ router.post('/shorts/upload', async (req, res) => {
         }
 
         const oauth2Client = new google.auth.OAuth2();
-        oauth2Client.setCredentials({ access_token: activeAccessToken });
+        oauth2Client.setCredentials({ access_token: accessToken });
 
         const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
         const results = [];

@@ -1,4 +1,4 @@
-# Director 测试协作操作手册
+# MHSDC 测试协作操作手册
 
 这套目录用于实现：
 
@@ -27,6 +27,7 @@
 模块 README 的约定位置示例：
 
 - 导演模块：[testing/director/README.md](/Users/luzhoua/MHSDC/DeliveryConsole/Director/testing/director/README.md)
+- 分发模块：`testing/distribution/README.md`
 - 未来其他模块也遵循同样位置，例如 `testing/golden-crucible/README.md`
 
 ## 你需要做什么
@@ -34,8 +35,8 @@
 正常情况下，你只需要做 3 件事：
 
 1. 在 OpenCode 侧启动测试 worker，或让它读取最新 request
-2. 查看 `testing/director/status/` 或 `testing/director/reports/` 了解当前状态
-3. 测完后回来一句“读取最新 director 测试报告”
+2. 查看 `testing/<module>/status/` 或 `testing/<module>/reports/` 了解当前状态
+3. 测完后回来一句“读取最新 <module> 测试报告”
 
 初始化和开测细则见：
 
@@ -87,6 +88,7 @@
 
 ```bash
 npm run test:worker:director
+npm run test:worker:distribution
 ```
 
 ## 你如何监控状态
@@ -100,6 +102,7 @@ npm run test:worker:director
 
 ```bash
 npm run test:status:director
+npm run test:status:distribution
 ```
 
 它现在会额外显示：

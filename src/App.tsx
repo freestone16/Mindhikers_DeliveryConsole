@@ -196,6 +196,7 @@ function App() {
                 </div>
             ) : (
                 <DistributionLayout
+                    projectId={state.projectId}
                     activePage={activeDistributionPage}
                     onPageChange={setActiveDistributionPage}
                 />
@@ -206,7 +207,7 @@ function App() {
     );
 }
 
-const DistributionLayout = ({ activePage, onPageChange }: { activePage: DistributionPage; onPageChange: (page: DistributionPage) => void }) => {
+const DistributionLayout = ({ activePage, onPageChange, projectId }: { activePage: DistributionPage; onPageChange: (page: DistributionPage) => void; projectId: string }) => {
     const navItems = [
         { id: 'accounts' as DistributionPage, label: 'Accounts Hub', icon: <Users className="w-4 h-4" /> },
         { id: 'composer' as DistributionPage, label: 'Publish Composer', icon: <Send className="w-4 h-4" /> },
@@ -236,8 +237,8 @@ const DistributionLayout = ({ activePage, onPageChange }: { activePage: Distribu
             </div>
             <main className="max-w-7xl mx-auto px-6 py-8">
                 {activePage === 'accounts' && <AccountsHub />}
-                {activePage === 'composer' && <PublishComposer />}
-                {activePage === 'queue' && <DistributionQueue />}
+                {activePage === 'composer' && <PublishComposer projectId={projectId} />}
+                {activePage === 'queue' && <DistributionQueue projectId={projectId} />}
             </main>
         </>
     );

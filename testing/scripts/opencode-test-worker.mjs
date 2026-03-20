@@ -10,6 +10,8 @@ function parseArgs(argv) {
     interval: 60,
     once: false,
     timeoutMinutes: 120,
+    model: '',
+    ignoreActiveOpencode: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -25,6 +27,11 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === '--once') {
       args.once = true;
+    } else if (arg === '--model' && argv[i + 1]) {
+      args.model = argv[i + 1];
+      i += 1;
+    } else if (arg === '--ignore-active-opencode') {
+      args.ignoreActiveOpencode = true;
     }
   }
 
@@ -147,7 +154,7 @@ function updateStatusFiles(paths, status) {
   fs.writeFileSync(boardPath, board);
 }
 
-function writeClaim(item, workerName) {
+function writeClaim(item, workerName, modelName) {
   const content = `# ${item.id}.claim
 
 ## 元信息
@@ -155,6 +162,7 @@ function writeClaim(item, workerName) {
 - request_id: ${item.id}
 - claimed_by: ${workerName}
 - claimed_at: ${nowIso()}
+- model: ${modelName || 'default'}
 - status: claimed
 
 ## 执行计划
@@ -171,7 +179,7 @@ function writeClaim(item, workerName) {
   fs.writeFileSync(item.claimPath, content);
 }
 
-function writeFallbackReport(item, status, summary, extra) {
+function writeFallbackReport(item, status, summary, extra, modelName) {
   const content = `# ${item.id}.report
 
 ## 元信息
@@ -179,6 +187,7 @@ function writeFallbackReport(item, status, summary, extra) {
 - request_id: ${item.id}
 - executed_by: OpenCode worker
 - executed_at: ${nowIso()}
+- actual_model: ${modelName || 'default'}
 - status: ${status}
 
 ## 实际执行
@@ -232,13 +241,14 @@ async function runRequest(paths, item, options) {
   const prompt = buildPrompt(promptTemplate, item);
   const activeOpencode = hasActiveOpencodeProcess();
 
-  if (activeOpencode) {
-    writeClaim(item, workerName);
+  if (activeOpencode && !options.ignoreActiveOpencode) {
+    writeClaim(item, workerName, options.model);
     writeFallbackReport(
       item,
       'blocked',
       '检测到已有活跃的 `opencode` 进程。为避免测试 worker 与用户会话争抢同一数据库，本次测试未启动。',
-      `活跃进程:\n\n\`\`\`\n${activeOpencode}\n\`\`\`\n\n请先退出已有 OpenCode 会话，再重新执行 worker。`
+      `活跃进程:\n\n\`\`\`\n${activeOpencode}\n\`\`\`\n\n请先退出已有 OpenCode 会话，再重新执行 worker。`,
+      options.model
     );
     updateStatusFiles(paths, {
       module: options.module,
@@ -253,7 +263,7 @@ async function runRequest(paths, item, options) {
     return;
   }
 
-  writeClaim(item, workerName);
+  writeClaim(item, workerName, options.model);
   updateStatusFiles(paths, {
     module: options.module,
     moduleLabel: options.moduleLabel,
@@ -270,7 +280,13 @@ async function runRequest(paths, item, options) {
   const rawLogStream = fs.createWriteStream(item.rawLogPath);
 
   return new Promise((resolve) => {
-    const child = spawn('opencode', ['run', '--dir', cwd, '--format', 'default', prompt], {
+    const commandArgs = ['run', '--dir', cwd, '--format', 'default'];
+    if (options.model) {
+      commandArgs.push('-m', options.model);
+    }
+    commandArgs.push(prompt);
+
+    const child = spawn('opencode', commandArgs, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -287,7 +303,7 @@ async function runRequest(paths, item, options) {
       rawLogStream.end();
 
       if (!fs.existsSync(item.reportPath)) {
-        writeFallbackReport(item, resultStatus, summary, extra);
+        writeFallbackReport(item, resultStatus, summary, extra, options.model);
       }
 
       updateStatusFiles(paths, {
