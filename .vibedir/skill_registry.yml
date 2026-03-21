@@ -5,3 +5,9 @@ skills:
         snapshot_file: .vibedir/skill_drafts/codex_Director_chat_edit_20260312.md
         updated_at: 2026-03-12
         note: Director Chatbox prompt switched from raw patch guidance to Bridge-action guidance
+  OldYang:
+    codex:
+      - path: /Users/luzhoua/.codex/skills/OldYang/SKILL.md
+        snapshot_file: .vibedir/skill_drafts/codex_OldYang_20260321.md
+        updated_at: 2026-03-21
+        note: Sync Codex wrapper with SSOT hard constraints (handoff, ports registry, git redlines) while keeping restrained trigger wording
