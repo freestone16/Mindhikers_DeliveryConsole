@@ -8,6 +8,9 @@ export function setupSSE(res: Response) {
   res.flushHeaders();
 }
 
-export function writeSSE(res: Response, payload: unknown) {
+export function writeSSE(res: Response, payload: unknown, event?: string) {
+  if (event) {
+    res.write(`event: ${event}\n`);
+  }
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }

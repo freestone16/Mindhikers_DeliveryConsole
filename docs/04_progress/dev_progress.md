@@ -37,6 +37,8 @@
 | v4.2.2 | 2026-03-16 | **Director 冷启动项目态恢复修复** - 修复页面刷新后新 socket 未自动恢复 active project，导致右上角文稿下拉空白、Phase2 测试未开始的问题；统一复用 socket 项目态 hydrate 逻辑，并以 Agent Browser 完成真实页面验证 |
 | v4.2.3 | 2026-03-16 | **MIN-89 测试治理父任务补强** - 将 `Director 协调测试与验收治理` 从简短条目扩成真正的父 issue：补齐仓库文档索引、用途、当前状态、边界、验收目标，并挂载配套 Linear 文档与子 issue，便于后续 handoff 和跨模块复用 |
 | v4.2.4 | 2026-03-22 | **Distribution MIN-101 收口** - 跑通真实 YouTube success-path；修复成功结果回写、OAuth token 热重载丢失、默认公开视频风险，并以 `TREQ-2026-03-22-DISTRIBUTION-005` 完成黄金验收 |
+| v4.2.5 | 2026-03-22 | **Distribution MIN-102 + MIN-103A 收口** - Queue 接入 SSE 实时可观测性并完成统一验收；`Publish Composer` 的 `Magic Fill` 切换到真实 Marketing / Script 数据源，支持 `sourceFiles / platformOverrides` 入队，验收见 `TREQ-2026-03-22-DISTRIBUTION-006 / 009 / 010` |
+| v4.2.6 | 2026-03-22 | **Distribution MIN-103B/C 收口** - 新增 `X` 与 `微信公众号` connector，一期以 `artifact_ready / draft_ready` 模式写入项目内 `06_Distribution/outbound/`；Queue 联调通过，验收见 `TREQ-2026-03-22-DISTRIBUTION-011` |
 
 ---
 

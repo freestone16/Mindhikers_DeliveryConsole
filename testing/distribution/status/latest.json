@@ -1,10 +1,10 @@
 {
   "module": "distribution",
   "moduleLabel": "Distribution",
-  "latest_request": "TREQ-2026-03-22-DISTRIBUTION-005-phase1-youtube-success-path",
+  "latest_request": "TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance",
   "status": "passed",
   "claimed_by": "Codex self-acceptance",
-  "latest_claim": "testing/distribution/claims/TREQ-2026-03-22-DISTRIBUTION-005-phase1-youtube-success-path.claim.md",
-  "latest_report": "testing/distribution/reports/TREQ-2026-03-22-DISTRIBUTION-005-phase1-youtube-success-path.report.md",
-  "updated_at": "2026-03-21T23:42:12.000Z"
+  "latest_claim": "testing/distribution/claims/TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance.claim.md",
+  "latest_report": "testing/distribution/reports/TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance.report.md",
+  "updated_at": "2026-03-22T02:19:30.000Z"
 }

@@ -45,7 +45,7 @@ describe('distribution-queue-service', () => {
         projectId: 'alpha',
         platforms: ['x'],
         assets: { mediaUrl: 'b', textDraft: '', title: 'b', tags: [] },
-        status: 'pending',
+        status: 'queued',
         createdAt: today,
       },
     ]);
@@ -61,7 +61,7 @@ describe('distribution-queue-service', () => {
         projectId: 'alpha',
         platforms: ['youtube'],
         assets: { mediaUrl: 'a', textDraft: '', title: 'a', tags: [] },
-        status: 'pending' as const,
+        status: 'queued' as const,
         createdAt: '2026-03-20T00:00:00.000Z',
       },
       {
@@ -69,7 +69,7 @@ describe('distribution-queue-service', () => {
         projectId: 'alpha',
         platforms: ['x'],
         assets: { mediaUrl: 'b', textDraft: '', title: 'b', tags: [] },
-        status: 'failed' as const,
+        status: 'retryable' as const,
         createdAt: '2026-03-20T00:00:00.000Z',
         error: 'boom',
       },
@@ -79,7 +79,7 @@ describe('distribution-queue-service', () => {
     expect(updatedQueue).toHaveLength(1);
 
     const retriedTask = retryDistributionTask(updatedQueue, 'failed_task');
-    expect(retriedTask.status).toBe('pending');
+    expect(retriedTask.status).toBe('queued');
     expect(retriedTask.error).toBeUndefined();
   });
 });

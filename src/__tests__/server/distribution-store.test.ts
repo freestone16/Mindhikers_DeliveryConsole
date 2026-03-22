@@ -70,6 +70,7 @@ describe('distribution-store', () => {
 
     expect(queue).toHaveLength(1);
     expect(queue[0].taskId).toBe('dist_alpha');
+    expect(queue[0].status).toBe('queued');
     expect(fs.existsSync(getDistributionQueueFile('alpha'))).toBe(true);
   });
 
@@ -155,7 +156,7 @@ describe('distribution-store', () => {
       projectId: 'epsilon',
       platforms: ['youtube'],
       assets: { mediaUrl: '05_Shorts_Output/demo.mp4', textDraft: 'body', title: 'Demo', tags: [] },
-      status: 'pending',
+      status: 'queued',
       createdAt: '2026-03-20T00:00:00.000Z',
     });
 

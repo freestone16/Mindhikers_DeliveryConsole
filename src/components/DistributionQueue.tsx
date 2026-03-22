@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Trash2, Loader2, Play, Calendar, Send } from 'lucide-react';
 
 interface DistributionTask {
@@ -13,8 +13,9 @@ interface DistributionTask {
     };
     scheduleTime?: string;
     timezone?: string;
-    status: 'pending' | 'scheduled' | 'running' | 'completed' | 'failed';
+    status: 'queued' | 'scheduled' | 'processing' | 'succeeded' | 'failed' | 'retryable';
     createdAt: string;
+    updatedAt?: string;
     scheduledAt?: string;
     completedAt?: string;
     error?: string;
@@ -26,14 +27,26 @@ interface DistributionTask {
         publishedAt?: string;
         message?: string;
     }>;
+    latestEvent?: {
+        type: 'job_created' | 'job_deleted' | 'job_retried' | 'job_started' | 'job_progress' | 'job_failed' | 'job_succeeded';
+        status: DistributionTask['status'];
+        platform?: string;
+        message?: string;
+        progress?: {
+            stage: 'validating_auth' | 'uploading_media' | 'finalizing_result';
+            current?: number;
+            total?: number;
+        };
+        timestamp: string;
+    };
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-    pending: {
+    queued: {
         color: 'text-slate-400',
         bg: 'bg-slate-500/10 border-slate-500/30',
         icon: <Clock className="w-4 h-4" />,
-        label: '等待中'
+        label: '待执行'
     },
     scheduled: {
         color: 'text-blue-400',
@@ -41,13 +54,13 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.Rea
         icon: <Calendar className="w-4 h-4" />,
         label: '已定时'
     },
-    running: {
+    processing: {
         color: 'text-yellow-400',
         bg: 'bg-yellow-500/10 border-yellow-500/30',
         icon: <Loader2 className="w-4 h-4 animate-spin" />,
         label: '执行中'
     },
-    completed: {
+    succeeded: {
         color: 'text-emerald-400',
         bg: 'bg-emerald-500/10 border-emerald-500/30',
         icon: <CheckCircle className="w-4 h-4" />,
@@ -58,6 +71,12 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.Rea
         bg: 'bg-red-500/10 border-red-500/30',
         icon: <XCircle className="w-4 h-4" />,
         label: '失败'
+    },
+    retryable: {
+        color: 'text-amber-300',
+        bg: 'bg-amber-500/10 border-amber-500/30',
+        icon: <AlertCircle className="w-4 h-4" />,
+        label: '待重试'
     }
 };
 
@@ -72,18 +91,92 @@ const PLATFORM_ICONS: Record<string, string> = {
     wechat_mp: '📝'
 };
 
+interface DistributionTaskEvent {
+    type: 'job_created' | 'job_deleted' | 'job_retried' | 'job_started' | 'job_progress' | 'job_failed' | 'job_succeeded';
+    taskId: string;
+    projectId: string;
+    status: DistributionTask['status'];
+    platform?: string;
+    message?: string;
+    progress?: {
+        stage: 'validating_auth' | 'uploading_media' | 'finalizing_result';
+        current?: number;
+        total?: number;
+    };
+    result?: {
+        platform: string;
+        status: 'success' | 'failed';
+        remoteId?: string;
+        url?: string;
+        publishedAt?: string;
+        message?: string;
+    };
+    timestamp: string;
+    task?: DistributionTask;
+}
+
+const CONNECTION_STATUS = {
+    connecting: {
+        color: 'text-blue-300',
+        bg: 'bg-blue-500/10 border-blue-500/30',
+        label: '连接中'
+    },
+    live: {
+        color: 'text-emerald-300',
+        bg: 'bg-emerald-500/10 border-emerald-500/30',
+        label: '实时同步中'
+    },
+    offline: {
+        color: 'text-amber-200',
+        bg: 'bg-amber-500/10 border-amber-500/30',
+        label: '连接断开'
+    }
+} as const;
+
+function formatProgressStage(stage?: 'validating_auth' | 'uploading_media' | 'finalizing_result') {
+    switch (stage) {
+        case 'validating_auth':
+            return '校验账号';
+        case 'uploading_media':
+            return '上传媒体';
+        case 'finalizing_result':
+            return '整理结果';
+        default:
+            return '状态更新';
+    }
+}
+
+function updateTasksFromEvent(queue: DistributionTask[], event: DistributionTaskEvent) {
+    if (event.type === 'job_deleted') {
+        return queue.filter((task) => task.taskId !== event.taskId);
+    }
+
+    const incomingTask = event.task;
+
+    if (!incomingTask) {
+        return queue;
+    }
+
+    const existingIndex = queue.findIndex((task) => task.taskId === event.taskId);
+    if (existingIndex === -1) {
+        return [incomingTask, ...queue];
+    }
+
+    const nextQueue = [...queue];
+    nextQueue[existingIndex] = incomingTask;
+    return nextQueue;
+}
+
 export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
     const [tasks, setTasks] = useState<DistributionTask[]>([]);
     const [loading, setLoading] = useState(true);
-    const [todayCount, setTodayCount] = useState(0);
-    const [upcomingCount, setUpcomingCount] = useState(0);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [eventConnection, setEventConnection] = useState<'connecting' | 'live' | 'offline'>('connecting');
+    const [recentEvents, setRecentEvents] = useState<DistributionTaskEvent[]>([]);
 
     const fetchQueue = async () => {
         if (!projectId) {
             setTasks([]);
-            setTodayCount(0);
-            setUpcomingCount(0);
             setLoading(false);
             return;
         }
@@ -93,8 +186,6 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
             const data = await res.json();
             if (data.success) {
                 setTasks(data.queue || []);
-                setTodayCount(data.todayCount || 0);
-                setUpcomingCount(data.upcomingCount || 0);
             }
         } catch (e) {
             console.error('Failed to fetch queue:', e);
@@ -105,8 +196,73 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
 
     useEffect(() => {
         setLoading(true);
+        setRecentEvents([]);
         fetchQueue();
     }, [projectId]);
+
+    useEffect(() => {
+        if (!projectId) {
+            setEventConnection('offline');
+            return;
+        }
+
+        setEventConnection('connecting');
+        const params = new URLSearchParams({ projectId });
+        const source = new EventSource(`/api/distribution/events?${params.toString()}`);
+        const eventTypes: DistributionTaskEvent['type'][] = [
+            'job_created',
+            'job_deleted',
+            'job_retried',
+            'job_started',
+            'job_progress',
+            'job_failed',
+            'job_succeeded',
+        ];
+
+        const handlers = eventTypes.map((eventType) => {
+            const handler = (rawEvent: MessageEvent<string>) => {
+                try {
+                    const payload = JSON.parse(rawEvent.data) as DistributionTaskEvent;
+                    setEventConnection('live');
+                    setTasks((current) => updateTasksFromEvent(current, payload));
+                    setRecentEvents((current) => {
+                        const next = [payload, ...current.filter((item) => item.timestamp !== payload.timestamp || item.taskId !== payload.taskId)];
+                        return next.slice(0, 5);
+                    });
+                } catch (error) {
+                    console.error('Failed to parse distribution event:', error);
+                }
+            };
+
+            source.addEventListener(eventType, handler as EventListener);
+            return { eventType, handler };
+        });
+
+        source.onopen = () => {
+            setEventConnection('live');
+        };
+
+        source.onerror = () => {
+            setEventConnection('offline');
+        };
+
+        return () => {
+            handlers.forEach(({ eventType, handler }) => {
+                source.removeEventListener(eventType, handler as EventListener);
+            });
+            source.close();
+        };
+    }, [projectId]);
+
+    const todayCount = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0];
+        return tasks.filter((task) => task.createdAt.startsWith(today)).length;
+    }, [tasks]);
+
+    const upcomingCount = useMemo(
+        () => tasks.filter((task) => task.status === 'scheduled').length,
+        [tasks]
+    );
 
     const handleDelete = async (taskId: string) => {
         if (!confirm('确定要删除这个任务吗？')) return;
@@ -163,7 +319,9 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
             if (!data.success) {
                 throw new Error(data.error || '执行发布失败');
             }
-            await fetchQueue();
+            if (eventConnection !== 'live') {
+                await fetchQueue();
+            }
         } catch (e) {
             console.error('Failed to execute task:', e);
             alert(e instanceof Error ? e.message : '执行发布失败');
@@ -192,6 +350,9 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
         });
     };
 
+    const latestEvent = recentEvents[0];
+    const connectionConfig = CONNECTION_STATUS[eventConnection];
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -210,6 +371,30 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
             {!projectId && (
                 <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                     请先在顶部选择项目，再查看分发队列。
+                </div>
+            )}
+
+            {projectId && (
+                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs ${connectionConfig.bg} ${connectionConfig.color}`}>
+                            {connectionConfig.label}
+                        </span>
+                        <span className="text-sm text-slate-300">
+                            {latestEvent
+                                ? `${formatProgressStage(latestEvent.progress?.stage)} · ${latestEvent.message || latestEvent.type}`
+                                : '等待新的分发事件'}
+                        </span>
+                    </div>
+                    {recentEvents.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+                            {recentEvents.slice(0, 3).map((event) => (
+                                <span key={`${event.taskId}-${event.timestamp}`} className="rounded-full bg-slate-800 px-2.5 py-1">
+                                    {formatDate(event.timestamp)} · {event.platform || event.taskId} · {event.message || event.type}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -252,6 +437,7 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                     <div className="divide-y divide-slate-800">
                         {tasks.map((task) => {
                             const statusConfig = STATUS_CONFIG[task.status];
+                            const latestTaskEvent = task.latestEvent;
                             
                             return (
                                 <div key={task.taskId} className="p-4 hover:bg-slate-800/30 transition-colors">
@@ -296,6 +482,15 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                                                 </div>
                                             )}
 
+                                            {latestTaskEvent && (
+                                                <div className="mt-2 text-xs text-slate-300">
+                                                    <span className="text-slate-500">最近事件：</span>
+                                                    {latestTaskEvent.platform ? `${latestTaskEvent.platform} · ` : ''}
+                                                    {formatProgressStage(latestTaskEvent.progress?.stage)}
+                                                    {latestTaskEvent.message ? ` · ${latestTaskEvent.message}` : ''}
+                                                </div>
+                                            )}
+
                                             {task.results && Object.values(task.results).length > 0 && (
                                                 <div className="mt-2 space-y-1">
                                                     {Object.values(task.results).map((result) => (
@@ -331,7 +526,7 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                                         </div>
                                         
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                            {task.status === 'pending' && (
+                                            {task.status === 'queued' && (
                                                 <button
                                                     onClick={() => handleExecute(task.taskId)}
                                                     disabled={actionLoading === task.taskId}
@@ -346,7 +541,7 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                                                 </button>
                                             )}
 
-                                            {task.status === 'failed' && (
+                                            {task.status === 'retryable' && (
                                                 <button
                                                     onClick={() => handleRetry(task.taskId)}
                                                     disabled={actionLoading === task.taskId}
@@ -361,7 +556,7 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                                                 </button>
                                             )}
                                             
-                                            {(task.status === 'pending' || task.status === 'scheduled') && (
+                                            {(task.status === 'queued' || task.status === 'scheduled' || task.status === 'retryable' || task.status === 'failed') && (
                                                 <button
                                                     onClick={() => handleDelete(task.taskId)}
                                                     disabled={actionLoading === task.taskId}

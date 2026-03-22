@@ -13,6 +13,7 @@ import {
 } from './distribution-queue-service';
 import {
     appendDistributionHistory,
+    getDistributionComposerSources,
     listDistributionAssets,
     loadDistributionHistory,
     loadDistributionQueue,
@@ -20,11 +21,16 @@ import {
     saveDistributionQueue,
 } from './distribution-store';
 import {
+    broadcastDistributionEvent,
+    registerDistributionEventSubscriber,
+} from './distribution-events';
+import {
     createDistributionHistoryEntries,
     executeDistributionTask,
     getDistributionTaskOrThrow,
     markDistributionTaskFailed,
     markDistributionTaskRunning,
+    recordDistributionTaskEvent,
 } from './distribution-execution-service';
 import { buildYoutubeAuthUrl } from './youtube-oauth-service';
 
@@ -117,6 +123,15 @@ router.get('/queue', (req, res) => {
     }
 });
 
+router.get('/events', (req, res) => {
+    const projectId = req.query.projectId as string;
+    if (!projectId) {
+        return res.status(400).json({ success: false, error: 'Missing projectId parameter' });
+    }
+
+    registerDistributionEventSubscriber(projectId, res);
+});
+
 router.post('/queue/create', (req, res) => {
     try {
         const { projectId, platforms, assets, scheduleTime, timezone } = req.body;
@@ -135,8 +150,14 @@ router.post('/queue/create', (req, res) => {
         });
         
         queue.push(newTask);
+        const createdEvent = recordDistributionTaskEvent(newTask, {
+            type: 'job_created',
+            status: newTask.status,
+            message: scheduleTime ? '任务已进入定时队列' : '任务已进入待执行队列',
+        });
         saveDistributionQueue(projectId, queue);
         savePublishPackageSnapshot(projectId, newTask);
+        broadcastDistributionEvent(createdEvent);
         
         res.json({
             success: true,
@@ -156,8 +177,15 @@ router.delete('/queue/:taskId', (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing projectId parameter' });
         }
         const queue = loadDistributionQueue(projectId);
+        const task = getDistributionTaskOrThrow(queue, taskId);
+        const deletedEvent = recordDistributionTaskEvent(task, {
+            type: 'job_deleted',
+            status: task.status,
+            message: '任务已从队列移除',
+        });
         deleteDistributionTask(queue, taskId);
         saveDistributionQueue(projectId, queue);
+        broadcastDistributionEvent(deletedEvent);
         
         res.json({ success: true, message: 'Task cancelled' });
     } catch (error: any) {
@@ -180,7 +208,13 @@ router.post('/queue/:taskId/retry', (req, res) => {
         }
         const queue = loadDistributionQueue(projectId);
         const task = retryDistributionTask(queue, taskId);
+        const retriedEvent = recordDistributionTaskEvent(task, {
+            type: 'job_retried',
+            status: task.status,
+            message: '任务已重新入队，等待再次执行',
+        });
         saveDistributionQueue(projectId, queue);
+        broadcastDistributionEvent(retriedEvent);
         
         res.json({ success: true, task });
     } catch (error: any) {
@@ -209,6 +243,13 @@ router.post('/queue/:taskId/execute', async (req, res) => {
         queue = loadDistributionQueue(projectId);
         task = getDistributionTaskOrThrow(queue, taskId);
         markDistributionTaskRunning(task);
+        broadcastDistributionEvent(
+            recordDistributionTaskEvent(task, {
+                type: 'job_started',
+                status: 'processing',
+                message: '任务开始执行，正在准备发布',
+            })
+        );
         saveDistributionQueue(projectId, queue);
     } catch (error: any) {
         const statusCode =
@@ -223,10 +264,16 @@ router.post('/queue/:taskId/execute', async (req, res) => {
 
     let executionError: Error | null = null;
     try {
-        await executeDistributionTask(task);
+        await executeDistributionTask(task, {
+            onEvent: (event) => broadcastDistributionEvent(event),
+        });
     } catch (error: any) {
         executionError = error instanceof Error ? error : new Error(String(error));
-        markDistributionTaskFailed(task, executionError);
+        broadcastDistributionEvent(
+            markDistributionTaskFailed(task, executionError, {
+                retryable: true,
+            })
+        );
     }
 
     try {
@@ -263,7 +310,7 @@ router.post('/queue/:taskId/execute', async (req, res) => {
     res.json({
         success: true,
         task,
-        message: task.status === 'completed' ? 'Task executed successfully' : 'Task executed with failures',
+        message: task.status === 'succeeded' ? 'Task executed successfully' : 'Task executed with failures',
     });
 });
 
@@ -279,6 +326,25 @@ router.get('/assets', (req, res) => {
             success: true,
             videos,
             marketingFiles
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/composer-sources', (req, res) => {
+    try {
+        const projectId = (req.query.projectId || req.query.project) as string;
+        const selectedVideoPath = req.query.selectedVideoPath as string | undefined;
+        if (!projectId) {
+            return res.status(400).json({ success: false, error: 'Missing project parameter' });
+        }
+
+        res.json({
+            success: true,
+            sources: getDistributionComposerSources(projectId, {
+                selectedVideoPath,
+            }),
         });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });

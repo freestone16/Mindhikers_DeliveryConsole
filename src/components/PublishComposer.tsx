@@ -22,6 +22,18 @@ interface PlatformConfig {
     customTags?: string;
 }
 
+interface ComposerSources {
+    suggestedTitle: string;
+    suggestedBody: string;
+    suggestedTags: string[];
+    sourceFiles: Array<{
+        name: string;
+        path: string;
+        category: 'marketing' | 'script' | 'video';
+    }>;
+    warnings: string[];
+}
+
 interface PublishComposerProps {
     projectId?: string;
 }
@@ -50,16 +62,37 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     const [timezone, setTimezone] = useState('Asia/Shanghai');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [magicFillLoading, setMagicFillLoading] = useState(false);
+    const [composerSources, setComposerSources] = useState<ComposerSources | null>(null);
     const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
 
     useEffect(() => {
         if (!propProjectId) {
             setVideos([]);
             setMarketingFiles([]);
+            setComposerSources(null);
             return;
         }
         fetchAssets();
     }, [propProjectId]);
+
+    useEffect(() => {
+        setPlatforms((current) => current.map((platform) => {
+            if (!selectedVideo || !platform.aspectRatio) {
+                return platform;
+            }
+
+            const isCompatible = platform.aspectRatio === selectedVideo.type;
+            if (isCompatible) {
+                return platform;
+            }
+
+            return {
+                ...platform,
+                enabled: false,
+            };
+        }));
+    }, [selectedVideo]);
 
     const fetchAssets = async () => {
         if (!propProjectId) {
@@ -86,35 +119,48 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             alert('请先选择项目');
             return;
         }
-        if (marketingFiles.length === 0) {
-            alert('请先运行 Marketing Master 生成营销方案');
-            return;
-        }
 
+        setMagicFillLoading(true);
         try {
-            const projectDir = propProjectId;
-            const res = await fetch(`/api/files?dir=/data/projects/${projectDir}/05_Marketing`);
-            const data = await res.json();
+            const params = new URLSearchParams({ projectId: propProjectId });
+            if (selectedVideo?.path) {
+                params.set('selectedVideoPath', selectedVideo.path);
+            }
 
-            const planFile = data.files?.find((f: any) => f.name === 'marketing_plan.json');
-            if (planFile) {
-                setTitle('AI 如何重构工作方式 (#Short)');
-                setContent('今天聊聊底层逻辑...');
-                setTags('#AI #MindHikers #科技创新 #个人成长');
-            } else {
-                setTitle('AI 如何重构工作方式 (#Short)');
-                setContent('今天聊聊底层逻辑...');
-                setTags('#AI #MindHikers #科技创新 #个人成长');
+            const res = await fetch(`/api/distribution/composer-sources?${params.toString()}`);
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Magic Fill 失败');
+            }
+
+            const sources = data.sources as ComposerSources;
+            setComposerSources(sources);
+            if (sources.suggestedTitle) {
+                setTitle(sources.suggestedTitle);
+            }
+            if (sources.suggestedBody) {
+                setContent(sources.suggestedBody);
+            }
+            if (sources.suggestedTags.length > 0) {
+                setTags(sources.suggestedTags.join(', '));
             }
         } catch (e) {
             console.error('Failed to fill from marketing:', e);
+            alert(e instanceof Error ? e.message : 'Magic Fill 失败');
+        } finally {
+            setMagicFillLoading(false);
         }
     };
 
     const togglePlatform = (platformId: string) => {
-        setPlatforms(prev => prev.map(p =>
-            p.id === platformId ? { ...p, enabled: !p.enabled } : p
-        ));
+        setPlatforms(prev => prev.map((platform) => {
+            const isCompatible = !selectedVideo || !platform.aspectRatio || platform.aspectRatio === selectedVideo.type;
+            if (platform.id !== platformId || !isCompatible) {
+                return platform;
+            }
+
+            return { ...platform, enabled: !platform.enabled };
+        }));
     };
 
     const handlePlatformSetting = (platformId: string, field: 'customTitle' | 'customTags', value: string) => {
@@ -144,6 +190,25 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
         setSubmitResult(null);
 
         try {
+            const platformOverrides = platforms.reduce<Record<string, { title?: string; tags?: string[] }>>((acc, platform) => {
+                if (!platform.enabled) {
+                    return acc;
+                }
+
+                const nextEntry: { title?: string; tags?: string[] } = {};
+                if (platform.customTitle?.trim()) {
+                    nextEntry.title = platform.customTitle.trim();
+                }
+                if (platform.customTags?.trim()) {
+                    nextEntry.tags = platform.customTags.split(',').map((item) => item.trim()).filter(Boolean);
+                }
+
+                if (nextEntry.title || nextEntry.tags?.length) {
+                    acc[platform.id] = nextEntry;
+                }
+                return acc;
+            }, {});
+
             const res = await fetch('/api/distribution/queue/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -155,6 +220,8 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                         title: title || selectedVideo.name,
                         textDraft: content,
                         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+                        sourceFiles: composerSources?.sourceFiles.map((source) => source.path) || [],
+                        platformOverrides,
                         visibility: 'private'
                     },
                     scheduleTime: isScheduleMode ? scheduleTime : null,
@@ -177,6 +244,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                     setTags('');
                     setPlatforms(AVAILABLE_PLATFORMS);
                     setIsScheduleMode(false);
+                    setComposerSources(null);
                     setSubmitResult(null);
                 }, 2000);
             } else {
@@ -258,11 +326,36 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
 
                             <button
                                 onClick={handleMagicFill}
+                                disabled={magicFillLoading || !propProjectId}
                                 className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm font-medium rounded-lg transition-all"
                             >
-                                <Sparkles className="w-4 h-4" />
-                                从 Marketing Master 自动装填
+                                {magicFillLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Sparkles className="w-4 h-4" />
+                                )}
+                                从真实产物自动装填
                             </button>
+
+                            {composerSources && (
+                                <div className="mb-4 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
+                                    <div className="text-xs text-slate-300">
+                                        来源：
+                                        <span className="ml-1 text-slate-400">
+                                            {composerSources.sourceFiles.map((source) => source.name).join(' · ') || '未命中'}
+                                        </span>
+                                    </div>
+                                    {composerSources.warnings.length > 0 && (
+                                        <div className="mt-2 space-y-1">
+                                            {composerSources.warnings.map((warning) => (
+                                                <div key={warning} className="text-xs text-amber-300">
+                                                    {warning}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <div>
@@ -311,11 +404,20 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
 
                             <div className="space-y-2 mb-4">
                                 {platforms.map((platform) => (
+                                    (() => {
+                                        const isCompatible =
+                                            !selectedVideo ||
+                                            !platform.aspectRatio ||
+                                            platform.aspectRatio === selectedVideo.type;
+
+                                        return (
                                     <div
                                         key={platform.id}
                                         className={`p-3 rounded-lg border transition-all ${platform.enabled
                                                 ? 'bg-blue-600/10 border-blue-500/30'
-                                                : 'bg-slate-800/30 border-slate-700'
+                                                : !isCompatible
+                                                    ? 'bg-slate-900/60 border-slate-800 opacity-50'
+                                                    : 'bg-slate-800/30 border-slate-700'
                                             }`}
                                     >
                                         <div className="flex items-center justify-between">
@@ -324,6 +426,7 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                                     type="checkbox"
                                                     checked={platform.enabled}
                                                     onChange={() => togglePlatform(platform.id)}
+                                                    disabled={!isCompatible}
                                                     className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500"
                                                 />
                                                 <span className="text-sm text-slate-200">
@@ -331,9 +434,9 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                                 </span>
                                             </label>
 
-                                            {platform.enabled && platform.aspectRatio && (
+                                            {platform.aspectRatio && (
                                                 <span className="text-xs text-slate-500">
-                                                    {platform.aspectRatio}
+                                                    {!isCompatible && selectedVideo ? `仅 ${platform.aspectRatio}` : platform.aspectRatio}
                                                 </span>
                                             )}
                                         </div>
@@ -357,6 +460,8 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                             </div>
                                         )}
                                     </div>
+                                        );
+                                    })()
                                 ))}
                             </div>
 

@@ -11,7 +11,7 @@ export function createDistributionTask(input: {
 
   let systemDelayMs: number | undefined;
   let scheduledAt: string | undefined;
-  let status: DistributionTask['status'] = 'pending';
+  let status: DistributionTask['status'] = 'queued';
 
   if (input.scheduleTime) {
     systemDelayMs = Math.floor(Math.random() * (10 - 3) + 3) * 60 * 1000;
@@ -48,7 +48,7 @@ export function deleteDistributionTask(queue: DistributionTask[], taskId: string
     throw new Error('Task not found');
   }
 
-  if (queue[taskIndex].status === 'running') {
+  if (queue[taskIndex].status === 'processing') {
     throw new Error('Cannot cancel running task');
   }
 
@@ -62,16 +62,17 @@ export function retryDistributionTask(queue: DistributionTask[], taskId: string)
     throw new Error('Task not found');
   }
 
-  if (task.status !== 'failed') {
+  if (task.status !== 'retryable' && task.status !== 'failed') {
     throw new Error('Only failed tasks can be retried');
   }
 
-  task.status = 'pending';
+  task.status = 'queued';
   task.error = undefined;
   task.results = undefined;
   task.createdAt = new Date().toISOString();
   task.updatedAt = new Date().toISOString();
   task.completedAt = undefined;
+  task.latestEvent = undefined;
 
   return task;
 }

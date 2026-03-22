@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AuthData, PlatformAccount } from './distribution-types';
+import type { AuthData, PlatformAccount, PlatformAuthStatus } from './distribution-types';
 import { getYoutubeTokenStatus } from './youtube-oauth-service';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -126,6 +126,37 @@ export function refreshPlatformAuth(platform: string) {
   saveAuthData(authData);
 
   return authData.accounts[match.index];
+}
+
+export function getPlatformAccount(platform: string): PlatformAccount | null {
+  const authData = ensureAuthFile();
+  const match = findAccount(authData, platform);
+  if (!match) {
+    return null;
+  }
+
+  if (platform === 'youtube' || platform === 'youtube_shorts') {
+    const youtubeState = getYoutubeTokenStatus();
+    return {
+      ...match.account,
+      status: youtubeState.authenticated ? 'connected' : 'expired',
+    };
+  }
+
+  return match.account;
+}
+
+export function requirePlatformAuth(platform: string, allowedStatuses: PlatformAuthStatus[]) {
+  const account = getPlatformAccount(platform);
+  if (!account) {
+    throw new Error(`Platform not found: ${platform}`);
+  }
+
+  if (!allowedStatuses.includes(account.status)) {
+    throw new Error(`Platform auth not ready for ${platform}: ${account.status}`);
+  }
+
+  return account;
 }
 
 export function revokePlatformAuth(platform: string) {

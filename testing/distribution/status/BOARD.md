@@ -2,12 +2,12 @@
 
 ## 当前状态
 
-- latest_request: `TREQ-2026-03-20-DISTRIBUTION-004-phase1-self-acceptance-rerun`
+- latest_request: `TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance`
 - latest_status: `passed`
 - claimed_by: `Codex self-acceptance`
-- latest_claim: `testing/distribution/claims/TREQ-2026-03-20-DISTRIBUTION-004-phase1-self-acceptance-rerun.claim.md`
-- latest_report: `testing/distribution/reports/TREQ-2026-03-20-DISTRIBUTION-004-phase1-self-acceptance-rerun.report.md`
-- updated_at: `2026-03-20T11:26:45.000Z`
+- latest_claim: `testing/distribution/claims/TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance.claim.md`
+- latest_report: `testing/distribution/reports/TREQ-2026-03-22-DISTRIBUTION-011-x-wechat-phase1-acceptance.report.md`
+- updated_at: `2026-03-22T10:19:30+08:00`
 
 ## 状态说明
 
