@@ -7,14 +7,66 @@ const __dirname = path.dirname(__filename);
 
 const SECRETS_DIR = path.resolve(__dirname, '../secrets');
 const CLIENT_SECRET_FILE = path.join(SECRETS_DIR, 'client_id.json');
+const YOUTUBE_TOKEN_FILE = path.resolve(__dirname, '../../.mindhikers/youtube-oauth.json');
 const YOUTUBE_UPLOAD_SCOPE = 'https://www.googleapis.com/auth/youtube.upload';
 
 let activeAccessToken: string | null = null;
 let tokenExpiry = 0;
+let persistedTokenLoaded = false;
 
 interface GoogleClientConfig {
   client_id: string;
   client_secret: string;
+}
+
+interface PersistedYoutubeToken {
+  accessToken: string;
+  tokenExpiry: number;
+  lastUpdated: string;
+}
+
+function ensureYoutubeTokenDir() {
+  const dir = path.dirname(YOUTUBE_TOKEN_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function loadPersistedYoutubeToken() {
+  if (persistedTokenLoaded) {
+    return;
+  }
+
+  persistedTokenLoaded = true;
+  if (!fs.existsSync(YOUTUBE_TOKEN_FILE)) {
+    return;
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(YOUTUBE_TOKEN_FILE, 'utf-8')) as PersistedYoutubeToken;
+    if (!data.accessToken || typeof data.tokenExpiry !== 'number') {
+      return;
+    }
+
+    activeAccessToken = data.accessToken;
+    tokenExpiry = data.tokenExpiry;
+  } catch (error) {
+    console.warn('Failed to load persisted YouTube OAuth token:', error);
+  }
+}
+
+function persistYoutubeToken() {
+  if (!activeAccessToken || !tokenExpiry) {
+    return;
+  }
+
+  ensureYoutubeTokenDir();
+  const payload: PersistedYoutubeToken = {
+    accessToken: activeAccessToken,
+    tokenExpiry,
+    lastUpdated: new Date().toISOString(),
+  };
+  fs.writeFileSync(YOUTUBE_TOKEN_FILE, JSON.stringify(payload, null, 2));
 }
 
 export function getYoutubeAuthPort() {
@@ -41,11 +93,12 @@ export function getYoutubeRedirectUri(authPort = getYoutubeAuthPort()) {
 
 export function buildYoutubeAuthUrl(authPort = getYoutubeAuthPort()) {
   const config = getGoogleConfig();
+  const redirectUri = getYoutubeRedirectUri(authPort);
 
   return (
     'https://accounts.google.com/o/oauth2/v2/auth?' +
     `client_id=${config.client_id}&` +
-    `redirect_uri=${encodeURIComponent(getYoutubeRedirectUri(authPort))}&` +
+    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     'response_type=code&' +
     `scope=${encodeURIComponent(YOUTUBE_UPLOAD_SCOPE)}&` +
     'access_type=online&' +
@@ -55,11 +108,12 @@ export function buildYoutubeAuthUrl(authPort = getYoutubeAuthPort()) {
 
 export async function exchangeYoutubeCode(code: string, authPort = getYoutubeAuthPort()) {
   const config = getGoogleConfig();
+  const redirectUri = getYoutubeRedirectUri(authPort);
   const params = new URLSearchParams();
   params.append('code', code);
   params.append('client_id', config.client_id);
   params.append('client_secret', config.client_secret);
-  params.append('redirect_uri', getYoutubeRedirectUri(authPort));
+  params.append('redirect_uri', redirectUri);
   params.append('grant_type', 'authorization_code');
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -75,11 +129,13 @@ export async function exchangeYoutubeCode(code: string, authPort = getYoutubeAut
   const data: any = await response.json();
   activeAccessToken = data.access_token;
   tokenExpiry = Date.now() + data.expires_in * 1000;
+  persistYoutubeToken();
 
   return data;
 }
 
 export function getYoutubeTokenStatus() {
+  loadPersistedYoutubeToken();
   const authenticated = Boolean(activeAccessToken) && Date.now() < tokenExpiry;
 
   return {
@@ -89,6 +145,7 @@ export function getYoutubeTokenStatus() {
 }
 
 export function requireYoutubeAccessToken() {
+  loadPersistedYoutubeToken();
   const { authenticated } = getYoutubeTokenStatus();
   if (!authenticated || !activeAccessToken) {
     throw new Error('No active access token. Please authorize again.');
@@ -100,4 +157,8 @@ export function requireYoutubeAccessToken() {
 export function clearYoutubeAccessToken() {
   activeAccessToken = null;
   tokenExpiry = 0;
+  persistedTokenLoaded = true;
+  if (fs.existsSync(YOUTUBE_TOKEN_FILE)) {
+    fs.unlinkSync(YOUTUBE_TOKEN_FILE);
+  }
 }

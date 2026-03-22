@@ -6,13 +6,22 @@ import type {
 } from './distribution-types';
 
 function buildFailureResult(platform: string, error: unknown): DistributionPlatformResult {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorMessage(error);
 
   return {
     platform,
     status: 'failed',
     message,
   };
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildHistoryId(task: DistributionTask, result: DistributionPlatformResult, completedAt: string) {
+  const safeCompletedAt = completedAt.replace(/[^0-9A-Za-z]/g, '');
+  return `hist_${task.taskId}_${result.platform}_${safeCompletedAt}`;
 }
 
 export function getDistributionTaskOrThrow(queue: DistributionTask[], taskId: string) {
@@ -36,6 +45,15 @@ export function markDistributionTaskRunning(task: DistributionTask) {
   task.status = 'running';
   task.error = undefined;
   task.updatedAt = new Date().toISOString();
+}
+
+export function markDistributionTaskFailed(task: DistributionTask, error: unknown) {
+  const completedAt = new Date().toISOString();
+
+  task.status = 'failed';
+  task.updatedAt = completedAt;
+  task.completedAt = completedAt;
+  task.error = getErrorMessage(error);
 }
 
 export async function executeDistributionTask(task: DistributionTask) {
@@ -76,7 +94,7 @@ export function createDistributionHistoryEntries(task: DistributionTask): Distri
   const results = Object.values(task.results || {});
 
   return results.map((result) => ({
-    historyId: `hist_${task.taskId}_${result.platform}`,
+    historyId: buildHistoryId(task, result, completedAt),
     taskId: task.taskId,
     projectId: task.projectId,
     platform: result.platform,
@@ -85,8 +103,10 @@ export function createDistributionHistoryEntries(task: DistributionTask): Distri
     status: result.status,
     createdAt: task.createdAt,
     completedAt,
+    publishedAt: result.publishedAt,
     remoteId: result.remoteId,
     url: result.url,
+    message: result.message,
     error: result.status === 'failed' ? result.message : undefined,
   }));
 }

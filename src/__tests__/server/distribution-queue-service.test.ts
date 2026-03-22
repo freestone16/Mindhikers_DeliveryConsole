@@ -16,6 +16,7 @@ describe('distribution-queue-service', () => {
         textDraft: 'body',
         title: 'Demo',
         tags: ['ai'],
+        visibility: 'private',
       },
       scheduleTime: '2026-03-21T09:00:00.000Z',
     });
@@ -25,6 +26,7 @@ describe('distribution-queue-service', () => {
     expect(task.systemDelayMs).toBeGreaterThanOrEqual(3 * 60 * 1000);
     expect(task.systemDelayMs).toBeLessThanOrEqual(9 * 60 * 1000);
     expect(task.scheduledAt).toBe('2026-03-21T09:00:00.000Z');
+    expect(task.assets.visibility).toBe('private');
   });
 
   it('summarizes today and upcoming counts from a queue', () => {

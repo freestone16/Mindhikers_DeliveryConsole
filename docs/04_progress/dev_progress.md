@@ -1,6 +1,6 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-16 CST
+> **更新日期**: 2026-03-22 CST
 
 ---
 
@@ -36,6 +36,7 @@
 | v4.2.1 | 2026-03-16 | **“协调opencode测试”语义纠偏** - 根据用户纠正，将该口令收紧为“只做环境 ready，不自动开跑”；代理完成 testing 文档读取与队列接管后，必须等待用户明确说明下一步计划 |
 | v4.2.2 | 2026-03-16 | **Director 冷启动项目态恢复修复** - 修复页面刷新后新 socket 未自动恢复 active project，导致右上角文稿下拉空白、Phase2 测试未开始的问题；统一复用 socket 项目态 hydrate 逻辑，并以 Agent Browser 完成真实页面验证 |
 | v4.2.3 | 2026-03-16 | **MIN-89 测试治理父任务补强** - 将 `Director 协调测试与验收治理` 从简短条目扩成真正的父 issue：补齐仓库文档索引、用途、当前状态、边界、验收目标，并挂载配套 Linear 文档与子 issue，便于后续 handoff 和跨模块复用 |
+| v4.2.4 | 2026-03-22 | **Distribution MIN-101 收口** - 跑通真实 YouTube success-path；修复成功结果回写、OAuth token 热重载丢失、默认公开视频风险，并以 `TREQ-2026-03-22-DISTRIBUTION-005` 完成黄金验收 |
 
 ---
 
@@ -64,7 +65,7 @@
 - [x] Shorts 完整状态机（draft → published）
 - [x] Link Video: 本地文件浏览器选择 .mp4
 - [x] Schedule: 日期/时间设定 + Marketing 数据一键导入
-- [x] YouTube OAuth 流程（零持久化 Token）
+- [x] YouTube OAuth 流程（现已支持本地 token 落盘保活）
 - [x] YouTube Upload API 对接
 - [x] 端口动态化（.env PORT 配置，OAuth redirect 跟随）
 

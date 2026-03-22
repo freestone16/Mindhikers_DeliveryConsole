@@ -10,6 +10,7 @@ import {
     getYoutubeTokenStatus,
     requireYoutubeAccessToken,
 } from './youtube-oauth-service';
+import { markPlatformsConnected } from './distribution-auth-service';
 import { google } from 'googleapis';
 
 // ESM compatibility
@@ -53,6 +54,7 @@ router.get('/auth/callback', async (req, res) => {
 
     try {
         await exchangeYoutubeCode(code);
+        markPlatformsConnected(['youtube', 'youtube_shorts']);
         console.log('✅ OAuth Success! Access Token received (in-memory only).');
 
         // Simple success page

@@ -29,6 +29,7 @@ export async function publishToYoutube(
   const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
   const publishAt = task.scheduleTime ? new Date(task.scheduleTime).toISOString() : undefined;
   const isShorts = platform === 'youtube_shorts';
+  const visibility = task.assets.visibility || 'private';
 
   const response = await youtube.videos.insert({
     part: ['snippet', 'status'],
@@ -40,7 +41,7 @@ export async function publishToYoutube(
         categoryId: '27',
       },
       status: {
-        privacyStatus: publishAt ? 'private' : 'public',
+        privacyStatus: publishAt ? 'private' : visibility,
         publishAt,
         selfDeclaredMadeForKids: false,
         containsSyntheticMedia: false,
@@ -62,6 +63,8 @@ export async function publishToYoutube(
     remoteId: videoId,
     url: buildYoutubeUrl(videoId, platform),
     publishedAt: new Date().toISOString(),
-    message: isShorts ? 'YouTube Shorts upload completed.' : 'YouTube upload completed.',
+    message: isShorts
+      ? `YouTube Shorts upload completed (${publishAt ? 'scheduled private' : visibility}).`
+      : `YouTube upload completed (${publishAt ? 'scheduled private' : visibility}).`,
   };
 }

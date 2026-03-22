@@ -154,7 +154,8 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                         mediaUrl: selectedVideo.path,
                         title: title || selectedVideo.name,
                         textDraft: content,
-                        tags: tags.split(',').map(t => t.trim()).filter(Boolean)
+                        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+                        visibility: 'private'
                     },
                     scheduleTime: isScheduleMode ? scheduleTime : null,
                     timezone: isScheduleMode ? timezone : null

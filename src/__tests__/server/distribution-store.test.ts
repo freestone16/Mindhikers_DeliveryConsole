@@ -137,14 +137,18 @@ describe('distribution-store', () => {
         status: 'success',
         createdAt: '2026-03-20T00:00:00.000Z',
         completedAt: '2026-03-20T00:01:00.000Z',
+        publishedAt: '2026-03-20T00:00:55.000Z',
         remoteId: 'abc123',
         url: 'https://youtube.com/watch?v=abc123',
+        message: 'uploaded',
       },
     ]);
 
     const history = loadDistributionHistory('epsilon');
     expect(history).toHaveLength(1);
     expect(history[0].remoteId).toBe('abc123');
+    expect(history[0].publishedAt).toBe('2026-03-20T00:00:55.000Z');
+    expect(history[0].message).toBe('uploaded');
 
     const snapshotPath = savePublishPackageSnapshot('epsilon', {
       taskId: 'dist_1',

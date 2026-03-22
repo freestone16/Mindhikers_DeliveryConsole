@@ -305,6 +305,12 @@ export const DistributionQueue = ({ projectId }: { projectId?: string }) => {
                                                             </span>
                                                             {' · '}
                                                             {result.message || (result.status === 'success' ? '发布成功' : '发布失败')}
+                                                            {result.publishedAt && (
+                                                                <>
+                                                                    {' · '}
+                                                                    发布于 {formatDate(result.publishedAt)}
+                                                                </>
+                                                            )}
                                                             {result.url && (
                                                                 <>
                                                                     {' · '}

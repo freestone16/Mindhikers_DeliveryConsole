@@ -27,6 +27,7 @@ export interface DistributionTaskAssets {
   textDraft: string;
   title: string;
   tags: string[];
+  visibility?: 'private' | 'unlisted' | 'public';
 }
 
 export interface DistributionPlatformResult {
@@ -65,8 +66,10 @@ export interface DistributionHistoryEntry {
   status: DistributionResultStatus;
   createdAt: string;
   completedAt: string;
+  publishedAt?: string;
   remoteId?: string;
   url?: string;
+  message?: string;
   error?: string;
 }
 

@@ -23,8 +23,10 @@ import {
     createDistributionHistoryEntries,
     executeDistributionTask,
     getDistributionTaskOrThrow,
+    markDistributionTaskFailed,
     markDistributionTaskRunning,
 } from './distribution-execution-service';
+import { buildYoutubeAuthUrl } from './youtube-oauth-service';
 
 const router = Router();
 
@@ -45,6 +47,24 @@ router.get('/auth/status', (req, res) => {
             lastChecked: groupedAccounts.lastChecked
         });
     } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/auth/url', (req, res) => {
+    try {
+        const platform = (req.query.platform as string) || 'youtube';
+        if (platform !== 'youtube' && platform !== 'youtube_shorts') {
+            return res.status(400).json({ success: false, error: `Interactive auth is not supported for platform: ${platform}` });
+        }
+
+        res.json({
+            success: true,
+            platform,
+            authUrl: buildYoutubeAuthUrl(),
+        });
+    } catch (error: any) {
+        console.error('Distribution auth url error:', error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -182,51 +202,69 @@ router.post('/queue/:taskId/execute', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Missing projectId parameter' });
     }
 
-    try {
-        const queue = loadDistributionQueue(projectId);
-        const task = getDistributionTaskOrThrow(queue, taskId);
+    let queue;
+    let task;
 
+    try {
+        queue = loadDistributionQueue(projectId);
+        task = getDistributionTaskOrThrow(queue, taskId);
         markDistributionTaskRunning(task);
         saveDistributionQueue(projectId, queue);
-
-        await executeDistributionTask(task);
-        saveDistributionQueue(projectId, queue);
-        savePublishPackageSnapshot(projectId, task);
-        appendDistributionHistory(projectId, createDistributionHistoryEntries(task));
-
-        res.json({
-            success: true,
-            task,
-            message: task.status === 'completed' ? 'Task executed successfully' : 'Task executed with failures',
-        });
     } catch (error: any) {
-        try {
-            const queue = loadDistributionQueue(projectId);
-            const task = queue.find((item) => item.taskId === taskId);
-            if (task) {
-                task.status = 'failed';
-                task.updatedAt = new Date().toISOString();
-                task.completedAt = task.updatedAt;
-                task.error = error.message;
-                saveDistributionQueue(projectId, queue);
-                savePublishPackageSnapshot(projectId, task);
-                appendDistributionHistory(projectId, createDistributionHistoryEntries(task));
-            }
-        } catch (persistError) {
-            console.error('Failed to persist distribution execution error:', persistError);
-        }
-
         const statusCode =
             error.message === 'Task not found'
                 ? 404
                 : error.message === 'Task is already running' || error.message === 'Completed tasks cannot be executed again'
                   ? 400
-                  : error.message === 'No active access token. Please authorize again.'
-                    ? 401
-                    : 500;
+                  : 500;
 
-        res.status(statusCode).json({ success: false, error: error.message });
+        return res.status(statusCode).json({ success: false, error: error.message });
     }
+
+    let executionError: Error | null = null;
+    try {
+        await executeDistributionTask(task);
+    } catch (error: any) {
+        executionError = error instanceof Error ? error : new Error(String(error));
+        markDistributionTaskFailed(task, executionError);
+    }
+
+    try {
+        saveDistributionQueue(projectId, queue);
+        savePublishPackageSnapshot(projectId, task);
+
+        if (task.results && Object.keys(task.results).length > 0) {
+            appendDistributionHistory(projectId, createDistributionHistoryEntries(task));
+        }
+    } catch (persistError: any) {
+        console.error('Failed to persist distribution execution result:', persistError);
+
+        const detail = persistError instanceof Error ? persistError.message : String(persistError);
+        const prefix = executionError
+            ? 'Task execution failed and the failure result could not be fully persisted'
+            : 'Task execution finished, but the final result could not be fully persisted';
+
+        return res.status(500).json({
+            success: false,
+            error: `${prefix}: ${detail}`,
+            task,
+        });
+    }
+
+    if (executionError) {
+        const statusCode =
+            executionError.message === 'No active access token. Please authorize again.'
+                ? 401
+                : 500;
+
+        return res.status(statusCode).json({ success: false, error: executionError.message, task });
+    }
+
+    res.json({
+        success: true,
+        task,
+        message: task.status === 'completed' ? 'Task executed successfully' : 'Task executed with failures',
+    });
 });
 
 router.get('/assets', (req, res) => {

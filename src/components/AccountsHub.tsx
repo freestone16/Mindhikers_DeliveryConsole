@@ -98,9 +98,60 @@ export const AccountsHub = () => {
         fetchAuthStatus();
     }, []);
 
+    const handleYoutubeAuth = async (platform: string) => {
+        const res = await fetch(`/api/distribution/auth/url?platform=${encodeURIComponent(platform)}`);
+        const data = await res.json();
+
+        if (!data.success || !data.authUrl) {
+            throw new Error(data.error || 'Failed to get YouTube auth URL');
+        }
+
+        const popup = window.open(data.authUrl, 'youtube-oauth', 'width=640,height=760');
+        if (!popup) {
+            throw new Error('OAuth popup was blocked. Please allow popups and try again.');
+        }
+
+        await new Promise<void>((resolve, reject) => {
+            const timeout = window.setTimeout(() => {
+                cleanup();
+                reject(new Error('Timed out waiting for YouTube authorization.'));
+            }, 120000);
+
+            const popupCheck = window.setInterval(() => {
+                if (popup.closed) {
+                    cleanup();
+                    reject(new Error('Authorization window was closed before completion.'));
+                }
+            }, 500);
+
+            const handleMessage = (event: MessageEvent) => {
+                if (event.data?.type !== 'youtube-auth-success') {
+                    return;
+                }
+
+                cleanup();
+                resolve();
+            };
+
+            const cleanup = () => {
+                window.clearTimeout(timeout);
+                window.clearInterval(popupCheck);
+                window.removeEventListener('message', handleMessage);
+            };
+
+            window.addEventListener('message', handleMessage);
+        });
+    };
+
     const handleRefresh = async (platform: string) => {
         setRefreshing(platform);
         try {
+            if (platform === 'youtube' || platform === 'youtube_shorts') {
+                await handleYoutubeAuth(platform);
+                await fetchAuthStatus();
+                return;
+            }
+
             const res = await fetch('/api/distribution/auth/refresh', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -112,6 +163,7 @@ export const AccountsHub = () => {
             }
         } catch (e) {
             console.error('Failed to refresh:', e);
+            alert(e instanceof Error ? e.message : '授权刷新失败');
         } finally {
             setRefreshing(null);
         }

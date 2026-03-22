@@ -50,6 +50,24 @@ function saveAuthData(authData: AuthData) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(authData, null, 2));
 }
 
+export function markPlatformsConnected(platforms: string[]) {
+  const authData = ensureAuthFile();
+  const now = new Date().toISOString();
+
+  for (const platform of platforms) {
+    const match = findAccount(authData, platform);
+    if (!match) {
+      continue;
+    }
+
+    authData.accounts[match.index].status = 'connected';
+    authData.accounts[match.index].lastAuth = now;
+  }
+
+  authData.lastChecked = now;
+  saveAuthData(authData);
+}
+
 function findAccount(authData: AuthData, platform: string): { account: PlatformAccount; index: number } | null {
   const index = authData.accounts.findIndex((account) => account.platform === platform);
   if (index === -1) {
