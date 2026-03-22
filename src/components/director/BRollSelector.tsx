@@ -5,6 +5,8 @@ interface BRollSelectorProps {
   selected: BRollType[];
   onChange: (selected: BRollType[]) => void;
   disabled?: boolean;
+  /** Restrict which types to show (default: all 6) */
+  types?: BRollType[];
 }
 
 const BROLL_OPTIONS: { type: BRollType; label: string; icon: typeof Code; description: string }[] = [
@@ -16,7 +18,11 @@ const BROLL_OPTIONS: { type: BRollType; label: string; icon: typeof Code; descri
   { type: 'infographic', label: 'F. 信息图', icon: BarChart3, description: '结构化逻辑图示' },
 ];
 
-export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorProps) => {
+export const BRollSelector = ({ selected, onChange, disabled, types }: BRollSelectorProps) => {
+  const visibleOptions = types
+    ? BROLL_OPTIONS.filter(o => types.includes(o.type))
+    : BROLL_OPTIONS;
+
   const toggleOption = (type: BRollType) => {
     if (disabled) return;
     if (selected.includes(type)) {
@@ -28,7 +34,7 @@ export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorPro
 
   return (
     <div className="flex gap-3">
-      {BROLL_OPTIONS.map(({ type, label, icon: Icon, description }) => {
+      {visibleOptions.map(({ type, label, icon: Icon, description }) => {
         const isSelected = selected.includes(type);
         return (
           <button

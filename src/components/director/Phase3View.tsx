@@ -1,10 +1,43 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Play, Pause, Maximize2, X, Loader2, CheckCircle, AlertCircle,
+  Play, Maximize2, X, Loader2, CheckCircle, AlertCircle, Check,
   RefreshCw, MessageSquare, Sparkles, Video, ChevronDown, ChevronUp
 } from 'lucide-react';
-import type { DirectorChapter, SceneOption } from '../../types';
+import { BRollSelector } from './BRollSelector';
+import type { DirectorChapter, SceneOption, BRollType } from '../../types';
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const RENDERABLE_TYPES: BRollType[] = ['remotion', 'seedance', 'generative', 'infographic'];
+
+const TYPE_COLORS: Record<string, string> = {
+  remotion: 'bg-blue-500/20 text-blue-300',
+  seedance: 'bg-purple-500/20 text-purple-300',
+  generative: 'bg-purple-500/20 text-purple-300',
+  infographic: 'bg-amber-500/20 text-amber-300',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  remotion: 'Remotion动画',
+  seedance: '文生视频',
+  generative: 'AI生成',
+  infographic: '📊 信息图',
+};
+
+function getScriptPreview(text: string): string {
+  const sentences = text.split(/[。！？\n]/).filter(s => s.trim());
+  if (sentences.length >= 2) {
+    return sentences.slice(0, 2).join('。') + '。';
+  }
+  return text.slice(0, 150) + (text.length > 150 ? '...' : '');
+}
+
+/** Strip redundant "第X章" prefix from chapter names at render time */
+const cleanChapterName = (name: string) =>
+  name.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface VideoTaskStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -14,23 +47,24 @@ interface VideoTaskStatus {
   retryCount?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// VideoCard: individual option row with video player + feedback chatbox
-// ─────────────────────────────────────────────────────────────────────────────
-interface VideoCardProps {
-  projectId: string;
-  chapterId: string;
+// ─── Phase3OptionRow ─────────────────────────────────────────────────────────
+// Mirrors Phase2's OptionRow layout (12-col grid), but col-4 = video player
+
+interface Phase3OptionRowProps {
+  chapter: DirectorChapter;
   option: SceneOption;
+  index: number;
+  projectId: string;
   isPendingTask: boolean;
-  onApprove: (optionId: string, approved: boolean) => void;
-  onUpdateOption: (optionId: string, updates: Partial<SceneOption>) => void;
-  onRetry: (optionId: string) => void;
+  onApprove: (chapterId: string, optionId: string) => void;
+  onUpdateOption: (chapterId: string, optionId: string, updates: Partial<SceneOption>) => void;
+  onRetry: (chapterId: string, option: SceneOption) => void;
 }
 
-const VideoCard = ({
-  projectId, chapterId, option, isPendingTask,
+const Phase3OptionRow = ({
+  chapter, option, index, projectId, isPendingTask,
   onApprove, onUpdateOption, onRetry
-}: VideoCardProps) => {
+}: Phase3OptionRowProps) => {
   const [taskStatus, setTaskStatus] = useState<VideoTaskStatus | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
@@ -41,8 +75,11 @@ const VideoCard = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const taskKey = `${chapterId}-${option.id}`;
+  const rowId = `${chapter.chapterIndex + 1}-${index + 1}`;
+  const quoteText = option.quote || getScriptPreview(chapter.scriptText);
+  const taskKey = `${chapter.chapterId}-${option.id}`;
 
+  // ── Polling ──
   const pollStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/director/phase3/video/${encodeURIComponent(taskKey)}`);
@@ -50,14 +87,14 @@ const VideoCard = ({
       if (data.success) {
         setTaskStatus(data.task);
         if (data.task.status === 'completed' && data.task.videoUrl) {
-          onUpdateOption(option.id, { videoUrl: data.task.videoUrl });
+          onUpdateOption(chapter.chapterId, option.id, { videoUrl: data.task.videoUrl });
           setIsPolling(false);
         } else if (data.task.status === 'failed') {
           setIsPolling(false);
         }
       }
     } catch {}
-  }, [taskKey, option.id, onUpdateOption]);
+  }, [taskKey, chapter.chapterId, option.id, onUpdateOption]);
 
   useEffect(() => {
     if ((isPendingTask || isPolling) && !taskStatus?.status?.match(/completed|failed/)) {
@@ -77,18 +114,20 @@ const VideoCard = ({
     }
   }, [isPolling, taskStatus]);
 
-  // Close fullscreen on ESC
+  // ESC to close fullscreen
   useEffect(() => {
+    if (!showFullscreen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFullscreen(false); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [showFullscreen]);
 
   const videoUrl = option.videoUrl || taskStatus?.videoUrl;
   const isProcessing = isPolling || taskStatus?.status === 'processing' || taskStatus?.status === 'pending';
   const isFailed = taskStatus?.status === 'failed';
   const isCompleted = !!videoUrl || taskStatus?.status === 'completed';
 
+  // ── Feedback / Revise ──
   const handleRevise = async () => {
     if (!feedbackText.trim()) return;
     setIsRevising(true);
@@ -96,12 +135,12 @@ const VideoCard = ({
       const res = await fetch('/api/director/phase2/revise-option', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, chapterId, optionId: option.id, userFeedback: feedbackText })
+        body: JSON.stringify({ projectId, chapterId: chapter.chapterId, optionId: option.id, userFeedback: feedbackText })
       });
       const data = await res.json();
       if (data.success) {
         setRevisedPrompt(data.revisedPrompt || '');
-        onUpdateOption(option.id, { revisedPrompt: data.revisedPrompt });
+        onUpdateOption(chapter.chapterId, option.id, { revisedPrompt: data.revisedPrompt });
       }
     } catch (e) {
       console.error(e);
@@ -111,8 +150,7 @@ const VideoCard = ({
   };
 
   const handleApplyAndRender = () => {
-    // Update option with revised prompt and trigger re-render
-    onUpdateOption(option.id, {
+    onUpdateOption(chapter.chapterId, option.id, {
       videoUrl: undefined,
       phase3Approved: false,
       revisedPrompt,
@@ -120,92 +158,57 @@ const VideoCard = ({
     } as any);
     setShowFeedback(false);
     setFeedbackText('');
-    onRetry(option.id);
+    onRetry(chapter.chapterId, option);
   };
 
-  const renderStatus = () => {
-    if (isProcessing) {
-      const progress = taskStatus?.progress;
-      return (
-        <div className="flex flex-col items-center justify-center gap-3 py-8 bg-slate-800/60 rounded-lg">
-          <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-          <div className="text-center">
-            <p className="text-sm text-slate-300">渲染中...</p>
-            {progress != null && (
-              <div className="mt-2 w-32 bg-slate-700 rounded-full h-1.5">
-                <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            )}
-            {taskStatus?.retryCount != null && taskStatus.retryCount > 0 && (
-              <p className="text-xs text-yellow-400 mt-1">第 {taskStatus.retryCount} 次重试</p>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (isFailed) {
-      return (
-        <div className="flex flex-col items-center justify-center gap-3 py-8 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <AlertCircle className="w-8 h-8 text-red-400" />
-          <p className="text-sm text-red-300 text-center px-4">{taskStatus?.error || '渲染失败'}</p>
-          <button
-            onClick={() => onRetry(option.id)}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs rounded-lg flex items-center gap-1"
-          >
-            <RefreshCw className="w-3 h-3" /> 重试
-          </button>
-        </div>
-      );
-    }
-
-    if (!videoUrl) {
-      return (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 bg-slate-800/40 rounded-lg border border-dashed border-slate-600">
-          <Video className="w-8 h-8 text-slate-500" />
-          <p className="text-xs text-slate-500">等待渲染</p>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
+  // ── Render ──
   return (
-    <div className={`bg-slate-800/50 rounded-lg border transition-all ${
-      option.phase3Approved ? 'border-emerald-500/50' : 'border-slate-700'
+    <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${
+      option.phase3Approved
+        ? 'border-emerald-500/50 bg-emerald-500/5'
+        : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
     }`}>
-      <div className="p-3 flex gap-3">
-        {/* Type badge */}
-        <div className="flex-shrink-0 w-16 text-center">
-          <span className={`text-xs px-1.5 py-0.5 rounded font-mono uppercase ${
-            option.type === 'remotion' ? 'bg-blue-500/20 text-blue-300' :
-            option.type === 'seedance' ? 'bg-purple-500/20 text-purple-300' :
-            option.type === 'generative' ? 'bg-pink-500/20 text-pink-300' :
-            'bg-slate-600 text-slate-300'
-          }`}>
-            {option.type}
+      {/* 序号 (col 1) */}
+      <div className="col-span-1 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
+          {rowId}
+        </div>
+      </div>
+
+      {/* 原文一句话 (col 2) */}
+      <div className="col-span-2 flex items-center">
+        <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
+          {quoteText}
+        </p>
+      </div>
+
+      {/* 设计方案/提示词 (col 3) */}
+      <div className="col-span-3 flex flex-col justify-center gap-1 px-2 -mx-2">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type] || 'bg-slate-600 text-slate-300'}`}>
+            {TYPE_LABELS[option.type] || option.type}
           </span>
         </div>
+        <p className="text-white text-xs leading-relaxed line-clamp-3">
+          {option.prompt || option.imagePrompt || '暂无方案描述'}
+        </p>
+        {(option as any).rationale && (
+          <p className="text-slate-500 text-[10px] italic mt-1 line-clamp-2">
+            💡 {(option as any).rationale}
+          </p>
+        )}
+      </div>
 
-        {/* Main content */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white mb-1 truncate">{option.name || option.id}</p>
-          {option.imagePrompt && (
-            <p className="text-xs text-slate-400 line-clamp-2 mb-2">{option.imagePrompt}</p>
-          )}
-
-          {/* Video player area */}
+      {/* 视频播放区 (col 5) — Phase3 核心：替代 Phase2 的预览图 */}
+      <div className="col-span-5 flex flex-col gap-2">
+        <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
           {videoUrl ? (
-            <div className="relative group rounded-lg overflow-hidden bg-black">
+            <>
               <video
                 ref={videoRef}
                 src={videoUrl}
                 controls
-                className="w-full max-h-48 object-contain"
+                className="w-full h-full object-contain bg-black"
                 preload="metadata"
               />
               <button
@@ -214,79 +217,114 @@ const VideoCard = ({
               >
                 <Maximize2 className="w-4 h-4 text-white" />
               </button>
+            </>
+          ) : isProcessing ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
+              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+              <span className="text-[10px] text-blue-400 mt-2">渲染中...</span>
+              {taskStatus?.progress != null && (
+                <div className="mt-2 w-24 bg-slate-700 rounded-full h-1">
+                  <div
+                    className="bg-blue-500 h-1 rounded-full transition-all"
+                    style={{ width: `${taskStatus.progress}%` }}
+                  />
+                </div>
+              )}
+              {taskStatus?.retryCount != null && taskStatus.retryCount > 0 && (
+                <span className="text-[9px] text-yellow-400 mt-1">第 {taskStatus.retryCount} 次重试</span>
+              )}
+            </div>
+          ) : isFailed ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
+              <AlertCircle className="w-5 h-5 text-red-400 mb-1" />
+              <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">
+                {taskStatus?.error || '渲染失败'}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
+                className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2"
+              >
+                重试渲染
+              </button>
             </div>
           ) : (
-            renderStatus()
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              <Video className="w-6 h-6 text-slate-500 mb-1" />
+              <span className="text-[10px] text-slate-500 font-medium">等待渲染</span>
+            </div>
           )}
-
-          {/* Feedback chatbox */}
-          <div className="mt-2">
-            <button
-              onClick={() => setShowFeedback(v => !v)}
-              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
-            >
-              <MessageSquare className="w-3 h-3" />
-              对视频不满意？提意见重新渲染
-              {showFeedback ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-
-            {showFeedback && (
-              <div className="mt-2 space-y-2">
-                <textarea
-                  value={feedbackText}
-                  onChange={e => setFeedbackText(e.target.value)}
-                  placeholder="描述你的修改需求，如：画面更有动感，颜色更鲜艳..."
-                  className="w-full p-2 text-xs bg-slate-900 border border-slate-600 rounded text-slate-200 placeholder-slate-500 resize-none"
-                  rows={2}
-                />
-                <button
-                  onClick={handleRevise}
-                  disabled={!feedbackText.trim() || isRevising}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs rounded flex items-center gap-1"
-                >
-                  {isRevising ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  AI 优化提示词
-                </button>
-
-                {revisedPrompt && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-slate-400">AI 优化后的提示词（可继续修改）：</p>
-                    <textarea
-                      value={revisedPrompt}
-                      onChange={e => setRevisedPrompt(e.target.value)}
-                      className="w-full p-2 text-xs bg-slate-900 border border-blue-500/50 rounded text-blue-200 resize-none"
-                      rows={3}
-                    />
-                    <button
-                      onClick={handleApplyAndRender}
-                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" /> 使用此提示词重新渲染
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Approve checkbox */}
-        <div className="flex-shrink-0">
+        {/* Feedback chatbox — below video */}
+        <div>
           <button
-            onClick={() => onApprove(option.id, !option.phase3Approved)}
-            disabled={!isCompleted}
-            title={isCompleted ? (option.phase3Approved ? '取消通过' : '标记通过') : '请先完成渲染'}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-              option.phase3Approved
-                ? 'bg-emerald-500 text-white'
-                : isCompleted
-                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-400'
-                  : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-            }`}
+            onClick={() => setShowFeedback(v => !v)}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
           >
-            <CheckCircle className="w-5 h-5" />
+            <MessageSquare className="w-3 h-3" />
+            对视频不满意？提意见重新渲染
+            {showFeedback ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
+
+          {showFeedback && (
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder="描述你的修改需求，如：画面更有动感，颜色更鲜艳..."
+                className="w-full p-2 text-xs bg-slate-900 border border-slate-600 rounded text-slate-200 placeholder-slate-500 resize-none"
+                rows={2}
+              />
+              <button
+                onClick={handleRevise}
+                disabled={!feedbackText.trim() || isRevising}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs rounded flex items-center gap-1"
+              >
+                {isRevising ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                AI 优化提示词
+              </button>
+
+              {revisedPrompt && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-400">AI 优化后的提示词（可继续修改）：</p>
+                  <textarea
+                    value={revisedPrompt}
+                    onChange={e => setRevisedPrompt(e.target.value)}
+                    className="w-full p-2 text-xs bg-slate-900 border border-blue-500/50 rounded text-blue-200 resize-none"
+                    rows={3}
+                  />
+                  <button
+                    onClick={handleApplyAndRender}
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" /> 使用此提示词重新渲染
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* 审阅通过 (col 1) */}
+      <div className="col-span-1 flex items-center justify-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onApprove(chapter.chapterId, option.id);
+          }}
+          disabled={!isCompleted}
+          title={isCompleted ? (option.phase3Approved ? '取消通过' : '标记通过') : '请先完成渲染'}
+          className={`w-7 h-7 rounded border-2 flex items-center justify-center transition-all ${
+            option.phase3Approved
+              ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
+              : isCompleted
+                ? 'border-slate-500 hover:border-slate-300 opacity-60 hover:opacity-100 hover:bg-slate-700'
+                : 'border-slate-700 opacity-30 cursor-not-allowed'
+          }`}
+        >
+          {option.phase3Approved && <Check className="w-4 h-4" />}
+        </button>
       </div>
 
       {/* Fullscreen video portal */}
@@ -296,7 +334,7 @@ const VideoCard = ({
           onClick={() => setShowFullscreen(false)}
         >
           <button
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full"
+            className="fixed top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full z-10"
             onClick={() => setShowFullscreen(false)}
           >
             <X className="w-6 h-6 text-white" />
@@ -316,62 +354,70 @@ const VideoCard = ({
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ChapterBlock: one chapter's options grouped
-// ─────────────────────────────────────────────────────────────────────────────
-interface ChapterBlockProps {
-  projectId: string;
+// ─── Phase3ChapterCard ───────────────────────────────────────────────────────
+// Mirrors Phase2's ChapterCard layout
+
+interface Phase3ChapterCardProps {
   chapter: DirectorChapter;
+  projectId: string;
   pendingTaskKeys: Set<string>;
-  onApproveOption: (chapterId: string, optionId: string, approved: boolean) => void;
+  onApprove: (chapterId: string, optionId: string) => void;
   onUpdateOption: (chapterId: string, optionId: string, updates: Partial<SceneOption>) => void;
-  onRetryOption: (chapterId: string, option: SceneOption) => void;
+  onRetry: (chapterId: string, option: SceneOption) => void;
 }
 
-const ChapterBlock = ({
-  projectId, chapter, pendingTaskKeys,
-  onApproveOption, onUpdateOption, onRetryOption
-}: ChapterBlockProps) => {
-  const renderableOptions = chapter.options.filter(o =>
-    ['remotion', 'seedance', 'generative', 'infographic'].includes(o.type)
-  );
-
-  if (renderableOptions.length === 0) return null;
+const Phase3ChapterCard = ({
+  chapter, projectId, pendingTaskKeys,
+  onApprove, onUpdateOption, onRetry
+}: Phase3ChapterCardProps) => {
+  const approvedAll = chapter.options.length > 0 && chapter.options.every(o => o.phase3Approved);
+  const displayName = cleanChapterName(chapter.chapterName);
 
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50">
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="text-xs text-slate-500 font-mono">CH{chapter.chapterIndex + 1}</span>
-            <h4 className="text-sm font-semibold text-white mt-0.5">{chapter.chapterName}</h4>
-          </div>
-          <span className="text-xs text-slate-500">
-            {renderableOptions.filter(o => o.phase3Approved).length}/{renderableOptions.length} 通过
-          </span>
-        </div>
+      {/* Chapter header — same as Phase2's ChapterCard */}
+      <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
+        <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
+        <span className="text-white font-medium">{displayName}</span>
+        {approvedAll && <Check className="w-4 h-4 text-green-400" />}
+        <span className="ml-auto text-xs text-slate-500">
+          {chapter.options.filter(o => o.phase3Approved).length}/{chapter.options.length} 通过
+        </span>
       </div>
-      <div className="p-3 space-y-3">
-        {renderableOptions.map(opt => (
-          <VideoCard
-            key={opt.id}
-            projectId={projectId}
-            chapterId={chapter.chapterId}
-            option={opt}
-            isPendingTask={pendingTaskKeys.has(`${chapter.chapterId}-${opt.id}`)}
-            onApprove={(optionId, approved) => onApproveOption(chapter.chapterId, optionId, approved)}
-            onUpdateOption={(optionId, updates) => onUpdateOption(chapter.chapterId, optionId, updates)}
-            onRetry={(optionId) => onRetryOption(chapter.chapterId, chapter.options.find(o => o.id === optionId)!)}
-          />
-        ))}
+
+      <div className="p-3">
+        {/* Column headers — same grid as Phase2 but col-4→col-3 方案, col-4→col-5 视频 */}
+        <div className="grid grid-cols-12 gap-3 mb-2 px-1">
+          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
+          <div className="col-span-2 text-xs text-slate-500 font-bold">原文一句话</div>
+          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
+          <div className="col-span-5 text-xs text-slate-500 font-bold text-center">视频</div>
+          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">审阅</div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {chapter.options.map((option, idx) => (
+            <Phase3OptionRow
+              key={option.id}
+              chapter={chapter}
+              option={option}
+              index={idx}
+              projectId={projectId}
+              isPendingTask={pendingTaskKeys.has(`${chapter.chapterId}-${option.id}`)}
+              onApprove={onApprove}
+              onUpdateOption={onUpdateOption}
+              onRetry={onRetry}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase3View: main orchestrator
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Phase3View ──────────────────────────────────────────────────────────────
+// Mirrors Phase2View structure: BRollSelector filter → sticky toolbar → ChapterCards
+
 interface Phase3ViewProps {
   projectId: string;
   chapters: DirectorChapter[];
@@ -382,27 +428,34 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
   const [localChapters, setLocalChapters] = useState<DirectorChapter[] | null>(null);
   const [pendingTaskKeys, setPendingTaskKeys] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [brollSelections, setBrollSelections] = useState<BRollType[]>([]);
 
   const displayedChapters = localChapters || chapters;
 
-  const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
+  // ── Filter logic (same as Phase2) ──
+  const isShowAll = brollSelections.length === 0;
+  const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
 
-  const renderableOptions = displayedChapters.flatMap(c =>
-    c.options.filter(o => RENDERABLE_TYPES.includes(o.type)).map(o => ({ chapter: c, option: o }))
+  // Only count renderable types
+  const allRenderableOptions = displayedChapters.flatMap(c =>
+    c.options.filter(o => RENDERABLE_TYPES.includes(o.type as BRollType))
   );
 
-  const approvedCount = renderableOptions.filter(({ option }) => option.phase3Approved).length;
-  const totalCount = renderableOptions.length;
-  const allApproved = totalCount > 0 && approvedCount === totalCount;
+  const visibleOptions = allRenderableOptions.filter(o => matchesFilter(o.type));
+  const visibleApprovedCount = visibleOptions.filter(o => o.phase3Approved).length;
+  const visibleCount = visibleOptions.length;
 
-  const completedCount = renderableOptions.filter(({ option }) =>
-    option.videoUrl || pendingTaskKeys.has(`${option.id}`)
-  ).length;
+  const totalApproved = allRenderableOptions.filter(o => o.phase3Approved).length;
+  const totalCount = allRenderableOptions.length;
+  const allApproved = totalCount > 0 && totalApproved === totalCount;
 
+  const visibleUnrenderedCount = visibleOptions.filter(o => !o.videoUrl).length;
+
+  // ── Batch render (respects current filter) ──
   const handleBatchRender = async () => {
     const items = displayedChapters.flatMap(c =>
       c.options
-        .filter(o => RENDERABLE_TYPES.includes(o.type) && !o.videoUrl)
+        .filter(o => RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type) && !o.videoUrl)
         .map(o => ({
           chapterId: c.chapterId,
           option: {
@@ -421,7 +474,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     );
 
     if (!items.length) {
-      alert('所有视频已渲染，无需重复触发');
+      alert('当前筛选范围内所有视频已渲染，无需重复触发');
       return;
     }
 
@@ -479,10 +532,10 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     }
   };
 
-  const handleApproveOption = (chapterId: string, optionId: string, approved: boolean) => {
+  const handleApproveOption = (chapterId: string, optionId: string) => {
     const updated = displayedChapters.map(c =>
       c.chapterId === chapterId
-        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, phase3Approved: approved } : o) }
+        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, phase3Approved: !o.phase3Approved } : o) }
         : c
     );
     setLocalChapters(updated);
@@ -497,98 +550,170 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     setLocalChapters(updated);
   };
 
+  // ── Batch approve (all visible filtered options) ──
+  const handleBatchApprove = (approved: boolean) => {
+    const updated = displayedChapters.map(c => ({
+      ...c,
+      options: c.options.map(o => {
+        if (!RENDERABLE_TYPES.includes(o.type as BRollType)) return o;
+        if (!matchesFilter(o.type)) return o;
+        // Only approve items that have video
+        if (approved && !o.videoUrl) return o;
+        return { ...o, phase3Approved: approved };
+      })
+    }));
+    setLocalChapters(updated);
+  };
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Sticky control bar */}
+    <div className="flex flex-col gap-6">
+      {/* B-Roll 类型筛选 — same as Phase2 */}
       <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-white">Phase 3: 视频二审</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              渲染 MP4 视频，逐条审阅后打勾通过，全部通过后提交 Phase 4
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Progress */}
-            <div className="text-right">
-              <p className="text-xs text-slate-400">审阅进度</p>
-              <p className="text-sm font-bold text-white">
-                <span className={approvedCount === totalCount && totalCount > 0 ? 'text-emerald-400' : 'text-white'}>
-                  {approvedCount}
-                </span>
-                <span className="text-slate-500">/{totalCount}</span>
-              </p>
-            </div>
-
-            {/* Render all button */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm text-slate-400 uppercase font-bold">
+            过滤视觉方案 (Excel 式筛选)
+          </h3>
+          <div className="flex gap-2">
             <button
-              onClick={handleBatchRender}
-              disabled={isSubmitting || pendingTaskKeys.size > 0}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg flex items-center gap-2"
+              onClick={() => setBrollSelections([...RENDERABLE_TYPES])}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
             >
-              {isSubmitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> 触发中...</>
-              ) : pendingTaskKeys.size > 0 ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中 {pendingTaskKeys.size} 条...</>
-              ) : (
-                <><Play className="w-4 h-4" /> 渲染所有视频</>
-              )}
+              显示全部
             </button>
-
-            {/* Proceed button */}
             <button
-              onClick={onProceed}
-              disabled={!allApproved}
-              className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
-                allApproved
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}
+              onClick={() => setBrollSelections([])}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
             >
-              <CheckCircle className="w-4 h-4" />
-              提交 → Phase 4
+              清空过滤 (显示全部)
             </button>
           </div>
         </div>
+        <BRollSelector
+          selected={brollSelections}
+          onChange={setBrollSelections}
+          types={RENDERABLE_TYPES}
+        />
 
-        {/* Overall progress bar */}
-        {totalCount > 0 && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
-              <span>批次进度</span>
-              <span>{approvedCount}/{totalCount} 已通过</span>
-            </div>
-            <div className="h-1.5 bg-slate-700 rounded-full">
-              <div
-                className="h-1.5 bg-emerald-500 rounded-full transition-all"
-                style={{ width: totalCount > 0 ? `${(approvedCount / totalCount) * 100}%` : '0%' }}
-              />
-            </div>
-          </div>
-        )}
+        {/* Batch operations */}
+        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-800">
+          <span className="text-xs text-slate-500 font-medium">批量操作:</span>
+          <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/80 p-1.5 -ml-1.5 rounded transition-colors group">
+            <input
+              type="checkbox"
+              className="w-4 h-4 cursor-pointer accent-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+              ref={el => {
+                if (el) el.indeterminate = visibleApprovedCount > 0 && visibleApprovedCount < visibleCount;
+              }}
+              checked={visibleApprovedCount === visibleCount && visibleCount > 0}
+              disabled={visibleCount === 0}
+              onChange={(e) => handleBatchApprove(e.target.checked)}
+            />
+            <span className="text-xs text-slate-400 group-hover:text-slate-300 select-none flex items-center gap-1">
+              全选通过当前视图 <span className="text-slate-500">({visibleApprovedCount}/{visibleCount})</span>
+            </span>
+          </label>
+        </div>
       </div>
 
-      {/* Chapter blocks */}
-      {displayedChapters.length === 0 ? (
+      {/* Sticky progress toolbar — same style as Phase2 */}
+      {displayedChapters.length > 0 && (
+        <>
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg">
+            <div className="flex items-center gap-4">
+              <span className="text-slate-400 font-medium whitespace-nowrap">筛选结果:</span>
+              <div className="flex gap-4">
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-bold ${visibleApprovedCount > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                    {visibleApprovedCount}
+                  </span>
+                  <span className="text-slate-500 font-medium">/ {visibleCount} (当前显示)</span>
+                </div>
+                <div className="w-px h-6 bg-slate-700 mx-2"></div>
+                {brollSelections.length > 0 && (
+                  <div className="flex items-baseline gap-1 opacity-60">
+                    <span className="text-lg font-bold text-slate-400">{totalApproved}</span>
+                    <span className="text-slate-500 text-sm">/ {totalCount} (全局总计)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Render button */}
+              <button
+                onClick={handleBatchRender}
+                disabled={isSubmitting || pendingTaskKeys.size > 0 || visibleUnrenderedCount === 0}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> 触发中...</>
+                ) : pendingTaskKeys.size > 0 ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中...</>
+                ) : (
+                  <><Play className="w-4 h-4" /> 渲染当前筛选 ({visibleUnrenderedCount}条)</>
+                )}
+              </button>
+
+              {/* Proceed button */}
+              {allApproved && (
+                <button
+                  onClick={onProceed}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  提交 → Phase 4
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Overall progress bar */}
+          {totalCount > 0 && (
+            <div className="bg-slate-900 rounded-lg border border-slate-700 p-3 -mt-4">
+              <div className="flex justify-between text-xs text-slate-500 mb-1">
+                <span>审阅进度</span>
+                <span>{totalApproved}/{totalCount} 已通过</span>
+              </div>
+              <div className="h-1.5 bg-slate-700 rounded-full">
+                <div
+                  className="h-1.5 bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${(totalApproved / totalCount) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Chapter cards */}
+          <div className="flex flex-col gap-4">
+            {displayedChapters.map(chapter => {
+              const filteredOptions = chapter.options.filter(o =>
+                RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type)
+              );
+              if (filteredOptions.length === 0) return null;
+
+              const filteredChapter = { ...chapter, options: filteredOptions };
+
+              return (
+                <Phase3ChapterCard
+                  key={chapter.chapterId}
+                  chapter={filteredChapter}
+                  projectId={projectId}
+                  pendingTaskKeys={pendingTaskKeys}
+                  onApprove={handleApproveOption}
+                  onUpdateOption={handleUpdateOption}
+                  onRetry={handleRetryOption}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {displayedChapters.length === 0 && (
         <div className="text-center py-12 text-slate-500">
           <Video className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>暂无可渲染的视觉方案</p>
           <p className="text-xs mt-1">请先在 Phase 2 生成并选择 B-roll 方案</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {displayedChapters.map(chapter => (
-            <ChapterBlock
-              key={chapter.chapterId}
-              projectId={projectId}
-              chapter={chapter}
-              pendingTaskKeys={pendingTaskKeys}
-              onApproveOption={handleApproveOption}
-              onUpdateOption={handleUpdateOption}
-              onRetryOption={handleRetryOption}
-            />
-          ))}
         </div>
       )}
     </div>

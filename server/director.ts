@@ -682,34 +682,13 @@ function buildRemotionPreview(option: {
   imagePrompt?: string;
   rationale?: string;
 }): { compositionId: string; props: any } {
-  // 1. 如果有明确的 template 并且有 props，尝试直接返回（除了 CinematicZoom 特殊拦截）
-  if (option.template && option.template !== 'SceneComposer') {
-    if (option.template === 'CinematicZoom') {
-      // 特殊逻辑：CinematicZoom 需要 imageUrl，但我们还没有火山 API 出图
-      // 先用 logo 或 default 作为底图
-      return {
-        compositionId: 'CinematicZoom',
-        props: {
-          ...(option.props || {}),
-          imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1920&q=80', // Unsplash 占位图
-          bgStyle: option.props?.bgStyle || 'dark-gradient'
-        }
-      };
-    }
-
-    // 处理新增的模板们，透传给 remotion cli 进行渲染
-    const supportedCoreTemplates = [
-      'ConceptChain', 'DataChartQuadrant',
-      'TextReveal', 'NumberCounter', 'ComparisonSplit', 'TimelineFlow',
-      'SegmentCounter', 'TerminalTyping'
-    ];
-
-    if (supportedCoreTemplates.includes(option.template)) {
-      return {
-        compositionId: option.template,
-        props: option.props || {}
-      };
-    }
+  // 纯透传：有 template → 直接传给 Remotion CLI
+  // 模板知识由导演大师 skill 管理，DC 不做白名单校验或降级
+  if (option.template) {
+    return {
+      compositionId: option.template,
+      props: option.props || {}
+    };
   }
 
   // 2. 兜底降级：转换为文字大字报 SceneComposer
@@ -884,6 +863,11 @@ LANGUAGE: ${lang}
 ${layoutPrompt}
 
 ${stylePrompt}
+
+LANGUAGE REQUIREMENT (CRITICAL):
+- ALL text content (titles, labels, descriptions, annotations, data values) MUST be in Chinese (简体中文)
+- Do NOT use any English text in the infographic unless it is a proper noun, brand name, or technical abbreviation
+- This includes: headings, axis labels, legend text, category names, descriptions, and any readable text elements
 
 QUALITY REQUIREMENTS:
 - Ultra-high detail, professional infographic quality
@@ -1599,16 +1583,19 @@ export const getVideoStatus = async (req: Request, res: Response) => {
   const { taskKey } = req.params;
   const task = videoTasks.get(taskKey);
   if (!task) {
-    return res.status(404).json({ status: 'not_found', error: 'Task not found' });
+    return res.status(404).json({ success: false, error: 'Task not found' });
   }
   res.json({
-    status: task.status,
-    videoUrl: task.videoUrl,
-    error: task.error,
-    retryCount: task.retryCount,
-    progress: task.progress,
-    startedAt: task.startedAt,
-    completedAt: task.completedAt,
+    success: true,
+    task: {
+      status: task.status,
+      videoUrl: task.videoUrl,
+      error: task.error,
+      retryCount: task.retryCount,
+      progress: task.progress,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+    },
   });
 };
 

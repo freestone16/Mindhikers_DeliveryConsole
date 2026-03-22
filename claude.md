@@ -1,7 +1,7 @@
 # Claude AI - Delivery Console 项目工作流契约
 
 > **项目级 AI 开发约定**
-> **最后更新**：2026-03-18
+> **最后更新**：2026-03-20
 
 ---
 
@@ -118,7 +118,7 @@
 2. **Verify Plan**：向用户确认计划后再开始实施
 3. **Track Progress**：执行过程中使用 `TodoWrite` 标记进度
 4. **Explain Changes**：每步提供高层级总结
-5. **Document Results**：完成后更新 `docs/04_progress/dev_progress.md`
+5. **Document Results**：完成后写入今日 `docs/dev_logs/YYYY-MM-DD.md`；重大版本追加 `dev_progress.md` 版本表一行；会话结束前覆盖写 `docs/dev_logs/HANDOFF.md`
 6. **Capture Lessons**：任何纠正后更新 `docs/04_progress/rules.md`
 
 ---
@@ -157,9 +157,14 @@
   2. **找更优模型**：有没有一种方案，能让"这类 bug 结构性地不可能出现"？
   3. **反转约束**：与其维护"允许什么"的白名单，不如保护"禁止什么"的黑名单
   4. **改完更简单**：好的根本修复，结果一定是代码变少、逻辑变清晰
+- **天条**：**找到根因，彻底解决问题。禁止打补丁。**
+  - 补丁 = `try/catch` 包住症状、加 `if` 覆盖漏掉的分支、在调用侧防御被调用侧的设计缺陷
+  - 根因 = 修复产生问题的**设计**，让这类 bug **结构性地不可能再出现**
+  - 验证标准：修完后代码更简单，而不是更复杂
 - **Delivery Console 典型案例**：
   - `update_option_fields` 漏掉 `type` 字段 → 不是加一行 `if`，而是用黑名单模型替换白名单枚举，让未来所有新字段自动放行
   - `getChapterSeq` 用 0-indexed `chapterIndex` 做 seq 编号 → 表象是"type 改不了"，实际是 Bridge 打错章节。不要在表象上打补丁（如强制刷新前端），要追溯数据流找到真正的映射错误源头
+  - `remotion-api-renderer` 临时文件清理崩进程 → 不是给 `unlinkSync` 加 `try/catch`，而是用 `makeTmpCleaner` 闭包统一管理生命周期，保证幂等
 
 ---
 
@@ -183,11 +188,19 @@
 ### 文档协议
 - **自动触发**：提及"修复"/"完成"/"记录"/"设计方案"时自动保存文档
 - **显式强制**：用户说"老杨，保存"时立即执行文档保存
-- **文档位置**：
-  - 开发进度 → `docs/04_progress/dev_progress.md`
+- **三层日志结构**（⭐ 核心规则）：
+
+  | 层 | 文件 | 内容 | 写入时机 |
+  |---|---|---|---|
+  | 里程碑层 | `docs/04_progress/dev_progress.md` | 版本表（≤60行） | 重大版本完成时追加一行 |
+  | 交接层 | `docs/dev_logs/HANDOFF.md` | 当前状态 + WIP + 待解决 | 每次**会话结束时覆盖写** |
+  | 日志层 | `docs/dev_logs/YYYY-MM-DD.md` | 每日详细记录 | 每日写入，永久保留 |
+
+- **其他文档位置**：
   - 精炼规则 → `docs/04_progress/rules.md`（每次会话必读）
   - 详细案例 → `docs/04_progress/lessons/`（按需搜索）
   - 设计方案 → `docs/02_design/[模块名].md`
+  - 历史归档 → `docs/dev_logs/archive/`
 
 ---
 
@@ -244,11 +257,14 @@ DeliveryConsole/
     ├── 02_design/                # 设计文档
     ├── 03_ui/                    # UI 设计稿
     ├── 04_progress/
-    │   ├── dev_progress.md       # 开发进度
+    │   ├── dev_progress.md       # 版本里程碑表（≤60行，只追加不累积）
     │   ├── rules.md              # 精炼规则 ⭐（每次会话必读）
     │   ├── lessons/              # 详细案例（按需搜索）
     │   └── lessons-index.md      # 案例索引
-    ├── dev_logs/                 # 开发日志
+    ├── dev_logs/
+    │   ├── HANDOFF.md            # 🔑 交接快照（每次会话结束覆盖写，新会话第一个读）
+    │   ├── YYYY-MM-DD.md         # 每日开发日志（按日分文件）
+    │   └── archive/              # 历史归档（pre-YYYY-MM-DD_full_history.md）
     └── plans/                    # 计划文档
 ```
 
@@ -256,13 +272,16 @@ DeliveryConsole/
 
 ## 🚀 会话启动检查清单
 
-每次新会话开始时，检查：
+每次新会话开始时，按顺序执行：
 
-- [ ] 阅读 `docs/04_progress/rules.md`（80条精炼规则）
-- [ ] 如需详细案例，搜索 `docs/04_progress/lessons/`
-- [ ] 检查 `docs/04_progress/dev_progress.md` 最新状态
+- [ ] **第1步**：读 `docs/dev_logs/HANDOFF.md` ← 🔑 最重要，30秒恢复上下文
+- [ ] **第2步**：读 `docs/04_progress/rules.md`（精炼规则，每次必读）
+- [ ] **第3步**：如需了解某日细节，读 `docs/dev_logs/YYYY-MM-DD.md`
+- [ ] **第4步**：如需版本历史，读 `docs/04_progress/dev_progress.md`（仅版本表）
 - [ ] 回顾当前任务相关的核心原则
 - [ ] 确认是否需要使用技能（Skills）
+
+> ⚠️ **会话结束时**：必须覆盖写 `docs/dev_logs/HANDOFF.md`，记录当前状态、未提交改动、待解决问题
 
 ---
 

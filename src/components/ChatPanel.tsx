@@ -205,7 +205,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const handleChatActionResult = (data: { expertId: string; success: boolean; message: string }) => {
             if (data.expertId !== currentExpertIdRef.current) return;
             setIsStreaming(false);
-            appendSystemMessage(data.message, '系统执行结果');
+            // 找到最近的 confirmed action 消息，更新其状态为 executed，避免追加重复消息
+            const msgs = [...messagesRef.current];
+            const lastConfirmedIdx = msgs.findLastIndex(
+                (m: any) => m.actionConfirm?.status === 'confirmed'
+            );
+            if (lastConfirmedIdx >= 0) {
+                msgs[lastConfirmedIdx] = {
+                    ...msgs[lastConfirmedIdx],
+                    actionConfirm: {
+                        ...(msgs[lastConfirmedIdx] as any).actionConfirm,
+                        status: 'executed',
+                        resultMessage: data.message,
+                        resultSuccess: data.success,
+                    }
+                };
+                setMessagesWithRef(msgs);
+            } else {
+                // 没找到匹配的 confirmed action，fallback 追加系统消息
+                appendSystemMessage(data.message, '系统执行结果');
+            }
         };
 
         socket.on('chat-chunk', handleChatChunk);

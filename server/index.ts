@@ -16,7 +16,6 @@ import { setupVisualPlanWatcher, getVisualPlan, updateSceneReview, closeVisualPl
 import { syncSkills, sendSyncStatusToSocket } from './skill-sync';
 import { getConfigStatus, saveApiKey, updateConfig, testConnection, getSavedKeys, loadConfig, testAllConnections } from './llm-config';
 import * as director from './director';
-import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
@@ -227,10 +226,6 @@ app.get('/api/director/phase3/download-xml/:projectId/:format', director.phase3D
 app.post('/api/director/upload-material', materialUpload.single('videoFile'), handleMaterialUpload);
 app.get('/api/director/material-exists', checkMaterialExists);
 
-// Pipeline Engine Routes (Phase 3 & Phase 4)
-app.post('/api/pipeline/render-brolls', pipeline.renderBrolls);
-app.get('/api/pipeline/render-status/:taskId', pipeline.getRenderStatus);
-app.post('/api/pipeline/weave-timeline', pipeline.weaveTimeline);
 
 // Shorts Master Routes (SD-206)
 app.post('/api/shorts/phase1/recommend', shorts.recommend);
