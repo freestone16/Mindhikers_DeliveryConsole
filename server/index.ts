@@ -32,6 +32,7 @@ const upload = multer({ dest: 'uploads/' });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 
 const app = express();
 app.use(cors()); // Enable CORS for all routes
