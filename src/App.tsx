@@ -39,6 +39,8 @@ function App() {
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleSelectProject = (projectId: string) => {
+        (window as any).__currentProjectId = projectId;
+        try { localStorage.setItem('dc:lastProjectId', projectId); } catch {}
         setState({
             ...INITIAL_STATE,
             projectId: projectId,
@@ -48,6 +50,18 @@ function App() {
             socket.emit('select-project', projectId);
         }
     };
+
+    // 🔑 页面刷新时自动恢复上次选择的项目
+    useEffect(() => {
+        if (state.projectId) {
+            (window as any).__currentProjectId = state.projectId;
+            return;
+        }
+        const saved = localStorage.getItem('dc:lastProjectId');
+        if (saved) {
+            handleSelectProject(saved);
+        }
+    }, []);
 
     const handleSelectExpert = (expertId: string) => {
         setActiveExpertId(expertId);

@@ -389,7 +389,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
       {/* Lightbox Portal */}
       {showLightbox && previewUrl && createPortal(
         <div
-          className="fixed inset-0 z-[9999] bg-black/90 overflow-auto flex items-start justify-center p-8"
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-6"
           onClick={() => setShowLightbox(false)}
         >
           <button
@@ -401,7 +401,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
           <img
             src={previewUrl}
             alt="Preview fullsize"
-            style={{ maxWidth: 'none', width: 'auto', height: 'auto' }}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', width: 'auto', height: 'auto' }}
             className="rounded shadow-2xl"
             onClick={e => e.stopPropagation()}
           />

@@ -8,7 +8,7 @@ import { buildDirectorSystemPrompt } from './server/skill-loader';
 dotenv.config();
 
 const PROJECT_ID = 'CSET-seedance2';
-const PROJECT_ROOT = '/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/CSET-Seedance2';
+const PROJECT_ROOT = path.join(process.env.PROJECTS_BASE || '/Users/luzhoua/Mindhikers/Mindhikers_workspace/Projects', 'CSET-Seedance2');
 const SCRIPT_PATH = path.join(PROJECT_ROOT, 'CSET-seedance2_深度文稿_v2.md');
 
 console.log('Loading script from:', SCRIPT_PATH);

@@ -4,9 +4,21 @@ import { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
 import { loadConfig } from '../llm-config';
 import type { LLMProvider } from '../../src/schemas/llm-config';
+import { tryResolveDirectorFastPath } from '../director-bridge';
 
 export const DirectorAdapter: ExpertActionAdapter = {
     expertId: 'Director',
+
+    tryFastPath(userMessage: string, projectRoot: string) {
+        const resolution = tryResolveDirectorFastPath(userMessage, projectRoot);
+        if (!resolution || resolution.status !== 'ready_to_confirm' || !resolution.executionPlan || !resolution.confirmCard) {
+            return null;
+        }
+        return {
+            executionPlan: resolution.executionPlan,
+            confirmCard: resolution.confirmCard,
+        };
+    },
 
     getToolDefinitions() {
         return [

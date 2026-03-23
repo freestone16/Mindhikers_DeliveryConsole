@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
-export const useExpertState = <T>(expertId: string, initialState: T) => {
+export const useExpertState = <T>(expertId: string, initialState: T, projectId?: string) => {
     const [state, setState] = useState<T>(initialState);
     const [socket, setSocket] = useState<any>(null);
+    const hydratedRef = useRef(false);
 
     useEffect(() => {
-        // 监听全局挂载的 socket
         const checkSocket = setInterval(() => {
             const globalSocket = (window as any).socket;
             if (globalSocket) {
@@ -13,37 +13,59 @@ export const useExpertState = <T>(expertId: string, initialState: T) => {
                 clearInterval(checkSocket);
             }
         }, 100);
-
         return () => clearInterval(checkSocket);
     }, []);
 
-    // 使用 useCallback 确保 applyUpdate 引用稳定
     const applyUpdate = useCallback((newData: any) => {
         const actualData = newData.data !== undefined ? newData.data : newData;
         setState(actualData);
+        hydratedRef.current = true;
     }, []);
+
+    // 🔑 确定性状态恢复：projectId 变化时通过 HTTP GET 拿持久化状态
+    useEffect(() => {
+        if (!projectId) return;
+
+        hydratedRef.current = false; // 项目切换时重置
+        fetch(`/api/expert-state/${expertId}?projectId=${encodeURIComponent(projectId)}`)
+            .then(res => res.json())
+            .then(result => {
+                if (result.success && result.data) {
+                    const data = result.data;
+                    // 只有后端有实质数据时才覆盖（防止空 state 文件覆盖 initialState）
+                    const hasSubstance = data.phase > 1 || data.isConceptApproved || (data.items && data.items.length > 0);
+                    if (hasSubstance) {
+                        console.log(`[useExpertState][${expertId}] 🔑 HTTP hydration: phase=${data.phase}, items=${data.items?.length || 0}`);
+                        setState(data);
+                    } else {
+                        console.log(`[useExpertState][${expertId}] 🔑 HTTP hydration: backend state is empty, using initialState`);
+                    }
+                    hydratedRef.current = true;
+                }
+            })
+            .catch(err => {
+                console.warn(`[useExpertState][${expertId}] HTTP hydration failed:`, err);
+                hydratedRef.current = true; // 失败也算完成，允许后续写操作
+            });
+    }, [expertId, projectId]);
 
     useEffect(() => {
         if (!socket) return;
 
-        // 通道 1: expert-data-update 广播（初始加载 + 正常广播）
         const updateEvent = `expert-data-update:${expertId}`;
         socket.on(updateEvent, applyUpdate);
 
-        // 通道 2: chat-action-result 携带 expertState（最可靠的更新通道）
-        // chat-action-result 一定会到达（用户能看到"操作执行成功"就证明了）
         const handleActionResult = (result: any) => {
             if (result.expertId === expertId && result.success && result.expertState) {
-                console.log(`[useExpertState][${expertId}] 🎯 chat-action-result carrying fresh state, applying directly`);
+                console.log(`[useExpertState][${expertId}] 🎯 chat-action-result carrying fresh state`);
                 applyUpdate(result.expertState);
             }
         };
         socket.on('chat-action-result', handleActionResult);
 
-        // 🔑 解决时序竞态：listener 注册完毕后，主动请求后端重发当前状态
-        // 原因：socket connect 时后端自动发送的 hydration 数据可能在 listener 注册之前就到达了
-        console.log(`[useExpertState][${expertId}] ✅ Listener registered, requesting hydration...`);
-        socket.emit('request-expert-hydration', { expertId });
+        if (!hydratedRef.current) {
+            socket.emit('request-expert-hydration', { expertId });
+        }
 
         return () => {
             socket.off(updateEvent, applyUpdate);
@@ -51,12 +73,17 @@ export const useExpertState = <T>(expertId: string, initialState: T) => {
         };
     }, [socket, expertId, applyUpdate]);
 
-    const updateState = (projectId: string, newData: T) => {
-        setState(newData);
-        if (socket) {
-            socket.emit('update-expert-data', { expertId, projectId, data: newData });
+    const updateState = useCallback((pid: string, newData: T) => {
+        if (!hydratedRef.current) {
+            console.warn(`[useExpertState][${expertId}] ⚠️ Blocked write-back before hydration`);
+            return;
         }
-    };
+        setState(newData);
+        const globalSocket = (window as any).socket;
+        if (globalSocket) {
+            globalSocket.emit('update-expert-data', { expertId, projectId: pid, data: newData });
+        }
+    }, [expertId]);
 
     return { state, updateState, setState };
 };

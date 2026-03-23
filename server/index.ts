@@ -843,6 +843,7 @@ io.on('connection', (socket) => {
             let isToolCallTriggered = false;
             let toolCallIndex = 0;
             let assistantResponse = '';
+            let confirmAlreadyEmitted = false; // 每次 chat-stream 最多发一个 confirm
 
             for await (const chunk of callLLMStream(messagesWithContext, provider, model, baseUrl, tools)) {
                 if (typeof chunk === 'string') {
@@ -863,15 +864,20 @@ io.on('connection', (socket) => {
                         const clarification = resolution.clarification?.message;
 
                         if (resolution.status === 'ready_to_confirm' && resolution.executionPlan && resolution.confirmCard) {
-                            emitAndPersistActionConfirm(socket, projectRoot, expertId, messages, {
-                                confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
-                                actionName: resolution.executionPlan.actionName,
-                                actionArgs: resolution.executionPlan.actionArgs,
-                                description: resolution.confirmCard.summary,
-                                title: resolution.confirmCard.title,
-                                targetLabel: resolution.confirmCard.targetLabel,
-                                diffLabel: resolution.confirmCard.diffLabel,
-                            });
+                            if (confirmAlreadyEmitted) {
+                                console.warn(`[Chat] Suppressed duplicate confirm from LLM tool_call[${toolCallIndex}]: ${resolution.confirmCard.summary}`);
+                            } else {
+                                confirmAlreadyEmitted = true;
+                                emitAndPersistActionConfirm(socket, projectRoot, expertId, messages, {
+                                    confirmId: `confirm_${Date.now()}_${toolCallIndex}`,
+                                    actionName: resolution.executionPlan.actionName,
+                                    actionArgs: resolution.executionPlan.actionArgs,
+                                    description: resolution.confirmCard.summary,
+                                    title: resolution.confirmCard.title,
+                                    targetLabel: resolution.confirmCard.targetLabel,
+                                    diffLabel: resolution.confirmCard.diffLabel,
+                                });
+                            }
                         } else if (clarification) {
                             socket.emit('chat-confirmation', {
                                 expertId,
@@ -1303,6 +1309,21 @@ app.post('/api/scripts/select', (req, res) => {
 
 app.get('/api/experts', (req, res) => {
     res.json({ experts: EXPERTS_CONFIG });
+});
+
+// 🔑 确定性状态恢复：前端刷新/断连后通过 HTTP GET 拿到持久化状态
+app.get('/api/expert-state/:expertId', (req, res) => {
+    const { expertId } = req.params;
+    const projectId = req.query.projectId as string;
+    if (!projectId) return res.status(400).json({ error: 'projectId required' });
+    try {
+        const projectRoot = getProjectRoot(projectId);
+        const expertData = loadExpertState(projectRoot, expertId);
+        const payload = expertData?.data !== undefined ? expertData.data : expertData;
+        res.json({ success: true, data: payload });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post('/api/experts/start', (req, res) => {

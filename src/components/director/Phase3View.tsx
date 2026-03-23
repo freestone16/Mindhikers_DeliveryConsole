@@ -59,11 +59,12 @@ interface Phase3OptionRowProps {
   onApprove: (chapterId: string, optionId: string) => void;
   onUpdateOption: (chapterId: string, optionId: string, updates: Partial<SceneOption>) => void;
   onRetry: (chapterId: string, option: SceneOption) => void;
+  onTaskComplete?: (taskKey: string) => void;
 }
 
 const Phase3OptionRow = ({
   chapter, option, index, projectId, isPendingTask,
-  onApprove, onUpdateOption, onRetry
+  onApprove, onUpdateOption, onRetry, onTaskComplete
 }: Phase3OptionRowProps) => {
   const [taskStatus, setTaskStatus] = useState<VideoTaskStatus | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -89,8 +90,10 @@ const Phase3OptionRow = ({
         if (data.task.status === 'completed' && data.task.videoUrl) {
           onUpdateOption(chapter.chapterId, option.id, { videoUrl: data.task.videoUrl });
           setIsPolling(false);
+          onTaskComplete?.(taskKey);
         } else if (data.task.status === 'failed') {
           setIsPolling(false);
+          onTaskComplete?.(taskKey);
         }
       }
     } catch {}
@@ -364,11 +367,12 @@ interface Phase3ChapterCardProps {
   onApprove: (chapterId: string, optionId: string) => void;
   onUpdateOption: (chapterId: string, optionId: string, updates: Partial<SceneOption>) => void;
   onRetry: (chapterId: string, option: SceneOption) => void;
+  onTaskComplete: (taskKey: string) => void;
 }
 
 const Phase3ChapterCard = ({
   chapter, projectId, pendingTaskKeys,
-  onApprove, onUpdateOption, onRetry
+  onApprove, onUpdateOption, onRetry, onTaskComplete
 }: Phase3ChapterCardProps) => {
   const approvedAll = chapter.options.length > 0 && chapter.options.every(o => o.phase3Approved);
   const displayName = cleanChapterName(chapter.chapterName);
@@ -407,6 +411,7 @@ const Phase3ChapterCard = ({
               onApprove={onApprove}
               onUpdateOption={onUpdateOption}
               onRetry={onRetry}
+              onTaskComplete={onTaskComplete}
             />
           ))}
         </div>
@@ -549,6 +554,15 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     );
     setLocalChapters(updated);
   };
+
+  // ── Clear completed/failed task keys ──
+  const handleTaskComplete = useCallback((taskKey: string) => {
+    setPendingTaskKeys(prev => {
+      const next = new Set(prev);
+      next.delete(taskKey);
+      return next;
+    });
+  }, []);
 
   // ── Batch approve (all visible filtered options) ──
   const handleBatchApprove = (approved: boolean) => {
@@ -702,6 +716,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
                   onApprove={handleApproveOption}
                   onUpdateOption={handleUpdateOption}
                   onRetry={handleRetryOption}
+                  onTaskComplete={handleTaskComplete}
                 />
               );
             })}

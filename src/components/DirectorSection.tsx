@@ -18,7 +18,7 @@ type Phase = 1 | 2 | 3 | 4;
 import { useExpertState } from '../hooks/useExpertState';
 
 export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSectionProps) => {
-  const { state: data, updateState } = useExpertState<DirectorModule>('Director', { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] });
+  const { state: data, updateState } = useExpertState<DirectorModule>('Director', { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] }, projectId);
 
   const onUpdate = (newData: DirectorModule) => {
     updateState(projectId, newData);
