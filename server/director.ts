@@ -1682,49 +1682,58 @@ async function renderVolcengineVideo(
       }
 
       const prompt = option.imagePrompt || option.prompt || '';
-      console.log(`[Video Render] ▶ Volcengine start: ${taskKey}`);
-      const result = await generateVideoWithVolc(prompt);
+      const isInfographic = option.type === 'infographic';
+      console.log(`[Video Render] ▶ ${isInfographic ? 'Infographic(Image)' : 'Volcengine(Video)'} start: ${taskKey}`);
+
+      // 信息图走图片接口（Seedream），其余走视频接口（Seedance）
+      const result = isInfographic
+        ? await generateImageWithVolc(prompt)
+        : await generateVideoWithVolc(prompt);
 
       if (result.error) throw new Error(result.error);
 
-      if (result.video_url) {
-        // Direct URL returned
+      // 信息图返回 image_url，视频返回 video_url
+      const directUrl = result.video_url || result.image_url;
+      if (directUrl) {
         const t = videoTasks.get(taskKey);
         if (t) {
           t.status = 'completed';
-          t.videoUrl = result.video_url;
+          t.videoUrl = directUrl;
           t.progress = 100;
           t.completedAt = new Date().toISOString();
         }
-        console.log(`[Video Render] ✅ Volcengine done (direct): ${taskKey}`);
+        console.log(`[Video Render] ✅ ${isInfographic ? 'Infographic' : 'Volcengine'} done (direct): ${taskKey}`);
         return;
       }
 
       if (result.task_id) {
-        // Poll cloud task
-        const maxPolls = 60; // 120s timeout
+        // Poll cloud task — 信息图用图片轮询，视频用视频轮询
+        const maxPolls = isInfographic ? 40 : 150; // 信息图 80s，视频 300s
+        const pollInterval = 2000;
         for (let p = 0; p < maxPolls; p++) {
-          await new Promise(r => setTimeout(r, 2000));
-          const poll = await pollVolcVideoResult(result.task_id as string);
+          await new Promise(r => setTimeout(r, pollInterval));
+          const poll = isInfographic
+            ? await pollVolcImageResult(result.task_id as string)
+            : await pollVolcVideoResult(result.task_id as string);
           const t = videoTasks.get(taskKey);
           if (!t) return;
-          if (poll.status === 'completed' && poll.video_url) {
+          const doneUrl = poll.video_url || poll.image_url;
+          if (poll.status === 'completed' && doneUrl) {
             t.status = 'completed';
-            t.videoUrl = poll.video_url;
+            t.videoUrl = doneUrl;
             t.progress = 100;
             t.completedAt = new Date().toISOString();
-            console.log(`[Video Render] ✅ Volcengine done (poll ${p + 1}): ${taskKey}`);
+            console.log(`[Video Render] ✅ ${isInfographic ? 'Infographic' : 'Volcengine'} done (poll ${p + 1}): ${taskKey}`);
             return;
           } else if (poll.status === 'failed' || poll.error) {
-            throw new Error(poll.error || 'Volcengine video task failed');
+            throw new Error(poll.error || `${isInfographic ? 'Infographic' : 'Volcengine video'} task failed`);
           }
-          // Update progress estimate
           if (t) t.progress = Math.min(90, Math.round((p / maxPolls) * 100));
         }
-        throw new Error('Volcengine video task timeout after 120s');
+        throw new Error(`${isInfographic ? 'Infographic' : 'Volcengine video'} task timeout after ${maxPolls * pollInterval / 1000}s`);
       }
 
-      throw new Error(`No task_id or video_url from Volcengine`);
+      throw new Error(`No task_id or ${isInfographic ? 'image_url' : 'video_url'} from Volcengine`);
     } catch (err: any) {
       console.error(`[Video Render] ❌ Volcengine error (attempt ${attempt + 1}): ${taskKey} — ${err.message}`);
       if (attempt === maxRetries) {
@@ -1751,6 +1760,7 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
     const triggeredTaskKeys: string[] = [];
     const remotionQueue: Array<{ chapterId: string; option: any }> = [];
     const volcQueue: Array<{ chapterId: string; option: any }> = [];
+    const infographicQueue: Array<{ chapterId: string; option: any }> = [];
     const staticItems: Array<{ chapterId: string; option: any }> = [];
 
     for (const chapter of chapters) {
@@ -1760,13 +1770,14 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
       const taskKey = `${chapterId}-${option.id}`;
       triggeredTaskKeys.push(taskKey);
 
-      let taskType: 'remotion' | 'volcengine' | 'static' = 'static';
+      let taskType: 'remotion' | 'volcengine' | 'infographic' | 'static' = 'static';
       if (option.type === 'remotion') taskType = 'remotion';
+      else if (option.type === 'infographic') taskType = 'infographic';
       else if (['seedance', 'generative'].includes(option.type)) taskType = 'volcengine';
 
       videoTasks.set(taskKey, {
         taskId: `p3-${taskKey}`,
-        type: taskType,
+        type: taskType === 'infographic' ? 'remotion' : taskType, // 信息图最终产出也是 Remotion 视频
         status: 'pending',
         retryCount: 0,
         progress: 0,
@@ -1774,6 +1785,7 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
       });
 
       if (taskType === 'remotion') remotionQueue.push(chapter);
+      else if (taskType === 'infographic') infographicQueue.push(chapter);
       else if (taskType === 'volcengine') volcQueue.push(chapter);
       else staticItems.push(chapter);
     }
@@ -1782,8 +1794,8 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
     res.json({
       success: true,
       taskKeys: triggeredTaskKeys,
-      counts: { remotion: remotionQueue.length, volcengine: volcQueue.length, static: staticItems.length },
-      message: `已触发 ${triggeredTaskKeys.length} 个视频渲染（Remotion×${remotionQueue.length} / Volcengine×${volcQueue.length} / 静态×${staticItems.length}）`,
+      counts: { remotion: remotionQueue.length, volcengine: volcQueue.length, infographic: infographicQueue.length, static: staticItems.length },
+      message: `已触发 ${triggeredTaskKeys.length} 个视频渲染（Remotion×${remotionQueue.length} / Volcengine×${volcQueue.length} / 信息图×${infographicQueue.length} / 静态×${staticItems.length}）`,
     });
 
     // Static items: reuse Phase 2 thumbnail as videoUrl
@@ -1817,13 +1829,82 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
       console.log(`[Video Render] Remotion queue complete (${remotionQueue.length} tasks)`);
     };
 
-    // 4. Volcengine 全并发
+    // 4. Volcengine 全并发（seedance / generative 视频）
     const runVolcQueue = async () => {
       await Promise.all(volcQueue.map(ch => renderVolcengineVideo(ch.chapterId, ch.option)));
       console.log(`[Video Render] Volcengine queue complete (${volcQueue.length} tasks)`);
     };
 
-    Promise.all([runRemotionQueue(), runVolcQueue()]).catch(err => {
+    // 5. 信息图两步渲染：先生图(Seedream) → 再 CinematicZoom(Remotion) 渲染视频
+    const runInfographicQueue = async () => {
+      for (const { chapterId, option } of infographicQueue) {
+        const taskKey = `${chapterId}-${option.id}`;
+        const task = videoTasks.get(taskKey);
+        if (!task) continue;
+
+        task.status = 'processing';
+        task.startedAt = new Date().toISOString();
+
+        try {
+          // Step 1: 生成信息图图片
+          const prompt = option.imagePrompt || option.prompt || '';
+          console.log(`[Video Render] ▶ Infographic Step1 (生图): ${taskKey}`);
+          const imgResult = await generateImageWithVolc(prompt);
+
+          let imageUrl: string | undefined;
+          if (imgResult.image_url) {
+            imageUrl = imgResult.image_url;
+          } else if (imgResult.task_id) {
+            // 轮询等待图片生成
+            for (let p = 0; p < 40; p++) {
+              await new Promise(r => setTimeout(r, 2000));
+              const poll = await pollVolcImageResult(imgResult.task_id as string);
+              if (poll.status === 'completed' && poll.image_url) {
+                imageUrl = poll.image_url;
+                break;
+              } else if (poll.status === 'failed') {
+                throw new Error(poll.error || 'Infographic image generation failed');
+              }
+            }
+            if (!imageUrl) throw new Error('Infographic image generation timeout (80s)');
+          } else {
+            throw new Error(imgResult.error || 'No image from Volcengine');
+          }
+
+          console.log(`[Video Render] ✅ Infographic Step1 done: ${taskKey}, imageUrl=${imageUrl.slice(0, 60)}...`);
+          if (task) task.progress = 40;
+
+          // Step 2: 用导演大师指定的 Remotion 模板渲染推镜视频
+          //   导演大师在 option.phase3 中指定渲染参数，DC 只做透传
+          //   兜底：未指定时使用 CinematicZoom + 默认推镜参数
+          const phase3Spec = option.phase3 || {};
+          const renderTemplate = phase3Spec.template || 'CinematicZoom';
+          const renderProps = {
+            imageUrl,                                        // 注入生成的图片
+            ...(phase3Spec.props || { bgStyle: 'black' }),   // 导演指定的 props 优先
+          };
+
+          console.log(`[Video Render] ▶ Infographic Step2 (${renderTemplate}): ${taskKey}`);
+          const cinematicOption = {
+            ...option,
+            type: 'remotion',
+            template: renderTemplate,
+            props: renderProps,
+          };
+
+          await renderRemotionVideo(chapterId, cinematicOption, projectId, outputDir);
+          console.log(`[Video Render] ✅ Infographic Step2 done: ${taskKey}`);
+
+        } catch (err: any) {
+          const t = videoTasks.get(taskKey);
+          if (t) { t.status = 'failed'; t.error = err.message; t.completedAt = new Date().toISOString(); }
+          console.error(`[Video Render] ❌ Infographic error: ${taskKey} — ${err.message}`);
+        }
+      }
+      console.log(`[Video Render] Infographic queue complete (${infographicQueue.length} tasks)`);
+    };
+
+    Promise.all([runRemotionQueue(), runVolcQueue(), runInfographicQueue()]).catch(err => {
       console.error('[Video Render] Queue error:', err);
     });
 

@@ -44,8 +44,11 @@ export async function generateImageWithVolc(
     return { error: 'VOLCENGINE_ACCESS_KEY not configured. Please save your API Key in LLM Config.' };
   }
 
-  // 火山引擎方舟平台必须使用推理接入点 ID (endpoint ID)，不能直接用模型名
-  const model = endpointId || options.model || 'ep-20260226142759-xqc82';
+  if (!endpointId) {
+    return { error: 'VOLCENGINE_ENDPOINT_ID_IMAGE not configured. Please set it in .env or LLM Config.' };
+  }
+
+  const model = endpointId;
   // 火山引擎要求图片尺寸至少 3686400 像素（约 4K）
   // 影视导演使用 16:9 横向分辨率
   // 2560x1440 (2K, 3,686,400 像素) - 满足火山引擎要求，适合 16:9 视频
@@ -168,10 +171,7 @@ export async function generateVideoWithVolc(
 
   try {
     console.log(`[Volcengine Video] Generating video with endpoint=${endpointId}, prompt="${prompt.slice(0, 50)}..."`);
-    
-    const duration = options.duration || 5;
-    const enhancedPrompt = `${prompt} --resolution 1080p --duration ${duration}`;
-    
+
     const response = await fetch(VOLC_VIDEO_API, {
       method: 'POST',
       headers,
@@ -180,9 +180,11 @@ export async function generateVideoWithVolc(
         content: [
           {
             type: 'text',
-            text: enhancedPrompt
+            text: prompt
           }
-        ]
+        ],
+        resolution: '1080p',
+        duration: String(options.duration || 5),
       }),
     });
 

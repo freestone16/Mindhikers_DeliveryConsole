@@ -98,39 +98,71 @@ function loadSkillPrompt(skillName: string, promptName: string): string {
 }
 
 /**
- * 从 Director Skill 目录加载指定的 resource 文件
- * @param resourceName 资源文件名（不含扩展名），如 'remotion_catalog', 'artlist_dictionary'
+ * 从指定 Skill 目录加载 resource 文件
+ * @param skillName 技能名称，如 'Director', 'RemotionStudio'
+ * @param resourceName 资源文件名（不含扩展名），如 'artlist_dictionary'
  * @returns 资源内容，找不到则返回空字符串
  */
-function loadDirectorResource(resourceName: string): string {
+function loadSkillResource(skillName: string, resourceName: string): string {
     for (const basePath of SKILL_SEARCH_PATHS) {
         if (!basePath) continue;
-        const resourcePath = path.join(basePath, 'Director', 'resources', `${resourceName}.md`);
+        const resourcePath = path.join(basePath, skillName, 'resources', `${resourceName}.md`);
         if (fs.existsSync(resourcePath)) {
             try {
                 const content = fs.readFileSync(resourcePath, 'utf-8');
-                console.log(`[SkillLoader] ✅ Loaded Director resource "${resourceName}" from ${basePath}`);
+                console.log(`[SkillLoader] ✅ Loaded ${skillName} resource "${resourceName}" from ${basePath}`);
                 return content;
             } catch (err: any) {
                 console.warn(`[SkillLoader] ⚠️ Failed to read ${resourcePath}:`, err.message);
             }
         }
     }
-    console.warn(`[SkillLoader] ❌ Director resource "${resourceName}" not found`);
+    console.warn(`[SkillLoader] ❌ ${skillName} resource "${resourceName}" not found`);
+    return '';
+}
+
+/**
+ * 从 RemotionStudio 加载模板速查表（catalog.md）
+ *
+ * 沙漏架构：模板知识由 RemotionStudio 自身维护，是唯一事实来源。
+ * 搜索路径：SKILL_SEARCH_PATHS + RemotionStudio 专属候选路径
+ */
+function loadRemotionCatalog(): string {
+    // 候选路径：通用 Skill 搜索路径 + RemotionStudio 专属路径
+    const candidatePaths = [
+        ...SKILL_SEARCH_PATHS.filter(Boolean).map(p => path.join(p!, 'RemotionStudio', 'catalog.md')),
+        // RemotionStudio 专属候选（与 skill-sync.ts 同源）
+        process.env.REMOTION_STUDIO_DIR && path.join(process.env.REMOTION_STUDIO_DIR, 'catalog.md'),
+        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio/catalog.md'),
+    ].filter(Boolean) as string[];
+
+    for (const catalogPath of candidatePaths) {
+        if (fs.existsSync(catalogPath)) {
+            try {
+                const content = fs.readFileSync(catalogPath, 'utf-8');
+                console.log(`[SkillLoader] ✅ Loaded RemotionStudio catalog from ${catalogPath}`);
+                return content;
+            } catch (err: any) {
+                console.warn(`[SkillLoader] ⚠️ Failed to read ${catalogPath}:`, err.message);
+            }
+        }
+    }
+    console.warn(`[SkillLoader] ❌ RemotionStudio catalog.md not found — Director LLM will not know available templates`);
     return '';
 }
 
 /**
  * 为 Director 专家构建完整的 system prompt
  * 
- * 从全局 Antigravity Skill 目录 (~/.gemini/antigravity/skills/Director/) 动态加载：
- * - SKILL.md → 导演大师的核心身份与方法论
- * - prompts/{taskType}.md → 对应任务的 prompt 模板
- * - resources/remotion_catalog.md → Remotion 组件速查表
- * 
+ * 从全局 Antigravity Skill 目录动态加载并组装 Director system prompt：
+ * - Director/SKILL.md → 导演大师的核心身份与方法论
+ * - Director/prompts/{taskType}.md → 对应任务的 prompt 模板
+ * - RemotionStudio/catalog.md → Remotion 模板速查表（沙漏架构：由 RS 自身维护）
+ * - Director/resources/ → 美学哲学、Artlist 词库等
+ *
  * Prompt 模板中的占位符会被自动替换：
- * - {{DIRECTOR_SKILL}} → SKILL.md 内容
- * - {{REMOTION_CATALOG}} → resources/remotion_catalog.md 内容
+ * - {{DIRECTOR_SKILL}} → Director/SKILL.md 内容
+ * - {{REMOTION_CATALOG}} → RemotionStudio/catalog.md 内容（唯一事实来源）
  * - {{AESTHETICS_GUIDELINE}} / {{CANVAS_DESIGN_ESSENCE}} → 美学哲学
  * - {{ARTLIST_DICTIONARY}} → Artlist 词库协议
  */
@@ -143,9 +175,10 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
 
     if (promptTemplate) {
         // 3. 加载 resources 用于占位符替换
-        const remotionCatalog = loadDirectorResource('remotion_catalog');
-        const aestheticsGuideline = loadDirectorResource('aesthetics_guideline');
-        const artlistDictionary = loadDirectorResource('artlist_dictionary');
+        // 沙漏架构：模板 catalog 从 RemotionStudio 读取（唯一事实来源），其余从 Director 读取
+        const remotionCatalog = loadRemotionCatalog();
+        const aestheticsGuideline = loadSkillResource('Director', 'aesthetics_guideline');
+        const artlistDictionary = loadSkillResource('Director', 'artlist_dictionary');
 
         // 4. 替换占位符
         const resolved = promptTemplate
