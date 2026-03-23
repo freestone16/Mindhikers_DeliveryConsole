@@ -9,6 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const EXPERTS = ['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster'];
+// RemotionStudio 是完整 Node 项目，不走 cpSync，通过可达性检查单独加入 syncedSkills
+const ALL_SKILLS = [...EXPERTS, 'RemotionStudio'];
 
 // Lazy evaluation: SOURCE_ROOT must be resolved after dotenv.config() runs
 const getSourceRoot = () => {
@@ -81,7 +83,8 @@ export const syncSkills = async (io: Server) => {
         }
     }
 
-    // RemotionStudio 可达性检查（不复制，只验证路径）
+    // RemotionStudio 特殊处理：完整 Node 项目不做 cpSync，只验证可达性
+    // 可达即视为已同步（与其他 Skill 同等身份）
     const remotionCandidates = [
         process.env.REMOTION_STUDIO_DIR,
         process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'RemotionStudio'),
@@ -90,14 +93,16 @@ export const syncSkills = async (io: Server) => {
     const remotionDir = remotionCandidates.find(d => fs.existsSync(path.join(d, 'node_modules', '.bin', 'remotion')));
     if (remotionDir) {
         console.log(`✅ RemotionStudio reachable: ${remotionDir}`);
+        if (!syncedSkills.includes('RemotionStudio')) {
+            syncedSkills.push('RemotionStudio');
+        }
     } else {
         console.warn(`⚠️ RemotionStudio not found in: ${remotionCandidates.join(', ')}`);
     }
 
-    console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${EXPERTS.length}`);
+    console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${ALL_SKILLS.length}`);
     lastSyncStatus = {
         status: 'done', synced: syncedSkills, count: syncedSkills.length,
-        remotionStudio: remotionDir ? { status: 'ok', path: remotionDir } : { status: 'missing' },
         timestamp: new Date().toISOString()
     };
     io.emit('skill-sync-status', lastSyncStatus);
