@@ -1,10 +1,11 @@
 # SD210 黄金坩埚当前工作计划
 
 > 日期：2026-03-12
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：当前执行计划 / 统一版
 > 依据：当前代码现场 + `2026-03-12_SD210_Crucible_Interaction_Contract_And_Bridge.md` + 上个窗口交接信息
+> 迁移说明：本文形成于旧 worktree 阶段；当前阅读与执行请以 `MHSDC` 目录体系为准，不再以 `/Users/luzhoua/DeliveryConsole` 作为启动入口。
 
 ## 1. 当前判断
 

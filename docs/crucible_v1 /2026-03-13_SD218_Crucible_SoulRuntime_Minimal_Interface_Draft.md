@@ -1,10 +1,11 @@
 # SD218 Soul Runtime 最小接口草案
 
 > 日期：2026-03-13
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：方案草案，等待人工审核
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：本文保留原设计草案，凡涉及目录、启动与协作入口，均应切到 `MHSDC` 当前 worktree 口径。
 
 ## 1. 本稿目的
 

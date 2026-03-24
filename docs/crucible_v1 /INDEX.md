@@ -1,18 +1,19 @@
 # 黄金坩埚 v1 方案索引
 
-> 目录：`/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1`
+> 目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1 `
 > 作用：汇总黄金坩埚 v1 当前主线方案，方便后续新窗口直接进入实现阶段。
+> 迁移说明：本索引与其链接已统一切到 `MHSDC` 新目录；若看到旧 `DeliveryConsole` 路径，应按历史档案理解。
 
 ## 1. 阅读顺序
 
 建议按这个顺序阅读：
 
-1. [SD217 黄金坩埚 v1 Soul Runtime 收束方案](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-13_SD217_Crucible_V1_SoulRuntime_Blueprint.md)
-2. [SD218 Soul Runtime 最小接口草案](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-13_SD218_Crucible_SoulRuntime_Minimal_Interface_Draft.md)
-3. [SD219 黄金坩埚开源 / 公益 / 商业三层模型](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-13_SD219_Crucible_OpenSource_PublicGood_Commercial_Model.md)
-4. [SD220 黄金坩埚三轨并行开发治理方案](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-14_SD220_Crucible_ThreeTrack_Parallel_Governance_Plan.md)
-5. [SD221 Golden Crucible Linear 治理交接文档](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-14_SD221_GoldenCrucible_Linear_Governance_Handoff.md)
-6. [SD222 黄金坩埚 Phase 1 Artifact-Lite 中屏方案](/Users/luzhoua/DeliveryConsole/docs/plans/crucible_v1/2026-03-14_SD222_Crucible_Phase1_ArtifactLite_Plan.md)
+1. [SD217 黄金坩埚 v1 Soul Runtime 收束方案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-13_SD217_Crucible_V1_SoulRuntime_Blueprint.md)
+2. [SD218 Soul Runtime 最小接口草案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-13_SD218_Crucible_SoulRuntime_Minimal_Interface_Draft.md)
+3. [SD219 黄金坩埚开源 / 公益 / 商业三层模型](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-13_SD219_Crucible_OpenSource_PublicGood_Commercial_Model.md)
+4. [SD220 黄金坩埚三轨并行开发治理方案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-14_SD220_Crucible_ThreeTrack_Parallel_Governance_Plan.md)
+5. [SD221 Golden Crucible Linear 治理交接文档](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-14_SD221_GoldenCrucible_Linear_Governance_Handoff.md)
+6. [SD222 黄金坩埚 Phase 1 Artifact-Lite 中屏方案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/crucible_v1%20/2026-03-14_SD222_Crucible_Phase1_ArtifactLite_Plan.md)
 
 ## 2. 这套方案回答什么
 
@@ -47,9 +48,9 @@
 
 下面这些文档仍然重要，但更偏背景与前置推导：
 
-- [SD210 黄金冶炼师 Skill 架构方案](/Users/luzhoua/DeliveryConsole/docs/plans/2026-03-10_SD210_GoldenMetallurgist_Skill_Architecture.md)
-- [SD212 黄金坩埚灵魂系统升级方案](/Users/luzhoua/DeliveryConsole/docs/plans/2026-03-11_SD212_GoldenCrucible_SoulSystem_Plan.md)
-- [SD215 黄金坩埚面向未来的 Ore / Soul / Review 架构](/Users/luzhoua/DeliveryConsole/docs/plans/2026-03-12_SD215_Crucible_FutureFacing_Ore_Soul_Review_Architecture.md)
+- [SD210 黄金冶炼师 Skill 架构方案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/plans/2026-03-10_SD210_GoldenMetallurgist_Skill_Architecture.md)
+- [SD212 黄金坩埚灵魂系统升级方案](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/plans/2026-03-11_SD212_GoldenCrucible_SoulSystem_Plan.md)
+- [SD215 黄金坩埚面向未来的 Ore / Soul / Review 架构](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/plans/2026-03-12_SD215_Crucible_FutureFacing_Ore_Soul_Review_Architecture.md)
 
 ## 5. 后续建议
 

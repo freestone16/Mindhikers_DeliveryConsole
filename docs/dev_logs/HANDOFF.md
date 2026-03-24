@@ -1,4 +1,4 @@
-🕐 Last updated: 2026-03-25 00:00
+🕐 Last updated: 2026-03-25 00:45
 🌿 Branch: MHSDC-GC-SSE
 
 ## 当前状态
@@ -8,6 +8,19 @@
   - commit: `b8a8854`
   - 内容：`README.md`、`RELOCATION.md`、`.claude/launch.json`、`ecosystem.config.cjs`、`package.json`、`package-lock.json`
 - `b8a8854` 已单独推送到远端 `origin/MHSDC-GC-SSE`，没有夹带搜索排错脏改动。
+- 入口文档继续完成第二轮收口：
+  - `README.md`
+  - `AGENTS.md`
+  - `claude.md`
+  - `.agent/PROJECT_STATUS.md`
+- 活跃计划 / 索引文档已开始从旧目录口径切到 `MHSDC`：
+  - `docs/plans/2026-03-10_SD210_GoldenMetallurgist_Skill_Architecture.md`
+  - `docs/plans/2026-03-12_*`
+  - `docs/plans/2026-03-19_SD223_Soul_Inference_Schema_v0.1.md`
+  - `docs/crucible_v1 /INDEX.md`
+  - `docs/crucible_v1 /2026-03-13~14_*`
+- 新增治理清单：
+  - `docs/plans/2026-03-25_MHSDC_Worktree_Migration_Governance.md`
 - 当前 SSE 本地环境可正常启动：
   - backend: `3009`
   - frontend: `5182`
@@ -21,7 +34,8 @@
 ## 当前 WIP
 - 工作区仍然很脏，存在大量本轮之外的既有改动。
 - 我另外开始了“老张搜索链路排错”，但这部分**尚未整理提交**，不应和 Git 治理混成同一个提交。
-- 顶层入口文档仍在继续清理旧 `DeliveryConsole` 文案，但这一步只处理 README / handoff / relocation 一类会误导启动的入口文件。
+- 本轮已把入口级文档与一批活跃计划文档切到 `MHSDC` 口径，但仍有历史 plans / design docs / dev_logs / lessons 保留旧绝对路径。
+- 当前剩余的旧路径引用大多已降级为“历史档案问题”，不是启动层风险；后续需要继续按批次处理，而不是一把梭全仓替换。
 - 当前与搜索排错直接相关的未提交文件主要包括：
   - `server/crucible.ts`
   - `server/crucible-research.ts`
@@ -32,9 +46,9 @@
 
 ## 新窗口继续 Git 治理怎么做
 - 先只做 Git / 目录治理，不要顺手处理老张搜索修复。
-- 第一步先看 `git status --short`，确认 `b8a8854` 已经单独上远端，后续只是在它之上继续做文档清理。
+- 第一步先看 `docs/plans/2026-03-25_MHSDC_Worktree_Migration_Governance.md`，按里面的 `Phase A / B / C` 继续清仓。
 - 第二步继续扫仓库里仍残留的 `DeliveryConsole` / 旧路径文档与说明，但优先级低于启动层；先清运行风险，再清历史文案。
-- 第三步把入口级文档和纯历史档案分层处理：README / HANDOFF / RELOCATION 优先，旧 plans / memory dump 延后。
+- 第三步优先清仍会被当前窗口引用的 plans / design docs；`lessons`、旧 `dev_logs`、`.agent/memory_dumps` 最后处理。
 - 第四步单独判断远端仓库命名、默认分支 README 展示、以及 SaaS 新 worktree 的后续治理，不要和当前 SSE 脏现场耦合。
 
 ## 提醒

@@ -1,10 +1,11 @@
 # SD217 黄金坩埚 v1 Soul Runtime 收束方案
 
 > 日期：2026-03-13
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：方案定稿，等待人工审核
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：本文为旧 worktree 阶段的定稿方案，当前目录与执行入口应统一按 `MHSDC` 新体系理解。
 
 ## 1. 本轮定稿目标
 

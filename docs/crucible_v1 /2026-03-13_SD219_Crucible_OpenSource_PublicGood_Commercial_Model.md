@@ -1,10 +1,11 @@
 # SD219 黄金坩埚开源 / 公益 / 商业三层模型
 
 > 日期：2026-03-13
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：方案草案，等待人工审核
 > 作者：Codex（按 OldYang + OldZhang 协议落盘）
+> 迁移说明：本文写于旧目录阶段；当前阅读时请把本地工作目录理解为 `MHSDC` 新 worktree。
 
 ## 1. 本稿目的
 
