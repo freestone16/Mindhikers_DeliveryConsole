@@ -1,12 +1,12 @@
-# Delivery Console
+# Golden Crucible SSE Workspace
 
-MindHikers 项目的内容交付管理控制台。用于管理视频项目的制作流程，包括导演、音乐、缩略图、营销等模块。
+MindHikers Delivery Console 体系中的黄金坩埚 SSE / SaaS 集成工作线。仓库历史文案里仍可能出现 “Delivery Console”，但当前启动、排障与协作都以本 worktree 为准。
 
 ---
 
 ## 📁 项目结构
 
-**⚠️ 重要变更（2026-03-24 更新）：当前代码已迁入 `MHSDC` worktree 体系，旧 `DeliveryConsole` 路径不再是默认启动位置。**
+**⚠️ 重要变更（2026-03-24 更新）：当前代码已迁入 `MHSDC` worktree 体系，旧 `DeliveryConsole` 路径仅保留为历史记录，不再是默认启动位置。**
 
 ```
 /Users/luzhoua/MHSDC/
@@ -25,6 +25,7 @@ MindHikers 项目的内容交付管理控制台。用于管理视频项目的制
 1. **代码目录以当前 worktree 为准**
 2. **项目数据目录仍由 `PROJECTS_BASE` 指向**
 3. **端口以 `~/.vibedir/global_ports_registry.yml` + 当前 worktree 的 `.env.local` 为准**
+4. **凡是提到旧 `DeliveryConsole` 路径的说明，默认视为历史背景，而不是当前启动入口**
 
 ---
 
@@ -186,7 +187,7 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ### v2.0.1 (2025-02-20)
 
-- **变更：** 项目代码从 Obsidian 目录分离到 `/Users/luzhoua/DeliveryConsole/`
+- **变更：** 当时项目代码从 Obsidian 目录分离到 `/Users/luzhoua/DeliveryConsole/`（后续已进一步迁入 `MHSDC` worktree 体系）
 - **修复：** `registry.py` 模型名称读取逻辑错误
 - **说明：** 数据目录（Projects/）保留在原处，不受影响
 
@@ -216,7 +217,7 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ## 📞 联系方式
 
-如有问题，请参考 `docs/` 目录或查看 Makefile 中的帮助信息。
+如有问题，请优先参考 `docs/dev_logs/HANDOFF.md`、`docs/04_progress/dev_progress.md` 与 `docs/` 目录，再查看 Makefile 中的帮助信息。
 
 ```bash
 make help
