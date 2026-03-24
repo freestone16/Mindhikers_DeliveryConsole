@@ -145,7 +145,7 @@ export const LLMConfigPage = ({ onClose }: LLMConfigPageProps) => {
                 <Settings className="w-6 h-6 text-blue-500" />
                 全局模型网关配置
               </h1>
-              <p className="text-sm text-slate-400 mt-1">管理 Delivery Console 所有环节的大语言模型与生成大模型状态。</p>
+              <p className="text-sm text-slate-400 mt-1">管理 GoldenCrucible SaaS 的大语言模型与生成模型状态。</p>
             </div>
           </div>
         </div>

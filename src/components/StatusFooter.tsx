@@ -75,12 +75,12 @@ export const StatusFooter = ({
                 <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                     <span className="font-mono text-[var(--ink-2)]">
-                        {isConnected ? 'CONSOLE ONLINE' : 'DISCONNECTED'}
+                        {isConnected ? 'CRUCIBLE ONLINE' : 'DISCONNECTED'}
                     </span>
                 </div>
 
                 <div className="text-[var(--ink-3)]">
-                    MindHikers Delivery Console {version}
+                    GoldenCrucible SaaS {version}
                 </div>
 
                 <div className="relative flex items-center gap-3" ref={dropdownRef}>
