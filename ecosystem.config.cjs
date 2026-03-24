@@ -4,13 +4,16 @@
  * 生产环境进程管理配置
  */
 
+const path = require('path');
+const projectRoot = __dirname;
+
 module.exports = {
   apps: [
     {
       name: 'delivery-backend',
       script: 'node',
       args: 'dist/server/index.js',
-      cwd: '/Users/luzhoua/DeliveryConsole',
+      cwd: projectRoot,
       instances: 1,
       autorestart: true,
       watch: false,
@@ -34,7 +37,7 @@ module.exports = {
       name: 'delivery-frontend',
       script: 'npx',
       args: 'vite preview --host',
-      cwd: '/Users/luzhoua/DeliveryConsole/dist',
+      cwd: path.join(projectRoot, 'dist'),
       instances: 1,
       autorestart: true,
       watch: false,

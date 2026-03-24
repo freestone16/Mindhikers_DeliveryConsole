@@ -4,32 +4,32 @@
     {
       "name": "Full Dev (Frontend + Backend)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "set -a; [ -f ./.env.local ] && . ./.env.local; [ -f ./.env ] && . ./.env; set +a; npm run dev"],
-      "port": 5181
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env ] && . ./.env; [ -f ./.env.local ] && . ./.env.local; set +a; npm run dev"],
+      "port": 5182
     },
     {
       "name": "Frontend Only (Vite)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "set -a; [ -f ./.env.local ] && . ./.env.local; [ -f ./.env ] && . ./.env; set +a; npx vite --host --port ${VITE_APP_PORT:-5176}"],
-      "port": 5181
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env ] && . ./.env; [ -f ./.env.local ] && . ./.env.local; set +a; npx vite --host --port ${VITE_APP_PORT:-5182}"],
+      "port": 5182
     },
     {
       "name": "Backend Only (TSX Server)",
-      "runtimeExecutable": "tsx",
-      "runtimeArgs": ["watch", "server/index.ts"],
-      "port": 3008
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env ] && . ./.env; [ -f ./.env.local ] && . ./.env.local; set +a; npx tsx watch server/index.ts"],
+      "port": 3009
     },
     {
       "name": "backend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3008
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env ] && . ./.env; [ -f ./.env.local ] && . ./.env.local; set +a; npx tsx watch server/index.ts"],
+      "port": 3009
     },
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 5176,
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "set -a; [ -f ./.env ] && . ./.env; [ -f ./.env.local ] && . ./.env.local; set +a; npx vite --host --port ${VITE_APP_PORT:-5182}"],
+      "port": 5182,
       "autoPort": false
     }
   ]

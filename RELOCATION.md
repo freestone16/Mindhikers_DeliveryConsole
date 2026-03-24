@@ -1,5 +1,9 @@
 # Delivery Console 搬迁记录
 
+> 说明：这是一份 **2025-02-20 的历史迁移记录**。
+> 当前 MHSDC 系列 worktree 已迁移到 `/Users/luzhoua/MHSDC/*`；
+> 若你要启动当前工作线，请优先参考当前 worktree 内的 `README.md`、`docs/dev_logs/HANDOFF.md` 和端口账本，而不是把本文当作现行启动说明。
+
 **日期：** 2025-02-20  
 **执行人：** AI Assistant  
 **状态：** ✅ 已完成
