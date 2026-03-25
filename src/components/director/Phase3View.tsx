@@ -252,8 +252,15 @@ const Phase3OptionRow = ({
             </div>
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center">
-              <Video className="w-6 h-6 text-slate-500 mb-1" />
-              <span className="text-[10px] text-slate-500 font-medium">等待渲染</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
+                className="flex flex-col items-center gap-1 group cursor-pointer hover:scale-105 transition-transform"
+              >
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 group-hover:bg-blue-500/30 flex items-center justify-center transition-colors">
+                  <Play className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
+                </div>
+                <span className="text-[10px] text-slate-400 group-hover:text-blue-300 font-medium">单条渲染</span>
+              </button>
             </div>
           )}
         </div>
