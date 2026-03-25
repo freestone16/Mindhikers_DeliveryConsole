@@ -36,13 +36,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
+const CLIENT_DIST_DIR = path.resolve(__dirname, '../dist');
+
+const resolveAllowedOrigins = () => {
+    const configured = [
+        process.env.CORS_ORIGIN,
+        process.env.APP_BASE_URL,
+    ]
+        .filter(Boolean)
+        .flatMap((value) => (value as string).split(','))
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+    if (configured.length > 0) {
+        return configured;
+    }
+
+    return true;
+};
+
+const corsOrigin = resolveAllowedOrigins();
 
 const app = express();
-app.use(cors()); // Enable CORS for all routes
+app.use(cors({ origin: corsOrigin, credentials: true }));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
+        origin: corsOrigin,
         methods: ["GET", "POST"]
     }
 });
@@ -101,7 +121,6 @@ function getAppVersion(): string {
     }
 }
 
-app.use(cors());
 app.use(express.json());
 
 // Mount YouTube Auth Routes
@@ -1297,6 +1316,20 @@ app.post('/api/experts/run', (req, res) => {
     }
 });
 
+// Setup Health Check Endpoints
+setupHealthCheck(app);
+
+const clientIndexPath = path.join(CLIENT_DIST_DIR, 'index.html');
+if (fs.existsSync(clientIndexPath)) {
+    app.use(express.static(CLIENT_DIST_DIR));
+    app.get(/^(?!\/(?:api|health|socket\.io)\b).*/, (_req, res) => {
+        res.sendFile(clientIndexPath);
+    });
+    console.log(`🧱 Serving built frontend from ${CLIENT_DIST_DIR}`);
+} else {
+    console.log('🪶 No built frontend detected at /dist yet; API/socket server will run standalone.');
+}
+
 // Start Server
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🔒 Server running on http://0.0.0.0:${PORT} (Docker Friendly)`);
@@ -1328,9 +1361,6 @@ shutdownManager.registerCleanup(async () => {
     closeVisualPlanWatcher();
     console.log('    ✓ Visual Plan Watcher 已关闭');
 });
-
-// Setup Health Check Endpoints
-setupHealthCheck(app);
 
 // --- Global Error Handlers (prevent server crashes from unhandled async errors) ---
 process.on('uncaughtException', (err) => {
