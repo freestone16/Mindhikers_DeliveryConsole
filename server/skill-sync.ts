@@ -9,8 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const EXPERTS = ['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster'];
-// RemotionStudio 是完整 Node 项目，不走 cpSync，通过可达性检查单独加入 syncedSkills
-const ALL_SKILLS = [...EXPERTS, 'RemotionStudio'];
+// RemotionStudio / svg-architect 是外部工具技能，不走 cpSync，通过可达性检查单独加入 syncedSkills
+const ALL_SKILLS = [...EXPERTS, 'RemotionStudio', 'svg-architect'];
 
 // Lazy evaluation: SOURCE_ROOT must be resolved after dotenv.config() runs
 const getSourceRoot = () => {
@@ -98,6 +98,21 @@ export const syncSkills = async (io: Server) => {
         }
     } else {
         console.warn(`⚠️ RemotionStudio not found in: ${remotionCandidates.join(', ')}`);
+    }
+
+    // svg-architect 特殊处理：Python 工具技能，不走 cpSync，只验证可达性
+    const svgArchitectCandidates = [
+        process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'svg-architect'),
+        path.join(os.homedir(), '.gemini/antigravity/skills/svg-architect'),
+    ].filter(Boolean) as string[];
+    const svgArchitectDir = svgArchitectCandidates.find(d => fs.existsSync(path.join(d, 'scripts', 'run_pipeline.py')));
+    if (svgArchitectDir) {
+        console.log(`✅ svg-architect reachable: ${svgArchitectDir}`);
+        if (!syncedSkills.includes('svg-architect')) {
+            syncedSkills.push('svg-architect');
+        }
+    } else {
+        console.warn(`⚠️ svg-architect not found in: ${svgArchitectCandidates.join(', ')}`);
     }
 
     console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${ALL_SKILLS.length}`);

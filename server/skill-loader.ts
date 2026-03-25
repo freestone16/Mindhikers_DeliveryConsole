@@ -152,6 +152,54 @@ function loadRemotionCatalog(): string {
 }
 
 /**
+ * 从 svg-architect 加载 SVG 制图能力说明
+ *
+ * svg-architect 是 Director 的工具技能（类似 RemotionStudio），
+ * 提供 platform_profiles（画布规格）和主题规格供 Director LLM 参考。
+ */
+function loadSvgArchitectSpec(): string {
+    const candidatePaths = [
+        ...SKILL_SEARCH_PATHS.filter(Boolean).map(p => path.join(p!, 'svg-architect')),
+        path.join(os.homedir(), '.gemini/antigravity/skills/svg-architect'),
+    ].filter(Boolean);
+
+    for (const skillDir of candidatePaths) {
+        const profilesPath = path.join(skillDir, 'resources', 'platform_profiles.json');
+        if (fs.existsSync(profilesPath)) {
+            try {
+                const profiles = fs.readFileSync(profilesPath, 'utf-8');
+                const themePath = path.join(skillDir, 'resources', 'tech_dark.md');
+                const theme = fs.existsSync(themePath) ? fs.readFileSync(themePath, 'utf-8') : '';
+
+                const spec = `【SVG-Architect 制图能力】
+你可以在 svgPrompt 字段中直接输出完整 SVG 代码。DC 会通过 SVG-Architect 管线验证、优化并转换为 PNG 注入模板。
+
+画布规格（platform_profiles）：
+${profiles}
+
+使用 remotion_bg (3840×2160) 作为视频背景，remotion_overlay (3840×2160 透明) 作为 CinematicZoom 叠加层。
+
+SVG 技术要求：
+- viewBox="0 0 3840 2160"
+- safe_area: x=200 y=120 w=3440 h=1920（文字/数据不超出此区域）
+- 字体：Inter (英文), PingFang SC (中文)
+- 禁止外部资源（no external URL, no @import）
+- 所有 ID 加 prefix 避免冲突
+
+${theme ? `默认主题色板 (tech-dark)：\n${theme}` : ''}`;
+
+                console.log(`[SkillLoader] ✅ Loaded svg-architect spec from ${skillDir}`);
+                return spec;
+            } catch (err: any) {
+                console.warn(`[SkillLoader] ⚠️ Failed to read svg-architect spec:`, err.message);
+            }
+        }
+    }
+    console.warn(`[SkillLoader] ❌ svg-architect not found — Director will not have SVG generation capability`);
+    return '';
+}
+
+/**
  * 为 Director 专家构建完整的 system prompt
  * 
  * 从全局 Antigravity Skill 目录动态加载并组装 Director system prompt：
@@ -165,6 +213,7 @@ function loadRemotionCatalog(): string {
  * - {{REMOTION_CATALOG}} → RemotionStudio/catalog.md 内容（唯一事实来源）
  * - {{AESTHETICS_GUIDELINE}} / {{CANVAS_DESIGN_ESSENCE}} → 美学哲学
  * - {{ARTLIST_DICTIONARY}} → Artlist 词库协议
+ * - {{SVG_ARCHITECT_SPEC}} → SVG-Architect 制图能力说明（画布规格+主题色板）
  */
 export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revise' | 'chat_edit'): string {
     // 1. 加载 Director 核心知识（SKILL.md）
@@ -179,6 +228,7 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
         const remotionCatalog = loadRemotionCatalog();
         const aestheticsGuideline = loadSkillResource('Director', 'aesthetics_guideline');
         const artlistDictionary = loadSkillResource('Director', 'artlist_dictionary');
+        const svgArchitectSpec = loadSvgArchitectSpec();
 
         // 4. 替换占位符
         const resolved = promptTemplate
@@ -186,7 +236,8 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
             .replace(/\{\{REMOTION_CATALOG\}\}/g, remotionCatalog)
             .replace(/\{\{ARTLIST_DICTIONARY\}\}/g, artlistDictionary)
             .replace(/\{\{AESTHETICS_GUIDELINE\}\}/g, aestheticsGuideline)
-            .replace(/\{\{CANVAS_DESIGN_ESSENCE\}\}/g, aestheticsGuideline);
+            .replace(/\{\{CANVAS_DESIGN_ESSENCE\}\}/g, aestheticsGuideline)
+            .replace(/\{\{SVG_ARCHITECT_SPEC\}\}/g, svgArchitectSpec);
 
         console.log(`[SkillLoader] 🎬 Director prompt "${taskType}" assembled (${resolved.length} chars)`);
         return resolved;

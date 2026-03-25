@@ -62,7 +62,8 @@ export async function renderStillWithApi(
             '--frame=50',
             '--scale=1.5',
             '--jpeg-quality=90',
-            `--props=${tmpPropsPath}`
+            `--props=${tmpPropsPath}`,
+            '--disable-web-security'
         ];
 
         console.log(`[Remotion CLI] Command: ${remotionBin} ${args.join(' ')}`);
@@ -140,7 +141,8 @@ export async function renderVideoWithApi(
             compositionId,
             outputPath,
             '--concurrency=2',
-            `--props=${tmpPropsPath}`
+            `--props=${tmpPropsPath}`,
+            '--disable-web-security'
         ];
 
         console.log(`[Remotion Video] Command: ${remotionBin} ${args.join(' ')}`);

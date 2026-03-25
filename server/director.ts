@@ -6,6 +6,7 @@ import { generateImageWithVolc, pollVolcImageResult, generateVideoWithVolc, poll
 import { loadConfig } from './llm-config';
 import type { LLMProvider } from '../src/schemas/llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
+import { generateSvgImage } from './svg-architect';
 import { getProjectRoot } from './project-paths';
 
 export interface DirectorChapter {
@@ -1606,6 +1607,71 @@ export const getVideoStatus = async (req: Request, res: Response) => {
   });
 };
 
+// ============================================================
+// 公共：下载远程图片到本地（解决 Remotion CLI Chromium CORS 问题）
+// ============================================================
+async function downloadImageToLocal(remoteUrl: string, taskKey: string, outputDir?: string): Promise<string> {
+  const dir = outputDir || path.join(process.cwd(), 'temp_images');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const ext = '.jpg';
+  const localPath = path.join(dir, `seedream_${taskKey.replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`);
+
+  try {
+    const response = await fetch(remoteUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(localPath, buffer);
+    console.log(`[ImageGen] 📥 图片已下载到本地: ${localPath} (${(buffer.length / 1024).toFixed(0)}KB)`);
+    return localPath;
+  } catch (err: any) {
+    console.warn(`[ImageGen] ⚠️ 下载失败，回退使用远程URL: ${err.message}`);
+    return remoteUrl; // fallback: 用远程 URL，可能有 CORS 问题但不阻断
+  }
+}
+
+// ============================================================
+// 公共：调火山引擎 Seedream 生图 + 轮询等待 → 下载到本地路径
+// ============================================================
+async function generateImageFromPrompt(
+  imagePrompt: string,
+  taskKey: string,
+  timeoutMs = 80000,
+  outputDir?: string,
+): Promise<string> {
+  console.log(`[ImageGen] ▶ 开始生图: ${taskKey}`);
+  const imgResult = await generateImageWithVolc(imagePrompt);
+
+  let remoteUrl: string | null = null;
+
+  if (imgResult.image_url) {
+    console.log(`[ImageGen] ✅ 直接返回: ${taskKey}`);
+    remoteUrl = imgResult.image_url;
+  } else if (imgResult.task_id) {
+    const pollInterval = 2000;
+    const maxPolls = Math.ceil(timeoutMs / pollInterval);
+    for (let p = 0; p < maxPolls; p++) {
+      await new Promise(r => setTimeout(r, pollInterval));
+      const poll = await pollVolcImageResult(imgResult.task_id as string);
+      if (poll.status === 'completed' && poll.image_url) {
+        console.log(`[ImageGen] ✅ 轮询完成: ${taskKey} (${(p + 1) * 2}s)`);
+        remoteUrl = poll.image_url;
+        break;
+      } else if (poll.status === 'failed') {
+        throw new Error(poll.error || `Image generation failed: ${taskKey}`);
+      }
+    }
+    if (!remoteUrl) {
+      throw new Error(`Image generation timeout (${timeoutMs / 1000}s): ${taskKey}`);
+    }
+  } else {
+    throw new Error(imgResult.error || `No image result from Volcengine: ${taskKey}`);
+  }
+
+  // 下载到本地，解决 Remotion CLI Chromium CORS 问题
+  return downloadImageToLocal(remoteUrl, taskKey, outputDir);
+}
+
 // Remotion 单条视频渲染（含重试）
 async function renderRemotionVideo(
   chapterId: string,
@@ -1812,13 +1878,46 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
     }
 
     // 3. Remotion 并发队列（3 workers）
+    //    如果 option 有 imagePrompt 且 props 里没有 imageUrl，先调 Seedream 生图再渲染
     const REMOTION_VIDEO_CONCURRENCY = 3;
     const runRemotionQueue = async () => {
       let idx = 0;
       const worker = async () => {
         while (idx < remotionQueue.length) {
           const chapter = remotionQueue[idx++];
-          await renderRemotionVideo(chapter.chapterId, chapter.option, projectId, outputDir);
+          const { chapterId, option } = chapter;
+          const taskKey = `${chapterId}-${option.id}`;
+
+          // 预处理：svgPrompt / imagePrompt → 自动生图 → 注入 props.imageUrl
+          // 优先级：svgPrompt（SVG-Architect 确定性制图）> imagePrompt（Seedream 照片级生图）
+          if (option.svgPrompt && !(option.props?.imageUrl)) {
+            try {
+              console.log(`[Video Render] 🖼️ SVG-Architect 预生图: ${taskKey}`);
+              const result = await generateSvgImage(option.svgPrompt, {
+                profile: 'remotion_bg', outputDir, slug: taskKey,
+              });
+              if (result.success) {
+                option.props = { ...(option.props || {}), imageUrl: result.pngPath };
+                console.log(`[Video Render] ✅ SVG 预生图完成: ${taskKey}`);
+              } else {
+                console.warn(`[Video Render] ⚠️ SVG 预生图失败，继续无底图渲染: ${taskKey} — ${result.error}`);
+              }
+            } catch (err: any) {
+              console.warn(`[Video Render] ⚠️ SVG 预生图异常，继续无底图渲染: ${taskKey} — ${err.message}`);
+            }
+          } else if (option.imagePrompt && !(option.props?.imageUrl)) {
+            try {
+              console.log(`[Video Render] 🎨 Remotion 预生图: ${taskKey}`);
+              const imageUrl = await generateImageFromPrompt(option.imagePrompt, taskKey);
+              option.props = { ...(option.props || {}), imageUrl };
+              console.log(`[Video Render] ✅ 预生图完成: ${taskKey}`);
+            } catch (err: any) {
+              // 生图失败不阻断渲染：模板会以无底图模式渲染
+              console.warn(`[Video Render] ⚠️ 预生图失败，继续无底图渲染: ${taskKey} — ${err.message}`);
+            }
+          }
+
+          await renderRemotionVideo(chapterId, option, projectId, outputDir);
         }
       };
       const workers = Array.from(
@@ -1835,7 +1934,7 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
       console.log(`[Video Render] Volcengine queue complete (${volcQueue.length} tasks)`);
     };
 
-    // 5. 信息图两步渲染：先生图(Seedream) → 再 CinematicZoom(Remotion) 渲染视频
+    // 5. 信息图两步渲染：先生图(SVG-Architect/Seedream) → 再 CinematicZoom(Remotion) 渲染视频
     const runInfographicQueue = async () => {
       for (const { chapterId, option } of infographicQueue) {
         const taskKey = `${chapterId}-${option.id}`;
@@ -1847,31 +1946,36 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
 
         try {
           // Step 1: 生成信息图图片
-          const prompt = option.imagePrompt || option.prompt || '';
-          console.log(`[Video Render] ▶ Infographic Step1 (生图): ${taskKey}`);
-          const imgResult = await generateImageWithVolc(prompt);
+          // 优先级：svgPrompt（SVG-Architect 精准制图）> imagePrompt（Seedream 文生图兜底）
+          let imageUrl: string | null = null;
+          let overlayUrl: string | undefined;
 
-          let imageUrl: string | undefined;
-          if (imgResult.image_url) {
-            imageUrl = imgResult.image_url;
-          } else if (imgResult.task_id) {
-            // 轮询等待图片生成
-            for (let p = 0; p < 40; p++) {
-              await new Promise(r => setTimeout(r, 2000));
-              const poll = await pollVolcImageResult(imgResult.task_id as string);
-              if (poll.status === 'completed' && poll.image_url) {
-                imageUrl = poll.image_url;
-                break;
-              } else if (poll.status === 'failed') {
-                throw new Error(poll.error || 'Infographic image generation failed');
-              }
-            }
-            if (!imageUrl) throw new Error('Infographic image generation timeout (80s)');
-          } else {
-            throw new Error(imgResult.error || 'No image from Volcengine');
+          if (option.svgPrompt && option.imagePrompt) {
+            // 双层模式：Seedream 底图 + SVG-Architect 透明数据叠加层
+            console.log(`[Video Render] ▶ Infographic Step1 (双层: Seedream底图 + SVG叠加): ${taskKey}`);
+            const bgPrompt = option.imagePrompt || option.prompt || '';
+            imageUrl = await generateImageFromPrompt(bgPrompt, taskKey + '-bg');
+            const svgResult = await generateSvgImage(option.svgPrompt, {
+              profile: 'remotion_overlay', outputDir, slug: taskKey + '-overlay',
+            });
+            if (svgResult.success) overlayUrl = svgResult.pngPath;
+          } else if (option.svgPrompt) {
+            // SVG-Architect 单层：精准数据可视化
+            console.log(`[Video Render] ▶ Infographic Step1 (SVG-Architect): ${taskKey}`);
+            const svgResult = await generateSvgImage(option.svgPrompt, {
+              profile: 'remotion_bg', outputDir, slug: taskKey,
+            });
+            if (svgResult.success) imageUrl = svgResult.pngPath;
           }
 
-          console.log(`[Video Render] ✅ Infographic Step1 done: ${taskKey}, imageUrl=${imageUrl.slice(0, 60)}...`);
+          // Seedream 兜底
+          if (!imageUrl) {
+            const prompt = option.imagePrompt || option.prompt || '';
+            console.log(`[Video Render] ▶ Infographic Step1 (Seedream): ${taskKey}`);
+            imageUrl = await generateImageFromPrompt(prompt, taskKey);
+          }
+
+          console.log(`[Video Render] ✅ Infographic Step1 done: ${taskKey}`);
           if (task) task.progress = 40;
 
           // Step 2: 用导演大师指定的 Remotion 模板渲染推镜视频
@@ -1879,10 +1983,11 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
           //   兜底：未指定时使用 CinematicZoom + 默认推镜参数
           const phase3Spec = option.phase3 || {};
           const renderTemplate = phase3Spec.template || 'CinematicZoom';
-          const renderProps = {
+          const renderProps: Record<string, any> = {
             imageUrl,                                        // 注入生成的图片
             ...(phase3Spec.props || { bgStyle: 'black' }),   // 导演指定的 props 优先
           };
+          if (overlayUrl) renderProps.overlayUrl = overlayUrl; // 双层模式注入叠加层
 
           console.log(`[Video Render] ▶ Infographic Step2 (${renderTemplate}): ${taskKey}`);
           const cinematicOption = {
@@ -1965,6 +2070,27 @@ Please rewrite the prompt based on the user's feedback. Return only the new prom
     const config = await loadConfig();
     const response = await callLLM(messages, config.provider, config.model);
     const revisedPrompt = response.content?.trim() || currentPrompt;
+
+    // 回写到 delivery_store.json
+    option.imagePrompt = revisedPrompt;
+    option.userFeedback = userFeedback;
+    fs.writeFileSync(storePath, JSON.stringify(storeData, null, 2), 'utf-8');
+    console.log(`[Phase2 Revise] ✅ 已回写 imagePrompt: ${chapterId}/${optionId}`);
+
+    // 同步更新 selection_state.json
+    const selStatePath = path.join(projectRoot, '04_Visuals', 'selection_state.json');
+    if (fs.existsSync(selStatePath)) {
+      try {
+        const selState = JSON.parse(fs.readFileSync(selStatePath, 'utf-8'));
+        const selChapter = selState.chapters?.find((c: any) => c.chapterId === chapterId);
+        const selOption = selChapter?.options?.find((o: any) => o.id === optionId);
+        if (selOption) {
+          selOption.imagePrompt = revisedPrompt;
+          selOption.userFeedback = userFeedback;
+          fs.writeFileSync(selStatePath, JSON.stringify(selState, null, 2), 'utf-8');
+        }
+      } catch {}
+    }
 
     res.json({ success: true, revisedPrompt });
   } catch (error: any) {

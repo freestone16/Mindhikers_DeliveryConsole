@@ -16,6 +16,95 @@ interface LLMResponse {
 
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
+/**
+ * 安全解析 LLM 返回的 JSON。
+ * 如果直接解析失败（通常因为 svgPrompt 中的 SVG 代码引号冲突），
+ * 尝试剥离 svgPrompt 字段来拯救其余数据。
+ */
+function safeParseLLMJson(raw: string): any {
+  // 第一次尝试：直接解析
+  try {
+    return JSON.parse(raw);
+  } catch (firstError: any) {
+    console.warn(`[llm.ts] ⚠️ JSON parse failed: ${firstError.message}, attempting repair...`);
+  }
+
+  // 修复策略：移除 svgPrompt 字段（它含有破坏 JSON 的 SVG 代码）
+  // 逐字符扫描找到 "svgPrompt" 字段并安全删除
+  let repaired = raw;
+  let searchFrom = 0;
+  const svgPromptKey = '"svgPrompt"';
+
+  while (true) {
+    const keyPos = repaired.indexOf(svgPromptKey, searchFrom);
+    if (keyPos === -1) break;
+
+    // 找到冒号后面的值开始位置
+    const colonPos = repaired.indexOf(':', keyPos + svgPromptKey.length);
+    if (colonPos === -1) break;
+
+    const valueStart = repaired.indexOf('"', colonPos + 1);
+    if (valueStart === -1) break;
+
+    // 逐字符找到字符串值的真正结尾：
+    // 未转义的引号后面紧跟 , 或 } 或 ]（允许空白）
+    let i = valueStart + 1;
+    while (i < repaired.length) {
+      if (repaired[i] === '\\') {
+        i += 2; // 跳过转义字符
+        continue;
+      }
+      if (repaired[i] === '"') {
+        // 检查这个引号后面是否是 JSON 结构字符
+        const afterQuote = repaired.substring(i + 1).trimStart();
+        if (afterQuote[0] === ',' || afterQuote[0] === '}' || afterQuote[0] === ']') {
+          // 找到了真正的字段结束位置
+          break;
+        }
+      }
+      i++;
+    }
+
+    if (i >= repaired.length) {
+      // 没找到合法结尾，直接跳过
+      searchFrom = keyPos + svgPromptKey.length;
+      continue;
+    }
+
+    // 删除从 keyPos 前的逗号到 valueEnd（包含引号）
+    const valueEnd = i + 1;
+    // 检查前面是否有逗号需要一起删除
+    let deleteStart = keyPos;
+    const before = repaired.substring(0, keyPos).trimEnd();
+    if (before.endsWith(',')) {
+      deleteStart = before.lastIndexOf(',');
+    }
+
+    // 检查后面是否有逗号
+    const afterStr = repaired.substring(valueEnd).trimStart();
+    let deleteEnd = valueEnd;
+    if (afterStr[0] === ',') {
+      deleteEnd = repaired.indexOf(',', valueEnd) + 1;
+    }
+
+    repaired = repaired.substring(0, deleteStart) + repaired.substring(deleteEnd);
+    console.warn(`[llm.ts] ⚠️ Stripped broken svgPrompt field at position ${keyPos}`);
+    // 继续搜索（位置不需要前进，因为字符串已缩短）
+  }
+
+  // 清理可能的尾随逗号
+  repaired = repaired.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
+  try {
+    const result = JSON.parse(repaired);
+    console.log('[llm.ts] ✅ JSON repair succeeded (svgPrompt fields stripped)');
+    return result;
+  } catch (secondError: any) {
+    console.error(`[llm.ts] ❌ JSON repair also failed: ${secondError.message}`);
+    throw secondError;
+  }
+}
+
 async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LLMResponse> {
   const apiKey = process.env.ZHIPU_API_KEY;
   if (!apiKey) {
@@ -244,6 +333,7 @@ export interface BRollOption {
   quote: string;
   prompt: string;
   imagePrompt?: string;
+  svgPrompt?: string;
   rationale?: string;
   // Infographic specific
   infographicLayout?: string;
@@ -300,6 +390,7 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
 3. 灵活分配：重点章节或高潮章节可以生成 4-8 个方案以增强视觉冲击力。
 4. 严禁均分！请根据内容深度和情感起伏智能分配数量和类型。
 5. 确保 quote 字段精准指向该章节内的具体行。
+6. ⚠️ **imagePrompt 底图规则**：remotion 类型方案中至少 50% 必须提供 imagePrompt（用于 Seedream 文生图底图），不要全部留空。infographic 类型也鼓励提供 imagePrompt 作为底图。底图能大幅提升视觉丰富度。
 `;
 
   try {
@@ -323,7 +414,7 @@ ${chapters.map((ch, i) => `--- [第${i + 1}章: ${ch.name}] (ID: ${ch.id}) ---\n
       throw new Error('未在模型输出中找到有效的 JSON 结构');
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = safeParseLLMJson(content);
 
     // 透传校验：仅 warn，不降级不阻断（模板知识由导演大师 skill 管理）
     if (parsed.chapters && Array.isArray(parsed.chapters)) {
@@ -405,7 +496,7 @@ export async function generateBRollOptions(
       content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = safeParseLLMJson(content);
     if (Array.isArray(parsed)) {
       options.push(...parsed);
     }

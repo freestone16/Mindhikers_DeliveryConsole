@@ -212,6 +212,7 @@ export interface SceneOption {
     prompt?: string;
     quote?: string;
     imagePrompt?: string;
+    svgPrompt?: string;       // SVG-Architect: Director LLM 内联的完整 SVG 代码
     rationale?: string;
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
@@ -219,6 +220,11 @@ export interface SceneOption {
     infographicLayout?: string;
     infographicStyle?: string;
     infographicUseMode?: 'cinematic-zoom' | 'static';
+    // Phase3 渲染指令（Director 导演指定，DC 纯透传给 Remotion）
+    phase3?: {
+        template?: string;            // 渲染模板，默认 CinematicZoom
+        props?: Record<string, any>;  // 渲染参数（bgStyle, startScale, endScale, rotation, imageFit 等）
+    };
     isChecked?: boolean;
     // Phase 2 (初审) fields
     phase2Approved?: boolean;
