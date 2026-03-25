@@ -5,6 +5,7 @@ import { ExpertPage } from './components/ExpertPage';
 import { DirectorSection } from './components/DirectorSection';
 import { ShortsSection } from './components/ShortsSection';
 import { MarketingSection } from './components/MarketingSection';
+import { ThumbnailWorkbench } from './components/ThumbnailWorkbench';
 import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
@@ -23,6 +24,7 @@ type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
 const CRUCIBLE_EXPERT_ID = 'GoldenMetallurgist';
 const CRUCIBLE_DEFAULT_PROJECT_ID = 'golden-crucible-sandbox';
+const THUMBNAIL_DEFAULT_PROJECT_ID = 'ThumbnailMasterSandbox';
 
 function useHashRoute() {
     const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
@@ -52,6 +54,8 @@ function App() {
     const [crucibleSeedVersion, setCrucibleSeedVersion] = useState(0);
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>([]);
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
+    const [thumbnailFeedbackCommand, setThumbnailFeedbackCommand] = useState<{ id: number; content: string } | null>(null);
+    const [thumbnailInjectedMessages, setThumbnailInjectedMessages] = useState<ChatMessage[]>([]);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +106,11 @@ function App() {
 
         if (activeModule !== 'delivery') return;
 
+        if (activeExpertId === 'ThumbnailMaster') {
+            setThumbnailFeedbackCommand(null);
+            setThumbnailInjectedMessages([]);
+        }
+
         socket.emit('update-expert-data', {
             projectId,
             expertId: activeExpertId,
@@ -126,6 +135,7 @@ function App() {
     };
 
     const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
+    const thumbnailProjectId = state.projectId || THUMBNAIL_DEFAULT_PROJECT_ID;
 
     const handleSelectExpert = (expertId: string) => {
         setActiveExpertId(expertId);
@@ -166,6 +176,18 @@ function App() {
         injectedRoundKeysRef.current.clear();
         setCrucibleTopicTitle('标题待定');
         setChatResetToken((prev) => prev + 1);
+    }, []);
+
+    const handleThumbnailUserPrompt = useCallback((content: string) => {
+        const normalized = content.trim();
+        if (!normalized) {
+            return;
+        }
+        setThumbnailFeedbackCommand({ id: Date.now(), content: normalized });
+    }, []);
+
+    const handleThumbnailAssistantMessage = useCallback((message: ChatMessage) => {
+        setThumbnailInjectedMessages((prev) => [...prev, message]);
     }, []);
 
     const handleCrucibleRoundGenerated = useCallback((payload: {
@@ -411,6 +433,13 @@ function App() {
                                             scriptPath={state.selectedScript?.path || ''}
                                             socket={socket}
                                         />
+                                    ) : activeExpertId === 'ThumbnailMaster' ? (
+                                        <ThumbnailWorkbench
+                                            projectId={thumbnailProjectId}
+                                            selectedScript={state.selectedScript}
+                                            feedbackCommand={thumbnailFeedbackCommand}
+                                            onAssistantMessage={handleThumbnailAssistantMessage}
+                                        />
                                     ) : activeExpertId === 'MarketingMaster' ? (
                                         <MarketingSection
                                             projectId={state.projectId}
@@ -433,15 +462,18 @@ function App() {
                     </div>
 
                     {/* ChatPanel Sidebar (Spans full height of the work area) */}
-                    <div className={`transition-all duration-300 flex-shrink-0 border-l border-slate-700/50 bg-[#0b1529]/80 backdrop-blur-md ${isChatOpen ? 'w-[25vw] min-w-[320px]' : 'w-0 overflow-hidden border-none'
+                    <div className={`transition-all duration-300 flex-shrink-0 border-l border-[var(--line-soft)] bg-[rgba(247,239,227,0.86)] backdrop-blur-md shadow-[-16px_0_40px_rgba(112,81,43,0.06)] ${isChatOpen ? 'w-[25vw] min-w-[320px]' : 'w-0 overflow-hidden border-none'
                         }`}>
                         <ChatPanel
                             isOpen={true}
                             onToggle={() => setIsChatOpen(false)}
                             expertId={activeExpertId}
-                            projectId={state.projectId}
+                            projectId={activeExpertId === 'ThumbnailMaster' ? thumbnailProjectId : state.projectId}
                             scriptPath={state.selectedScript?.path || ''}
                             resetToken={chatResetToken}
+                            externalMessages={activeExpertId === 'ThumbnailMaster' ? thumbnailInjectedMessages : undefined}
+                            onUserMessage={activeExpertId === 'ThumbnailMaster' ? handleThumbnailUserPrompt : undefined}
+                            disableDefaultStreaming={activeExpertId === 'ThumbnailMaster'}
                             socket={socket}
                         />
                     </div>

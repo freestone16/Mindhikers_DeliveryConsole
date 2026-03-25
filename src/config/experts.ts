@@ -63,11 +63,11 @@ export const getExpertById = (id: string): ExpertConfig | undefined =>
 
 export const getExpertColorClass = (color: string): string => {
     const colorMap: Record<string, string> = {
-        blue: 'text-blue-400 bg-blue-500/10 border-blue-500',
-        purple: 'text-purple-400 bg-purple-500/10 border-purple-500',
-        pink: 'text-pink-400 bg-pink-500/10 border-pink-500',
-        cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500',
-        orange: 'text-orange-400 bg-orange-500/10 border-orange-500'
+        blue: 'text-[var(--ink-1)] bg-[rgba(166,117,64,0.14)] border-[var(--accent)] shadow-[0_12px_24px_rgba(166,117,64,0.10)]',
+        purple: 'text-[var(--ink-1)] bg-[rgba(181,141,101,0.16)] border-[rgba(132,95,57,0.42)] shadow-[0_12px_24px_rgba(166,117,64,0.08)]',
+        pink: 'text-[var(--ink-1)] bg-[linear-gradient(135deg,rgba(255,233,213,0.94)_0%,rgba(246,214,183,0.92)_100%)] border-[rgba(196,86,32,0.65)] shadow-[0_16px_30px_rgba(196,86,32,0.14)]',
+        cyan: 'text-[var(--ink-1)] bg-[rgba(233,223,208,0.9)] border-[rgba(126,100,72,0.38)] shadow-[0_12px_24px_rgba(166,117,64,0.08)]',
+        orange: 'text-[var(--ink-1)] bg-[rgba(250,225,192,0.94)] border-[rgba(198,120,35,0.5)] shadow-[0_12px_24px_rgba(166,117,64,0.10)]'
     };
     return colorMap[color] || colorMap.blue;
 };

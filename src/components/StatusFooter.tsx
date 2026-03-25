@@ -4,9 +4,10 @@ import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 const SOCKET_URL = 'http://127.0.0.1:3002';
 
-export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
+export const StatusFooter = ({ isConnected, activeChatExpertId }: { isConnected: boolean; activeChatExpertId?: string }) => {
     const [syncStatus, setSyncStatus] = useState<any>(null);
     const [version, setVersion] = useState<string>('Loading...');
+    const isThumbnailActive = activeChatExpertId === 'ThumbnailMaster';
 
     useEffect(() => {
         const socket = io(SOCKET_URL);
@@ -34,29 +35,33 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
     }, []);
 
     return (
-        <footer className="w-full bg-slate-900/90 backdrop-blur border-t border-slate-800 py-1.5 px-6 text-xs z-[50]">
+        <footer className="w-full border-t border-[var(--line-soft)] bg-[linear-gradient(180deg,rgba(246,238,227,0.98)_0%,rgba(238,226,208,0.98)_100%)] py-1.5 px-6 text-xs z-[50] backdrop-blur">
             <div className="flex items-center justify-between">
-                {/* Connection Status */}
                 <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`}></span>
-                    <span className="text-slate-400 font-mono">
+                    <span className="text-[var(--ink-3)] font-mono">
                         {isConnected ? 'SYSTEM ONLINE' : 'DISCONNECTED'}
                     </span>
                 </div>
 
-                {/* Version */}
-                <div className="text-slate-600">
+                <div className="text-[var(--ink-3)]">
                     MindHikers Console {version}
                 </div>
 
-                {/* Skill Sync Status */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-right">
                     {syncStatus?.status === 'done' && (
                         <>
                             <CheckCircle className="w-3 h-3 text-emerald-500" />
-                            <span className="text-emerald-500/80">
-                                Skills Synced ({syncStatus.count || 0})
-                            </span>
+                            <div className="flex flex-col">
+                                <span className="text-emerald-500/80">
+                                    Skills Synced ({syncStatus.count || 0})
+                                </span>
+                                {isThumbnailActive && syncStatus?.sourceRoot && (
+                                    <span className="text-[10px] text-[var(--ink-3)]">
+                                        ThumbnailMaster ← {syncStatus.sourceRoot}/ThumbnailMaster
+                                    </span>
+                                )}
+                            </div>
                         </>
                     )}
                     {(!syncStatus || syncStatus.status === 'syncing') && isConnected && (
@@ -68,7 +73,12 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
                     {syncStatus?.status === 'error' && (
                         <>
                             <AlertCircle className="w-3 h-3 text-red-500" />
-                            <span className="text-red-500/80">Sync Failed</span>
+                            <div className="flex flex-col">
+                                <span className="text-red-500/80">Sync Failed</span>
+                                {syncStatus?.sourceRoot && (
+                                    <span className="text-[10px] text-[var(--ink-3)]">{syncStatus.sourceRoot}</span>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>

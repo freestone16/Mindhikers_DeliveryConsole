@@ -44,7 +44,14 @@ export const syncSkills = async (io: Server) => {
     // If source and target resolve to the same directory, skip copy
     if (sourceResolved === targetResolved) {
         const available = EXPERTS.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
-        lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
+        lastSyncStatus = {
+            status: 'done',
+            synced: available,
+            count: available.length,
+            timestamp: new Date().toISOString(),
+            sourceRoot: sourceResolved,
+            targetRoot: targetResolved,
+        };
         console.log(`✅ Skills in-place. Available: ${available.length}/${EXPERTS.length}`);
         io.emit('skill-sync-status', lastSyncStatus);
         return;
@@ -60,6 +67,8 @@ export const syncSkills = async (io: Server) => {
                 count: available.length,
                 timestamp: new Date().toISOString(),
                 message: `Global skills root not found: ${SOURCE_ROOT}`,
+                sourceRoot: sourceResolved,
+                targetRoot: targetResolved,
             };
             console.log(`ℹ️ Global skills root missing, keeping local skills. Available: ${available.length}/${EXPERTS.length}`);
             io.emit('skill-sync-status', lastSyncStatus);
@@ -90,6 +99,13 @@ export const syncSkills = async (io: Server) => {
     }
 
     console.log(`✅ Skill Sync Complete. Synced: ${syncedSkills.length}/${EXPERTS.length}`);
-    lastSyncStatus = { status: 'done', synced: syncedSkills, count: syncedSkills.length, timestamp: new Date().toISOString() };
+    lastSyncStatus = {
+        status: 'done',
+        synced: syncedSkills,
+        count: syncedSkills.length,
+        timestamp: new Date().toISOString(),
+        sourceRoot: sourceResolved,
+        targetRoot: targetResolved,
+    };
     io.emit('skill-sync-status', lastSyncStatus);
 };

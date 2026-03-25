@@ -27,6 +27,7 @@ import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
+import { createThumbnailRouter } from './thumbnail';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -186,6 +187,9 @@ app.get('/api/shorts/phase3/render-status/:jobId', shorts.getRenderStatus);
 
 // Music Director Routes
 app.get('/api/music/assets', music.getAssets);
+
+// Thumbnail Master Routes
+app.use('/api/thumbnail', createThumbnailRouter(io));
 
 // Market Master Routes (SD-207)
 app.use('/api/market', marketRouter);

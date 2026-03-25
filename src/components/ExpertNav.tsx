@@ -34,23 +34,23 @@ const getStatusIcon = (status: ExpertStatus) => {
 };
 
 const getStatusBg = (status: ExpertStatus, isActive: boolean): string => {
-    if (!isActive) return 'bg-slate-800/50 hover:bg-slate-700/50';
+    if (!isActive) return 'bg-[rgba(255,250,244,0.72)] hover:bg-[rgba(166,117,64,0.08)]';
     switch (status) {
         case 'completed':
-            return 'bg-emerald-500/20 border-emerald-500';
+            return 'bg-[rgba(133,153,104,0.18)] border-[rgba(111,127,91,0.55)]';
         case 'running':
         case 'pending':
-            return 'bg-yellow-500/20 border-yellow-500';
+            return 'bg-[rgba(214,170,86,0.18)] border-[rgba(192,138,47,0.52)]';
         case 'failed':
-            return 'bg-red-500/20 border-red-500';
+            return 'bg-[rgba(182,99,79,0.16)] border-[rgba(159,73,52,0.52)]';
         default:
-            return 'bg-slate-700/50';
+            return 'bg-[rgba(166,117,64,0.12)]';
     }
 };
 
 export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert, isChatOpen, onToggleChat }: ExpertNavProps) => {
     return (
-        <nav className="bg-[#0b1529]/60 border-b border-blue-900/30 backdrop-blur-md">
+        <nav className="border-b border-[var(--line-soft)] bg-[rgba(250,244,235,0.92)] backdrop-blur-md">
             <div className="px-6 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                     {EXPERTS.map((expert) => {
@@ -68,13 +68,13 @@ export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert, isCh
                                     flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all
                                     ${isActive
                                         ? `${colorClass} border-l-4`
-                                        : 'border-transparent hover:bg-slate-800/50'
+                                        : 'border-[rgba(146,118,82,0.06)]'
                                     }
                                     ${getStatusBg(expertStatus, isActive)}
                                 `}
                             >
-                                <Icon className={`w-4 h-4 ${isActive ? '' : 'text-slate-400'}`} />
-                                <span className={`text-sm font-medium ${isActive ? '' : 'text-slate-400'}`}>
+                                <Icon className={`w-4 h-4 ${isActive ? '' : 'text-[var(--ink-3)]'}`} />
+                                <span className={`text-sm font-medium ${isActive ? '' : 'text-[var(--ink-2)]'}`}>
                                     {expert.name}
                                 </span>
                                 {StatusIcon && (
@@ -87,7 +87,7 @@ export const ExpertNav = ({ activeExpertId, expertStatuses, onSelectExpert, isCh
                 {onToggleChat && (
                     <button
                         onClick={onToggleChat}
-                        className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isChatOpen ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                        className={`flex items-center justify-center p-2 rounded-xl transition-colors ${isChatOpen ? 'bg-[var(--accent)] text-white shadow-[0_10px_22px_rgba(166,117,64,0.22)]' : 'text-[var(--ink-3)] hover:bg-[rgba(166,117,64,0.08)] hover:text-[var(--ink-1)]'
                             }`}
                         title="对话面板 (ChatPanel)"
                     >

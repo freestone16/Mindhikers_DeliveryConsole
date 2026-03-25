@@ -61,6 +61,47 @@ export interface ThumbnailModule {
     selectedVariantId?: string; // NEW: tracks which variant was selected
 }
 
+export interface ThumbnailSourceDocument {
+    name: string;
+    type: 'uploaded' | 'project-script';
+    content: string;
+    scriptPath?: string;
+    loadedAt: string;
+    wordCount: number;
+    charCount: number;
+}
+
+export interface ThumbnailConceptCard {
+    id: string;
+    name: string;
+    hook: string;
+    rationale: string;
+    overlayText: string;
+    prompt: string;
+    imageUrl?: string;
+    error?: string;
+    status: 'draft' | 'rendering' | 'ready' | 'failed' | 'selected';
+    visualSpecs: {
+        font: string;
+        layout: string;
+        rendering: string;
+        composition: string;
+        tension: string;
+        colorPalette: string[];
+    };
+}
+
+export interface ThumbnailWorkspaceState {
+    status: 'idle' | 'ready' | 'generating' | 'revising' | 'error';
+    source?: ThumbnailSourceDocument;
+    variants: ThumbnailConceptCard[];
+    selectedVariantId?: string;
+    logs: string[];
+    lastFeedback?: string;
+    error?: string;
+    generatedAt?: string;
+}
+
 export interface MarketingModule {
     strategy: MarketingStrategy;
     feedback: string;

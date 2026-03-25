@@ -24,6 +24,7 @@ interface ChatPanelProps {
     onRouteAsset?: (asset: HostRoutedAsset) => void;
     blackboardHint?: string | null;
     crucibleTurnSettledToken?: number;
+    disableDefaultStreaming?: boolean;
     socket: any;
 }
 
@@ -137,6 +138,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onRouteAsset,
     blackboardHint,
     crucibleTurnSettledToken = 0,
+    disableDefaultStreaming = false,
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -504,19 +506,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setMessages((prev) => [...prev, userMessage]);
         setInputText('');
         setAttachments([]);
-        setIsStreaming(true);
-        setStreamingContent('');
-        if (isCrucibleMode) {
-            setCrucibleThinkingStartedAt(Date.now());
-            setCrucibleThinkingElapsedSec(0);
+        if (!disableDefaultStreaming) {
+            setIsStreaming(true);
+            setStreamingContent('');
+            if (isCrucibleMode) {
+                setCrucibleThinkingStartedAt(Date.now());
+                setCrucibleThinkingElapsedSec(0);
+            }
         }
 
         if (textareaRef.current) {
             textareaRef.current.style.height = '96px';
         }
 
-        if (!contextLoaded) {
+        if (!contextLoaded && !disableDefaultStreaming) {
             socket.emit('chat-load-context', { expertId, projectId, scriptPath });
+        }
+
+        if (disableDefaultStreaming) {
+            sendGuardRef.current = false;
+            return;
         }
 
         if (isCrucibleMode) {

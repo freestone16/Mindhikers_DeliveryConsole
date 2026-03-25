@@ -377,6 +377,20 @@ export const confirmAll = (req: Request, res: Response) => {
     res.json({ success: true, mergedFilePath: mergedPath, shortCount: state.scripts.length });
 };
 
+export const uploadBgm = async (_req: Request, res: Response) => {
+    res.json({
+        success: true,
+        message: 'BGM upload compatibility endpoint is active.',
+    });
+};
+
+export const getMusicAssets = (_req: Request, res: Response) => {
+    res.json({
+        success: true,
+        assets: [],
+    });
+};
+
 export const uploadAroll = async (req: Request, res: Response) => {
     const { projectId, shortId } = req.body;
     const file = (req as any).file;

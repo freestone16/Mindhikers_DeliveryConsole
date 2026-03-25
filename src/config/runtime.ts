@@ -1,6 +1,6 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-const backendPort = import.meta.env.VITE_BACKEND_PORT || '3004';
+const backendPort = import.meta.env.VITE_BACKEND_PORT || '3002';
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL?.trim();
 
