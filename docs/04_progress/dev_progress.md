@@ -1,6 +1,134 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-20 CST（早）
+> **更新日期**: 2026-03-26 CST
+
+---
+
+## 1.8 2026-03-24（黄金坩埚“老张已搜索”回归排错修复）
+
+### ✅ 本轮已完成
+
+- 修复 SSE 坩埚里“老张口头说去搜，但后台并未真正执行搜索”的回归：
+  - `server/crucible.ts`
+  - `server/crucible-research.ts`
+  - 当前主链会在检测到明确联网搜索诉求后，先执行真实外部检索，再把 `research` 证据块写回 prompt 与 `turn_log.json`
+- 补强搜索证据落盘：
+  - `meta.searchRequested`
+  - `meta.searchConnected`
+  - `research.query`
+  - `research.sources`
+- 修正搜索 query 生成：
+  - 当用户最新一句只是“去网上搜一下最新进展、补充我们的对话”这类泛化指令时，不再直接拿空话去搜
+  - 优先回退到 `topicTitle + 最新研究`，减少无关结果
+- 新增 / 更新回归测试：
+  - `src/__tests__/crucible-research.test.ts`
+  - 覆盖“泛化搜索指令回退到议题 query”场景
+
+### 🎯 本轮验证结论
+
+- 本地真实请求已确认重新接通搜索链路：
+  - `POST /api/crucible/turn`
+  - `roundIndex: 20`
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+  - 最新 turn 已写入：
+    - `meta.searchRequested: true`
+    - `meta.searchConnected: true`
+    - `research.query`
+    - `research.sources: 5`
+- 当前最小回归已通过：
+  - `npm run test:run -- src/__tests__/crucible-research.test.ts src/__tests__/crucible-prompt.test.ts src/components/crucible/sse.test.ts`
+
+### ⚠️ 剩余观察
+
+- 搜索“有没有执行”这一层已修复
+- 但 Bing RSS 结果质量仍会受 query 质量影响；当前已避免把“补充我们的对话”之类空话直接送去检索，后续仍可继续优化 query 组装与来源筛选
+
+---
+
+## 1.7 2026-03-23（SSE 轻量 SaaS 上云清单 + Linear 收口）
+
+### ✅ 本轮已完成
+
+- 新增当前 SSE 分支可直接执行的上云清单：
+  - `docs/plans/2026-03-23_GoldenCrucible_SSE_SaaS_Cloud_Launch_Checklist.md`
+- 明确从代码现场看仍需处理的 SaaS 阻塞：
+  - 仍存在 Delivery 宿主壳
+  - 坩埚链路仍残留 `projectId / scriptPath` 语义
+  - 会话恢复仍主要依赖 `localStorage`
+  - 仓库内尚无明确 Railway / Vercel 正式部署配置
+- Linear 已重新收口：
+  - `MIN-104` 已补完成说明与验证结果，并关闭为 `Done`
+  - `MIN-105` 已改为 `In Progress`，步骤收束为 SaaS 外壳、去本地依赖、最小持久化、部署配置、线上 smoke
+  - `MIN-106` 保持 `Todo`，明确不得抢在 SaaS 宿主前推进
+  - `MIN-94` 继续作为总协调卡保留
+
+### 🎯 当前统一口径
+
+- `MIN-104` 已结束，当前下一窗口的唯一主线应转入 `MIN-105`
+- 本轮不是再讨论“大而全 SaaS”，而是把当前 SSE 版黄金坩埚抽成一个轻量在线宿主
+- 目标明确为：给少量朋友、合作方、投资人做稳定演示
+
+---
+
+## 1.6 2026-03-22（坩埚主链收回宿主业务判断）
+
+### ✅ 本轮已完成
+
+- 删除宿主侧 Research bridge：
+  - 删除 `server/crucible-research.ts`
+  - 删除旧测试 `src/__tests__/crucible-research.test.ts`
+- 删除宿主侧 orchestrator 业务判断：
+  - `server/crucible-orchestrator.ts` 只保留 prompt 组装，不再判断 `phase / searchRequested / toolRoutes`
+  - 坩埚后端不再替苏格拉底决定是否搜索、是否查证、是否调用 `Researcher / FactChecker`
+- 删除宿主兜底业务输出：
+  - server / frontend 在 LLM 失败时不再伪造追问、黑板或“fallback 讨论内容”
+  - 失败时只保留技术层错误回传，不再冒充苏格拉底继续对话
+- 收紧坩埚主链 prompt：
+  - `server/crucible.ts`
+  - `buildSocratesPrompt()` 现在显式声明宿主只做上下文与结果回传，业务判断全部由苏格拉底依据 SKILL.md 自行处理
+- 前端 SSE 消费同步瘦身：
+  - `src/components/crucible/CrucibleWorkspaceView.tsx`
+  - `src/components/crucible/types.ts`
+  - 去掉对后端 `meta/orchestrator/searchConnected` 业务元信息的依赖
+- 新增回归测试：
+  - `src/__tests__/crucible-prompt.test.ts`
+  - 验证宿主边界已进入 prompt，且用户搜索诉求会被要求由苏格拉底正面响应
+
+### 🎯 当前统一口径
+
+- 黄金坩埚里，所有讨论业务都由苏格拉底负责
+- 宿主层只做 HTTP / SSE、状态同步、结果桥接、日志落盘
+- 如果用户要求联网搜索或事实核查，响应与调派逻辑都应来自苏格拉底 skill，而不是 server 侧桥接代码
+
+## 1.5 2026-03-22（当前执行面重构为 SSE / SaaS / Roundtable 三主线）
+
+### ✅ 本轮已完成
+
+- 将黄金坩埚当前执行面收束为三项主工作：
+  - 坩埚主链修订为 `HTTP + SSE` 版本并完成验收
+  - 完成 SaaS 版架构设计、环境需求确认与部署上线
+  - 在黄金坩埚内开启 Roundtable 分支，并要求本地版与 SaaS 版同步推进后再合并
+- 新增当前执行面 SSOT 文档：
+  - `docs/plans/2026-03-22_GoldenCrucible_SSE_SaaS_Roundtable_Execution_Plan.md`
+- 更新 `docs/02_design/crucible/_master.md`
+- Linear 已同步修订：
+  - 总协调卡：`MIN-94` `Crucible SSE / SaaS / Roundtable Tranche`
+  - 新主执行卡：`MIN-104`、`MIN-105`、`MIN-106`
+  - 上一轮 `MIN-95 ~ MIN-99` 已退回 Backlog，保留为历史拆卡背景
+- 明确纪律：本次对话中涉及但不在上述三项中的内容，一律暂列“未尽事宜”，后续再跟进
+- `MIN-104` 已开始实施第一刀：
+  - 后端新增黄金坩埚 SSE 流式接口：`POST /api/crucible/turn/stream`
+  - 坩埚 turn 生成逻辑已收敛为共享核心，原 JSON 接口与新 SSE 接口共用同一套生成逻辑
+  - 前端坩埚主链已改为 `POST + SSE` 流式消费
+  - 新增 SSE 解析单测：`src/components/crucible/sse.test.ts`
+  - 当前最小回归：`sse.test.ts`、`hostRouting.test.ts`、`crucible-research.test.ts` 已通过
+  - `npm run build` 仍被市场模块与旧 DeliveryState 类型债阻塞；本轮未新增新的坩埚类型错误
+- 分支资源隔离已完成：
+  - `MHSDC-GC-SSE` 保持当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+  - `MHSDC-GC` 稳定线已独立为 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-GC`
+  - `MHSDC-GC-SSE` 独立端口：后端 `3009` / 前端 `5182`
+  - `MHSDC-GC` 稳定线保留原端口：后端 `3004` / 前端 `5176`
+  - `MHSDC-GC-SSE` 已写入全局端口账本 `~/.vibedir/global_ports_registry.yml`
 
 ---
 
@@ -1553,3 +1681,62 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **双格式输出**：.md（结构化存档）/ .plain.txt（分发终端直读）
 - **session_expired 短路**：TubeBuddy 评分时遇 session 过期立即中止整批评分
 - **slugify + stripMarkdown**：confirm 路由中对关键词生成安全文件名，对内容二次清洗
+
+---
+
+## 2026-03-26 - SaaS -> SSE 共享底座反向同步（第一轮）
+
+### 背景
+- 三线分工已明确：
+  - `GC` 作为本地稳定基线
+  - `SSE` 作为 GC-only 研发主线
+  - `SaaS` 作为对外 staging / 发布线
+- 因此本轮目标不是把 `SaaS` 整线 merge 回 `SSE`，而是只回灌后续多账号研发必须依赖的共享底座。
+
+### 本轮已落地
+1. 搜索修复对齐
+   - `server/crucible-research.ts`
+   - `src/__tests__/crucible-research.test.ts`
+   - 结果：SSE 与 SaaS 在黄金坩埚搜索修复上重新对齐
+
+2. Skill Sync 收口
+   - `server/skill-sync.ts`
+   - 结果：删除 GC 无关的前五个 skill，仅保留黄金坩埚当前需要的同步项
+
+3. 统一项目根目录抽象
+   - 新增：`server/project-root.ts`
+   - 已切换模块：
+     - `server/chat.ts`
+     - `server/assets.ts`
+     - `server/upload_handler.ts`
+     - `server/director.ts`
+     - `server/music.ts`
+     - `server/shorts.ts`
+     - `server/pipeline_engine.ts`
+     - `server/xml-generator.ts`
+     - `server/market.ts`
+     - `server/youtube-auth.ts`
+     - `server/distribution.ts`
+     - `server/index.ts`（仅做最小导入桥接）
+
+4. 前端运行时 / 存储底座对齐
+   - `src/config/runtime.ts`
+   - `src/components/crucible/storage.ts`
+   - 结果：dev 模式下 API/Socket 可走同源口径；autosave 存储层已具备“本地 + 服务端接口”双通道能力，但尚未把 `App.tsx` / `CrucibleWorkspaceView.tsx` 整体改成 SaaS 版本
+
+### 验证
+- `npm run test:run -- src/__tests__/crucible-research.test.ts`
+  - 结果：`5 passed`
+- `npm run build`
+  - 结果：未通过
+  - 阻塞集中在 SSE 既有前端类型问题：
+    - `src/components/market/*`
+    - `src/components/StatusDashboard.tsx`
+    - `src/components/ScheduleModal.tsx`
+    - `src/components/ChatPanel.tsx`
+  - 判断：不属于本轮共享底座回灌直接引入的问题
+
+### 当前边界
+- 这轮还没有把 SaaS 的 session/autosave/runtime 前端口径整包灌进 SSE
+- 多账号研发还未开始
+- 这批改动按“共享底座回灌包”单独提交，不与其他脏改动混提

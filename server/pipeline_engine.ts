@@ -3,14 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
+import { getProjectRoot } from './project-root';
 
 const REMOTION_STUDIO_DIR = process.env.REMOTION_STUDIO_DIR ||
   path.join(os.homedir(), '.opencode/skills/RemotionStudio');
-
-const getProjectRoot = (projectId: string): string => {
-  const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-  return path.join(PROJECTS_BASE, projectId);
-};
 
 interface VisualPlanScene {
   id: string;

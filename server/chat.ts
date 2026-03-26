@@ -4,8 +4,7 @@ import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 import { loadCrucibleSoulRegistry, loadSoulProfile, resolveSoulProfilePath } from './crucible-soul-loader';
-
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
+import { getProjectRoot } from './project-root';
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 export interface LLMMessage {
@@ -524,10 +523,6 @@ export function formatMultimodalMessages(
             ? '当前模型不支持图片输入，已忽略附件'
             : undefined,
     };
-}
-
-export function getProjectRoot(projectId: string): string {
-    return path.resolve(PROJECTS_BASE, projectId);
 }
 
 // End of file

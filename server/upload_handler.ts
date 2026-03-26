@@ -11,11 +11,10 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { getProjectRoot } from './project-root';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
 
 /**
  * Configure multer storage for material uploads
@@ -89,7 +88,7 @@ export async function handleMaterialUpload(req: Request, res: Response) {
         }
 
         // Construct target path: projects/${projectId}/04_Visuals/${chapterId}_${optionId}_rendered.mp4
-        const visualsDir = path.join(PROJECTS_BASE, projectId, '04_Visuals');
+        const visualsDir = path.join(getProjectRoot(projectId), '04_Visuals');
         const targetFilename = `${chapterId}_${optionId}_rendered.mp4`;
         const targetPath = path.join(visualsDir, targetFilename);
 
@@ -151,8 +150,7 @@ export async function checkMaterialExists(req: Request, res: Response) {
         }
 
         const targetPath = path.join(
-            PROJECTS_BASE,
-            projectId as string,
+            getProjectRoot(projectId as string),
             '04_Visuals',
             `${chapterId}_${optionId}_rendered.mp4`
         );

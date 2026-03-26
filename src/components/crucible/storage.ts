@@ -1,4 +1,5 @@
 import type { CrucibleSnapshot } from './types';
+import { buildApiUrl } from '../../config/runtime';
 
 export const SNAPSHOT_KEY = 'golden-crucible-workspace-v8';
 const LEGACY_SNAPSHOT_KEYS = [
@@ -17,11 +18,10 @@ const purgeLegacySnapshots = () => {
     }
 };
 
-export const readCrucibleSnapshot = (): CrucibleSnapshot | null => {
-    purgeLegacySnapshots();
-    const snapshot = window.localStorage.getItem(SNAPSHOT_KEY);
-    if (!snapshot) return null;
-
+const normalizeCrucibleSnapshot = (snapshot: string | null): CrucibleSnapshot | null => {
+    if (!snapshot) {
+        return null;
+    }
     try {
         const parsed = JSON.parse(snapshot) as Partial<CrucibleSnapshot> & {
             canvasAssets?: CrucibleSnapshot['presentables'];
@@ -60,6 +60,11 @@ export const readCrucibleSnapshot = (): CrucibleSnapshot | null => {
     }
 };
 
+export const readCrucibleSnapshot = (): CrucibleSnapshot | null => {
+    purgeLegacySnapshots();
+    return normalizeCrucibleSnapshot(window.localStorage.getItem(SNAPSHOT_KEY));
+};
+
 export const writeCrucibleSnapshot = (snapshot: CrucibleSnapshot) => {
     purgeLegacySnapshots();
     window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
@@ -68,4 +73,60 @@ export const writeCrucibleSnapshot = (snapshot: CrucibleSnapshot) => {
 export const clearCrucibleSnapshot = () => {
     purgeLegacySnapshots();
     window.localStorage.removeItem(SNAPSHOT_KEY);
+};
+
+export const readPersistedCrucibleSnapshot = async (): Promise<CrucibleSnapshot | null> => {
+    const localSnapshot = readCrucibleSnapshot();
+
+    try {
+        const response = await fetch(buildApiUrl('/api/crucible/autosave'), {
+            credentials: 'include',
+        });
+
+        if (response.status === 404) {
+            return localSnapshot;
+        }
+
+        if (!response.ok) {
+            throw new Error(`autosave read failed: ${response.status}`);
+        }
+
+        const remoteSnapshot = normalizeCrucibleSnapshot(await response.text());
+        if (remoteSnapshot) {
+            writeCrucibleSnapshot(remoteSnapshot);
+            return remoteSnapshot;
+        }
+    } catch (error) {
+        console.warn('[CrucibleStorage] Failed to read persisted snapshot:', error);
+    }
+
+    return localSnapshot;
+};
+
+export const persistCrucibleSnapshot = async (snapshot: CrucibleSnapshot) => {
+    writeCrucibleSnapshot(snapshot);
+
+    try {
+        await fetch(buildApiUrl('/api/crucible/autosave'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(snapshot),
+        });
+    } catch (error) {
+        console.warn('[CrucibleStorage] Failed to persist snapshot:', error);
+    }
+};
+
+export const clearPersistedCrucibleSnapshot = async () => {
+    clearCrucibleSnapshot();
+
+    try {
+        await fetch(buildApiUrl('/api/crucible/autosave'), {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+    } catch (error) {
+        console.warn('[CrucibleStorage] Failed to clear persisted snapshot:', error);
+    }
 };

@@ -6,11 +6,7 @@ import { spawn } from 'child_process';
 import { callLLM } from './llm';
 import { loadConfig } from './llm-config';
 import { transcribeAudio, segmentsToSRT } from './whisper';
-
-const getProjectRoot = (projectId: string): string => {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-    return path.join(PROJECTS_BASE, projectId);
-};
+import { getProjectRoot } from './project-root';
 
 function ensureDir(dir: string) {
     if (!fs.existsSync(dir)) {

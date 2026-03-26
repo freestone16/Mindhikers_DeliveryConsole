@@ -21,13 +21,14 @@ import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
 import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
+import { getProjectRoot, PROJECTS_BASE } from './project-root';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -48,8 +49,6 @@ const io = new Server(httpServer, {
 });
 
 // --- Project Context (Mutable - supports runtime switching) ---
-// Docker: PROJECTS_BASE=/data/projects  |  Local: fallback to ../../Projects
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
 // No longer globally hardcoded. Projects are specified per request.
 let currentProjectName: string | null = null; // Track active project for server-side operations
 

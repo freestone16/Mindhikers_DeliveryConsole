@@ -9,6 +9,7 @@ import { spawn } from 'child_process';
 import { ExternalAsset } from '../src/types';
 import { Request } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { getProjectRoot } from './project-root';
 
 interface UploadedFileInfo {
     fieldname: string;
@@ -20,12 +21,6 @@ interface UploadedFileInfo {
     path: string;
     size: number;
 }
-
-// 项目路径管理
-const getProjectRoot = (projectId: string): string => {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-    return path.join(PROJECTS_BASE, projectId);
-};
 
 function ensureDir(dir: string) {
     if (!fs.existsSync(dir)) {
@@ -305,4 +300,3 @@ export async function cleanupTempFile(tempPath: string): Promise<void> {
         }
     }
 }
-

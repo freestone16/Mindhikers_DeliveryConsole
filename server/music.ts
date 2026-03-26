@@ -1,13 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import type { Request, Response } from 'express';
+import { getProjectRoot } from './project-root';
 
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg']);
-
-const getProjectRoot = (projectId: string): string => {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.join(process.cwd(), 'Projects');
-    return path.join(PROJECTS_BASE, projectId);
-};
 
 function walkFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
