@@ -161,6 +161,9 @@ function getAppVersion(): string {
 app.use(cors());
 app.use(express.json());
 
+// Serve temp_images as static files (Remotion CLI needs HTTP access to generated images)
+app.use('/temp_images', express.static(path.join(process.cwd(), 'temp_images')));
+
 // Mount YouTube Auth Routes
 app.use(youtubeAuthRouter);
 

@@ -265,55 +265,7 @@ const Phase3OptionRow = ({
           )}
         </div>
 
-        {/* Feedback chatbox — below video */}
-        <div>
-          <button
-            onClick={() => setShowFeedback(v => !v)}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
-          >
-            <MessageSquare className="w-3 h-3" />
-            对视频不满意？提意见重新渲染
-            {showFeedback ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-
-          {showFeedback && (
-            <div className="mt-2 space-y-2">
-              <textarea
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                placeholder="描述你的修改需求，如：画面更有动感，颜色更鲜艳..."
-                className="w-full p-2 text-xs bg-slate-900 border border-slate-600 rounded text-slate-200 placeholder-slate-500 resize-none"
-                rows={2}
-              />
-              <button
-                onClick={handleRevise}
-                disabled={!feedbackText.trim() || isRevising}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs rounded flex items-center gap-1"
-              >
-                {isRevising ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                AI 优化提示词
-              </button>
-
-              {revisedPrompt && (
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-400">AI 优化后的提示词（可继续修改）：</p>
-                  <textarea
-                    value={revisedPrompt}
-                    onChange={e => setRevisedPrompt(e.target.value)}
-                    className="w-full p-2 text-xs bg-slate-900 border border-blue-500/50 rounded text-blue-200 resize-none"
-                    rows={3}
-                  />
-                  <button
-                    onClick={handleApplyAndRender}
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-3 h-3" /> 使用此提示词重新渲染
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Feedback section removed — retry via single render button */}
       </div>
 
       {/* 审阅通过 (col 1) */}

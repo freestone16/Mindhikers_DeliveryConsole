@@ -1622,8 +1622,11 @@ async function downloadImageToLocal(remoteUrl: string, taskKey: string, outputDi
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const buffer = Buffer.from(await response.arrayBuffer());
     fs.writeFileSync(localPath, buffer);
-    console.log(`[ImageGen] 📥 图片已下载到本地: ${localPath} (${(buffer.length / 1024).toFixed(0)}KB)`);
-    return localPath;
+    // 通过后端 HTTP 服务提供给 Remotion CLI（file:// 被 Chromium 拒绝）
+    const fileName = path.basename(localPath);
+    const httpUrl = `http://localhost:3005/temp_images/${fileName}`;
+    console.log(`[ImageGen] 📥 图片已下载到本地: ${localPath} → ${httpUrl} (${(buffer.length / 1024).toFixed(0)}KB)`);
+    return httpUrl;
   } catch (err: any) {
     console.warn(`[ImageGen] ⚠️ 下载失败，回退使用远程URL: ${err.message}`);
     return remoteUrl; // fallback: 用远程 URL，可能有 CORS 问题但不阻断
