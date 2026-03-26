@@ -19,6 +19,18 @@ describe('crucible research bridge', () => {
         expect(query).not.toContain('联网搜索一下');
     });
 
+    it('falls back to the topic when the latest request is only a generic search instruction', () => {
+        const query = buildCrucibleSearchQuery({
+            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
+            seedPrompt: 'Seedance和小龙虾赋予了创作者几乎无尽的生产力',
+            latestUserReply: '我需要你到互联网搜一下最新进展 补充我们的对话',
+        });
+
+        expect(query).toContain('AI 时代高质量内容真正稀缺的东西是什么');
+        expect(query).toContain('最新研究');
+        expect(query).not.toContain('补充我们的对话');
+    });
+
     it('parses Bing RSS results into structured sources', () => {
         const rss = `<?xml version="1.0" encoding="utf-8" ?>
 <rss version="2.0">
@@ -86,5 +98,6 @@ describe('crucible research bridge', () => {
         expect(addon).toContain('Researcher 外部调研补充');
         expect(addon).toContain('https://example.com/a');
         expect(addon).toContain('检索状态：已接通真实外部搜索');
+        expect(addon).toContain('不要再说“我现在去搜索”');
     });
 });

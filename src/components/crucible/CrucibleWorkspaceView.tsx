@@ -2,12 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpenText, Boxes, BrainCircuit, Quote, Sparkles } from 'lucide-react';
 import type { HostRoutedAsset } from '../../types';
 import { buildApiUrl } from '../../config/runtime';
-import { clearCrucibleSnapshot, readCrucibleSnapshot, writeCrucibleSnapshot } from './storage';
+import {
+    clearPersistedCrucibleSnapshot,
+    persistCrucibleSnapshot,
+    readCrucibleSnapshot,
+    readPersistedCrucibleSnapshot,
+} from './storage';
 import type {
     CanvasAsset,
     CrucibleDialogue,
     CrucibleEngineMode,
     CrucibleRemotionPreviewResponse,
+    CrucibleSnapshot,
     CrucibleTurnResponse,
     RoundAnchor,
 } from './types';
@@ -260,6 +266,26 @@ export const CrucibleWorkspace = ({
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
     const [suggestedTitle, setSuggestedTitle] = useState<string>('');
+    const [snapshotHydrated, setSnapshotHydrated] = useState(false);
+
+    const applySnapshot = useCallback((nextSnapshot: CrucibleSnapshot | null) => {
+        if (!nextSnapshot) {
+            return;
+        }
+
+        setPresentables(nextSnapshot.presentables?.length ? nextSnapshot.presentables : []);
+        setCrystallizedQuotes(nextSnapshot.crystallizedQuotes?.length ? nextSnapshot.crystallizedQuotes : []);
+        setActivePresentableId(nextSnapshot.activePresentableId || '');
+        setOpeningPrompt(nextSnapshot.openingPrompt || '');
+        setRoundAnchors(nextSnapshot.roundAnchors?.length ? nextSnapshot.roundAnchors : []);
+        setRoundIndex(nextSnapshot.roundIndex || 1);
+        setIsThinking(Boolean(nextSnapshot.isThinking));
+        setQuestionSource(nextSnapshot.questionSource || 'static');
+        setEngineMode(nextSnapshot.engineMode || 'socratic_refinement');
+        setLastDialogue(nextSnapshot.lastDialogue || null);
+        snapshotMessagesRef.current = nextSnapshot.messages || [];
+        previousTopicRef.current = normalizeTopic(nextSnapshot.topicTitle || topicTitle);
+    }, [topicTitle]);
 
     const activePresentable = useMemo(
         () => presentables.find((asset) => asset.id === activePresentableId)
@@ -294,7 +320,11 @@ export const CrucibleWorkspace = ({
     }, [presentables.length, onBlackboardStateChange]);
 
     useEffect(() => {
-        writeCrucibleSnapshot({
+        if (!snapshotHydrated) {
+            return;
+        }
+
+        void persistCrucibleSnapshot({
             messages: snapshotMessagesRef.current,
             presentables,
             crystallizedQuotes,
@@ -308,7 +338,25 @@ export const CrucibleWorkspace = ({
             questionSource,
             engineMode,
         });
-    }, [activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, questionSource, engineMode]);
+    }, [activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, questionSource, engineMode, snapshotHydrated]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        void readPersistedCrucibleSnapshot().then((nextSnapshot) => {
+            if (cancelled) {
+                return;
+            }
+            if (nextSnapshot) {
+                applySnapshot(nextSnapshot);
+            }
+            setSnapshotHydrated(true);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [applySnapshot]);
 
     useEffect(() => {
         const normalizedTopic = normalizeTopic(topicTitle);
@@ -619,7 +667,7 @@ export const CrucibleWorkspace = ({
         if (thinkingTimerRef.current) {
             window.clearTimeout(thinkingTimerRef.current);
         }
-        clearCrucibleSnapshot();
+        void clearPersistedCrucibleSnapshot();
         routedIdsRef.current.clear();
         requestSeqRef.current += 1;
         setPresentables([]);

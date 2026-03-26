@@ -6,15 +6,11 @@ import { getTubeBuddyWorker } from './workers/tubebuddy-worker';
 import type { TubeBuddyScore } from '../src/types';
 import { callLLM } from './llm';
 import { loadConfig } from './llm-config';
+import { getProjectRoot } from './project-root';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = Router();
-
-const getProjectRoot = (projectId: string) => {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
-    return path.resolve(PROJECTS_BASE, projectId);
-};
 
 export const generateSEO = async (req: Request, res: Response) => {
     const { projectId, scriptPath, count, focusKeywords } = req.body;
@@ -133,8 +129,7 @@ router.post('/confirm', confirmSEO);
 
 /** Helper: read script content from disk */
 function readScriptContent(projectId: string, scriptPath: string): string {
-    const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
-    const projectRoot = path.resolve(PROJECTS_BASE, projectId);
+    const projectRoot = getProjectRoot(projectId);
     const fullPath = path.isAbsolute(scriptPath)
         ? scriptPath
         : path.join(projectRoot, scriptPath);

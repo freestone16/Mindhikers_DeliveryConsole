@@ -16,8 +16,20 @@ export interface CrucibleSearchResult {
 const SEARCH_TIMEOUT_MS = 12000;
 const MAX_SEARCH_RESULTS = 5;
 const SEARCH_FILLER_PATTERN = /(基于我们刚才这个问题|基于刚才这个问题|围绕我们刚才这个问题|我想先|先|联网搜索一下|联网搜索|搜索一下|搜索|再继续(往下)?聊|再继续讨论|之后再继续|最近一两年(关于)?)/g;
+const GENERIC_QUERY_PATTERN = /(我需要你|我需要|我想|请你|请|帮我|到互联网|去互联网|到网上|去网上|互联网|网上|网络|联网|搜索一下|搜索|搜一下|搜|查一下|查|最新进展|最新|进展|补充我们的对话|补充对话|补充一下|继续对话|再继续往下聊|再继续讨论|继续往下聊|继续讨论|这个问题|这个议题|这个话题|一下|先)/g;
 
 const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
+const sanitizeSearchFragment = (value: string) => normalizeText(
+    value
+        .replace(SEARCH_FILLER_PATTERN, ' ')
+        .replace(GENERIC_QUERY_PATTERN, ' ')
+        .replace(/[“”"'`]/g, ' ')
+        .replace(/[，。！？；：、（）()【】\[\]]/g, ' ')
+);
+const isGenericSearchQuery = (value: string) => {
+    const condensed = value.replace(/\s+/g, '');
+    return !condensed || condensed.length < 8;
+};
 
 const decodeHtmlEntities = (value: string) => value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -37,19 +49,18 @@ const extractXmlTag = (xml: string, tag: string) => {
 };
 
 export const buildCrucibleSearchQuery = (context: Pick<PromptContext, 'topicTitle' | 'seedPrompt' | 'latestUserReply'>) => {
-    const primary = normalizeText(context.latestUserReply || '');
-    const cleanedPrimary = normalizeText(
-        primary
-            .replace(SEARCH_FILLER_PATTERN, ' ')
-            .replace(/[“”"'`]/g, ' ')
-            .replace(/[，。！？；：]/g, ' ')
-    );
+    const cleanedPrimary = sanitizeSearchFragment(context.latestUserReply || '');
 
-    if (cleanedPrimary) {
+    if (!isGenericSearchQuery(cleanedPrimary)) {
         return cleanedPrimary;
     }
 
-    const fallback = normalizeText(context.topicTitle || context.seedPrompt || '最新研究现状');
+    const topicQuery = sanitizeSearchFragment(context.topicTitle || '');
+    if (topicQuery) {
+        return `${topicQuery} 最新研究`;
+    }
+
+    const fallback = sanitizeSearchFragment(context.seedPrompt || '最新研究现状');
     return fallback || '最新研究现状';
 };
 
@@ -143,5 +154,5 @@ export const buildCrucibleResearchPromptAddon = (result: CrucibleSearchResult) =
         .map((source, index) => `${index + 1}. 标题：${source.title}\n   链接：${source.url}\n   摘要：${source.snippet || '暂无摘要'}`)
         .join('\n');
 
-    return `\n\n## Researcher 外部调研补充\n用户本轮明确要求联网搜索，以下是已拉到的外部材料，请把它们作为最新背景信息使用：\n- 查询语句：${result.query}\n- 检索状态：已接通真实外部搜索\n- 使用要求：不要把材料机械罗列成搜索报告；优先结合当前对话语境继续推进，并在必要时把最有价值的一条压成 presentables 里的 reference。\n\n### 外部来源\n${sourcesBlock}`;
+    return `\n\n## Researcher 外部调研补充\n用户本轮明确要求联网搜索，以下是已拉到的外部材料，请把它们作为最新背景信息直接使用。\n- 查询语句：${result.query}\n- 检索状态：已接通真实外部搜索\n- 使用要求：不要再说“我现在去搜索”；你已经拿到了外部材料。请直接结合当前对话继续推进，并在必要时把最有价值的一条压成 presentables 里的 reference。\n\n### 外部来源\n${sourcesBlock}`;
 };

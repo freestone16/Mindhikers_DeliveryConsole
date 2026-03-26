@@ -6,6 +6,7 @@ import cors from 'cors';
 import chokidar from 'chokidar';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import multer from 'multer';
@@ -21,13 +22,14 @@ import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
 import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
-import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages, getProjectRoot } from './chat';
+import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
 import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS } from './expert_state_manager';
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
+import { DEFAULT_PROJECT_NAME, ensureProjectRoot, getProjectRoot, listAvailableProjects, PROJECTS_BASE } from './project-root';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -37,6 +39,90 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 const CLIENT_DIST_DIR = path.resolve(__dirname, '../dist');
+const LEGACY_CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
+const APP_SESSION_COOKIE = 'gc_session';
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_SECRET = process.env.SESSION_SECRET?.trim() || 'golden-crucible-dev-session-secret';
+
+const parseCookies = (cookieHeader?: string) => {
+    const entries = (cookieHeader || '')
+        .split(';')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => {
+            const separatorIndex = item.indexOf('=');
+            if (separatorIndex < 0) {
+                return null;
+            }
+            return [item.slice(0, separatorIndex), decodeURIComponent(item.slice(separatorIndex + 1))] as const;
+        })
+        .filter((item): item is readonly [string, string] => Boolean(item));
+
+    return Object.fromEntries(entries);
+};
+
+const signSessionId = (sessionId: string) => crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(sessionId)
+    .digest('hex');
+
+const verifySessionId = (rawValue?: string | null) => {
+    if (!rawValue) {
+        return null;
+    }
+
+    const separatorIndex = rawValue.lastIndexOf('.');
+    if (separatorIndex <= 0 || separatorIndex >= rawValue.length - 1) {
+        return null;
+    }
+
+    const sessionId = rawValue.slice(0, separatorIndex);
+    const signature = rawValue.slice(separatorIndex + 1);
+    const expected = signSessionId(sessionId);
+
+    if (signature.length !== expected.length) {
+        return null;
+    }
+
+    const isValid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    return isValid ? sessionId : null;
+};
+
+const buildSessionCookie = (sessionId: string) => {
+    const value = `${sessionId}.${signSessionId(sessionId)}`;
+    const parts = [
+        `${APP_SESSION_COOKIE}=${encodeURIComponent(value)}`,
+        'Path=/',
+        `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
+        'HttpOnly',
+        'SameSite=Lax',
+    ];
+
+    if (process.env.NODE_ENV === 'production') {
+        parts.push('Secure');
+    }
+
+    return parts.join('; ');
+};
+
+const ensureSessionId = (req: express.Request, res: express.Response) => {
+    const cookies = parseCookies(req.headers.cookie);
+    const verified = verifySessionId(cookies[APP_SESSION_COOKIE]);
+    if (verified) {
+        return verified;
+    }
+
+    const nextSessionId = crypto.randomUUID();
+    res.setHeader('Set-Cookie', buildSessionCookie(nextSessionId));
+    return nextSessionId;
+};
+
+const getCrucibleAutosavePath = (sessionId: string) => path.resolve(
+    __dirname,
+    '../runtime/crucible/sessions',
+    sessionId,
+    'autosave.json'
+);
 
 const resolveAllowedOrigins = () => {
     const configured = [
@@ -59,6 +145,10 @@ const corsOrigin = resolveAllowedOrigins();
 
 const app = express();
 app.use(cors({ origin: corsOrigin, credentials: true }));
+app.use((req, res, next) => {
+    res.locals.appSessionId = ensureSessionId(req, res);
+    next();
+});
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
@@ -68,8 +158,6 @@ const io = new Server(httpServer, {
 });
 
 // --- Project Context (Mutable - supports runtime switching) ---
-// Docker: PROJECTS_BASE=/data/projects  |  Local: fallback to ../../Projects
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../Projects');
 // No longer globally hardcoded. Projects are specified per request.
 let currentProjectName: string | null = null; // Track active project for server-side operations
 
@@ -216,13 +304,17 @@ app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
 
 // Crucible Autosave (S/L buttons — no file dialog)
-const CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
-app.get('/api/crucible/autosave', (_req, res) => {
-    if (!fs.existsSync(CRUCIBLE_AUTOSAVE_PATH)) {
-        return res.status(404).json({ error: 'No autosave found' });
+app.get('/api/crucible/autosave', (req, res) => {
+    const sessionId = res.locals.appSessionId as string;
+    const autosavePath = getCrucibleAutosavePath(sessionId);
+    const fallbackPath = fs.existsSync(autosavePath) ? autosavePath : LEGACY_CRUCIBLE_AUTOSAVE_PATH;
+
+    if (!fs.existsSync(fallbackPath)) {
+        return res.status(404).json({ error: 'No autosave found', sessionId });
     }
+
     try {
-        const data = fs.readFileSync(CRUCIBLE_AUTOSAVE_PATH, 'utf-8');
+        const data = fs.readFileSync(fallbackPath, 'utf-8');
         res.setHeader('Content-Type', 'application/json');
         res.send(data);
     } catch (e) {
@@ -231,12 +323,26 @@ app.get('/api/crucible/autosave', (_req, res) => {
 });
 app.post('/api/crucible/autosave', (req, res) => {
     try {
-        const dir = path.dirname(CRUCIBLE_AUTOSAVE_PATH);
+        const sessionId = res.locals.appSessionId as string;
+        const autosavePath = getCrucibleAutosavePath(sessionId);
+        const dir = path.dirname(autosavePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(CRUCIBLE_AUTOSAVE_PATH, JSON.stringify(req.body, null, 2), 'utf-8');
-        res.json({ ok: true });
+        fs.writeFileSync(autosavePath, JSON.stringify(req.body, null, 2), 'utf-8');
+        res.json({ ok: true, sessionId });
     } catch (e) {
         res.status(500).json({ error: 'Failed to write autosave' });
+    }
+});
+app.delete('/api/crucible/autosave', (_req, res) => {
+    try {
+        const sessionId = res.locals.appSessionId as string;
+        const autosavePath = getCrucibleAutosavePath(sessionId);
+        if (fs.existsSync(autosavePath)) {
+            fs.unlinkSync(autosavePath);
+        }
+        res.json({ ok: true, sessionId });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to clear autosave' });
     }
 });
 
@@ -259,7 +365,7 @@ function matchARollToShorts(filename: string, shortsList: any[]): string | null 
 */
 
 function ensureDeliveryFile(projectId: string) {
-    const projectRoot = getProjectRoot(projectId);
+    const projectRoot = ensureProjectRoot(projectId);
     const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
     const initialState = {
@@ -278,7 +384,8 @@ function ensureDeliveryFile(projectId: string) {
         // but we don't want to overwrite existing data unless explicitly migrating.
         // For now, just ensure projectId is correct and add selectedScript if missing.
         const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-        if (!data.modules.shorts || Array.isArray(data.modules.shorts.shorts)) {
+        data.modules = data.modules || {};
+        if (!data.modules.shorts || Array.isArray(data.modules.shorts?.shorts)) {
             // Migration or initialization
             console.log('Migrating/Initializing shorts module to v2 Structure');
             // Backup old data if exists
@@ -901,19 +1008,13 @@ app.get('/api/chat/history/:expertId', (req, res) => {
 // List all available projects under Projects/
 app.get('/api/projects', (req, res) => {
     try {
-        if (!fs.existsSync(PROJECTS_BASE)) {
-            return res.json({ projects: [], active: currentProjectName });
-        }
-        const dirs = fs.readdirSync(PROJECTS_BASE, { withFileTypes: true })
-            .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-            .map(d => ({
-                name: d.name,
-                isActive: d.name === currentProjectName,
-                hasDeliveryStore: fs.existsSync(
-                    path.join(PROJECTS_BASE, d.name, 'delivery_store.json')
-                )
-            }));
-        res.json({ projects: dirs, active: currentProjectName });
+        const activeProject = currentProjectName || DEFAULT_PROJECT_NAME;
+        const dirs = listAvailableProjects().map((name) => ({
+            name,
+            isActive: name === activeProject,
+            hasDeliveryStore: fs.existsSync(path.join(getProjectRoot(name), 'delivery_store.json')),
+        }));
+        res.json({ projects: dirs, active: activeProject, defaultProjectId: DEFAULT_PROJECT_NAME });
     } catch (error: any) {
         console.error('Projects API Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -927,9 +1028,9 @@ app.post('/api/projects/switch', (req, res) => {
         return res.status(400).json({ error: 'Missing projectName' });
     }
 
-    const newRoot = path.resolve(PROJECTS_BASE, projectName);
+    const newRoot = getProjectRoot(projectName);
     if (!fs.existsSync(newRoot)) {
-        return res.status(404).json({ error: `项目目录不存在: Projects/${projectName}` });
+        return res.status(404).json({ error: `项目目录不存在: ${projectName}` });
     }
 
     // Update mutable project context

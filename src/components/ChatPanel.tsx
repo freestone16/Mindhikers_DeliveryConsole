@@ -712,23 +712,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const handleSaveAutosave = useCallback(() => {
         try {
             const raw = localStorage.getItem('golden-crucible-workspace-v8');
-            if (!raw) { showToast('当前没有状态可保存'); return; }
+            if (!raw) { showToast('当前没有状态可备份'); return; }
             localStorage.setItem(SNAPSHOT_BACKUP_KEY, raw);
-            showToast('快照已保存');
-        } catch { showToast('保存失败'); }
+            showToast('手动备份已保存');
+        } catch { showToast('备份失败'); }
     }, [showToast]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
             const raw = localStorage.getItem(SNAPSHOT_BACKUP_KEY);
-            if (!raw) { showToast('还没有保存过快照'); return; }
+            if (!raw) { showToast('还没有手动备份'); return; }
             const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.presentables)) {
-                showToast('快照数据损坏');
+                showToast('备份数据损坏');
                 return;
             }
             localStorage.setItem('golden-crucible-workspace-v8', raw);
-            showToast('快照已载入，刷新中...');
+            showToast('手动备份已载入，刷新中...');
             setTimeout(() => window.location.reload(), 600);
         } catch { showToast('载入失败'); }
     }, [showToast]);
@@ -782,14 +782,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <>
                                 <button
                                     onClick={handleSaveAutosave}
-                                    title="保存快照到本地（localStorage）"
+                                    title="保存当前工作台的手动备份"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">S</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从本地（localStorage）载入快照"
+                                    title="从手动备份恢复当前工作台"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">L</span>

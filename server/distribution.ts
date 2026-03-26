@@ -2,13 +2,13 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getProjectRoot, PROJECTS_BASE } from './project-root';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = Router();
 
-const PROJECTS_BASE = process.env.PROJECTS_BASE || '/data/projects';
 const AUTH_FILE = path.join(__dirname, '../../.mindhikers/auth.json');
 
 function log(module: string, stage: string, status: string, detail: string = '') {
@@ -294,7 +294,7 @@ router.get('/assets', (req, res) => {
         if (!projectId) {
             return res.status(400).json({ success: false, error: 'Missing project parameter' });
         }
-        const projectRoot = path.join(PROJECTS_BASE, projectId);
+        const projectRoot = getProjectRoot(projectId);
         
         const shortsDir = path.join(projectRoot, '05_Shorts_Output');
         const marketingDir = path.join(projectRoot, '05_Marketing');

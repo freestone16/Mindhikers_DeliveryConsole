@@ -7,8 +7,9 @@ import { StatusFooter } from './components/StatusFooter';
 import { CrucibleWorkspace } from './components/CrucibleWorkspace';
 import { LLMConfigPage } from './components/LLMConfigPage';
 import type { ChatMessage, HostRoutedAsset } from './types';
+import type { CrucibleSnapshot } from './components/crucible/types';
 import { CRUCIBLE_HEADER_BADGES, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
-import { readCrucibleSnapshot } from './components/crucible/storage';
+import { readCrucibleSnapshot, readPersistedCrucibleSnapshot } from './components/crucible/storage';
 
 const CRUCIBLE_EXPERT_ID = 'GoldenMetallurgist';
 const CRUCIBLE_DEFAULT_PROJECT_ID = 'golden-crucible-sandbox';
@@ -37,20 +38,38 @@ function App() {
     });
     const [crucibleSeedPrompt, setCrucibleSeedPrompt] = useState('');
     const [crucibleSeedVersion, setCrucibleSeedVersion] = useState(0);
-    const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => {
-        const snap = readCrucibleSnapshot();
-        if (!snap?.messages?.length) return [];
-        return snap.messages.map((msg) => ({
-            id: msg.id,
-            role: (msg.speaker === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: msg.content,
-            timestamp: msg.timestamp || msg.createdAt,
-            meta: msg.speaker !== 'user' ? getCrucibleSpeakerMeta(msg.speaker) : undefined,
-        }));
-    });
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
+
+    const toInjectedMessages = useCallback((snapshot: CrucibleSnapshot | null) => {
+        if (!snapshot?.messages?.length) {
+            injectedRoundKeysRef.current.clear();
+            return [];
+        }
+
+        const roundKeys = new Set<string>();
+        const mapped = snapshot.messages.map((msg) => {
+            const roundMatch = msg.id.match(/^crucible_round_(\d+)_/);
+            if (roundMatch) {
+                roundKeys.add(roundMatch[1]);
+            }
+
+            return {
+                id: msg.id,
+                role: (msg.speaker === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                content: msg.content,
+                timestamp: msg.timestamp || msg.createdAt,
+                meta: msg.speaker !== 'user' ? getCrucibleSpeakerMeta(msg.speaker) : undefined,
+            };
+        });
+
+        injectedRoundKeysRef.current = roundKeys;
+        return mapped;
+    }, []);
+    const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => (
+        toInjectedMessages(readCrucibleSnapshot())
+    ));
 
     const resetCrucibleContext = useCallback(() => {
         setCrucibleRoutedAssets([]);
@@ -62,6 +81,38 @@ function App() {
         injectedRoundKeysRef.current.clear();
         setChatResetToken((prev) => prev + 1);
     }, []);
+
+    useEffect(() => {
+        if (!isConnected || !socket || state.projectId) {
+            return;
+        }
+
+        const projectId = CRUCIBLE_DEFAULT_PROJECT_ID;
+        setState({
+            ...INITIAL_STATE,
+            projectId,
+            lastUpdated: new Date().toISOString(),
+        });
+        socket.emit('select-project', projectId);
+    }, [isConnected, socket, state.projectId, setState]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        void readPersistedCrucibleSnapshot().then((snapshot) => {
+            if (!snapshot || cancelled) {
+                return;
+            }
+
+            setCrucibleTopicTitle(snapshot.topicTitle || '标题待定');
+            setCrucibleInjectedMessages(toInjectedMessages(snapshot));
+            setCrucibleHasBoardContent((snapshot.presentables || []).length > 0);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [toInjectedMessages]);
 
     const handleSelectProject = (projectId: string) => {
         if (projectId !== state.projectId) {

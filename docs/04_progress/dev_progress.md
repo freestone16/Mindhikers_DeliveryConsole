@@ -1,6 +1,103 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-20 CST（早）
+> **更新日期**: 2026-03-26 CST（早）
+
+---
+
+## 1.5 2026-03-26（吸收 SSE 搜索修复）
+
+### ✅ 本轮已完成
+
+- 单独吸收 SSE 已验证的搜索修复，但不回退 SaaS 现有宿主与编排结构：
+  - `server/crucible-research.ts`
+  - `src/__tests__/crucible-research.test.ts`
+- 搜索查询构建逻辑已增强：
+  - 当用户最新一句只是“去网上搜一下最新进展、补充对话”这类泛化搜索指令时，不再把废话本身当查询词
+  - 现在会优先回落到 `topicTitle + 最新研究`
+  - 若无明确 `topicTitle`，再回落到 `seedPrompt`
+- 搜索 prompt addon 已增强：
+  - 明确告诉模型“已接通真实外部搜索”
+  - 显式禁止再说“我现在去搜索”
+  - 要求直接结合当前对话推进，而不是机械罗列搜索报告
+- 本轮只迁搜索修复，不把 SSE 其他脏现场一并带入 SaaS
+
+### 🎯 本轮验证结论
+
+- 定向单测已通过：
+  - `npm run test:run -- src/__tests__/crucible-research.test.ts src/__tests__/crucible-orchestrator.test.ts`
+  - `2` 个测试文件、`7` 条用例全绿
+- 构建已通过：
+  - `npm run build:railway`
+- 当前行为边界已明确：
+  - 搜索触发仍由 SaaS 现有 `crucible-orchestrator` 决策
+  - 本轮修复聚焦于“触发后搜什么、以及拿到结果后怎么约束模型使用”
+
+### ⚠️ 当前说明
+
+- 这轮是第 5 件事的最小吸收版，核心目标是把 SSE 已验证有效的搜索查询与 prompt 约束迁入 SaaS
+- 如需继续补“真实联网现场回放”，应在当前 `3010 / 5183` 在线环境上再做一次带外部网络的回合级验证
+- 提交时要只暂存搜索修复相关文件，不能把工作区里其他历史脏改动混入
+
+### 🚀 同日补充：Railway staging 已真实上线
+
+- 已为当前分支新建干净的 Railway 项目与服务：
+  - Project: `GoldenCrucible-SaaS-Staging`
+  - Service: `golden-crucible-saas`
+- 已完成 Railway 域名生成与变量回写：
+  - `APP_BASE_URL`
+  - `CORS_ORIGIN`
+- 已修复 Railway 首次部署中的两个真实阻塞：
+  1. 部署上下文被 `node_modules_bad` 和本地缓存污染
+     - 通过新增 `.railwayignore` 解决
+  2. 云端干净构建时缺少 `yaml` 依赖
+     - 通过将 `yaml` 写入 `package.json` / `package-lock.json` 解决
+- 同时清理了不属于黄金坩埚主链的历史 `.wav` 大文件，避免部署包体失控
+
+### 🎯 Railway 验证结果
+
+- 线上域名：
+  - `https://golden-crucible-saas-production.up.railway.app`
+- 最新 deployment：
+  - `04bd55e3-ce95-4a82-9083-902546545a0f`
+  - 状态：`SUCCESS`
+- 线上健康检查：
+  - `GET /health`
+  - 返回 `status: ok`
+  - `env: production`
+- 线上页面验证：
+  - `agent-browser` 已确认首页可打开
+  - 页面文本包含：
+    - `黄金坩埚 GoldenCrucible`
+    - `CRUCIBLE ONLINE`
+    - `GoldenCrucible SaaS v4.0.0`
+
+### 🔍 同日补充：安全 / 健壮性快速扫描
+
+- 已完成一轮线上 staging 暴露面检查，确认 2 个高优先级问题：
+  1. `llm-config` 管理接口当前对公网匿名开放
+  2. `POST /api/projects/switch` 当前对公网匿名可写
+- 同时确认 1 个中低优先级问题：
+  - 基础安全响应头不足，仍暴露 `x-powered-by: Express`，且未补 `CSP / HSTS / X-Frame-Options`
+- 正向结论：
+  - CORS 当前没有把任意 `Origin` 反射成允许源
+- 当前建议：
+  - staging 可小范围试用
+  - 若要更公开扩散，优先先收口管理接口鉴权
+
+### 🧹 同日补充：Skill Sync 收口
+
+- 已从黄金坩埚 SaaS 的 Skill Sync 名单中移除与 GC 主链无关的 5 个技能：
+  - `Director`
+  - `MusicDirector`
+  - `ThumbnailMaster`
+  - `ShortsMaster`
+  - `MarketingMaster`
+- 当前保留的最小技能集为：
+  - `Writer`
+  - `ThesisWriter`
+  - `Researcher`
+  - `FactChecker`
+  - `Socrates`
 
 ---
 
