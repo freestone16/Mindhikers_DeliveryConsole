@@ -1,4 +1,4 @@
-# 交接快照 | 2026-03-22（最新）
+# 交接快照 | 2026-03-26（最新）
 
 > **每次会话结束时覆盖写此文件（不累积）**
 > 新会话启动时第一个读此文件，30 秒恢复上下文
@@ -10,102 +10,88 @@
 | 项目 | 状态 |
 |---|---|
 | 分支 | `MHSDC-DC-director` |
-| 代码状态 | ⚠️ 未提交（RemotionStudio theme fix + DC llm.ts/director.ts 透传改造） |
-| 当前 Phase | 用户在 Phase 3 验收中 |
-| **🔴 最高优先任务** | **Phase3View.tsx 需重写，布局要对齐 Phase 2** |
+| 代码状态 | ✅ 已提交 `768d082`（ahead 7 commits） |
+| 最新 commit | `768d082` fix(director): CORS修复(temp_images本地HTTP) + Phase3反馈区移除 |
+| 版本 | v3.8.2 |
+| SkillSync | 7/7（含 svg-architect） |
+| 当前 Phase | Phase 3 渲染管线基本可用，用户正在验收 |
 
 ---
 
-## 🔴 最高优先任务：Phase 3 UI 重写
+## ✅ 本轮已完成（2026-03-25~26 会话）
 
-**问题**：Phase 3 当前是独立的简单卡片式布局（VideoCard），与 Phase 2 的12列Grid风格完全不同。
+### 1. SVG-Architect 集成
+- `server/svg-architect.ts` — 新建 Python pipeline 桥接模块
+- `server/skill-sync.ts` — svg-architect 加入 SkillSync（7/7）
+- `server/skill-loader.ts` — 加载 svg-architect 规格，注入 Director prompt `{{SVG_ARCHITECT_SPEC}}`
+- `broll.md` — svgPrompt 字段暂标为"预留"（JSON 内嵌 SVG 代码会破坏 JSON 解析，见下方教训）
 
-**用户要求**：Phase 3 布局需要与 Phase 2 保持一致。
+### 2. JSON 安全解析（safeParseLLMJson）
+- `server/llm.ts` — 新增 `safeParseLLMJson`：如果 svgPrompt 中的 SVG 代码破坏 JSON，自动剥离 svgPrompt 保全其余数据
+- **根因**：LLM 在 JSON 字符串中输出 `<svg fill="#ff0000"...>`，双引号冲突导致 `JSON.parse` 在 position 12007 失败 → 兜底方案
+- **教训**：不要要求 LLM 在 JSON 字段中输出代码。svgPrompt 已降级为预留字段
 
-**Phase 2 布局参考（ChapterCard + OptionRow）**：
-```
-顶部：BRollSelector 类型筛选（过滤可渲染类型：remotion/seedance/generative/infographic）
-Sticky toolbar：审阅进度 X/Y + 渲染按钮 + 提交→Phase 4
-ChapterCard 式布局，每个 option 用 12列 grid：
-  col-1: 序号（如 3-2）
-  col-2: 原文一句话（option.quote）
-  col-4: 设计方案/提示词（类型badge + prompt + rationale）
-  col-4: 视频播放区（等待渲染/渲染中/视频播放/失败重试）+ 反馈chatbox
-  col-1: 审阅通过✓（phase3Approved toggle，替代 Phase2 的 isChecked）
-```
+### 3. imagePrompt 底图覆盖率优化
+- `broll.md` — 硬约束从 svgPrompt 改为 imagePrompt 覆盖率（≥50% remotion 方案必须提供 imagePrompt）
+- `server/llm.ts` — 用户消息规则 #6 改为 imagePrompt 底图规则
+- **效果**：LLM 现在为 remotion 方案生成丰富多样的 imagePrompt 底图
 
-**参考文件**：
-- Phase 2 布局：`src/components/director/Phase2View.tsx`
-- Phase 2 每行：`src/components/director/ChapterCard.tsx`（OptionRow 组件，grid-cols-12）
-- 当前 Phase 3（需重写）：`src/components/director/Phase3View.tsx`
-- DirectorSection 调用：`src/components/DirectorSection.tsx` line 507-513（props：projectId, chapters, onProceed）
+### 4. CORS 修复（Seedream 图片）
+- `server/director.ts` — `downloadImageToLocal` 返回 `http://localhost:3005/temp_images/xxx.jpg` 而非 `file://` 路径
+- `server/index.ts` — 新增 `/temp_images` 静态文件服务
+- **根因**：Remotion CLI 的 headless Chromium 拦截跨域图片（火山引擎 TOS CDN → localhost）
 
-**注意**：Phase 3 的视频渲染逻辑（handleBatchRender, handleRetryOption, handleApproveOption, pollStatus等）全部保留，只改 UI 呈现层。
+### 5. Phase 3 UI 改进
+- **单条渲染按钮**：Phase3OptionRow "等待渲染" → 蓝色 Play 按钮，点击触发单条渲染
+- **反馈区移除**："对视频不满意？提意见重新渲染" 区域已删除，修订通道统一走侧边栏 Chat
 
----
-
-## ✅ 本轮已完成事项
-
-### 1. DC 导演模块归位为纯透明管道（沙漏架构）
-- `server/llm.ts`：删除 suggestTemplateFromContent、VALID_TEMPLATES 白名单、自动降级逻辑
-- `server/director.ts`：buildRemotionPreview 改为纯透传 `{ compositionId: template, props }`
-- 架构文档：`docs/00_architecture/hourglass_architecture.md`
-
-### 2. RemotionStudio theme crash 修复
-- **根因**：10个组件 `THEMES[theme]` 当 theme 无效时返回 undefined → 访问 .accent 崩溃
-- **修复**：全部改为 `THEMES[theme] || THEMES['deep-space']`
-- **文件**：RemotionStudio/src/BrollTemplates/ 下 10 个组件
-- **验证**：20 个 composition 全部正常注册
-
-### 3. Skillsync 完成
-- Director skill（prompts/ + resources/）已同步到 ~/.gemini/antigravity/skills/Director/
-- remotion_catalog.md 已更新
+### 6. RS 模板底图适配
+- `src/types.ts` — SceneOption 新增 `svgPrompt` 字段
+- Phase 2/3 双通道路由逻辑（svgPrompt → SVG-Architect，imagePrompt → Seedream）
 
 ---
 
-## ❌ 待解决问题
+## 🔧 待解决问题（下个会话优先）
 
-1. **🔴 Phase 3 UI 重写**（最高优先）：布局要对齐 Phase 2 的12列grid风格
-2. **描述与动画不一致**：属于 Director skill 层（remotion_catalog.md 需更新），用户自行治理
-3. **渲染卡住问题**：前端轮询偶发不更新，待深入排查
+### P0 — 阻塞性
+1. **Chat 侧边栏修订流不通**：用户在 Chat 中对 Phase 3 条目提出修改意见 → Director AI 生成修订方案 → "确认修改" → 但 Phase3View 本地状态（`localChapters`）**未监听** `expert-data-update:Director` 广播，导致修改不反映到 UI，也不触发重新渲染
+   - 修复方向：Phase3View 监听 socket 广播 → 刷新 localChapters → 自动触发 handleRetryOption
 
----
+### P1 — 体验优化
+2. **RS 模板前景/背景混合问题**（如 4-5 case）：ComparisonSplit 等模板的遮罩层透明度过高（13%），导致照片级底图与前景数据面板视觉"打架"
+   - 修复方向：提高遮罩不透明度，或在 RS 模板层面区分"照片底图"和"图案底图"的遮罩策略
+3. **火山引擎并发控制**：建议 Seedream 最多 3 worker 并行，完成后再添加新进程
+4. **Phase 3 文字方框半透明**：如 6-1 case，文字区域建议采用半透明/毛玻璃效果，让背景图若隐若现
 
-## 🏗️ 架构铁律（沙漏架构）
-
-```
-Director Master（大脑）→ VibePayload JSON → DC（只触发CLI）→ Remotion Studio（渲染黑盒）
-DC 禁止：校验模板/改写props/白名单/任何模板知识
-```
-
-详见：`docs/00_architecture/hourglass_architecture.md`
-
----
-
-## 🌍 环境信息
-
-```
-PROJECTS_BASE=/Users/luzhoua/Mindhikers/Mindhikers_workspace/Projects
-SKILLS_BASE=/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/.agent/skills
-RemotionStudio 路径：${SKILLS_BASE}/RemotionStudio
-测试项目：CSET-Seedance2
-后端端口：3005
-前端端口：5178
-```
+### P2 — 架构演进
+5. **svgPrompt 方案重新设计**：当前"在 JSON 中嵌入 SVG 代码"的方案不可行（破坏 JSON）。需要重新设计：
+   - 方案 A：svgPrompt 改为结构化描述（type + data + style），svg-architect 用模板生成 SVG
+   - 方案 B：分离 SVG 到独立输出通道（LLM 返回 JSON + SVG code blocks）
+   - 方案 C：放弃 LLM 生成 SVG，改为 svg-architect 自主生成（输入数据描述 → 输出 SVG）
 
 ---
 
-## 🚀 启动命令
+## 📁 本轮涉及的关键文件
 
-```bash
-cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-lsof -i :3005 -t | xargs kill -9 2>/dev/null; lsof -i :5178 -t | xargs kill -9 2>/dev/null
-npx tsx server/index.ts > /tmp/director-server.log 2>&1 &
-npx vite --host --port 5178 &
-```
+| 文件 | 改动 |
+|---|---|
+| `server/svg-architect.ts` | 新建：Python pipeline 桥接 |
+| `server/llm.ts` | safeParseLLMJson + BRollOption.svgPrompt + imagePrompt 规则 |
+| `server/skill-sync.ts` | svg-architect 加入 ALL_SKILLS |
+| `server/skill-loader.ts` | loadSvgArchitectSpec + {{SVG_ARCHITECT_SPEC}} |
+| `server/director.ts` | downloadImageToLocal CORS 修复 + SVG/imagePrompt 双通道路由 |
+| `server/index.ts` | /temp_images 静态文件服务 |
+| `src/types.ts` | SceneOption.svgPrompt |
+| `src/components/director/Phase3View.tsx` | 单条渲染按钮 + 反馈区移除 |
+| `~/.gemini/.../Director/prompts/broll.md` | svgPrompt 预留 + imagePrompt 底图硬约束 |
 
 ---
 
-## 📅 今日日志
+## 📝 Commit 历史（本轮）
 
-→ `docs/dev_logs/2026-03-22.md`
+```
+768d082 fix(director): CORS修复(temp_images本地HTTP) + Phase3反馈区移除
+4dbc50c feat(director): Phase3 单条渲染按钮
+28fb7c7 feat(director): SVG-Architect集成 + CORS修复 + RS模板底图优化
+c51c863 fix(director): infographic Phase3 两步渲染管线 + 沙漏架构拉通
+```
