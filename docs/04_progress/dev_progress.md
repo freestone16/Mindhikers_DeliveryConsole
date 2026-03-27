@@ -21,10 +21,15 @@
 - `artifact` 已具备最小 workspace-aware 读取入口：
   - 当前不再只存在于写入文件里
   - 已可通过 conversation detail 一并读回
+- `artifact` 已补上最小单独导出能力：
+  - `GET /api/crucible/conversations/:conversationId/artifacts/export`
+  - 当前稳定导出结构化 bundle JSON
+  - `format` 参数已预留，后续可平滑切到 markdown / docx / pdf 等文档形态
 - SaaS 已接入最小“历史对话”入口：
   - 头像菜单中的“历史对话”已可打开 history sheet
   - 可读取当前 workspace 下的 conversation 列表
   - 点击任一历史 conversation 后会恢复 snapshot，并重新设为 active conversation
+  - 同时可对单条历史 conversation 触发“导出产物”
 - 前端启动恢复链路已切换为：
   - 优先读取 `active conversation`
   - 若没有 active conversation，再退回 `autosave`
@@ -45,8 +50,7 @@
 
 - 目前历史对话已经有最小 UI，但还不是完整历史中心
 - `artifact` 已可随 conversation detail 读回，但还没做：
-  - 单独下载
-  - 导出
+  - 更多文档格式导出
   - 更完整的历史浏览入口
 - `projectId / scriptPath` 仍保留在 `sourceContext` 和部分宿主链路中
   - 现在更多是兼容上下文

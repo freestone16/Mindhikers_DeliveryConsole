@@ -101,6 +101,24 @@ export interface CrucibleConversationDetail {
     };
 }
 
+export interface CrucibleArtifactExportBundle {
+    version: 'crucible-artifact-export-v1';
+    requestedFormat: string;
+    exportedAt: string;
+    conversation: {
+        id: string;
+        topicTitle: string;
+        workspaceId: string;
+        roundIndex: number;
+        updatedAt: string;
+    };
+    sourceContext: {
+        projectId: string;
+        scriptPath: string;
+    };
+    artifacts: CrucibleConversationArtifact[];
+}
+
 interface StoredCrucibleMessage {
     id: string;
     role: 'user' | 'assistant';
@@ -157,6 +175,7 @@ interface StoredCrucibleConversation {
 }
 
 const sanitizePathSegment = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_');
+const sanitizeFilenameSegment = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, '_');
 
 const ensureDirectory = (targetDir: string) => {
     if (!fs.existsSync(targetDir)) {
@@ -567,4 +586,34 @@ export const activateCrucibleConversation = async (
     const context = await resolveCruciblePersistenceContext(req, options);
     writeActiveConversationPointer(context.workspaceDir, conversationId, detail.summary.topicTitle);
     return detail;
+};
+
+export const buildCrucibleArtifactExport = (
+    detail: CrucibleConversationDetail,
+    options?: {
+        format?: string;
+    },
+) => {
+    const requestedFormat = options?.format?.trim() || 'bundle-json';
+    const bundle: CrucibleArtifactExportBundle = {
+        version: 'crucible-artifact-export-v1',
+        requestedFormat,
+        exportedAt: new Date().toISOString(),
+        conversation: {
+            id: detail.summary.id,
+            topicTitle: detail.summary.topicTitle,
+            workspaceId: detail.summary.workspaceId,
+            roundIndex: detail.summary.roundIndex,
+            updatedAt: detail.summary.updatedAt,
+        },
+        sourceContext: detail.sourceContext,
+        artifacts: detail.artifacts,
+    };
+
+    const safeTopicTitle = sanitizeFilenameSegment(detail.summary.topicTitle || 'crucible');
+    return {
+        filename: `${safeTopicTitle}-${detail.summary.id}-artifacts.json`,
+        contentType: 'application/json; charset=utf-8',
+        body: JSON.stringify(bundle, null, 2),
+    };
 };

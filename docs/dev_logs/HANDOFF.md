@@ -37,6 +37,10 @@
   - `snapshot`
   - `artifacts`
   - `sourceContext`
+- artifact 已补上最小独立导出：
+  - `GET /api/crucible/conversations/:conversationId/artifacts/export`
+  - 当前先导出结构化 bundle JSON
+  - `format` 参数已留位，后续可扩成 markdown / docx / pdf
 - 前端坩埚主链已开始保存和续用 `conversationId`
 - 快照持久化已升级为：
   - `localStorage + /api/crucible/autosave`
@@ -47,6 +51,7 @@
 - SaaS 已接入最小历史对话入口：
   - 头像菜单可打开 history sheet
   - 可恢复历史 conversation，并重新设为 active
+  - 可对单条历史 conversation 触发“导出产物”
 - 后端 SSE 路由已正式挂载：
   - `POST /api/crucible/turn/stream`
 - 基于当前代码现场补齐了一版 Ver1.0 总体方案，统一口径为：
@@ -114,7 +119,7 @@
   - `workspace-aware persistence` 第二刀（恢复 / 查询读侧）
 - 未完成：
   - `Crucible` 更完整的历史中心 UI
-  - `artifact` 下载 / 导出
+  - `artifact` 更多格式导出
   - 用户登录后态的头像菜单真实功能接线
   - 微信网站应用登录接通
 
@@ -124,7 +129,7 @@
 - Google `Client Secret` 已在对话中出现，测试完成后建议旋转一版
 - 当前 persistence 已完成“写 + 读接口”闭环，但还没补：
   - 更完整的历史对话 UI
-  - artifact 下载 / 导出接口
+  - artifact 多格式导出
   - localStorage 的 workspace scope key
 
 ## 新窗口直接怎么做
@@ -132,7 +137,7 @@
    - 搜索
    - 排序
    - 更多元数据
-2. 给 `artifact` 补单独下载 / 导出入口
+2. 基于当前 `format` 参数，把 `artifact` 继续扩成 markdown / docx / pdf 等导出
 3. 对照 `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`，继续把 `projectId / scriptPath` 从坩埚主 identity 链路剥掉
 4. 然后接登录后态真实功能：
    - 历史对话

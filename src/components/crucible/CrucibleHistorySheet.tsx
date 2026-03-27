@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { History, Loader2, MessageSquareQuote, X } from 'lucide-react';
+import { Download, History, Loader2, MessageSquareQuote, X } from 'lucide-react';
 import {
     activatePersistedCrucibleConversation,
+    exportPersistedCrucibleArtifacts,
     listPersistedCrucibleConversations,
 } from './storage';
 import type { CrucibleConversationSummary, CrucibleSnapshot } from './types';
@@ -41,6 +42,7 @@ export const CrucibleHistorySheet = ({
     const [items, setItems] = useState<CrucibleConversationSummary[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingId, setLoadingId] = useState<string | null>(null);
+    const [exportingId, setExportingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -92,6 +94,22 @@ export const CrucibleHistorySheet = ({
             setError('恢复这段历史失败了，请再试一次。');
         } finally {
             setLoadingId(null);
+        }
+    };
+
+    const handleExportArtifacts = async (conversationId: string) => {
+        setExportingId(conversationId);
+        setError(null);
+
+        try {
+            await exportPersistedCrucibleArtifacts(conversationId, {
+                format: 'bundle-json',
+            });
+        } catch (err) {
+            console.warn('[CrucibleHistory] Failed to export artifacts:', err);
+            setError('导出产物失败了，请稍后再试。');
+        } finally {
+            setExportingId(null);
         }
     };
 
@@ -152,13 +170,11 @@ export const CrucibleHistorySheet = ({
                         <div className="space-y-3">
                             {items.map((item) => {
                                 const isRestoring = loadingId === item.id;
+                                const isExporting = exportingId === item.id;
                                 return (
-                                    <button
+                                    <div
                                         key={item.id}
-                                        type="button"
-                                        onClick={() => void handleRestore(item.id)}
-                                        disabled={isRestoring}
-                                        className="w-full rounded-[26px] border border-[rgba(156,117,76,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-4 text-left shadow-[0_10px_24px_rgba(133,101,69,0.06)] transition-colors hover:border-[rgba(156,117,76,0.28)] hover:bg-[rgba(255,255,255,0.92)] disabled:cursor-wait"
+                                        className="rounded-[26px] border border-[rgba(156,117,76,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-4 shadow-[0_10px_24px_rgba(133,101,69,0.06)]"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
@@ -180,7 +196,32 @@ export const CrucibleHistorySheet = ({
                                         <p className="mt-3 text-sm leading-6 text-[var(--ink-2)]">
                                             {summarizeFocus(item.lastFocus)}
                                         </p>
-                                    </button>
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleRestore(item.id)}
+                                                disabled={isRestoring}
+                                                className="inline-flex items-center gap-2 rounded-full border border-[rgba(156,117,76,0.18)] bg-[rgba(246,236,221,0.7)] px-3 py-1.5 text-xs font-medium text-[var(--ink-1)] transition-colors hover:bg-[rgba(246,236,221,0.94)] disabled:cursor-wait"
+                                            >
+                                                {isRestoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                                恢复对话
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleExportArtifacts(item.id)}
+                                                disabled={isExporting}
+                                                className="inline-flex items-center gap-2 rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[rgba(156,117,76,0.28)] hover:text-[var(--ink-1)] disabled:cursor-wait"
+                                                title="当前先导出结构化 bundle，format 参数已预留给后续 markdown/docx/pdf 等文档形态。"
+                                            >
+                                                {isExporting ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Download className="h-3.5 w-3.5" />
+                                                )}
+                                                导出产物
+                                            </button>
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </div>

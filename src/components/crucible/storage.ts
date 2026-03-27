@@ -188,3 +188,35 @@ export const activatePersistedCrucibleConversation = async (conversationId: stri
 
     return await response.json() as CrucibleConversationDetail;
 };
+
+export const exportPersistedCrucibleArtifacts = async (
+    conversationId: string,
+    options?: {
+        format?: string;
+    },
+) => {
+    const format = options?.format?.trim() || 'bundle-json';
+    const response = await fetch(buildApiUrl(
+        `/api/crucible/conversations/${encodeURIComponent(conversationId)}/artifacts/export?format=${encodeURIComponent(format)}`
+    ), {
+        credentials: 'include',
+    });
+
+    if (!response.ok) {
+        throw new Error(`artifact export failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = filenameMatch?.[1] || `${conversationId}-artifacts.json`;
+
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+};

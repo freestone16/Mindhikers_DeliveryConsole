@@ -35,6 +35,7 @@ import { AUTH_ROUTE_BASE, closeAuthPool, getAuth, getAuthPool, getSessionFromReq
 import { ensurePersonalWorkspace } from './auth/workspace-store';
 import {
     activateCrucibleConversation,
+    buildCrucibleArtifactExport,
     clearCrucibleActiveConversation,
     getCrucibleConversationDetail,
     listCrucibleConversations,
@@ -306,6 +307,28 @@ app.post('/api/crucible/conversations/:conversationId/activate', async (req, res
     } catch (error) {
         const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
         res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to activate conversation' });
+    }
+});
+app.get('/api/crucible/conversations/:conversationId/artifacts/export', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        const artifactExport = buildCrucibleArtifactExport(detail, {
+            format: typeof req.query.format === 'string' ? req.query.format : undefined,
+        });
+        res.setHeader('Content-Type', artifactExport.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${artifactExport.filename}"`);
+        res.send(artifactExport.body);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to export artifacts' });
     }
 });
 
