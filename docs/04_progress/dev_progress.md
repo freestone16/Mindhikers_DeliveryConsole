@@ -4,6 +4,36 @@
 
 ---
 
+## 1.13 2026-03-27（邮箱注册线上真实 smoke）
+
+### ✅ 本轮已完成
+
+- 已在生产环境 `https://golden-crucible-saas-production.up.railway.app/` 完成一次真实邮箱注册 smoke
+- 本次实测使用邮箱：
+  - `codex.gc.smoke.20260327.1417@example.com`
+- 实测结果：
+  - 注册按钮可提交
+  - 注册后成功进入登录后界面
+  - `GET /api/account/session` 返回 `authenticated: true`
+  - personal workspace 已自动创建
+
+### 🎯 本轮验证结论
+
+- 邮箱注册不再只是“代码可用”，已经升级为“实测可用”
+- 实测拿到的关键信息：
+  - `email = codex.gc.smoke.20260327.1417@example.com`
+  - `workspaceName = Codex Smoke 的工作区`
+  - `workspaceId = 3b1633f7-efcc-4955-9cfe-7f6f30492aa5`
+
+### ⚠️ 现场备注
+
+- 当前本地 `.env.local` 没有 `DATABASE_URL`
+  - 所以本地开发环境不会出现真实注册页
+  - 这次 smoke 结论来自生产环境，不是本地环境
+- 当前生产环境登录后仍落到旧的多模块宿主壳，不是最新的 SaaS-only 壳
+  - 这不影响“邮箱注册可用”的结论
+  - 但说明线上部署版本和当前仓库最新主链仍存在差距
+
 ## 1.12 2026-03-27（workspace-aware persistence 第二刀：读侧闭环）
 
 ### ✅ 本轮已完成

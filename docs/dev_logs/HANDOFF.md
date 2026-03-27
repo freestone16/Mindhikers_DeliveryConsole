@@ -1,4 +1,4 @@
-🕐 Last updated: 2026-03-27 11:18
+🕐 Last updated: 2026-03-27 14:20
 🌿 Branch: MHSDC-GC-SSE
 
 ## 当前状态
@@ -13,6 +13,9 @@
 - `workspace-aware persistence` 已完成第二刀：
   - conversation 读侧 API 已补齐
   - 前端启动恢复已优先走 active conversation
+- 邮箱注册已完成线上真实 smoke：
+  - 生产环境注册成功
+  - personal workspace 自动创建成功
 
 ## 本轮关键结果
 - 新增坩埚持久化骨架：
@@ -87,6 +90,13 @@
   - `npm run typecheck:full` 保留整仓历史债清单
 - 当前打包体积已明显下降：
   - `721.22 kB -> 562.12 kB`
+- 线上邮箱注册 smoke 结果：
+  - 环境：`https://golden-crucible-saas-production.up.railway.app/`
+  - 测试邮箱：`codex.gc.smoke.20260327.1417@example.com`
+  - `GET /api/account/session` 返回：
+    - `authenticated: true`
+    - `workspaceName: Codex Smoke 的工作区`
+    - `workspaceId: 3b1633f7-efcc-4955-9cfe-7f6f30492aa5`
 
 ## 本轮代码落点
 - 新增：
@@ -131,6 +141,7 @@
   - `artifact` 更多格式导出
   - 用户登录后态的头像菜单真实功能接线
   - 微信网站应用登录接通
+  - 线上部署切到最新 SaaS-only 壳
 
 ## 待解决问题
 - 当前只是把历史模块从 SaaS 主链入口和 build 中切掉了，整仓旧债本身并未清除
@@ -140,6 +151,10 @@
   - 更完整的历史对话 UI
   - artifact 多格式导出
   - localStorage 的 workspace scope key
+- 本地 `.env.local` 仍未启用 auth：
+  - 缺 `DATABASE_URL`
+  - 所以本地无法直接复现邮箱注册 smoke
+- 当前生产环境登录后仍落旧宿主壳，不是仓库里最新的 `SaaSApp` 形态
 
 ## 新窗口直接怎么做
 1. 把当前 history sheet 扩成更完整的历史中心：
@@ -147,9 +162,10 @@
    - 排序
    - 更多元数据
 2. 基于当前 `format` 参数，把 `artifact` 继续扩成 markdown / docx / pdf 等导出
-3. 对照 `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`，继续把 `projectId / scriptPath` 从坩埚主 identity 链路剥掉
-4. 然后接登录后态真实功能：
+3. 把线上部署切到最新 SaaS-only 壳，并再做一次登录后态 smoke
+4. 对照 `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`，继续把 `projectId / scriptPath` 从坩埚主 identity 链路剥掉
+5. 然后接登录后态真实功能：
    - 历史对话
    - 下载
    - 会员计划
-5. 最后补微信网站应用登录
+6. 最后补微信网站应用登录
