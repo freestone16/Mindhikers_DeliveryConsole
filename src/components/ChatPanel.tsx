@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
-import { buildApiUrl } from '../config/runtime';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -14,6 +13,13 @@ interface ChatPanelProps {
     resetToken: number;
     displayName?: string;
     panelTitle?: string;
+    currentUserBadge?: {
+        id?: string;
+        name: string;
+        role?: string;
+        avatarText?: string;
+        avatarImage?: string;
+    };
     headerBadges?: Array<{
         id: string;
         name: string;
@@ -75,13 +81,14 @@ const getBubbleTone = (msg: ChatMessage) => {
 const getMessageAuthor = (
     msg: ChatMessage,
     headerBadges?: ChatPanelProps['headerBadges'],
-    fallbackName?: string
+    fallbackName?: string,
+    currentUserBadge?: ChatPanelProps['currentUserBadge'],
 ) => {
     if (msg.role === 'user') {
-        return headerBadges?.find((badge) => badge.id === 'user') || {
+        return headerBadges?.find((badge) => badge.id === 'user') || currentUserBadge || {
             id: 'user',
             name: '你',
-            role: '命题发起',
+            role: '当前用户',
             avatarText: '你',
         };
     }
@@ -135,6 +142,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     resetToken,
     displayName,
     panelTitle,
+    currentUserBadge,
     headerBadges,
     externalMessages = [],
     onUserMessage,
@@ -192,6 +200,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
         [isCrucibleMode, expertId, expertName]
     );
+    const resolvedCurrentUserBadge = useMemo(() => ({
+        id: currentUserBadge?.id || 'user',
+        name: currentUserBadge?.name || '你',
+        role: currentUserBadge?.role || '当前用户',
+        avatarText: currentUserBadge?.avatarText || currentUserBadge?.name?.slice(0, 1) || '你',
+        avatarImage: currentUserBadge?.avatarImage,
+    }), [currentUserBadge]);
     const lastOldluMessageId = useMemo(() => {
         for (let index = messages.length - 1; index >= 0; index -= 1) {
             const message = messages[index];
@@ -522,8 +537,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             attachments: attachments.length > 0 ? [...attachments] : undefined,
             meta: {
                 authorId: 'user',
-                authorName: '你',
-                authorRole: '命题发起',
+                authorName: resolvedCurrentUserBadge.name,
+                authorRole: resolvedCurrentUserBadge.role,
                 classification: 'dialogue',
             },
         };
@@ -559,7 +574,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend, isCrucibleMode, resolvedCurrentUserBadge]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
@@ -879,7 +894,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                     <div className="space-y-4">
                         {messages.map((msg) => {
-                            const author = getMessageAuthor(msg, headerBadges, expertName);
+                            const author = getMessageAuthor(msg, headerBadges, expertName, resolvedCurrentUserBadge);
                             const isUser = msg.role === 'user';
 
                             return (
@@ -994,8 +1009,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
-                        你
+                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                        {resolvedCurrentUserBadge.avatarImage ? (
+                            <img
+                                src={resolvedCurrentUserBadge.avatarImage}
+                                alt={resolvedCurrentUserBadge.name}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            resolvedCurrentUserBadge.avatarText || resolvedCurrentUserBadge.name.slice(0, 1)
+                        )}
                     </div>
                     <label className="flex-shrink-0 cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
                         <Paperclip className="h-4 w-4" />

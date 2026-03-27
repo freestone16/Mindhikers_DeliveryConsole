@@ -22,3 +22,14 @@ export const buildApiUrl = (path: string) => {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return runtimeConfig.apiBaseUrl ? `${runtimeConfig.apiBaseUrl}${normalizedPath}` : normalizedPath;
 };
+
+export const buildAbsoluteApiUrl = (path: string) => {
+    const target = buildApiUrl(path);
+
+    if (/^https?:\/\//.test(target)) {
+        return target;
+    }
+
+    const origin = browserOrigin || `http://localhost:${backendPort}`;
+    return new URL(target, origin).toString();
+};

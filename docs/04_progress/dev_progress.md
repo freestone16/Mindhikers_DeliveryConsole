@@ -1,8 +1,162 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-26 CST
+> **更新日期**: 2026-03-27 CST
 
 ---
+
+## 1.10 2026-03-27（SaaS 主链入口分仓 + 历史类型债隔离）
+
+### ✅ 本轮已完成
+
+- 当前默认前端入口已切到独立 SaaS 壳：
+  - `src/SaaSApp.tsx`
+  - `src/main.tsx`
+  - 当前 production / Railway 构建不再经过旧的 `src/App.tsx`
+- SaaS 壳已只保留当前主线能力：
+  - `黄金坩埚`
+  - `分发终端`
+  - 不再 import 导演 / Shorts / 营销等历史交付模块
+- Header 已改成可配置模块口径：
+  - `src/components/Header.tsx`
+  - 当前 SaaS 入口只展示 `crucible / distribution`
+  - 在 SaaS 壳里，project / script 选择器不再因为位于坩埚页而被锁死
+- 构建与类型检查已正式分仓：
+  - 新增 `tsconfig.saas.json`
+  - 新增 `npm run typecheck:saas`
+  - `npm run build` / `npm run build:railway` 现走 `typecheck:saas + vite build`
+  - `npm run typecheck:full` 保留为整仓历史债务清单
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- SaaS 前端产物体积已下降：
+  - 由 `721.22 kB` 降到 `562.12 kB`
+  - 说明旧 Delivery 模块已不再进入当前默认打包主链
+- `npm run typecheck:full`：仍失败，但失败项已明确退回历史模块：
+  - `src/components/market/*`
+  - `src/components/MarketingSection.tsx`
+  - `src/components/ScheduleModal.tsx`
+  - `src/components/StatusDashboard.tsx`
+  - 这些旧债当前已不再阻塞 SaaS 主链 build
+
+### ⚠️ 当前剩余事项
+
+- `Crucible turn / conversation / artifact` 仍未完成全量 `workspace-aware`
+  - 当前只完成了登录、workspace bootstrap、autosave 分仓
+- Google 登录已可用，但登录后态仍需继续补齐：
+  - 头像菜单真实功能接线
+  - 历史对话 / 下载 / 会员计划等菜单项
+- 微信网站应用登录仍待接通
+- 整仓历史类型债仍存在
+  - 但已经从当前 SaaS 交付链路中隔离出来
+  - 后续若要清债，应作为独立收口任务推进，不应再阻塞 `MIN-105` 主线
+
+## 1.9 2026-03-26（多账号 Phase 0/1 骨架接入）
+
+### ✅ 本轮已完成
+
+- 按 `docs/plans/2026-03-26_GoldenCrucible_SSE_Multi_Account_Research_and_Plan.md` 落下首批实现骨架：
+  - `Better Auth + Postgres + personal workspace bootstrap`
+- 新增后端 auth/workspace 基础层：
+  - `server/auth/index.ts`
+  - `server/auth/account-router.ts`
+  - `server/auth/workspace-store.ts`
+  - 支持：
+    - Better Auth 路由挂载
+    - `GET /api/account/status`
+    - `GET /api/account/session`
+    - `POST /api/account/active-workspace`
+    - personal workspace 自动初始化
+- 新增迁移入口：
+  - `scripts/run-auth-migrations.ts`
+  - `package.json` 新增 `npm run auth:migrate`
+- 前端已接最小登录门禁：
+  - `src/auth/*`
+  - `src/main.tsx`
+  - 未登录时进入注册 / 登录界面
+  - 登录后自动拉取 account session 与 active workspace
+- 三类登录入口已进入首批接线状态：
+  - `邮箱注册 / 登录` 已可用
+  - `Google 登录` 已接入 provider 配置位与前端入口
+  - `微信扫码登录` 已按“微信开放平台网站应用”口径预留 provider 配置位与前端入口
+- Header 已接入当前登录态摘要与退出入口：
+  - `src/components/Header.tsx`
+- Crucible autosave 已开始按 workspace 落隔离路径：
+  - 未启用 auth 时继续兼容旧路径 `runtime/crucible/autosave.json`
+  - 启用 auth 后切换为 `runtime/crucible/workspaces/<workspaceId>/autosave.json`
+- 补上 crucible autosave 清理路由：
+  - `DELETE /api/crucible/autosave`
+
+### 🎯 本轮验证结论
+
+- 新增前端 auth 层定向 lint 已通过：
+  - `src/auth/AppAuthContext.ts`
+  - `src/auth/AuthBoundary.tsx`
+  - `src/auth/AuthProvider.tsx`
+  - `src/auth/AuthScreen.tsx`
+  - `src/auth/client.ts`
+  - `src/auth/types.ts`
+  - `src/auth/useAppAuth.ts`
+  - `src/main.tsx`
+  - `src/App.tsx`
+- 新增服务端 auth 模块已可被 `tsx` 真实加载：
+  - 输出：`auth-module-ok`
+- `npm run build` 仍未通过，但阻塞仍集中在仓库既有前端类型债：
+  - `src/components/market/*`
+  - `src/components/ScheduleModal.tsx`
+  - `src/components/StatusDashboard.tsx`
+  - `src/components/ChatPanel.tsx`
+  - 当前未出现新的 auth/workspace 构建阻塞项
+- Railway 侧已完成第一轮真实打通：
+  - `GoldenCrucible-SaaS-Staging` 已 link 到当前 worktree
+  - 已新增 Railway Postgres
+  - `golden-crucible-saas` 已写入：
+    - `DATABASE_URL`
+    - `BETTER_AUTH_SECRET`
+    - `BETTER_AUTH_URL`
+  - `npm run auth:migrate` 已成功执行
+  - Railway Postgres 已验表存在：
+    - `user`
+    - `session`
+    - `account`
+    - `verification`
+    - `workspace`
+    - `workspace_member`
+    - `workspace_invitation`
+    - `active_workspace`
+  - Staging 部署已成功
+  - 线上核验已通过：
+    - `GET /health`
+    - `GET /api/account/status`
+    - 返回 `authEnabled: true`
+    - Google provider 已完成 production 接通并验证 `googleEnabled: true`
+    - 微信 provider 是否可用仍取决于对应开放平台资料与密钥是否补齐
+
+### ⚠️ 当前剩余事项
+
+- 还没有把 `Crucible turn / conversation / artifact` 全量切到 workspace-aware
+  - 当前只先收口 autosave
+- Google 登录已完成真实 smoke，可作为当前可用登录入口
+  - production `googleEnabled: true`
+  - 首页按钮已可点击
+  - 已能跳转 Google 授权页并命中正确 callback
+  - 当前剩余的是登录后态细节与头像菜单功能补齐，不再是“能不能登录”的问题
+- 微信真实线上登录还未完成 smoke
+  - 当前已经预留 UI 与 provider 配置位
+  - 仍需补齐对应的 `CLIENT_ID / CLIENT_SECRET` 与开放平台资料
+- 已新增微信网站应用准备清单：
+  - `docs/plans/2026-03-26_GoldenCrucible_SSE_WeChat_Web_Login_Preparation_Checklist.md`
+- 为了让 `railway up` 成功，已新增：
+  - `.railwayignore`
+  - `railway.json`
+  - `build:railway`
+  - `start`
+  - 当前 staging 已能用 Express 托管 `dist` 静态产物
+- 整仓 `npm run build` 仍会被既有前端类型债拦住：
+  - 主要集中在 `src/components/market/*`
+  - 以及依赖旧 `DeliveryState.modules` 结构的历史面板组件
+  - 当前 `build:railway` 已绕开这批 unrelated 前端债，先保障 SaaS 主链可部署
 
 ## 1.8 2026-03-24（黄金坩埚“老张已搜索”回归排错修复）
 

@@ -11,6 +11,11 @@
 1. **永远不要修改 .env 中的路径**，除非用户明确要求
 2. 修改配置文件前问自己：「我是否 100% 确认原来的值是错的？」
 3. 看到路径异常时，先 `ls` 验证目录是否存在，再判断谁对谁错
+4. **并行 worktree 的物理目录必须和分支语义对齐**：如 `MHSDC-GC-SSE` 对应 `/GoldenCrucible-SSE`，不要让 SSE / 稳定线共用易混淆目录名
+5. **汇报或登记目录前必须同时核对 `ls` 与 `git worktree list`**：不要凭口头记忆写 `GoldenCrucible/GC`、`GoldenCrucible-GC` 这类路径，统一以现场实际 worktree 为准
+6. **系统设计、实时链路与排障都必须以 SkillSync 同步过来的能力为业务主题**：我们的系统只负责胶水代码与路由编排，来自用户的任何业务需求，默认都要直接交给同步过来的 skill 处理，禁止让宿主系统替 skill 擅自承接业务语义
+7. **黄金坩埚场景下，用户业务需求默认直路由苏格拉底 skill**：由苏格拉底负责主导回应，并按需要调动 Researcher 与 FactChecker，宿主层只负责事件流、状态同步、工具接驳与结果回传
+8. **orchestrator 不做任何业务判断**：不能替苏格拉底决定 phase、是否搜索、是否查证、是否调用哪个 skill；若发现 orchestrator / bridge / server 出现此类判断，直接删除并把决定权还给苏格拉底
 
 ---
 
@@ -36,32 +41,34 @@
 11. 恢复版本时不要同时添加新修改，先验证恢复是否成功
 12. 版本回滚步骤：git checkout → 重启 → 验证 → 再添加新功能
 13. 在 dev_progress.md 记录已知正常工作的 commit hash
+14. **汇报“当前开发进度 / 剩余事项”前，必须同时核对 `docs/04_progress/dev_progress.md`、当天 `docs/dev_logs/YYYY-MM-DD.md` 与 `docs/dev_logs/HANDOFF.md`**；若口径不一致，以最新时间戳日志为准，并顺手回写进度文档，避免把“已接通 / 已验证”的事项继续报成“未完成”
 
 ---
 
 ## 前端开发
 
-14. **TypeScript 类型导入必须使用 `import type`**
-15. 分开写 `import { Component }` 和 `import type { Type }`
-16. 遇到模块导出错误时检查：是 `export type` 还是普通 `export`
-17. Vite 中类型导入错误只在运行时暴露，tsc 会通过
-18. **新增 CSS 主题 token 时，必须同时 `rg "var\\(--"` 校对引用全集，确认每个 `var(--xxx)` 都有定义**；缺失变量会让页面静默回落到继承色，最容易出现“浅底白字/深底暗字”的整页配色异常
+15. **TypeScript 类型导入必须使用 `import type`**
+16. 分开写 `import { Component }` 和 `import type { Type }`
+17. 遇到模块导出错误时检查：是 `export type` 还是普通 `export`
+18. Vite 中类型导入错误只在运行时暴露，tsc 会通过
+19. **新增 CSS 主题 token 时，必须同时 `rg "var\\(--"` 校对引用全集，确认每个 `var(--xxx)` 都有定义**；缺失变量会让页面静默回落到继承色，最容易出现“浅底白字/深底暗字”的整页配色异常
+20. **Better Auth 的 `createAuthClient` 不能喂相对 `baseURL`**；`/api/auth` 在生产环境会触发 `Invalid base URL` 并导致 React 启动前白屏，必须先转成绝对地址
 
 ---
 
 ## 状态管理
 
-18. **选择新文件 = 重置所有状态**
-19. 切换项目时清除临时状态文件（如 `phase2_review_state.json`）
-20. 状态重置清单：phase、proposals、feedback、approved、items、jobs
+20. **选择新文件 = 重置所有状态**
+21. 切换项目时清除临时状态文件（如 `phase2_review_state.json`）
+22. 状态重置清单：phase、proposals、feedback、approved、items、jobs
 
 ---
 
 ## SSE 事件处理
 
-21. **每种后端发送的 type 都必须有对应的前端处理逻辑**
-22. 特别处理 `error` 类型，必须抛出并显示给用户
-23. 不要静默忽略解析错误，记录到 console
+23. **每种后端发送的 type 都必须有对应的前端处理逻辑**
+24. 特别处理 `error` 类型，必须抛出并显示给用户
+25. 不要静默忽略解析错误，记录到 console
 
 ---
 
@@ -173,52 +180,54 @@
 65. **端口判断先查** `~/.vibedir/global_ports_registry.yml`；再读取 `.env.local` / `.env` 中的 `PORT` 和 `VITE_APP_PORT`，最后才执行 `lsof`
 66. 强制杀进程：`kill -9 <PID>`
 67. **worktree 的 `.env` / `.env.local` 端口口径必须一致**；不要残留其他模块的端口号，避免误判当前服务归属
+68. **并行分支若要与稳定线同时存在，必须先分配独立 worktree + 独立端口 + 账本登记后再启动验证**；不能只开新分支却继续共用同一组资源
 
 ---
 
 ## 前端组件开发
 
-68. 组件重命名时同步更新所有 import 引用
-69. 检查导入完整性：确保所有使用的组件/图标都已正确导入
-70. React 组件白屏 → 检查浏览器控制台的 Uncaught Error
-71. 热更新失败 → 刷新页面或重启 dev server
+69. 组件重命名时同步更新所有 import 引用
+70. 检查导入完整性：确保所有使用的组件/图标都已正确导入
+71. React 组件白屏 → 检查浏览器控制台的 Uncaught Error
+72. 热更新失败 → 刷新页面或重启 dev server
 
 ---
 
 ## 测试验证
 
-72. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
-73. 不要假设修改生效，用实际命令验证
-74. 验证清单：`lsp_diagnostics` → build → test → 功能测试
-75. 收口/迁移任务若被 build 暴露出 unrelated 模块报错，先按模块边界隔离；不要顺手改进到其他业务域（例如营销大师类型债不应混入坩埚/运行时收口）
-76. **测试“用户请求搜索/联网”时，不能一上来就空口提搜索**；必须先至少铺垫 2 轮具体语境，再在后续轮次基于该语境提出搜索需求，否则结论不可信
+73. **修改后必须验证**：运行测试 → 检查类型 → 重启服务 → 手动测试
+74. 不要假设修改生效，用实际命令验证
+75. 验证清单：`lsp_diagnostics` → build → test → 功能测试
+76. 收口/迁移任务若被 build 暴露出 unrelated 模块报错，先按模块边界隔离；不要顺手改进到其他业务域（例如营销大师类型债不应混入坩埚/运行时收口）
+77. **测试“用户请求搜索/联网”时，不能一上来就空口提搜索**；必须先至少铺垫 2 轮具体语境，再在后续轮次基于该语境提出搜索需求，否则结论不可信
+78. **当前交付主线若要摆脱历史模块类型债，必须拆独立入口 / 独立 tsconfig / 独立 typecheck**；不要靠直接移除类型检查来“伪绿灯”，正确做法是让 `build` 只验证当前主线，同时保留 `typecheck:full` 挂账历史债
 
 ---
 
 ## 性能优化
 
-77. 长时间运行的请求必须有超时
-78. 大文件读取要分块，不要一次性加载到内存
-79. 频繁操作考虑加 debounce/throttle
+79. 长时间运行的请求必须有超时
+80. 大文件读取要分块，不要一次性加载到内存
+81. 频繁操作考虑加 debounce/throttle
 
 ---
 
 ## 安全考虑
 
-80. API Key 不要硬编码在代码里，使用环境变量
-81. `.env` 文件要在 `.gitignore` 中
-82. 敏感日志输出前脱敏处理
+82. API Key 不要硬编码在代码里，使用环境变量
+83. `.env` 文件要在 `.gitignore` 中
+84. 敏感日志输出前脱敏处理
 
 ---
 
 ## 项目特定
 
-83. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
-84. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
-85. worktree 环境需要复制 `.env` 到 worktree 目录
-86. **修改 `.env` 后必须重启服务器** 才能生效
-87. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
-88. **Skill 的业务逻辑绝不在后端硬编码**：deriveRuntimePhase / searchRequested 等只是 prompt 框架辅助，真正的对话节奏应由 LLM 从完整 SKILL.md 自行判断。如果发现后端越俎代庖地写了轮次上限、搜索频率等逻辑，立即删除
+85. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
+86. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
+87. worktree 环境需要复制 `.env` 到 worktree 目录
+88. **修改 `.env` 后必须重启服务器** 才能生效
+89. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
+88. **Skill 的业务逻辑绝不在后端硬编码，但“工具是否真的执行过”必须由宿主留证**：宿主不能替苏格拉底决定 phase、结论、追问方向或工具编排；但只要回复里可能声称“已经搜索/已查到”，宿主就必须负责最小证据桥接与落盘，至少写明 `searchRequested / searchConnected / research.sources`，绝不能只让模型口头声称已搜索
 
 ---
 

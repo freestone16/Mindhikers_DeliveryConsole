@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
 import { buildApiUrl } from '../config/runtime';
+import { UserAvatarMenu } from './UserAvatarMenu';
+
+export type HeaderModule = 'crucible' | 'delivery' | 'distribution';
 
 interface Project {
     name: string;
@@ -20,17 +23,52 @@ interface HeaderProps {
     selectedScriptPath?: string;
     onSelectProject: (projectId: string) => void;
     onSelectScript: (projectId: string, path: string) => Promise<boolean>;
-    activeModule: 'crucible' | 'delivery' | 'distribution';
-    onModuleChange: (module: 'crucible' | 'delivery' | 'distribution') => void;
+    activeModule: HeaderModule;
+    onModuleChange: (module: HeaderModule) => void;
+    availableModules?: HeaderModule[];
+    lockSelectorsWhenCrucible?: boolean;
+    authSummary?: {
+        displayName: string;
+        email: string;
+        avatarImage?: string | null;
+        workspaceName?: string;
+        onSignOut: () => void;
+    };
 }
 
-export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelectScript, activeModule, onModuleChange }: HeaderProps) => {
+const MODULE_META: Record<HeaderModule, { label: string; activeClass: string }> = {
+    crucible: {
+        label: '黄金坩埚',
+        activeClass: 'bg-[var(--accent)] text-white',
+    },
+    delivery: {
+        label: '交付终端',
+        activeClass: 'bg-[var(--surface-2)] text-[var(--ink-1)]',
+    },
+    distribution: {
+        label: '分发终端',
+        activeClass: 'bg-[var(--surface-2)] text-[var(--ink-1)]',
+    },
+};
+
+export const Header = ({
+    projectId,
+    selectedScriptPath,
+    onSelectProject,
+    onSelectScript,
+    activeModule,
+    onModuleChange,
+    availableModules,
+    lockSelectorsWhenCrucible = true,
+    authSummary,
+}: HeaderProps) => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [scripts, setScripts] = useState<ScriptFile[]>([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isScriptDropdownOpen, setIsScriptDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const scriptDropdownRef = useRef<HTMLDivElement>(null);
+    const modules = availableModules ?? ['crucible', 'delivery', 'distribution'];
 
     // ... (fetch logic remains same)
     const fetchProjects = async () => {
@@ -95,7 +133,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
     const selectedScript = scripts.find(s => s.path === selectedScriptPath);
     const formatSize = (bytes: number) => bytes > 1000 ? `${(bytes / 1000).toFixed(1)}k` : `${bytes}`;
-    const isCrucibleLocked = activeModule === 'crucible';
+    const isCrucibleLocked = lockSelectorsWhenCrucible && activeModule === 'crucible';
 
     return (
         <>
@@ -109,36 +147,31 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                     </div>
 
                     <div className="flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-1 shadow-[0_10px_24px_rgba(130,102,70,0.05)]">
-                        <button
-                            onClick={() => onModuleChange('crucible')}
-                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'crucible'
-                                ? 'bg-[var(--accent)] text-white'
-                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
-                                }`}
-                        >
-                            黄金坩埚
-                        </button>
-                        <button
-                            onClick={() => onModuleChange('delivery')}
-                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'delivery'
-                                ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
-                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
-                                }`}
-                        >
-                            交付终端
-                        </button>
-                        <button
-                            onClick={() => onModuleChange('distribution')}
-                            className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === 'distribution'
-                                ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
-                                : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
-                                }`}
-                        >
-                            分发终端
-                        </button>
+                        {modules.map((module) => (
+                            <button
+                                key={module}
+                                onClick={() => onModuleChange(module)}
+                                className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === module
+                                    ? MODULE_META[module].activeClass
+                                    : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
+                                    }`}
+                            >
+                                {MODULE_META[module].label}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="flex items-center gap-2.5">
+                        {authSummary ? (
+                            <UserAvatarMenu
+                                displayName={authSummary.displayName}
+                                email={authSummary.email}
+                                avatarImage={authSummary.avatarImage}
+                                workspaceName={authSummary.workspaceName}
+                                onSignOut={authSummary.onSignOut}
+                            />
+                        ) : null}
+
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => {

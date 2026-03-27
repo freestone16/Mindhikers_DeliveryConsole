@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import multer from 'multer';
+import { toNodeHandler } from 'better-auth/node';
 
 import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
@@ -29,6 +30,9 @@ import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
 import { getProjectRoot, PROJECTS_BASE } from './project-root';
+import { accountRouter } from './auth/account-router';
+import { AUTH_ROUTE_BASE, closeAuthPool, getAuth, getAuthPool, getSessionFromRequest, isAuthEnabled } from './auth';
+import { ensurePersonalWorkspace } from './auth/workspace-store';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -38,8 +42,39 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 
+if (process.env.NODE_ENV === 'production') {
+    console.log('[AuthEnv] runtime flags', {
+        authEnabled: Boolean(process.env.DATABASE_URL?.trim()),
+        googleEnabled: Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim()),
+        wechatEnabled: Boolean(process.env.WECHAT_CLIENT_ID?.trim() && process.env.WECHAT_CLIENT_SECRET?.trim()),
+        betterAuthUrl: process.env.BETTER_AUTH_URL?.trim() || null,
+    });
+}
+
+const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const allowedOrigins = new Set([
+    process.env.APP_BASE_URL?.trim(),
+    process.env.CORS_ORIGIN?.trim(),
+    process.env.VITE_API_BASE_URL?.trim(),
+    process.env.VITE_APP_PORT ? `http://localhost:${process.env.VITE_APP_PORT}` : '',
+    process.env.VITE_APP_PORT ? `http://127.0.0.1:${process.env.VITE_APP_PORT}` : '',
+].filter(Boolean));
+
+const corsOptions = {
+    origin(origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) {
+        if (!origin || allowedOrigins.has(origin) || localOriginPattern.test(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
+};
+
 const app = express();
-app.use(cors()); // Enable CORS for all routes
+app.set('trust proxy', 1);
+app.use(cors(corsOptions));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
@@ -100,8 +135,13 @@ function getAppVersion(): string {
     }
 }
 
-app.use(cors());
+const auth = getAuth();
+if (auth) {
+    app.all(`${AUTH_ROUTE_BASE}/*splat`, toNodeHandler(auth));
+}
+
 app.use(express.json());
+app.use('/api/account', accountRouter);
 
 // Mount YouTube Auth Routes
 app.use(youtubeAuthRouter);
@@ -196,27 +236,77 @@ app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
 
 // Crucible Autosave (S/L buttons — no file dialog)
-const CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
-app.get('/api/crucible/autosave', (_req, res) => {
-    if (!fs.existsSync(CRUCIBLE_AUTOSAVE_PATH)) {
-        return res.status(404).json({ error: 'No autosave found' });
+const LEGACY_CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
+
+function sanitizePathSegment(value: string) {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+async function resolveCrucibleAutosavePath(req: express.Request) {
+    if (!isAuthEnabled()) {
+        return LEGACY_CRUCIBLE_AUTOSAVE_PATH;
     }
+
+    const session = await getSessionFromRequest(req);
+    if (!session?.user?.id) {
+        const error = new Error('Authentication required');
+        (error as Error & { statusCode?: number }).statusCode = 401;
+        throw error;
+    }
+
+    const workspace = await ensurePersonalWorkspace(getAuthPool(), {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+    });
+
+    return path.resolve(
+        __dirname,
+        '../runtime/crucible/workspaces',
+        sanitizePathSegment(workspace.activeWorkspace.id),
+        'autosave.json',
+    );
+}
+
+app.get('/api/crucible/autosave', async (req, res) => {
     try {
-        const data = fs.readFileSync(CRUCIBLE_AUTOSAVE_PATH, 'utf-8');
+        const autosavePath = await resolveCrucibleAutosavePath(req);
+        if (!fs.existsSync(autosavePath)) {
+            return res.status(404).json({ error: 'No autosave found' });
+        }
+
+        const data = fs.readFileSync(autosavePath, 'utf-8');
         res.setHeader('Content-Type', 'application/json');
         res.send(data);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to read autosave' });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read autosave' });
     }
 });
-app.post('/api/crucible/autosave', (req, res) => {
+
+app.post('/api/crucible/autosave', async (req, res) => {
     try {
-        const dir = path.dirname(CRUCIBLE_AUTOSAVE_PATH);
+        const autosavePath = await resolveCrucibleAutosavePath(req);
+        const dir = path.dirname(autosavePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(CRUCIBLE_AUTOSAVE_PATH, JSON.stringify(req.body, null, 2), 'utf-8');
+        fs.writeFileSync(autosavePath, JSON.stringify(req.body, null, 2), 'utf-8');
         res.json({ ok: true });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to write autosave' });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to write autosave' });
+    }
+});
+
+app.delete('/api/crucible/autosave', async (req, res) => {
+    try {
+        const autosavePath = await resolveCrucibleAutosavePath(req);
+        if (fs.existsSync(autosavePath)) {
+            fs.unlinkSync(autosavePath);
+        }
+        res.json({ ok: true });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to clear autosave' });
     }
 });
 
@@ -1328,8 +1418,21 @@ shutdownManager.registerCleanup(async () => {
     console.log('    ✓ Visual Plan Watcher 已关闭');
 });
 
+shutdownManager.registerCleanup(async () => {
+    await closeAuthPool();
+    console.log('    ✓ Auth Postgres Pool 已关闭');
+});
+
 // Setup Health Check Endpoints
 setupHealthCheck(app);
+
+const distDir = path.resolve(__dirname, '../dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.get(/^(?!\/api|\/socket\.io).*/, (_req, res) => {
+        res.sendFile(path.join(distDir, 'index.html'));
+    });
+}
 
 // --- Global Error Handlers (prevent server crashes from unhandled async errors) ---
 process.on('uncaughtException', (err) => {
