@@ -52,6 +52,14 @@
   - 头像菜单可打开 history sheet
   - 可恢复历史 conversation，并重新设为 active
   - 可对单条历史 conversation 触发“导出产物”
+- history sheet 已升级为轻量历史中心：
+  - 搜索
+  - 排序
+  - 基础元数据
+  - 扩展位预留
+- 导出参数位已从接口打到 UI：
+  - 当前仅开放 `bundle-json`
+  - 后续可继续加 markdown / docx / pdf
 - 后端 SSE 路由已正式挂载：
   - `POST /api/crucible/turn/stream`
 - 基于当前代码现场补齐了一版 Ver1.0 总体方案，统一口径为：
@@ -119,6 +127,7 @@
   - `workspace-aware persistence` 第二刀（恢复 / 查询读侧）
 - 未完成：
   - `Crucible` 更完整的历史中心 UI
+  - 归档 / 重命名 / 标签等管理能力
   - `artifact` 更多格式导出
   - 用户登录后态的头像菜单真实功能接线
   - 微信网站应用登录接通

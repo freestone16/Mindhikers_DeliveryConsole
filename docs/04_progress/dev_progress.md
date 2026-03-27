@@ -30,6 +30,14 @@
   - 可读取当前 workspace 下的 conversation 列表
   - 点击任一历史 conversation 后会恢复 snapshot，并重新设为 active conversation
   - 同时可对单条历史 conversation 触发“导出产物”
+- history sheet 已升级为轻量历史中心：
+  - 搜索
+  - 排序
+  - `messageCount / artifactCount / status` 基础元数据
+  - 预留后续筛选 / 归档 / 标签扩展位
+- 导出参数位已前置到 UI：
+  - 当前只有 `bundle-json`
+  - 但前后端都已留出 `format` 选择位
 - 前端启动恢复链路已切换为：
   - 优先读取 `active conversation`
   - 若没有 active conversation，再退回 `autosave`
@@ -52,6 +60,7 @@
 - `artifact` 已可随 conversation detail 读回，但还没做：
   - 更多文档格式导出
   - 更完整的历史浏览入口
+  - 归档 / 重命名 / 标签等管理能力
 - `projectId / scriptPath` 仍保留在 `sourceContext` 和部分宿主链路中
   - 现在更多是兼容上下文
   - 已不是坩埚主 identity

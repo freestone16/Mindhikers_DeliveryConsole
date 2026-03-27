@@ -33,6 +33,8 @@ export interface CrucibleConversationSummary {
     roundIndex: number;
     lastSpeaker: string;
     lastFocus: string;
+    messageCount: number;
+    artifactCount: number;
 }
 
 export interface CrucibleConversationArtifact {
@@ -263,6 +265,8 @@ const buildConversationSummary = (
         roundIndex: conversation.roundIndex,
         lastSpeaker: lastTurn?.bridgeOutput.dialogue.speaker || fallback?.lastSpeaker || 'assistant',
         lastFocus: lastTurn?.bridgeOutput.dialogue.focus || fallback?.lastFocus || '',
+        messageCount: conversation.messages.length || fallback?.messageCount || 0,
+        artifactCount: conversation.artifacts.length || fallback?.artifactCount || 0,
     };
 };
 
@@ -500,17 +504,7 @@ export const appendTurnToCrucibleConversation = (
 
     fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
     writeActiveConversationPointer(context.workspaceDir, context.conversationId, params.topicTitle);
-    updateConversationIndex(context.workspaceDir, {
-        id: conversation.id,
-        workspaceId: conversation.workspaceId,
-        topicTitle: conversation.topicTitle,
-        status: conversation.status,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt,
-        roundIndex: conversation.roundIndex,
-        lastSpeaker: params.speaker,
-        lastFocus: params.focus,
-    });
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
 
     fs.writeFileSync(getCompatTurnLogPath(context.workspaceDir), JSON.stringify({
         conversationId: conversation.id,

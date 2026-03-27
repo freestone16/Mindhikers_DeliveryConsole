@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, History, Loader2, MessageSquareQuote, X } from 'lucide-react';
+import { ArrowDownUp, Download, History, Loader2, MessageSquareQuote, Search, X } from 'lucide-react';
 import {
     activatePersistedCrucibleConversation,
     exportPersistedCrucibleArtifacts,
@@ -12,6 +12,8 @@ interface CrucibleHistorySheetProps {
     onClose: () => void;
     onRestoreSnapshot: (snapshot: CrucibleSnapshot) => void;
 }
+
+type SortMode = 'recent' | 'oldest' | 'rounds';
 
 const formatUpdatedAt = (value: string) => {
     try {
@@ -44,6 +46,9 @@ export const CrucibleHistorySheet = ({
     const [loadingId, setLoadingId] = useState<string | null>(null);
     const [exportingId, setExportingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortMode, setSortMode] = useState<SortMode>('recent');
+    const [exportFormat, setExportFormat] = useState('bundle-json');
 
     useEffect(() => {
         if (!isOpen) {
@@ -79,7 +84,35 @@ export const CrucibleHistorySheet = ({
         };
     }, [isOpen]);
 
-    const hasItems = useMemo(() => items.length > 0, [items.length]);
+    const filteredItems = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        const nextItems = items.filter((item) => {
+            if (!query) {
+                return true;
+            }
+
+            const haystack = [
+                item.topicTitle,
+                item.lastFocus,
+                item.lastSpeaker,
+            ].join(' ').toLowerCase();
+            return haystack.includes(query);
+        });
+
+        nextItems.sort((left, right) => {
+            if (sortMode === 'oldest') {
+                return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
+            }
+            if (sortMode === 'rounds') {
+                return right.roundIndex - left.roundIndex;
+            }
+            return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        });
+
+        return nextItems;
+    }, [items, searchQuery, sortMode]);
+
+    const hasItems = useMemo(() => filteredItems.length > 0, [filteredItems.length]);
 
     const handleRestore = async (conversationId: string) => {
         setLoadingId(conversationId);
@@ -103,7 +136,7 @@ export const CrucibleHistorySheet = ({
 
         try {
             await exportPersistedCrucibleArtifacts(conversationId, {
-                format: 'bundle-json',
+                format: exportFormat,
             });
         } catch (err) {
             console.warn('[CrucibleHistory] Failed to export artifacts:', err);
@@ -131,9 +164,9 @@ export const CrucibleHistorySheet = ({
                     <div>
                         <div className="flex items-center gap-2 text-[var(--ink-1)]">
                             <History className="h-4 w-4" />
-                            <h2 className="text-base font-semibold">历史对话</h2>
+                            <h2 className="text-base font-semibold">历史中心</h2>
                         </div>
-                        <p className="mt-1 text-xs text-[var(--ink-3)]">按当前 workspace 恢复最近的黄金坩埚会话。</p>
+                        <p className="mt-1 text-xs text-[var(--ink-3)]">先做轻量版会话管理：搜索、排序、恢复与产物导出。</p>
                     </div>
                     <button
                         type="button"
@@ -145,6 +178,52 @@ export const CrucibleHistorySheet = ({
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-4">
+                    <div className="mb-4 space-y-3">
+                        <div className="grid gap-2 rounded-[26px] border border-[rgba(156,117,76,0.14)] bg-[rgba(255,255,255,0.7)] px-4 py-4 shadow-[0_10px_24px_rgba(133,101,69,0.05)]">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ink-3)]">
+                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">共 {items.length} 段会话</span>
+                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">当前展示 {filteredItems.length} 段</span>
+                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">导出格式参数已预留</span>
+                            </div>
+                            <label className="flex items-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-3 py-2">
+                                <Search className="h-4 w-4 text-[var(--ink-3)]" />
+                                <input
+                                    value={searchQuery}
+                                    onChange={(event) => setSearchQuery(event.target.value)}
+                                    placeholder="搜索议题、焦点或发言人"
+                                    className="w-full bg-transparent text-sm text-[var(--ink-1)] outline-none placeholder:text-[var(--ink-3)]"
+                                />
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <label className="flex items-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-3 py-2">
+                                    <ArrowDownUp className="h-4 w-4 text-[var(--ink-3)]" />
+                                    <select
+                                        value={sortMode}
+                                        onChange={(event) => setSortMode(event.target.value as SortMode)}
+                                        className="w-full bg-transparent text-sm text-[var(--ink-1)] outline-none"
+                                    >
+                                        <option value="recent">最近更新</option>
+                                        <option value="rounds">轮次最多</option>
+                                        <option value="oldest">最早开始</option>
+                                    </select>
+                                </label>
+                                <label className="flex items-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-3 py-2">
+                                    <Download className="h-4 w-4 text-[var(--ink-3)]" />
+                                    <select
+                                        value={exportFormat}
+                                        onChange={(event) => setExportFormat(event.target.value)}
+                                        className="w-full bg-transparent text-sm text-[var(--ink-1)] outline-none"
+                                    >
+                                        <option value="bundle-json">bundle-json</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div className="rounded-2xl border border-dashed border-[rgba(156,117,76,0.16)] bg-[rgba(255,248,241,0.78)] px-3 py-2 text-[11px] leading-5 text-[var(--ink-3)]">
+                                这里先预留扩展位。后面如果流程稳定，再把筛选、归档、标签、批量操作接进来。
+                            </div>
+                        </div>
+                    </div>
+
                     {isLoading ? (
                         <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--ink-3)]">
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -161,14 +240,14 @@ export const CrucibleHistorySheet = ({
                     {!isLoading && !error && !hasItems ? (
                         <div className="rounded-[28px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.48)] px-5 py-8 text-center">
                             <MessageSquareQuote className="mx-auto h-6 w-6 text-[var(--ink-3)]" />
-                            <p className="mt-3 text-sm text-[var(--ink-2)]">当前还没有可恢复的历史对话。</p>
+                            <p className="mt-3 text-sm text-[var(--ink-2)]">当前还没有可恢复的历史会话。</p>
                             <p className="mt-1 text-xs text-[var(--ink-3)]">等你在黄金坩埚里走过一轮，对话就会开始按 workspace 留档。</p>
                         </div>
                     ) : null}
 
                     {!isLoading && hasItems ? (
                         <div className="space-y-3">
-                            {items.map((item) => {
+                            {filteredItems.map((item) => {
                                 const isRestoring = loadingId === item.id;
                                 const isExporting = exportingId === item.id;
                                 return (
@@ -196,6 +275,11 @@ export const CrucibleHistorySheet = ({
                                         <p className="mt-3 text-sm leading-6 text-[var(--ink-2)]">
                                             {summarizeFocus(item.lastFocus)}
                                         </p>
+                                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-3)]">
+                                            <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">消息 {item.messageCount}</span>
+                                            <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">产物 {item.artifactCount}</span>
+                                            <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{item.status === 'active' ? '当前活跃' : '已归档'}</span>
+                                        </div>
                                         <div className="mt-4 flex items-center gap-2">
                                             <button
                                                 type="button"
@@ -224,6 +308,13 @@ export const CrucibleHistorySheet = ({
                                     </div>
                                 );
                             })}
+                        </div>
+                    ) : null}
+
+                    {!isLoading && !hasItems && items.length > 0 ? (
+                        <div className="rounded-[24px] border border-dashed border-[rgba(156,117,76,0.16)] bg-[rgba(255,252,247,0.86)] px-4 py-6 text-center">
+                            <p className="text-sm text-[var(--ink-2)]">没有匹配当前搜索条件的历史会话。</p>
+                            <p className="mt-1 text-xs text-[var(--ink-3)]">试试换个关键词，或者把排序切回“最近更新”。</p>
                         </div>
                     ) : null}
                 </div>

@@ -28,6 +28,8 @@ export interface CrucibleConversationSummary {
     roundIndex: number;
     lastSpeaker: string;
     lastFocus: string;
+    messageCount: number;
+    artifactCount: number;
 }
 
 export interface CrucibleConversationArtifact {
