@@ -228,6 +228,9 @@
 88. **修改 `.env` 后必须重启服务器** 才能生效
 89. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
 88. **Skill 的业务逻辑绝不在后端硬编码，但“工具是否真的执行过”必须由宿主留证**：宿主不能替苏格拉底决定 phase、结论、追问方向或工具编排；但只要回复里可能声称“已经搜索/已查到”，宿主就必须负责最小证据桥接与落盘，至少写明 `searchRequested / searchConnected / research.sources`，绝不能只让模型口头声称已搜索
+90. **GoldenCrucible 的 Railway 域名必须分成 `SSE` 与 `SAAS` 两条线**：`SSE` 域名只用于新功能测试与 smoke，`SAAS` 域名只承载稳定对外版本，不能混用
+91. **`SSE` 分支的成果默认先在 `SSE` Railway 域名验证，不得直接覆盖 `SAAS` 生产域名**；只有当功能稳定、口径收敛后，才允许进入 `SAAS` 合并与发布流程
+92. **`SAAS` 是全量生产库，不是临时测试分支**：`SAAS` 线应不定期合并 `SSE` 已验证成果，再统一发布到生产域名与真实外部域名；不要出现“未合并稳定线却先改生产域名”的流程漂移
 
 ---
 

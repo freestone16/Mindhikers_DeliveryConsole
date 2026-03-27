@@ -1,4 +1,4 @@
-🕐 Last updated: 2026-03-27 14:20
+🕐 Last updated: 2026-03-27 14:38
 🌿 Branch: MHSDC-GC-SSE
 
 ## 当前状态
@@ -16,6 +16,9 @@
 - 邮箱注册已完成线上真实 smoke：
   - 生产环境注册成功
   - personal workspace 自动创建成功
+- `SSE / SAAS` 的 Railway 域名治理口径已定：
+  - `SSE` 域名只做测试线
+  - `SAAS` 域名只做稳定生产线
 
 ## 本轮关键结果
 - 新增坩埚持久化骨架：
@@ -97,6 +100,11 @@
     - `authenticated: true`
     - `workspaceName: Codex Smoke 的工作区`
     - `workspaceId: 3b1633f7-efcc-4955-9cfe-7f6f30492aa5`
+- 部署治理新结论：
+  - 当前 `golden-crucible-saas-production.up.railway.app` 确实是 Railway 的 SaaS 生产域名
+  - 线上已有发布版本
+  - 但后续不应再由 `SSE` 研发线直接覆盖该域名
+  - 正确流程应是：`SSE` 验证完成 -> 合并到 `SAAS` -> 由 `SAAS` 统一发布生产域名
 
 ## 本轮代码落点
 - 新增：
@@ -141,7 +149,9 @@
   - `artifact` 更多格式导出
   - 用户登录后态的头像菜单真实功能接线
   - 微信网站应用登录接通
-  - 线上部署切到最新 SaaS-only 壳
+  - 建立独立 `SSE` Railway 测试域名
+  - 将最新稳定 `SSE` 成果合并到 `SAAS`
+  - 再由 `SAAS` 覆盖当前生产域名并切真实外部域名
 
 ## 待解决问题
 - 当前只是把历史模块从 SaaS 主链入口和 build 中切掉了，整仓旧债本身并未清除
@@ -155,17 +165,14 @@
   - 缺 `DATABASE_URL`
   - 所以本地无法直接复现邮箱注册 smoke
 - 当前生产环境登录后仍落旧宿主壳，不是仓库里最新的 `SaaSApp` 形态
+- 当前不要再追查历史部署事件，直接按新治理口径推进最稳：
+  - `SSE` 先稳
+  - 合并到 `SAAS`
+  - 再发布生产域名
 
 ## 新窗口直接怎么做
-1. 把当前 history sheet 扩成更完整的历史中心：
-   - 搜索
-   - 排序
-   - 更多元数据
-2. 基于当前 `format` 参数，把 `artifact` 继续扩成 markdown / docx / pdf 等导出
-3. 把线上部署切到最新 SaaS-only 壳，并再做一次登录后态 smoke
-4. 对照 `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`，继续把 `projectId / scriptPath` 从坩埚主 identity 链路剥掉
-5. 然后接登录后态真实功能：
-   - 历史对话
-   - 下载
-   - 会员计划
-6. 最后补微信网站应用登录
+1. 先建立独立 `SSE` Railway 测试域名
+2. 继续在 `SSE` 线上把功能收稳，不直接碰 `SAAS` 生产域名
+3. 收稳后整理一版 `SSE -> SAAS` 合并清单
+4. 合并到 `SAAS` 后，再统一覆盖当前 `golden-crucible-saas-production.up.railway.app`
+5. 最后把 `SAAS` 绑定真实外部正式域名
