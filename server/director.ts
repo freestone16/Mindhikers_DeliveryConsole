@@ -88,6 +88,25 @@ interface Phase3RenderState {
 
 const renderJobStorage = new Map<string, Phase3RenderState>();
 
+// ─── 通用并发队列 ───────────────────────────────────────────────────────────
+// Remotion 和 Volcengine 队列统一复用此工具函数
+async function runConcurrentQueue<T>(
+  queue: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<void>
+): Promise<void> {
+  let idx = 0;
+  const worker = async () => {
+    while (idx < queue.length) {
+      const item = queue[idx++];
+      await handler(item);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, queue.length) }, () => worker())
+  );
+}
+
 export function parseMarkdownChapters(content: string): { title: string; text: string }[] {
   const chapters: { title: string; text: string }[] = [];
   const lines = content.split('\n');
@@ -1316,47 +1335,38 @@ export const phase2RenderChecked = async (req: Request, res: Response) => {
     // ── 3. Remotion 并发队列（本机限制 3 个同时渲染）────────────
     const REMOTION_CONCURRENCY = 3;
     const runRemotionQueue = async () => {
-      let idx = 0;
-      const worker = async () => {
-        while (idx < remotionQueue.length) {
-          const chapter = remotionQueue[idx++];
-          const { chapterId, option } = chapter;
-          const taskKey = `${chapterId}-${option.id}`;
-          const outputPath = path.join(outputDir, `thumb_${taskKey}.png`);
+      await runConcurrentQueue(remotionQueue, REMOTION_CONCURRENCY, async (chapter) => {
+        const { chapterId, option } = chapter;
+        const taskKey = `${chapterId}-${option.id}`;
+        const outputPath = path.join(outputDir, `thumb_${taskKey}.png`);
 
-          const task = thumbnailTasks.get(taskKey);
-          if (task) task.status = 'processing';
+        const task = thumbnailTasks.get(taskKey);
+        if (task) task.status = 'processing';
 
-          console.log(`[Batch Render] ▶ Remotion start: ${taskKey}`);
-          try {
-            const { compositionId, props } = buildRemotionPreview(option);
-            const { renderStillWithApi } = require('./remotion-api-renderer');
-            await renderStillWithApi(compositionId, outputPath, props);
+        console.log(`[Batch Render] ▶ Remotion start: ${taskKey}`);
+        try {
+          const { compositionId, props } = buildRemotionPreview(option);
+          const { renderStillWithApi } = require('./remotion-api-renderer');
+          await renderStillWithApi(compositionId, outputPath, props);
 
-            const imageBuffer = fs.readFileSync(outputPath);
-            const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
-            const t = thumbnailTasks.get(taskKey);
-            if (t) { t.status = 'completed'; t.imageUrl = base64Image; }
-            console.log(`[Batch Render] ✅ Remotion done: ${taskKey}`);
-          } catch (err: any) {
-            const t = thumbnailTasks.get(taskKey);
-            if (t) { t.status = 'failed'; t.error = err.message; }
-            console.error(`[Batch Render] ❌ Remotion error: ${taskKey} — ${err.message}`);
-          }
+          const imageBuffer = fs.readFileSync(outputPath);
+          const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+          const t = thumbnailTasks.get(taskKey);
+          if (t) { t.status = 'completed'; t.imageUrl = base64Image; }
+          console.log(`[Batch Render] ✅ Remotion done: ${taskKey}`);
+        } catch (err: any) {
+          const t = thumbnailTasks.get(taskKey);
+          if (t) { t.status = 'failed'; t.error = err.message; }
+          console.error(`[Batch Render] ❌ Remotion error: ${taskKey} — ${err.message}`);
         }
-      };
-      // 并发启动 N 个 worker，各自顺序领取任务
-      const workers = Array.from(
-        { length: Math.min(REMOTION_CONCURRENCY, remotionQueue.length) },
-        () => worker()
-      );
-      await Promise.all(workers);
+      });
       console.log(`[Batch Render] Remotion queue done (${remotionQueue.length} tasks)`);
     };
 
-    // ── 4. Volcengine 队列（云端并发，本地 fire-and-forget）──────
+    // ── 4. Volcengine 队列（限 3 并发 worker）──────
+    const VOLC_IMAGE_CONCURRENCY = 3;
     const runVolcQueue = async () => {
-      const promises = volcQueue.map(async (chapter) => {
+      await runConcurrentQueue(volcQueue, VOLC_IMAGE_CONCURRENCY, async (chapter) => {
         const { chapterId, option } = chapter;
         const taskKey = `${chapterId}-${option.id}`;
         const task = thumbnailTasks.get(taskKey);
@@ -1413,8 +1423,7 @@ export const phase2RenderChecked = async (req: Request, res: Response) => {
           console.error(`[Batch Render] ❌ Volcengine error: ${taskKey} — ${err.message}`);
         }
       });
-      await Promise.all(promises);
-      console.log(`[Batch Render] Volcengine queue done (${volcQueue.length} tasks)`);
+      console.log(`[Batch Render] Volcengine queue done (${volcQueue.length} tasks, max ${VOLC_IMAGE_CONCURRENCY} concurrent)`);
     };
 
     // 两条流水线并行跑，互不阻塞
@@ -1434,7 +1443,7 @@ export const phase2RenderChecked = async (req: Request, res: Response) => {
 // Phase 3 终态比照与 XML 输出 API
 // ============================================================
 
-import { parseSRT, compileSRTForLLM, generateFCPXML, generateJianyingXML } from './srt-aligner';
+import { parseSRT, compileSRTForLLM, generateFCPXML, generateJianyingXML, findBrollFile } from './srt-aligner';
 
 export const phase3AlignSrt = async (req: Request, res: Response) => {
   const { projectId, srtContent, brolls } = req.body;
@@ -1481,7 +1490,14 @@ Reply ONLY with the valid JSON array, no markdown.`;
       throw new Error('LLM did not return proper JSON');
     }
 
-    res.json({ success: true, alignments });
+    // 标记每条对齐结果是否有已渲染的视频文件
+    const projectRoot = getProjectRoot(projectId);
+    const enriched = alignments.map((a: any) => ({
+      ...a,
+      hasVideo: !!findBrollFile(a.brollId, projectRoot),
+    }));
+
+    res.json({ success: true, alignments: enriched });
   } catch (error: any) {
     console.error('[Phase3 Align] Error:', error);
     res.status(500).json({ error: error.message || 'Failed to align SRT' });
@@ -1884,57 +1900,51 @@ export const phase3RenderBatch = async (req: Request, res: Response) => {
     //    如果 option 有 imagePrompt 且 props 里没有 imageUrl，先调 Seedream 生图再渲染
     const REMOTION_VIDEO_CONCURRENCY = 3;
     const runRemotionQueue = async () => {
-      let idx = 0;
-      const worker = async () => {
-        while (idx < remotionQueue.length) {
-          const chapter = remotionQueue[idx++];
-          const { chapterId, option } = chapter;
-          const taskKey = `${chapterId}-${option.id}`;
+      await runConcurrentQueue(remotionQueue, REMOTION_VIDEO_CONCURRENCY, async (chapter) => {
+        const { chapterId, option } = chapter;
+        const taskKey = `${chapterId}-${option.id}`;
 
-          // 预处理：svgPrompt / imagePrompt → 自动生图 → 注入 props.imageUrl
-          // 优先级：svgPrompt（SVG-Architect 确定性制图）> imagePrompt（Seedream 照片级生图）
-          if (option.svgPrompt && !(option.props?.imageUrl)) {
-            try {
-              console.log(`[Video Render] 🖼️ SVG-Architect 预生图: ${taskKey}`);
-              const result = await generateSvgImage(option.svgPrompt, {
-                profile: 'remotion_bg', outputDir, slug: taskKey,
-              });
-              if (result.success) {
-                option.props = { ...(option.props || {}), imageUrl: result.pngPath };
-                console.log(`[Video Render] ✅ SVG 预生图完成: ${taskKey}`);
-              } else {
-                console.warn(`[Video Render] ⚠️ SVG 预生图失败，继续无底图渲染: ${taskKey} — ${result.error}`);
-              }
-            } catch (err: any) {
-              console.warn(`[Video Render] ⚠️ SVG 预生图异常，继续无底图渲染: ${taskKey} — ${err.message}`);
+        // 预处理：svgPrompt / imagePrompt → 自动生图 → 注入 props.imageUrl
+        // 优先级：svgPrompt（SVG-Architect 确定性制图）> imagePrompt（Seedream 照片级生图）
+        if (option.svgPrompt && !(option.props?.imageUrl)) {
+          try {
+            console.log(`[Video Render] 🖼️ SVG-Architect 预生图: ${taskKey}`);
+            const result = await generateSvgImage(option.svgPrompt, {
+              profile: 'remotion_bg', outputDir, slug: taskKey,
+            });
+            if (result.success) {
+              option.props = { ...(option.props || {}), imageUrl: result.pngPath };
+              console.log(`[Video Render] ✅ SVG 预生图完成: ${taskKey}`);
+            } else {
+              console.warn(`[Video Render] ⚠️ SVG 预生图失败，继续无底图渲染: ${taskKey} — ${result.error}`);
             }
-          } else if (option.imagePrompt && !(option.props?.imageUrl)) {
-            try {
-              console.log(`[Video Render] 🎨 Remotion 预生图: ${taskKey}`);
-              const imageUrl = await generateImageFromPrompt(option.imagePrompt, taskKey);
-              option.props = { ...(option.props || {}), imageUrl };
-              console.log(`[Video Render] ✅ 预生图完成: ${taskKey}`);
-            } catch (err: any) {
-              // 生图失败不阻断渲染：模板会以无底图模式渲染
-              console.warn(`[Video Render] ⚠️ 预生图失败，继续无底图渲染: ${taskKey} — ${err.message}`);
-            }
+          } catch (err: any) {
+            console.warn(`[Video Render] ⚠️ SVG 预生图异常，继续无底图渲染: ${taskKey} — ${err.message}`);
           }
-
-          await renderRemotionVideo(chapterId, option, projectId, outputDir);
+        } else if (option.imagePrompt && !(option.props?.imageUrl)) {
+          try {
+            console.log(`[Video Render] 🎨 Remotion 预生图: ${taskKey}`);
+            const imageUrl = await generateImageFromPrompt(option.imagePrompt, taskKey);
+            option.props = { ...(option.props || {}), imageUrl };
+            console.log(`[Video Render] ✅ 预生图完成: ${taskKey}`);
+          } catch (err: any) {
+            // 生图失败不阻断渲染：模板会以无底图模式渲染
+            console.warn(`[Video Render] ⚠️ 预生图失败，继续无底图渲染: ${taskKey} — ${err.message}`);
+          }
         }
-      };
-      const workers = Array.from(
-        { length: Math.min(REMOTION_VIDEO_CONCURRENCY, remotionQueue.length) },
-        () => worker()
-      );
-      await Promise.all(workers);
+
+        await renderRemotionVideo(chapterId, option, projectId, outputDir);
+      });
       console.log(`[Video Render] Remotion queue complete (${remotionQueue.length} tasks)`);
     };
 
-    // 4. Volcengine 全并发（seedance / generative 视频）
+    // 4. Volcengine 视频队列（限 3 并发 worker）
+    const VOLC_VIDEO_CONCURRENCY = 3;
     const runVolcQueue = async () => {
-      await Promise.all(volcQueue.map(ch => renderVolcengineVideo(ch.chapterId, ch.option)));
-      console.log(`[Video Render] Volcengine queue complete (${volcQueue.length} tasks)`);
+      await runConcurrentQueue(volcQueue, VOLC_VIDEO_CONCURRENCY, async (ch) => {
+        await renderVolcengineVideo(ch.chapterId, ch.option);
+      });
+      console.log(`[Video Render] Volcengine queue complete (${volcQueue.length} tasks, max ${VOLC_VIDEO_CONCURRENCY} concurrent)`);
     };
 
     // 5. 信息图两步渲染：先生图(SVG-Architect/Seedream) → 再 CinematicZoom(Remotion) 渲染视频

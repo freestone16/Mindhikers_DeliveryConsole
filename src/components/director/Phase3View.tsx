@@ -7,9 +7,10 @@ import {
 import { BRollSelector } from './BRollSelector';
 import type { DirectorChapter, SceneOption, BRollType } from '../../types';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// Re-export for DirectorSection to use
+export const RENDERABLE_TYPES: BRollType[] = ['remotion', 'seedance', 'generative', 'infographic'];
 
-const RENDERABLE_TYPES: BRollType[] = ['remotion', 'seedance', 'generative', 'infographic'];
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
   remotion: 'bg-blue-500/20 text-blue-300',
@@ -385,23 +386,23 @@ const Phase3ChapterCard = ({
 interface Phase3ViewProps {
   projectId: string;
   chapters: DirectorChapter[];
+  onApproveOption: (chapterId: string, optionId: string) => void;
+  onUpdateOption: (chapterId: string, optionId: string, updates: Partial<SceneOption>) => void;
+  onBatchApprove: (approved: boolean, filterFn?: (opt: SceneOption) => boolean) => void;
   onProceed: () => void;
 }
 
-export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) => {
-  const [localChapters, setLocalChapters] = useState<DirectorChapter[] | null>(null);
+export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOption, onBatchApprove, onProceed }: Phase3ViewProps) => {
   const [pendingTaskKeys, setPendingTaskKeys] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [brollSelections, setBrollSelections] = useState<BRollType[]>([]);
-
-  const displayedChapters = localChapters || chapters;
 
   // ── Filter logic (same as Phase2) ──
   const isShowAll = brollSelections.length === 0;
   const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
 
   // Only count renderable types
-  const allRenderableOptions = displayedChapters.flatMap(c =>
+  const allRenderableOptions = chapters.flatMap(c =>
     c.options.filter(o => RENDERABLE_TYPES.includes(o.type as BRollType))
   );
 
@@ -417,7 +418,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
 
   // ── Batch render (respects current filter) ──
   const handleBatchRender = async () => {
-    const items = displayedChapters.flatMap(c =>
+    const items = chapters.flatMap(c =>
       c.options
         .filter(o => RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type) && !o.videoUrl)
         .map(o => ({
@@ -496,23 +497,9 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
     }
   };
 
-  const handleApproveOption = (chapterId: string, optionId: string) => {
-    const updated = displayedChapters.map(c =>
-      c.chapterId === chapterId
-        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, phase3Approved: !o.phase3Approved } : o) }
-        : c
-    );
-    setLocalChapters(updated);
-  };
-
-  const handleUpdateOption = (chapterId: string, optionId: string, updates: Partial<SceneOption>) => {
-    const updated = displayedChapters.map(c =>
-      c.chapterId === chapterId
-        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, ...updates } : o) }
-        : c
-    );
-    setLocalChapters(updated);
-  };
+  // Delegate mutations to parent (DirectorSection) via callbacks — no local shadow state
+  const handleApproveOption = onApproveOption;
+  const handleUpdateOption = onUpdateOption;
 
   // ── Clear completed/failed task keys ──
   const handleTaskComplete = useCallback((taskKey: string) => {
@@ -525,17 +512,14 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
 
   // ── Batch approve (all visible filtered options) ──
   const handleBatchApprove = (approved: boolean) => {
-    const updated = displayedChapters.map(c => ({
-      ...c,
-      options: c.options.map(o => {
-        if (!RENDERABLE_TYPES.includes(o.type as BRollType)) return o;
-        if (!matchesFilter(o.type)) return o;
-        // Only approve items that have video
-        if (approved && !o.videoUrl) return o;
-        return { ...o, phase3Approved: approved };
-      })
-    }));
-    setLocalChapters(updated);
+    // Pass filter function to parent so it can apply the same filter logic
+    const currentFilter = (o: SceneOption) => {
+      if (!RENDERABLE_TYPES.includes(o.type as BRollType)) return false;
+      if (!matchesFilter(o.type)) return false;
+      if (approved && !o.videoUrl) return false;
+      return true;
+    };
+    onBatchApprove(approved, currentFilter);
   };
 
   return (
@@ -589,7 +573,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
       </div>
 
       {/* Sticky progress toolbar — same style as Phase2 */}
-      {displayedChapters.length > 0 && (
+      {chapters.length > 0 && (
         <>
           <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg">
             <div className="flex items-center gap-4">
@@ -627,16 +611,14 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
                 )}
               </button>
 
-              {/* Proceed button */}
-              {allApproved && (
-                <button
-                  onClick={onProceed}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  提交 → Phase 4
-                </button>
-              )}
+              {/* Proceed button — 始终可见，即使未全部渲染完也可进入 Phase4 生成 XML */}
+              <button
+                onClick={onProceed}
+                className={`px-4 py-2 ${allApproved ? 'bg-green-600 hover:bg-green-500' : 'bg-amber-600 hover:bg-amber-500'} text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                {allApproved ? '提交 → Phase 4' : `进入 Phase 4 (${totalApproved}/${totalCount})`}
+              </button>
             </div>
           </div>
 
@@ -658,7 +640,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
 
           {/* Chapter cards */}
           <div className="flex flex-col gap-4">
-            {displayedChapters.map(chapter => {
+            {chapters.map(chapter => {
               const filteredOptions = chapter.options.filter(o =>
                 RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type)
               );
@@ -683,7 +665,7 @@ export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) 
         </>
       )}
 
-      {displayedChapters.length === 0 && (
+      {chapters.length === 0 && (
         <div className="text-center py-12 text-slate-500">
           <Video className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>暂无可渲染的视觉方案</p>

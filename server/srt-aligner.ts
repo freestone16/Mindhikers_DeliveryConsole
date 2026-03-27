@@ -69,7 +69,7 @@ function timeToFrames(timeStr: string, fps = 30): number {
 
 /** Find B-roll video file in 06_Video_Broll/ by brollId.
  *  Tries exact match first, then partial match (brollId contained in filename). */
-function findBrollFile(brollId: string, projectRoot: string): string | null {
+export function findBrollFile(brollId: string, projectRoot: string): string | null {
     const brollDir = path.join(projectRoot, '06_Video_Broll');
     if (!fs.existsSync(brollDir)) return null;
 

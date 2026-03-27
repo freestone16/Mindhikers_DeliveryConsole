@@ -131,6 +131,8 @@
 48. Remotion 组件预览失败时检查：帧率、分辨率、编码参数
 49. 文字排版遵循红线守则
 50. 预览图生成失败时增强日志输出，记录完整错误
+128. **CSS `paddingBottom` 百分比是基于容器宽度而非高度**：在 1920×1080 画布上 `paddingBottom:'15%'` = 15%×1920 = 288px ≈ 高度 27%，远超预期。Remotion 模板的字幕安全区必须用固定像素值（108px = 1080×10%），绝不能用百分比
+129. **绝对定位元素不受父容器 padding 约束**：用 `position:absolute` + `cx/cy` 计算坐标的模板（如 RadarChart、MindmapFlow、VennDiagram），paddingBottom 无效；必须把安全区高度从绘图区域的 `height` 中扣除
 84. **React key 不要用内容 hash**：`key={contentKey}` 会在 props 变化时导致组件重挂载，丢失所有 ref 和内部状态。用稳定 ID：`key={option.id}`
 85. **ConceptChain 模板 props 待修**：压测中 TypeError，需对照 RemotionStudio 中实际组件检查 nodes 格式
 
@@ -302,3 +304,4 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |
+| 2026-03-26 | #128-129: CSS paddingBottom 百分比陷阱 + 绝对定位不受 padding 约束 |

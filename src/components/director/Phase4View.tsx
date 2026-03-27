@@ -10,6 +10,7 @@ interface AlignResult {
   startTime: string;
   endTime: string;
   duration?: string;
+  hasVideo?: boolean;
 }
 
 interface FoundSrtFile {
@@ -290,7 +291,9 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
             <div className="flex items-center justify-between">
               <h4 className="text-white font-medium flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-400" />
-                比照完成（共 {alignResults.length} 条）
+                比照完成（共 {alignResults.length} 条，
+                {alignResults.filter(r => r.hasVideo !== false).length} 条有视频，
+                {alignResults.filter(r => r.hasVideo === false).length} 条未渲染将跳过）
               </h4>
               <button
                 onClick={() => { setAlignResults([]); setXmlGenerated(false); }}
@@ -312,10 +315,15 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                   {alignResults.map((res, i) => (
-                    <tr key={i} className="hover:bg-slate-800/30">
-                      <td className="px-4 py-3 text-white font-medium">{res.brollName}</td>
+                    <tr key={i} className={`${res.hasVideo === false ? 'opacity-40' : 'hover:bg-slate-800/30'}`}>
+                      <td className="px-4 py-3 font-medium flex items-center gap-2">
+                        <span className={res.hasVideo === false ? 'text-slate-500' : 'text-white'}>{res.brollName}</span>
+                        {res.hasVideo === false && (
+                          <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">未渲染</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs">{res.keySentence}</td>
-                      <td className="px-4 py-3 text-xs text-blue-300">{res.matchedText}</td>
+                      <td className={`px-4 py-3 text-xs ${res.hasVideo === false ? 'text-slate-500' : 'text-blue-300'}`}>{res.matchedText}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="bg-slate-800 px-2 py-1 rounded text-xs font-mono">{res.startTime} - {res.endTime}</span>
                       </td>

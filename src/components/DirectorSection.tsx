@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { MonitorPlay } from 'lucide-react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
-import { Phase3View } from './director/Phase3View';
+import { Phase3View, RENDERABLE_TYPES as PHASE3_RENDERABLE_TYPES } from './director/Phase3View';
 import { Phase4View } from './director/Phase4View';
-import type { DirectorModule, DirectorChapter, BRollType } from '../types';
+import type { DirectorModule, DirectorChapter, SceneOption, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
 interface DirectorSectionProps {
@@ -397,6 +397,40 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
     }
   };
 
+  // ── Phase 3 mutation handlers (same pattern as Phase 2: mutate → persist → sync) ──
+
+  const handlePhase3ApproveOption = (chapterId: string, optionId: string) => {
+    const updated = chapters.map(c =>
+      c.chapterId === chapterId
+        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, phase3Approved: !o.phase3Approved } : o) }
+        : c
+    );
+    setLocalChapters(null);
+    onUpdate({ ...data, items: updated });
+  };
+
+  const handlePhase3UpdateOption = (chapterId: string, optionId: string, updates: Partial<SceneOption>) => {
+    const updated = chapters.map(c =>
+      c.chapterId === chapterId
+        ? { ...c, options: c.options.map(o => o.id === optionId ? { ...o, ...updates } : o) }
+        : c
+    );
+    setLocalChapters(null);
+    onUpdate({ ...data, items: updated });
+  };
+
+  const handlePhase3BatchApprove = (approved: boolean, filterFn?: (opt: SceneOption) => boolean) => {
+    const updated = chapters.map(c => ({
+      ...c,
+      options: c.options.map(o => {
+        if (filterFn && !filterFn(o)) return o;
+        return { ...o, phase3Approved: approved };
+      })
+    }));
+    setLocalChapters(null);
+    onUpdate({ ...data, items: updated });
+  };
+
   // Phase 2 → 3
   const handleProceedToPhase3 = () => {
     onUpdate({ ...data, phase: 3 });
@@ -508,6 +542,9 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
           <Phase3View
             projectId={projectId}
             chapters={displayedChapters}
+            onApproveOption={handlePhase3ApproveOption}
+            onUpdateOption={handlePhase3UpdateOption}
+            onBatchApprove={handlePhase3BatchApprove}
             onProceed={handleProceedToPhase4}
           />
         )}

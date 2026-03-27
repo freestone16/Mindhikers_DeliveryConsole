@@ -28,8 +28,18 @@
       "videoModel": "doubao-seedance-1-5-pro"
     },
     "music": null,
-    "thumbnail": null,
-    "marketing": null,
+    "thumbnail": {
+      "enabled": true,
+      "llm": null,
+      "imageModel": null,
+      "videoModel": null
+    },
+    "marketing": {
+      "enabled": false,
+      "llm": null,
+      "imageModel": null,
+      "videoModel": null
+    },
     "shorts": null
   }
 }
