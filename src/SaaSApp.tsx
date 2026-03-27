@@ -8,11 +8,16 @@ import { ChatPanel } from './components/ChatPanel';
 import { StatusFooter } from './components/StatusFooter';
 import { CrucibleWorkspace } from './components/CrucibleWorkspace';
 import { LLMConfigPage } from './components/LLMConfigPage';
+import { CrucibleHistorySheet } from './components/crucible/CrucibleHistorySheet';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
-import { buildApiUrl } from './config/runtime';
 import type { ChatMessage, HostRoutedAsset } from './types';
 import { buildCrucibleHeaderBadges, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
-import { readCrucibleSnapshot, writeCrucibleSnapshot } from './components/crucible/storage';
+import {
+    clearPersistedCrucibleSnapshot,
+    readCrucibleSnapshot,
+    readPersistedCrucibleSnapshot,
+    writeCrucibleSnapshot,
+} from './components/crucible/storage';
 import type { CrucibleSnapshot } from './components/crucible/types';
 import { useAppAuth } from './auth/useAppAuth';
 
@@ -66,6 +71,7 @@ function SaaSApp() {
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => toCrucibleInjectedMessages(initialCrucibleSnapshot));
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const [crucibleWorkspaceKey, setCrucibleWorkspaceKey] = useState(0);
+    const [isCrucibleHistoryOpen, setIsCrucibleHistoryOpen] = useState(false);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
@@ -90,7 +96,28 @@ function SaaSApp() {
         [currentUserBadge],
     );
 
-    const resetCrucibleState = useCallback((options?: { remount?: boolean }) => {
+    const hydrateCrucibleSnapshot = useCallback((snapshot: CrucibleSnapshot) => {
+        writeCrucibleSnapshot(snapshot);
+        window.localStorage.setItem(CRUCIBLE_AUTOSAVE_BOOTSTRAP_KEY, 'done');
+        injectedRoundKeysRef.current.clear();
+        setCrucibleRoutedAssets([]);
+        setCrucibleTopicTitle(snapshot.topicTitle || '标题待定');
+        setCrucibleInjectedMessages(toCrucibleInjectedMessages(snapshot));
+        setCrucibleHasBoardContent(Boolean(snapshot.presentables?.length || snapshot.crystallizedQuotes?.length));
+        setCrucibleSeedPrompt('');
+        setCrucibleSeedVersion(0);
+        setCrucibleTurnSettledToken(0);
+        setActiveModule('crucible');
+        setHasBootedCrucible(true);
+        setCrucibleWorkspaceKey((prev) => prev + 1);
+        setChatResetToken((prev) => prev + 1);
+    }, []);
+
+    const resetCrucibleState = useCallback((options?: { remount?: boolean; clearPersisted?: boolean }) => {
+        if (options?.clearPersisted) {
+            window.localStorage.removeItem(CRUCIBLE_AUTOSAVE_BOOTSTRAP_KEY);
+            void clearPersistedCrucibleSnapshot();
+        }
         setCrucibleRoutedAssets([]);
         setCrucibleSeedPrompt('');
         setCrucibleSeedVersion(0);
@@ -131,29 +158,12 @@ function SaaSApp() {
                     return;
                 }
 
-                const response = await fetch(buildApiUrl('/api/crucible/autosave'), {
-                    credentials: 'include',
-                });
-                if (!response.ok) {
+                const persistedSnapshot = await readPersistedCrucibleSnapshot();
+                if (!persistedSnapshot?.topicTitle || !persistedSnapshot.messages?.length || cancelled) {
                     return;
                 }
 
-                const autosave = await response.json();
-                if (!autosave?.topicTitle || !autosave.messages?.length || cancelled) {
-                    return;
-                }
-
-                writeCrucibleSnapshot(autosave);
-                window.localStorage.setItem(CRUCIBLE_AUTOSAVE_BOOTSTRAP_KEY, 'done');
-                injectedRoundKeysRef.current.clear();
-                setCrucibleTopicTitle(autosave.topicTitle);
-                setCrucibleInjectedMessages(toCrucibleInjectedMessages(autosave));
-                setCrucibleHasBoardContent(Boolean(autosave.presentables?.length));
-                setCrucibleSeedPrompt('');
-                setCrucibleSeedVersion(0);
-                setCrucibleTurnSettledToken(0);
-                setCrucibleWorkspaceKey((prev) => prev + 1);
-                setChatResetToken((prev) => prev + 1);
+                hydrateCrucibleSnapshot(persistedSnapshot);
             } catch (error) {
                 console.warn('[Crucible] Failed to hydrate autosave on boot:', error);
             }
@@ -164,7 +174,17 @@ function SaaSApp() {
         return () => {
             cancelled = true;
         };
+    }, [hydrateCrucibleSnapshot]);
+
+    const handleOpenCrucibleHistory = useCallback(() => {
+        setActiveModule('crucible');
+        setHasBootedCrucible(true);
+        setIsCrucibleHistoryOpen(true);
     }, []);
+
+    const handleRestoreCrucibleHistory = useCallback((snapshot: CrucibleSnapshot) => {
+        hydrateCrucibleSnapshot(snapshot);
+    }, [hydrateCrucibleSnapshot]);
 
     const handleSelectProject = (projectId: string) => {
         setState({
@@ -307,6 +327,7 @@ function SaaSApp() {
                     email: authSession.user.email,
                     avatarImage: authSession.user.image,
                     workspaceName: workspace?.activeWorkspace.name,
+                    onOpenHistory: handleOpenCrucibleHistory,
                     onSignOut: () => {
                         void signOut();
                     },
@@ -328,7 +349,7 @@ function SaaSApp() {
                             topicTitle={crucibleTopicTitle}
                             seedPrompt={crucibleSeedPrompt}
                             seedPromptVersion={crucibleSeedVersion}
-                            onResetWorkspace={() => resetCrucibleState()}
+                            onResetWorkspace={() => resetCrucibleState({ clearPersisted: true })}
                             onRoundGenerated={handleCrucibleRoundGenerated}
                             onBlackboardStateChange={handleCrucibleBoardStateChange}
                             onTurnSettled={handleCrucibleTurnSettled}
@@ -361,7 +382,7 @@ function SaaSApp() {
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
-                            onResetAll={() => resetCrucibleState()}
+                            onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
                             blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             socket={socket}
@@ -381,6 +402,11 @@ function SaaSApp() {
             <StatusFooter
                 isConnected={isConnected}
                 activeChatExpertId={activeModule === 'crucible' ? CRUCIBLE_EXPERT_ID : undefined}
+            />
+            <CrucibleHistorySheet
+                isOpen={isCrucibleHistoryOpen}
+                onClose={() => setIsCrucibleHistoryOpen(false)}
+                onRestoreSnapshot={handleRestoreCrucibleHistory}
             />
         </div>
     );

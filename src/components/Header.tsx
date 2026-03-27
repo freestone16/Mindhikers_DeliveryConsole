@@ -32,6 +32,7 @@ interface HeaderProps {
         email: string;
         avatarImage?: string | null;
         workspaceName?: string;
+        onOpenHistory?: () => void;
         onSignOut: () => void;
     };
 }
@@ -168,6 +169,7 @@ export const Header = ({
                                 email={authSummary.email}
                                 avatarImage={authSummary.avatarImage}
                                 workspaceName={authSummary.workspaceName}
+                                onOpenHistory={authSummary.onOpenHistory}
                                 onSignOut={authSummary.onSignOut}
                             />
                         ) : null}

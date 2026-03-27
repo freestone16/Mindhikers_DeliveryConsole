@@ -4,6 +4,114 @@
 
 ---
 
+## 1.12 2026-03-27（workspace-aware persistence 第二刀：读侧闭环）
+
+### ✅ 本轮已完成
+
+- 补齐坩埚 conversation 的读侧 API：
+  - `GET /api/crucible/conversations`
+  - `GET /api/crucible/conversations/active`
+  - `GET /api/crucible/conversations/:conversationId`
+  - `POST /api/crucible/conversations/:conversationId/activate`
+- conversation 详情接口已统一返回：
+  - `summary`
+  - `snapshot`
+  - `artifacts`
+  - `sourceContext`
+- `artifact` 已具备最小 workspace-aware 读取入口：
+  - 当前不再只存在于写入文件里
+  - 已可通过 conversation detail 一并读回
+- SaaS 已接入最小“历史对话”入口：
+  - 头像菜单中的“历史对话”已可打开 history sheet
+  - 可读取当前 workspace 下的 conversation 列表
+  - 点击任一历史 conversation 后会恢复 snapshot，并重新设为 active conversation
+- 前端启动恢复链路已切换为：
+  - 优先读取 `active conversation`
+  - 若没有 active conversation，再退回 `autosave`
+  - 本地 `localStorage` 继续只做缓存兜底
+- `src/components/crucible/storage.ts` 已统一恢复逻辑：
+  - 避免 `SaaSApp` / `App` 各自重复请求和各自漂移
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- `./node_modules/.bin/tsx --eval "import './server/crucible-persistence.ts'; import './server/crucible.ts'"`：通过
+- 当前说明：
+  - workspace 下的 `turn / conversation / artifact` 已不再只是“能写不能读”
+  - 当前已经具备最小恢复与查询闭环
+
+### ⚠️ 当前剩余事项
+
+- 目前历史对话已经有最小 UI，但还不是完整历史中心
+- `artifact` 已可随 conversation detail 读回，但还没做：
+  - 单独下载
+  - 导出
+  - 更完整的历史浏览入口
+- `projectId / scriptPath` 仍保留在 `sourceContext` 和部分宿主链路中
+  - 现在更多是兼容上下文
+  - 已不是坩埚主 identity
+- browser `localStorage` 仍未按 workspace 拆 key
+  - 当前靠服务端 active conversation 恢复来压低串数据风险
+  - 后续仍建议补成本地 scope key
+
+## 1.11 2026-03-27（workspace-aware persistence 第一刀）
+
+### ✅ 本轮已完成
+
+- 为黄金坩埚新增最小持久化骨架：
+  - `server/crucible-persistence.ts`
+  - 统一为当前主链生成：
+    - `workspaceId`
+    - `conversationId`
+    - `active conversation pointer`
+- 坩埚 turn 写入已开始进入 `workspace / conversation` 语义：
+  - 认证开启时写入 `runtime/crucible/workspaces/<workspaceId>/conversations/<conversationId>.json`
+  - 本地未启用 auth 时继续兼容 legacy `projectId` 目录语义
+- conversation 文件当前已开始承载：
+  - `turns`
+  - `messages`
+  - `artifacts`
+  - `sourceContext`
+- workspace 目录下新增最小索引与兼容镜像：
+  - `active_conversation.json`
+  - `conversations/index.json`
+  - `turn_log.json`（兼容观察口径）
+- 前端坩埚主链已开始透传并持有 `conversationId`：
+  - `src/components/crucible/CrucibleWorkspaceView.tsx`
+  - 首轮无 `conversationId` 时由后端生成，后续轮次续用
+- 前端快照已从“只写 localStorage”升级为：
+  - `localStorage + /api/crucible/autosave`
+  - 快照中已开始保存 `conversationId`
+- reset 语义已补齐最小闭环：
+  - 清空本地快照
+  - 清空服务端 autosave
+  - 清空 active conversation pointer
+- 补上后端 SSE 主链挂载：
+  - `POST /api/crucible/turn/stream`
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- `./node_modules/.bin/tsx --eval "import './server/crucible-persistence.ts'; import './server/crucible.ts'"`：通过
+- 当前说明：
+  - SaaS 主链已经具备最小 `workspaceId / conversationId` 持久化骨架
+  - 但还没有做“历史对话列表读取 UI”与“conversation 查询接口”
+
+### ⚠️ 当前剩余事项
+
+- 当前已把写入主链切到 `workspace / conversation`，但读取面还没补齐：
+  - 历史对话列表接口
+  - conversation 恢复接口
+  - artifact 下载 / 导出接口
+- `projectId / scriptPath` 仍存在于部分预览与宿主链路中
+  - 目前已不再作为坩埚主持久化主 identity
+  - 但还未从全链路完全删除
+- browser `localStorage` 仍是缓存层
+  - 当前真实来源已经开始转向服务端 autosave / conversation 文件
+  - 但还没做 workspace 维度的本地 key 拆分
+
 ## 1.10 2026-03-27（SaaS 主链入口分仓 + 历史类型债隔离）
 
 ### ✅ 本轮已完成

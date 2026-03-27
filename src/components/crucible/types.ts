@@ -10,11 +10,44 @@ export interface CrucibleDialogue {
 }
 
 export interface CrucibleTurnResponse {
+    conversationId?: string;
     source?: 'socrates' | 'fallback';
     warning?: string;
     dialogue?: CrucibleDialogue;
     presentables?: Array<{ type?: 'reference' | 'quote' | 'asset'; title?: string; summary?: string; content?: string }>;
     topicSuggestion?: string;
+}
+
+export interface CrucibleConversationSummary {
+    id: string;
+    workspaceId: string;
+    topicTitle: string;
+    status: 'active' | 'archived';
+    createdAt: string;
+    updatedAt: string;
+    roundIndex: number;
+    lastSpeaker: string;
+    lastFocus: string;
+}
+
+export interface CrucibleConversationArtifact {
+    id: string;
+    type: 'reference' | 'quote' | 'asset';
+    title: string;
+    summary: string;
+    content: string;
+    roundIndex: number;
+    createdAt: string;
+}
+
+export interface CrucibleConversationDetail {
+    summary: CrucibleConversationSummary;
+    snapshot: CrucibleSnapshot;
+    artifacts: CrucibleConversationArtifact[];
+    sourceContext: {
+        projectId: string;
+        scriptPath: string;
+    };
 }
 
 export type CrucibleSseEventName = 'turn' | 'error' | 'done';
@@ -51,6 +84,7 @@ export interface RoundAnchor {
 }
 
 export interface CrucibleSnapshot {
+    conversationId?: string;
     messages?: CrucibleMessage[];
     presentables: CanvasAsset[];
     crystallizedQuotes?: CanvasAsset[];

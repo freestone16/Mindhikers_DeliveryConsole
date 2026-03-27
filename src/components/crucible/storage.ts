@@ -1,4 +1,8 @@
-import type { CrucibleSnapshot } from './types';
+import type {
+    CrucibleConversationDetail,
+    CrucibleConversationSummary,
+    CrucibleSnapshot,
+} from './types';
 import { buildApiUrl } from '../../config/runtime';
 
 export const SNAPSHOT_KEY = 'golden-crucible-workspace-v8';
@@ -60,6 +64,18 @@ const normalizeCrucibleSnapshot = (snapshot: string | null): CrucibleSnapshot | 
     }
 };
 
+const normalizeSnapshotPayload = (payload: unknown): CrucibleSnapshot | null => {
+    if (!payload) {
+        return null;
+    }
+
+    const candidate = typeof payload === 'object' && payload !== null && 'snapshot' in payload
+        ? (payload as { snapshot?: CrucibleSnapshot }).snapshot
+        : payload;
+
+    return normalizeCrucibleSnapshot(JSON.stringify(candidate));
+};
+
 export const readCrucibleSnapshot = (): CrucibleSnapshot | null => {
     purgeLegacySnapshots();
     return normalizeCrucibleSnapshot(window.localStorage.getItem(SNAPSHOT_KEY));
@@ -79,19 +95,33 @@ export const readPersistedCrucibleSnapshot = async (): Promise<CrucibleSnapshot 
     const localSnapshot = readCrucibleSnapshot();
 
     try {
-        const response = await fetch(buildApiUrl('/api/crucible/autosave'), {
+        const activeResponse = await fetch(buildApiUrl('/api/crucible/conversations/active'), {
             credentials: 'include',
         });
 
-        if (response.status === 404) {
+        if (activeResponse.ok) {
+            const activePayload = normalizeSnapshotPayload(await activeResponse.json());
+            if (activePayload) {
+                writeCrucibleSnapshot(activePayload);
+                return activePayload;
+            }
+        } else if (activeResponse.status !== 404) {
+            throw new Error(`conversation read failed: ${activeResponse.status}`);
+        }
+
+        const autosaveResponse = await fetch(buildApiUrl('/api/crucible/autosave'), {
+            credentials: 'include',
+        });
+
+        if (autosaveResponse.status === 404) {
             return localSnapshot;
         }
 
-        if (!response.ok) {
-            throw new Error(`autosave read failed: ${response.status}`);
+        if (!autosaveResponse.ok) {
+            throw new Error(`autosave read failed: ${autosaveResponse.status}`);
         }
 
-        const remoteSnapshot = normalizeCrucibleSnapshot(await response.text());
+        const remoteSnapshot = normalizeCrucibleSnapshot(await autosaveResponse.text());
         if (remoteSnapshot) {
             writeCrucibleSnapshot(remoteSnapshot);
             return remoteSnapshot;
@@ -129,4 +159,32 @@ export const clearPersistedCrucibleSnapshot = async () => {
     } catch (error) {
         console.warn('[CrucibleStorage] Failed to clear persisted snapshot:', error);
     }
+};
+
+export const listPersistedCrucibleConversations = async (): Promise<CrucibleConversationSummary[]> => {
+    const response = await fetch(buildApiUrl('/api/crucible/conversations'), {
+        credentials: 'include',
+    });
+
+    if (!response.ok) {
+        throw new Error(`conversation list failed: ${response.status}`);
+    }
+
+    const payload = await response.json() as { items?: CrucibleConversationSummary[] };
+    return Array.isArray(payload.items) ? payload.items : [];
+};
+
+export const activatePersistedCrucibleConversation = async (conversationId: string): Promise<CrucibleConversationDetail> => {
+    const response = await fetch(buildApiUrl(`/api/crucible/conversations/${encodeURIComponent(conversationId)}/activate`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+        throw new Error(`conversation activate failed: ${response.status}`);
+    }
+
+    return await response.json() as CrucibleConversationDetail;
 };

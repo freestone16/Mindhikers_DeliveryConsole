@@ -22,6 +22,7 @@ interface UserAvatarMenuProps {
     email: string;
     workspaceName?: string;
     avatarImage?: string | null;
+    onOpenHistory?: () => void;
     onSignOut: () => void;
 }
 
@@ -43,6 +44,7 @@ export const UserAvatarMenu = ({
     email,
     workspaceName,
     avatarImage,
+    onOpenHistory,
     onSignOut,
 }: UserAvatarMenuProps) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -81,6 +83,13 @@ export const UserAvatarMenu = ({
         setIsOpen(false);
 
         switch (item.id) {
+            case 'history':
+                if (onOpenHistory) {
+                    onOpenHistory();
+                    return;
+                }
+                setToast(`${item.label} 即将开放。`);
+                return;
             case 'website':
                 window.open(OFFICIAL_WEBSITE_URL, '_blank', 'noopener,noreferrer');
                 return;

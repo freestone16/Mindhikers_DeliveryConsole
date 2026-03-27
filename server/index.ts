@@ -21,7 +21,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
-import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
+import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -33,6 +33,12 @@ import { getProjectRoot, PROJECTS_BASE } from './project-root';
 import { accountRouter } from './auth/account-router';
 import { AUTH_ROUTE_BASE, closeAuthPool, getAuth, getAuthPool, getSessionFromRequest, isAuthEnabled } from './auth';
 import { ensurePersonalWorkspace } from './auth/workspace-store';
+import {
+    activateCrucibleConversation,
+    clearCrucibleActiveConversation,
+    getCrucibleConversationDetail,
+    listCrucibleConversations,
+} from './crucible-persistence';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -232,8 +238,76 @@ app.get('/api/music/assets', music.getAssets);
 
 // Crucible Routes (SD-210)
 app.post('/api/crucible/turn', generateCrucibleTurn);
+app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
+app.get('/api/crucible/conversations', async (req, res) => {
+    try {
+        const items = await listCrucibleConversations(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        res.json({ items });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to list conversations' });
+    }
+});
+app.get('/api/crucible/conversations/active', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'No active conversation found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read active conversation' });
+    }
+});
+app.get('/api/crucible/conversations/:conversationId', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read conversation' });
+    }
+});
+app.post('/api/crucible/conversations/:conversationId/activate', async (req, res) => {
+    try {
+        const detail = await activateCrucibleConversation(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.body?.projectId === 'string'
+                ? req.body.projectId
+                : typeof req.query.projectId === 'string'
+                    ? req.query.projectId
+                    : undefined,
+            scriptPath: typeof req.body?.scriptPath === 'string'
+                ? req.body.scriptPath
+                : typeof req.query.scriptPath === 'string'
+                    ? req.query.scriptPath
+                    : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to activate conversation' });
+    }
+});
 
 // Crucible Autosave (S/L buttons — no file dialog)
 const LEGACY_CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
@@ -303,6 +377,7 @@ app.delete('/api/crucible/autosave', async (req, res) => {
         if (fs.existsSync(autosavePath)) {
             fs.unlinkSync(autosavePath);
         }
+        await clearCrucibleActiveConversation(req);
         res.json({ ok: true });
     } catch (error) {
         const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
