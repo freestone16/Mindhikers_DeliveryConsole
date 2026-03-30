@@ -38,17 +38,12 @@ export async function generateImageWithVolc(
   } = {}
 ): Promise<VolcImageResult> {
   const apiKey = getEnvVar('VOLCENGINE_ACCESS_KEY') || getEnvVar('VOLCENGINE_API_KEY');
-  const endpointId = getEnvVar('VOLCENGINE_ENDPOINT_ID_IMAGE') || getEnvVar('VOLCENGINE_ENDPOINT_ID');
 
   if (!apiKey) {
     return { error: 'VOLCENGINE_ACCESS_KEY not configured. Please save your API Key in LLM Config.' };
   }
 
-  if (!endpointId) {
-    return { error: 'VOLCENGINE_ENDPOINT_ID_IMAGE not configured. Please set it in .env or LLM Config.' };
-  }
-
-  const model = endpointId;
+  const model = options.model || getEnvVar('VOLCENGINE_IMAGE_MODEL') || getEnvVar('VOLCENGINE_ENDPOINT_ID_IMAGE') || getEnvVar('VOLCENGINE_ENDPOINT_ID') || 'doubao-seedream-4-5-251128';
   // 火山引擎要求图片尺寸至少 3686400 像素（约 4K）
   // 影视导演使用 16:9 横向分辨率
   // 2560x1440 (2K, 3,686,400 像素) - 满足火山引擎要求，适合 16:9 视频
@@ -154,15 +149,12 @@ export async function generateVideoWithVolc(
   } = {}
 ): Promise<VolcVideoResult> {
   const apiKey = getEnvVar('VOLCENGINE_ACCESS_KEY') || getEnvVar('VOLCENGINE_API_KEY');
-  const endpointId = getEnvVar('VOLCENGINE_ENDPOINT_ID_VIDEO');
 
   if (!apiKey) {
     return { error: 'VOLCENGINE_ACCESS_KEY not configured. Please save your API Key in LLM Config.' };
   }
 
-  if (!endpointId) {
-    return { error: 'VOLCENGINE_ENDPOINT_ID_VIDEO not configured.' };
-  }
+  const model = options.model || getEnvVar('VOLCENGINE_VIDEO_MODEL') || getEnvVar('VOLCENGINE_ENDPOINT_ID_VIDEO') || 'doubao-seedance-1-5-pro';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -170,13 +162,13 @@ export async function generateVideoWithVolc(
   };
 
   try {
-    console.log(`[Volcengine Video] Generating video with endpoint=${endpointId}, prompt="${prompt.slice(0, 50)}..."`);
+    console.log(`[Volcengine Video] Generating video with model=${model}, prompt="${prompt.slice(0, 50)}..."`);
 
     const response = await fetch(VOLC_VIDEO_API, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: endpointId,
+        model,
         content: [
           {
             type: 'text',

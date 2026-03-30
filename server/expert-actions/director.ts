@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExpertActionAdapter } from '../expert-actions';
+import type { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
 import { loadConfig } from '../llm-config';
 import type { LLMProvider } from '../../src/schemas/llm-config';

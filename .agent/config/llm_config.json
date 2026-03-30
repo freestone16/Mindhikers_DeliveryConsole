@@ -5,40 +5,40 @@
     "baseUrl": "https://api.moonshot.cn/v1"
   },
   "generation": {
-    "imageModel": "doubao-seedream-4-5-251128",
-    "videoModel": "doubao-video-01"
+    "image": {
+      "provider": "google",
+      "model": "gemini-3-pro-image-preview"
+    },
+    "video": {
+      "provider": "volcengine",
+      "model": "doubao-seedance-1-5-pro"
+    }
   },
   "experts": {
     "crucible": {
       "enabled": true,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "writer": {
       "enabled": true,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "director": {
       "enabled": true,
-      "llm": null,
-      "imageModel": "doubao-seedream-5.0-litenew",
-      "videoModel": "doubao-seedance-1-5-pro"
+      "llm": {
+        "provider": "kimi",
+        "model": null,
+        "baseUrl": null
+      }
     },
     "music": null,
     "thumbnail": {
       "enabled": true,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "marketing": {
       "enabled": false,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "shorts": null
   }

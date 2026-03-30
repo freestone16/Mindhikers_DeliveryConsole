@@ -206,11 +206,15 @@ ${theme ? `默认主题色板 (tech-dark)：\n${theme}` : ''}`;
  * - Director/SKILL.md → 导演大师的核心身份与方法论
  * - Director/prompts/{taskType}.md → 对应任务的 prompt 模板
  * - RemotionStudio/catalog.md → Remotion 模板速查表（沙漏架构：由 RS 自身维护）
+ * - Director/resources/remotion_decision_matrix.md → 模板选择决策矩阵
+ * - Director/resources/template_combo_playbook.md → 模板节奏编排手册
  * - Director/resources/ → 美学哲学、Artlist 词库等
  *
  * Prompt 模板中的占位符会被自动替换：
  * - {{DIRECTOR_SKILL}} → Director/SKILL.md 内容
  * - {{REMOTION_CATALOG}} → RemotionStudio/catalog.md 内容（唯一事实来源）
+ * - {{REMOTION_DECISION_MATRIX}} → Director 模板决策矩阵
+ * - {{TEMPLATE_COMBO_PLAYBOOK}} → Director 模板节奏编排手册
  * - {{AESTHETICS_GUIDELINE}} / {{CANVAS_DESIGN_ESSENCE}} → 美学哲学
  * - {{ARTLIST_DICTIONARY}} → Artlist 词库协议
  * - {{SVG_ARCHITECT_SPEC}} → SVG-Architect 制图能力说明（画布规格+主题色板）
@@ -226,6 +230,8 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
         // 3. 加载 resources 用于占位符替换
         // 沙漏架构：模板 catalog 从 RemotionStudio 读取（唯一事实来源），其余从 Director 读取
         const remotionCatalog = loadRemotionCatalog();
+        const remotionDecisionMatrix = loadSkillResource('Director', 'remotion_decision_matrix');
+        const templateComboPlaybook = loadSkillResource('Director', 'template_combo_playbook');
         const aestheticsGuideline = loadSkillResource('Director', 'aesthetics_guideline');
         const artlistDictionary = loadSkillResource('Director', 'artlist_dictionary');
         const svgArchitectSpec = loadSvgArchitectSpec();
@@ -234,6 +240,8 @@ export function buildDirectorSystemPrompt(taskType: 'concept' | 'broll' | 'revis
         const resolved = promptTemplate
             .replace(/\{\{DIRECTOR_SKILL\}\}/g, directorSkill)
             .replace(/\{\{REMOTION_CATALOG\}\}/g, remotionCatalog)
+            .replace(/\{\{REMOTION_DECISION_MATRIX\}\}/g, remotionDecisionMatrix)
+            .replace(/\{\{TEMPLATE_COMBO_PLAYBOOK\}\}/g, templateComboPlaybook)
             .replace(/\{\{ARTLIST_DICTIONARY\}\}/g, artlistDictionary)
             .replace(/\{\{AESTHETICS_GUIDELINE\}\}/g, aestheticsGuideline)
             .replace(/\{\{CANVAS_DESIGN_ESSENCE\}\}/g, aestheticsGuideline)

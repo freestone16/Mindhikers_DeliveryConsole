@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { LLMConfigSchema, DEFAULT_LLM_CONFIG, resolveGlobalLLMConfig } from '../../schemas/llm-config';
+import {
+  LLMConfigSchema,
+  DEFAULT_LLM_CONFIG,
+  resolveGlobalLLMConfig,
+  normalizeGenerationConfig,
+  normalizeExpertsConfig,
+} from '../../schemas/llm-config';
 
 describe('LLMConfig Schema', () => {
   it('should validate default config', () => {
@@ -10,60 +16,45 @@ describe('LLMConfig Schema', () => {
   it('should reject invalid provider', () => {
     const config = {
       global: { provider: 'invalid' as any, model: 'test', baseUrl: null },
-      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
-      experts: {
-        crucible: null,
-        writer: null,
-        director: null,
-        music: null,
-        thumbnail: null,
-        marketing: null,
-        shorts: null,
-      },
+      generation: DEFAULT_LLM_CONFIG.generation,
+      experts: DEFAULT_LLM_CONFIG.experts,
     };
     const result = LLMConfigSchema.safeParse(config);
     expect(result.success).toBe(false);
   });
 
-  it('should allow null expert config (inherit global)', () => {
-    const config = {
-      global: { provider: 'siliconflow', model: 'Pro/moonshotai/Kimi-K2.5', baseUrl: 'https://api.siliconflow.cn/v1' },
-      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
-      experts: {
-        crucible: null,
-        writer: null,
-        director: null,
-        music: null,
-        thumbnail: null,
-        marketing: null,
-        shorts: null,
+  it('should normalize legacy generation config into the new nested structure', () => {
+    const generation = normalizeGenerationConfig({
+      imageModel: 'gemini-2.5-flash-image',
+      videoModel: 'doubao-seedance-1-0-lite',
+    });
+
+    expect(generation).toEqual({
+      image: {
+        provider: 'google',
+        model: 'gemini-2.5-flash-image',
       },
-    };
-    const result = LLMConfigSchema.safeParse(config);
-    expect(result.success).toBe(true);
+      video: {
+        provider: 'volcengine',
+        model: 'doubao-seedance-1-0-lite',
+      },
+    });
   });
 
-  it('should allow valid expert override', () => {
-    const config = {
-      global: { provider: 'siliconflow', model: 'Pro/moonshotai/Kimi-K2.5', baseUrl: 'https://api.siliconflow.cn/v1' },
-      generation: { imageModel: 'doubao-image-01', videoModel: 'doubao-video-01' },
-      experts: {
-        crucible: null,
-        writer: null,
-        director: { 
-          enabled: true, 
-          llm: { provider: 'siliconflow', model: 'Qwen/Qwen2.5-72B-Instruct', baseUrl: null },
-          imageModel: 'doubao-image-01',
-          videoModel: 'doubao-video-01'
-        },
-        music: null,
-        thumbnail: null,
-        marketing: null,
-        shorts: null,
+  it('should strip legacy expert visual overrides and keep llm override only', () => {
+    const experts = normalizeExpertsConfig({
+      director: {
+        enabled: true,
+        llm: { provider: 'kimi', model: 'kimi-k2.5', baseUrl: null },
+        imageModel: 'gemini-2.5-flash-image',
+        videoModel: 'doubao-seedance-1-5-pro',
       },
-    };
-    const result = LLMConfigSchema.safeParse(config);
-    expect(result.success).toBe(true);
+    });
+
+    expect(experts.director).toEqual({
+      enabled: true,
+      llm: { provider: 'kimi', model: 'kimi-k2.5', baseUrl: null },
+    });
   });
 
   it('should resolve the configured global gateway', () => {

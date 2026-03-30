@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { LLMConfig, ExpertConfig } from '../schemas/llm-config';
+import type { LLMConfig, ExpertConfig, GenProvider } from '../schemas/llm-config';
+import type { VisualModelOption } from '../schemas/visual-models';
 
 interface ConfigStatus {
   providers: Record<string, {
@@ -12,13 +13,13 @@ interface ConfigStatus {
   generation: LLMConfig['generation'];
   experts: Record<string, ExpertConfig | null>;
   availableModels: {
-    image: { id: string; name: string }[];
-    video: { id: string; name: string }[];
+    image: Record<GenProvider, VisualModelOption[]>;
+    video: Record<GenProvider, VisualModelOption[]>;
   };
 }
 
 interface SavedKeys {
-  [provider: string]: { last4: string; configured: boolean; endpointImageLast8?: string; endpointVideoLast8?: string };
+  [provider: string]: { last4: string; configured: boolean };
 }
 
 export const useLLMConfig = () => {

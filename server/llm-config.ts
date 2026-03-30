@@ -1,7 +1,18 @@
 import fs from 'fs';
 import path from 'path';
-import { Request, Response } from 'express';
-import { LLMConfigSchema, LLMConfig, DEFAULT_LLM_CONFIG, PROVIDER_INFO, IMAGE_MODELS, VIDEO_MODELS, normalizeProviderConfig } from '../src/schemas/llm-config';
+import type { Request, Response } from 'express';
+import {
+  LLMConfigSchema,
+  DEFAULT_LLM_CONFIG,
+  PROVIDER_INFO,
+  IMAGE_MODELS_BY_PROVIDER,
+  VIDEO_MODELS_BY_PROVIDER,
+  normalizeProviderConfig,
+  normalizeGenerationConfig,
+  normalizeGenerationTarget,
+  normalizeExpertsConfig,
+} from '../src/schemas/llm-config';
+import type { LLMConfig } from '../src/schemas/llm-config';
 
 const CONFIG_DIR = path.join(process.cwd(), '.agent', 'config');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'llm_config.json');
@@ -10,6 +21,32 @@ const ensureConfigDir = () => {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
   }
+};
+
+const getEnvFileContent = (): string => {
+  const envPath = path.join(process.cwd(), '.env');
+  return fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
+};
+
+const getEnvValue = (varName: string): string | undefined => {
+  if (process.env[varName]) return process.env[varName];
+
+  const match = getEnvFileContent().match(new RegExp(`^${varName}=(.+)$`, 'm'));
+  if (match?.[1]?.trim()) {
+    const value = match[1].trim();
+    process.env[varName] = value;
+    return value;
+  }
+
+  return undefined;
+};
+
+const getConfiguredProviders = () => {
+  return Object.keys(PROVIDER_INFO).reduce((acc, provider) => {
+    const info = PROVIDER_INFO[provider];
+    acc[provider] = info.envVars.every((envVar) => Boolean(getEnvValue(envVar)));
+    return acc;
+  }, {} as Record<string, boolean>);
 };
 
 export const loadConfig = (): LLMConfig => {
@@ -21,12 +58,12 @@ export const loadConfig = (): LLMConfig => {
   const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
   const parsed = JSON.parse(content);
 
-  const merged = {
+  const merged: LLMConfig = {
     ...DEFAULT_LLM_CONFIG,
     ...parsed,
-    generation: parsed.generation || DEFAULT_LLM_CONFIG.generation,
     global: parsed.global || DEFAULT_LLM_CONFIG.global,
-    experts: parsed.experts || DEFAULT_LLM_CONFIG.experts,
+    experts: normalizeExpertsConfig(parsed.experts),
+    generation: normalizeGenerationConfig(parsed.generation),
   };
 
   // 归一化 global provider/model/baseUrl 三字段联动
@@ -35,7 +72,13 @@ export const loadConfig = (): LLMConfig => {
     merged.global = normalized;
   }
 
-  return LLMConfigSchema.parse(merged);
+  const validated = LLMConfigSchema.parse(merged);
+  const normalized = JSON.stringify(validated, null, 2);
+  if (content.trim() !== normalized.trim()) {
+    fs.writeFileSync(CONFIG_PATH, normalized);
+  }
+
+  return validated;
 };
 
 const saveConfig = (config: LLMConfig) => {
@@ -43,29 +86,14 @@ const saveConfig = (config: LLMConfig) => {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 };
 
-const PROVIDER_ENV_MAP: Record<string, string[]> = {
-  openai: ['OPENAI_API_KEY'],
-  deepseek: ['DEEPSEEK_API_KEY'],
-  zhipu: ['ZHIPU_API_KEY'],
-  siliconflow: ['SILICONFLOW_API_KEY'],
-  kimi: ['KIMI_API_KEY'],
-  volcengine: ['VOLCENGINE_ACCESS_KEY'],
-  yinli: ['YINLI_API_KEY'],
-};
-
-const getDefaultModel = (provider: string): string => {
-  const info = PROVIDER_INFO[provider];
-  return info?.models[0] || 'unknown';
-};
-
-export const getConfigStatus = (req: Request, res: Response) => {
+export const getConfigStatus = (_req: Request, res: Response) => {
   const config = loadConfig();
+  const configuredProviders = getConfiguredProviders();
 
   const providers = Object.keys(PROVIDER_INFO).reduce((acc, provider) => {
     const info = PROVIDER_INFO[provider];
-    const allConfigured = info.envVars.every(v => process.env[v]);
     acc[provider] = {
-      configured: allConfigured,
+      configured: configuredProviders[provider],
       type: info.type,
       name: info.name,
       models: info.models,
@@ -79,21 +107,20 @@ export const getConfigStatus = (req: Request, res: Response) => {
     generation: config.generation,
     experts: config.experts,
     availableModels: {
-      image: IMAGE_MODELS,
-      video: VIDEO_MODELS,
+      image: IMAGE_MODELS_BY_PROVIDER,
+      video: VIDEO_MODELS_BY_PROVIDER,
     },
   });
 };
 
 export const saveApiKey = (req: Request, res: Response) => {
-  const { provider, apiKey, apiKey2, projectId } = req.body;
+  const { provider, apiKey } = req.body;
 
   if (!provider) {
     return res.status(400).json({ error: 'Missing provider' });
   }
 
-  // volcengine 允许只更新接入点，不强制要求同时更新 apiKey
-  if (!apiKey && provider !== 'volcengine') {
+  if (!apiKey) {
     return res.status(400).json({ error: 'Missing apiKey' });
   }
 
@@ -122,12 +149,7 @@ export const saveApiKey = (req: Request, res: Response) => {
     process.env[envVar] = value;
   };
 
-  if (apiKey) updateLine(envVars[0], apiKey);
-
-  if (provider === 'volcengine') {
-    if (apiKey2) updateLine(envVars[1], apiKey2);
-    if (projectId) updateLine(envVars[2], projectId);
-  }
+  updateLine(envVars[0], apiKey);
 
   fs.writeFileSync(envPath, lines.join('\n'));
 
@@ -146,17 +168,27 @@ export const updateConfig = (req: Request, res: Response) => {
   }
 
   if (generation) {
-    config.generation = { ...config.generation, ...generation };
+    const next = generation as Partial<LLMConfig['generation']> & {
+      image?: Partial<LLMConfig['generation']['image']>;
+      video?: Partial<LLMConfig['generation']['video']>;
+    };
+    config.generation = {
+      image: normalizeGenerationTarget('image', next.image ? { ...config.generation.image, ...next.image } : config.generation.image),
+      video: normalizeGenerationTarget('video', next.video ? { ...config.generation.video, ...next.video } : config.generation.video),
+    };
   }
 
   if (experts) {
     for (const [expertName, expertConfig] of Object.entries(experts)) {
       if (expertConfig && config.experts[expertName as keyof typeof config.experts] !== undefined) {
         const current = config.experts[expertName as keyof typeof config.experts];
-        config.experts[expertName as keyof typeof config.experts] = {
-          ...(current || { enabled: false, llm: null, imageModel: null, videoModel: null }),
-          ...expertConfig,
-        };
+        config.experts[expertName as keyof typeof config.experts] =
+          expertConfig === null
+            ? null
+            : {
+                ...(current || { enabled: false, llm: null }),
+                ...expertConfig,
+              };
       }
     }
   }
@@ -175,18 +207,7 @@ export const testConnection = async (req: Request, res: Response) => {
     return res.json({ success: false, error: 'Unknown provider' });
   }
 
-  // 优先从 .env 文件读取最新值（进程启动后新保存的 key 也能实时生效）
-  const getLatestKey = (varName: string): string | undefined => {
-    const envPath = path.join(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf-8');
-      const match = content.match(new RegExp(`^${varName}=(.+)$`, 'm'));
-      if (match && match[1]?.trim()) return match[1].trim();
-    }
-    return process.env[varName];
-  };
-
-  const apiKey = getLatestKey(info.envVars[0]);
+  const apiKey = getEnvValue(info.envVars[0]);
 
   if (!apiKey) {
     return res.json({ success: false, error: `${info.name} API Key not configured` });
@@ -199,6 +220,23 @@ export const testConnection = async (req: Request, res: Response) => {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     };
+
+    // Google Gemini Image：用 models.list 轻量探测 key 是否可用
+    if (provider === 'google') {
+      const response = await fetch(`${info.baseUrl}/models?key=${encodeURIComponent(apiKey)}`, {
+        method: 'GET',
+      });
+
+      const latency = Date.now() - start;
+
+      if (response.ok) {
+        res.json({ success: true, latency });
+      } else {
+        const error = await response.text();
+        res.json({ success: false, error: `API Error ${response.status}: ${error.slice(0, 200)}` });
+      }
+      return;
+    }
 
     // 火山引擎：使用 /models 接口轻量探测鉴权，不触发真实图生任务，不消耗配额
     if (info.type === 'generation') {
@@ -245,13 +283,9 @@ export const testConnection = async (req: Request, res: Response) => {
   }
 };
 
-export const testAllConnections = async (req: Request, res: Response) => {
+export const testAllConnections = async (_req: Request, res: Response) => {
   const results: Record<string, any> = {};
-  const envPath = path.join(process.cwd(), '.env');
-  let envContent = '';
-  if (fs.existsSync(envPath)) {
-    envContent = fs.readFileSync(envPath, 'utf-8');
-  }
+  const envContent = getEnvFileContent();
 
   const promises = Object.keys(PROVIDER_INFO).map(async (provider) => {
     const info = PROVIDER_INFO[provider];
@@ -284,13 +318,17 @@ export const testAllConnections = async (req: Request, res: Response) => {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       let response;
-      if (info.type === 'generation') {
-        const endpointId = process.env['VOLCENGINE_ENDPOINT_ID_IMAGE'] || process.env['VOLCENGINE_ENDPOINT_ID'] || info.models[0];
+      if (provider === 'google') {
+        response = await fetch(`${info.baseUrl}/models?key=${encodeURIComponent(apiKey)}`, {
+          method: 'GET',
+          signal: controller.signal
+        });
+      } else if (info.type === 'generation') {
         response = await fetch(`${info.baseUrl}/images/generations`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            model: endpointId,
+            model: info.models[0],
             prompt: 'a simple blue circle on white background',
             size: '256x256',
             num_images: 1,
@@ -327,7 +365,7 @@ export const testAllConnections = async (req: Request, res: Response) => {
   res.json(results);
 };
 
-export const getSavedKeys = (req: Request, res: Response) => {
+export const getSavedKeys = (_req: Request, res: Response) => {
   const envPath = path.join(process.cwd(), '.env');
   const savedKeys: Record<string, any> = {};
 
@@ -348,13 +386,9 @@ export const getSavedKeys = (req: Request, res: Response) => {
     const primaryValue = getFieldValue(envVars[0]);
 
     if (provider === 'volcengine') {
-      const imageEp = getFieldValue(envVars[1]);
-      const videoEp = getFieldValue(envVars[2]);
       savedKeys[provider] = {
         last4: primaryValue ? primaryValue.slice(-4) : '',
-        configured: !!(primaryValue && imageEp && videoEp),
-        endpointImageLast8: imageEp ? imageEp.slice(-8) : '',
-        endpointVideoLast8: videoEp ? videoEp.slice(-8) : '',
+        configured: !!primaryValue,
       };
     } else {
       savedKeys[provider] = {

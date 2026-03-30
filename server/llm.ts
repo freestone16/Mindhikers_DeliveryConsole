@@ -15,6 +15,26 @@ interface LLMResponse {
 }
 
 const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+const DEFAULT_LLM_TIMEOUT_MS = Number(process.env.LLM_REQUEST_TIMEOUT_MS || 300000);
+
+async function fetchWithTimeout(url: string, init: RequestInit, providerLabel: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_LLM_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`${providerLabel} request timeout after ${Math.round(DEFAULT_LLM_TIMEOUT_MS / 1000)}s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * 安全解析 LLM 返回的 JSON。
@@ -111,7 +131,7 @@ async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LL
     throw new Error('ZHIPU_API_KEY not configured');
   }
 
-  const response = await fetch(ZHIPU_API_URL, {
+  const response = await fetchWithTimeout(ZHIPU_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -122,7 +142,7 @@ async function callZhipuLLM(messages: LLMMessage[], model = 'glm-4'): Promise<LL
       messages,
       temperature: 0.7,
     }),
-  });
+  }, 'Zhipu');
 
   if (!response.ok) {
     const error = await response.text();
@@ -142,7 +162,7 @@ async function callOpenAILLM(messages: LLMMessage[], model = 'gpt-4o'): Promise<
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -153,7 +173,7 @@ async function callOpenAILLM(messages: LLMMessage[], model = 'gpt-4o'): Promise<
       messages,
       temperature: 0.7,
     }),
-  });
+  }, 'OpenAI');
 
   if (!response.ok) {
     const error = await response.text();
@@ -173,7 +193,7 @@ async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'):
     throw new Error('DEEPSEEK_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -184,7 +204,7 @@ async function callDeepSeekLLM(messages: LLMMessage[], model = 'deepseek-chat'):
       messages,
       temperature: 0.7,
     }),
-  });
+  }, 'DeepSeek');
 
   if (!response.ok) {
     const error = await response.text();
@@ -204,7 +224,7 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
     throw new Error('SILICONFLOW_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.siliconflow.cn/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -215,7 +235,7 @@ async function callSiliconFlowLLM(messages: LLMMessage[], model = 'Pro/moonshota
       messages,
       temperature: 0.7,
     }),
-  });
+  }, 'SiliconFlow');
 
   if (!response.ok) {
     const error = await response.text();
@@ -235,7 +255,7 @@ async function callYinliLLM(messages: LLMMessage[], model = 'claude-sonnet-4-6-t
     throw new Error('YINLI_API_KEY not configured');
   }
 
-  const response = await fetch('https://yinli.one/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://yinli.one/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -247,7 +267,7 @@ async function callYinliLLM(messages: LLMMessage[], model = 'claude-sonnet-4-6-t
       temperature: 0.7,
       max_tokens: 16384,
     }),
-  });
+  }, 'Yinli');
 
   if (!response.ok) {
     const error = await response.text();
@@ -271,7 +291,7 @@ async function callKimiLLM(messages: LLMMessage[], model = 'kimi-k2.5'): Promise
   const isKimiK25 = model.includes('kimi-k2') || model.includes('k2.5');
   const temperature = isKimiK25 ? 1 : 0.7;
 
-  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.moonshot.cn/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -282,7 +302,7 @@ async function callKimiLLM(messages: LLMMessage[], model = 'kimi-k2.5'): Promise
       messages,
       temperature,
     }),
-  });
+  }, 'Kimi');
 
   if (!response.ok) {
     const error = await response.text();
@@ -527,4 +547,3 @@ export function generateFallbackOptions(
     rationale: '兜底方案（LLM 生成失败）',
   }));
 }
-
