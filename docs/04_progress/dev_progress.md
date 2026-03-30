@@ -1,103 +1,604 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-26 CST（早）
+> **更新日期**: 2026-03-30 CST
 
 ---
 
-## 1.5 2026-03-26（吸收 SSE 搜索修复）
+## 1.17 2026-03-30（`gc.mindhikers.com` 正式域名接入收口）
 
 ### ✅ 本轮已完成
 
-- 单独吸收 SSE 已验证的搜索修复，但不回退 SaaS 现有宿主与编排结构：
-  - `server/crucible-research.ts`
-  - `src/__tests__/crucible-research.test.ts`
-- 搜索查询构建逻辑已增强：
-  - 当用户最新一句只是“去网上搜一下最新进展、补充对话”这类泛化搜索指令时，不再把废话本身当查询词
-  - 现在会优先回落到 `topicTitle + 最新研究`
-  - 若无明确 `topicTitle`，再回落到 `seedPrompt`
-- 搜索 prompt addon 已增强：
-  - 明确告诉模型“已接通真实外部搜索”
-  - 显式禁止再说“我现在去搜索”
-  - 要求直接结合当前对话推进，而不是机械罗列搜索报告
-- 本轮只迁搜索修复，不把 SSE 其他脏现场一并带入 SaaS
+- `mindhikers.com` 已正式接入 Cloudflare：
+  - Cloudflare zone 已从 `pending` 变为 `active`
+  - 当前公开 nameserver 已切到 Cloudflare
+- `gc.mindhikers.com` 已挂到 Railway `golden-crucible-saas` 生产服务
+- Cloudflare 侧已补齐生产所需 DNS：
+  - `gc -> uf5ltnom.up.railway.app`
+  - `_railway-verify.gc`
+- 邮件相关记录已迁入 Cloudflare 并保留 `DNS only`：
+  - `MX x2`
+  - `SPF TXT`
+  - `DKIM TXT`
+  - `_autodiscover._tcp SRV`
+  - `Thunderbolt TXT`
+- Railway 生产变量已切到正式域名：
+  - `APP_BASE_URL=https://gc.mindhikers.com`
+  - `BETTER_AUTH_URL=https://gc.mindhikers.com`
+  - `CORS_ORIGIN=https://gc.mindhikers.com`
+- Google OAuth 已补正式回调：
+  - `https://gc.mindhikers.com/api/auth/callback/google`
 
 ### 🎯 本轮验证结论
 
-- 定向单测已通过：
-  - `npm run test:run -- src/__tests__/crucible-research.test.ts src/__tests__/crucible-orchestrator.test.ts`
-  - `2` 个测试文件、`7` 条用例全绿
-- 构建已通过：
-  - `npm run build:railway`
-- 当前行为边界已明确：
-  - 搜索触发仍由 SaaS 现有 `crucible-orchestrator` 决策
-  - 本轮修复聚焦于“触发后搜什么、以及拿到结果后怎么约束模型使用”
+- `dig NS mindhikers.com +short` 已返回：
+  - `jimmy.ns.cloudflare.com.`
+  - `celeste.ns.cloudflare.com.`
+- Railway 变量变更已触发新的生产 redeploy，状态 `SUCCESS`
+- `https://gc.mindhikers.com/api/account/status` 当前返回：
+  - `authEnabled: true`
+  - `googleEnabled: true`
+  - `baseUrl: https://gc.mindhikers.com`
+  - `usingDefaultSecret: false`
+- `https://gc.mindhikers.com` 已可正常渲染登录壳，不再证书报错，也不再白屏
+
+### ⚠️ 当前剩余事项
+
+- 还没有在 `gc.mindhikers.com` 上完成完整真人 smoke：
+  - Google 登录
+  - 邮箱注册 / 登录
+  - 登录后进入 SaaS
+  - 免费额度与 BYOK 提示
+- 坩埚真实回答链路仍需继续验：
+  - 生产环境 `DEEPSEEK_API_KEY` 缺失问题尚未确认是否已解除
+
+## 1.16 2026-03-30（SaaS 试用额度第一版 + 用户 BYOK 主链）
+
+### ✅ 本轮已完成
+
+- 黄金坩埚 SaaS 已接入第一版免费试用额度：
+  - 每个注册用户最多 `3` 个平台对话
+  - 每个平台对话最多 `10` 轮
+- 后端已新增 trial status 读取接口：
+  - `GET /api/crucible/trial-status`
+- 坩埚主链已在真正调用模型前做额度判定：
+  - 平台额度未用尽：继续走平台模型
+  - 当前对话达到 `10` 轮：阻止继续发送
+  - 平台免费对话额度耗尽：阻止新建平台对话
+- 前端已补最小试用提示：
+  - 显示剩余免费对话数
+  - 显示当前对话剩余轮数
+  - 超限时禁用发送并给出明确文案
+- SaaS 已新增用户级 BYOK 存储与接口：
+  - `GET /api/crucible/byok`
+  - `POST /api/crucible/byok`
+  - `POST /api/crucible/byok/test`
+  - `DELETE /api/crucible/byok`
+- 用户级 BYOK 已接入坩埚主链：
+  - 配置 BYOK 后，后续对话优先走用户自己的 `baseUrl + apiKey + model`
+  - 对话会记录 `accessMode = platform | byok`
+  - `byok` 模式的新对话不再继续计入平台免费额度统计
+- SaaS 已恢复右上角 `LLM 配置` 入口，并切到 SaaS 专用配置页：
+  - 只保留文本模型相关能力
+  - 默认推荐 `Kimi 原厂 k2.5`
+  - 支持自填：
+    - `providerLabel`
+    - `baseUrl`
+    - `apiKey`
+    - `model`
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build:railway`：通过
 
 ### ⚠️ 当前说明
 
-- 这轮是第 5 件事的最小吸收版，核心目标是把 SSE 已验证有效的搜索查询与 prompt 约束迁入 SaaS
-- 如需继续补“真实联网现场回放”，应在当前 `3010 / 5183` 在线环境上再做一次带外部网络的回合级验证
-- 提交时要只暂存搜索修复相关文件，不能把工作区里其他历史脏改动混入
+- 本轮已完成主链代码与页面接线，但尚未做一轮带 auth 的真实线上 smoke
+- 当前未做“真 BYOK（仅浏览器本地存 key）”
+  - 这一版是“用户级云端加密存储 BYOK”
+  - 更适合 SaaS 当前登录态与跨设备继续使用
+- 后续若要继续推进，优先顺序应为：
+  - 线上 smoke 一轮
+  - 再决定是否加邀请码 / 邮箱验证 / IP 级风控
 
-### 🚀 同日补充：Railway staging 已真实上线
+---
 
-- 已为当前分支新建干净的 Railway 项目与服务：
-  - Project: `GoldenCrucible-SaaS-Staging`
-  - Service: `golden-crucible-saas`
-- 已完成 Railway 域名生成与变量回写：
-  - `APP_BASE_URL`
-  - `CORS_ORIGIN`
-- 已修复 Railway 首次部署中的两个真实阻塞：
-  1. 部署上下文被 `node_modules_bad` 和本地缓存污染
-     - 通过新增 `.railwayignore` 解决
-  2. 云端干净构建时缺少 `yaml` 依赖
-     - 通过将 `yaml` 写入 `package.json` / `package-lock.json` 解决
-- 同时清理了不属于黄金坩埚主链的历史 `.wav` 大文件，避免部署包体失控
+## 1.15 2026-03-27（历史中心闭环增强 + 发布治理落盘）
 
-### 🎯 Railway 验证结果
+### ✅ 本轮已完成
 
-- 线上域名：
-  - `https://golden-crucible-saas-production.up.railway.app`
-- 最新 deployment：
-  - `04bd55e3-ce95-4a82-9083-902546545a0f`
-  - 状态：`SUCCESS`
-- 线上健康检查：
-  - `GET /health`
-  - 返回 `status: ok`
-  - `env: production`
-- 线上页面验证：
-  - `agent-browser` 已确认首页可打开
-  - 页面文本包含：
-    - `黄金坩埚 GoldenCrucible`
-    - `CRUCIBLE ONLINE`
-    - `GoldenCrucible SaaS v4.0.0`
+- Crucible 本地快照已切到 `workspace` 作用域：
+  - `localStorage` 不再只用全局单 key
+  - SaaS / ChatPanel 手动 `S/L` 快照也已跟随 workspace scope
+- 历史中心已从“轻量入口”升级为可管理闭环：
+  - 会话详情预览
+  - 标题重命名
+  - 归档 / 恢复活动态
+  - `bundle-json / markdown` 双导出格式
+- 后端已补齐历史中心管理接口：
+  - `PATCH /api/crucible/conversations/:conversationId`
+  - 支持更新 `topicTitle / status`
+- 导出链路已补齐 markdown：
+  - `GET /api/crucible/conversations/:conversationId/artifacts/export?format=markdown`
+- `SSE / SAAS` 发布治理文档已正式落盘：
+  - `docs/02_design/crucible/2026-03-27_GoldenCrucible_SSE_SAAS_Release_Governance.md`
 
-### 🔍 同日补充：安全 / 健壮性快速扫描
+### 🎯 本轮验证结论
 
-- 已完成一轮线上 staging 暴露面检查，确认 2 个高优先级问题：
-  1. `llm-config` 管理接口当前对公网匿名开放
-  2. `POST /api/projects/switch` 当前对公网匿名可写
-- 同时确认 1 个中低优先级问题：
-  - 基础安全响应头不足，仍暴露 `x-powered-by: Express`，且未补 `CSP / HSTS / X-Frame-Options`
-- 正向结论：
-  - CORS 当前没有把任意 `Origin` 反射成允许源
-- 当前建议：
-  - staging 可小范围试用
-  - 若要更公开扩散，优先先收口管理接口鉴权
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 本地页面壳已确认可正常加载，未出现白屏
+- 本地 fixture API smoke 已验证通过：
+  - 历史列表读取
+  - conversation 详情读取
+  - 标题重命名
+  - markdown 导出
+  - 归档后状态回写
 
-### 🧹 同日补充：Skill Sync 收口
+### ⚠️ 当前说明
 
-- 已从黄金坩埚 SaaS 的 Skill Sync 名单中移除与 GC 主链无关的 5 个技能：
-  - `Director`
-  - `MusicDirector`
-  - `ThumbnailMaster`
-  - `ShortsMaster`
-  - `MarketingMaster`
-- 当前保留的最小技能集为：
-  - `Writer`
-  - `ThesisWriter`
-  - `Researcher`
-  - `FactChecker`
-  - `Socrates`
+- 本地 `.env.local` 仍未启用 auth，所以无法直接在本地 UI 中点开头像菜单验证历史中心入口
+- 因此本轮对历史中心的“真实页面壳”做了浏览器核验，对“历史详情 / 重命名 / 归档 / 导出”做了本地 API smoke 核验
+- Railway CLI 在当前执行环境里因外部握手限制未能重新拉取在线项目映射；治理文档沿用仓库已确认口径，不额外宣称新的线上发现
+
+## 1.14 2026-03-27（SSE / SAAS Railway 域名治理收口）
+
+### ✅ 本轮已确认
+
+- 当前 `https://golden-crucible-saas-production.up.railway.app/` 确实是 Railway 上 `golden-crucible-saas` 服务的生产域名
+- 该域名上已经存在已发布版本
+- 但它不应继续承担 `SSE` 新功能试验线的直接覆盖职责
+
+### 🎯 新治理口径
+
+- `SSE`、`SAAS` 在 Railway 上必须各自拥有独立域名
+- `SSE` 分支与 `SSE` 域名：
+  - 只用于测试新功能
+  - 只用于 smoke / 验证 / 收口前演示
+- `SAAS` 分支与 `SAAS` 域名：
+  - 作为全量生产库
+  - 不定期合并 `SSE` 已稳定成果
+  - 再统一发布覆盖当前 SaaS 生产域名
+  - 后续再绑定真实外部正式域名
+
+### ⚠️ 当前执行建议
+
+- 不再追查“之前为什么先发过某个版本”
+- 当前最稳路线是：
+  - 先把 `SSE` 稳下来
+  - 再合并到 `SAAS`
+  - 然后由 `SAAS` 统一覆盖当前生产域名
+
+## 1.13 2026-03-27（邮箱注册线上真实 smoke）
+
+### ✅ 本轮已完成
+
+- 已在生产环境 `https://golden-crucible-saas-production.up.railway.app/` 完成一次真实邮箱注册 smoke
+- 本次实测使用邮箱：
+  - `codex.gc.smoke.20260327.1417@example.com`
+- 实测结果：
+  - 注册按钮可提交
+  - 注册后成功进入登录后界面
+  - `GET /api/account/session` 返回 `authenticated: true`
+  - personal workspace 已自动创建
+
+### 🎯 本轮验证结论
+
+- 邮箱注册不再只是“代码可用”，已经升级为“实测可用”
+- 实测拿到的关键信息：
+  - `email = codex.gc.smoke.20260327.1417@example.com`
+  - `workspaceName = Codex Smoke 的工作区`
+  - `workspaceId = 3b1633f7-efcc-4955-9cfe-7f6f30492aa5`
+
+### ⚠️ 现场备注
+
+- 当前本地 `.env.local` 没有 `DATABASE_URL`
+  - 所以本地开发环境不会出现真实注册页
+  - 这次 smoke 结论来自生产环境，不是本地环境
+- 当前生产环境登录后仍落到旧的多模块宿主壳，不是最新的 SaaS-only 壳
+  - 这不影响“邮箱注册可用”的结论
+  - 但说明线上部署版本和当前仓库最新主链仍存在差距
+
+## 1.12 2026-03-27（workspace-aware persistence 第二刀：读侧闭环）
+
+### ✅ 本轮已完成
+
+- 补齐坩埚 conversation 的读侧 API：
+  - `GET /api/crucible/conversations`
+  - `GET /api/crucible/conversations/active`
+  - `GET /api/crucible/conversations/:conversationId`
+  - `POST /api/crucible/conversations/:conversationId/activate`
+- conversation 详情接口已统一返回：
+  - `summary`
+  - `snapshot`
+  - `artifacts`
+  - `sourceContext`
+- `artifact` 已具备最小 workspace-aware 读取入口：
+  - 当前不再只存在于写入文件里
+  - 已可通过 conversation detail 一并读回
+- `artifact` 已补上最小单独导出能力：
+  - `GET /api/crucible/conversations/:conversationId/artifacts/export`
+  - 当前稳定导出结构化 bundle JSON
+  - `format` 参数已预留，后续可平滑切到 markdown / docx / pdf 等文档形态
+- SaaS 已接入最小“历史对话”入口：
+  - 头像菜单中的“历史对话”已可打开 history sheet
+  - 可读取当前 workspace 下的 conversation 列表
+  - 点击任一历史 conversation 后会恢复 snapshot，并重新设为 active conversation
+  - 同时可对单条历史 conversation 触发“导出产物”
+- history sheet 已升级为轻量历史中心：
+  - 搜索
+  - 排序
+  - `messageCount / artifactCount / status` 基础元数据
+  - 预留后续筛选 / 归档 / 标签扩展位
+- 导出参数位已前置到 UI：
+  - 当前只有 `bundle-json`
+  - 但前后端都已留出 `format` 选择位
+- 前端启动恢复链路已切换为：
+  - 优先读取 `active conversation`
+  - 若没有 active conversation，再退回 `autosave`
+  - 本地 `localStorage` 继续只做缓存兜底
+- `src/components/crucible/storage.ts` 已统一恢复逻辑：
+  - 避免 `SaaSApp` / `App` 各自重复请求和各自漂移
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- `./node_modules/.bin/tsx --eval "import './server/crucible-persistence.ts'; import './server/crucible.ts'"`：通过
+- 当前说明：
+  - workspace 下的 `turn / conversation / artifact` 已不再只是“能写不能读”
+  - 当前已经具备最小恢复与查询闭环
+
+### ⚠️ 当前剩余事项
+
+- 目前历史对话已经有最小 UI，但还不是完整历史中心
+- `artifact` 已可随 conversation detail 读回，但还没做：
+  - 更多文档格式导出
+  - 更完整的历史浏览入口
+  - 归档 / 重命名 / 标签等管理能力
+- `projectId / scriptPath` 仍保留在 `sourceContext` 和部分宿主链路中
+  - 现在更多是兼容上下文
+  - 已不是坩埚主 identity
+- browser `localStorage` 仍未按 workspace 拆 key
+  - 当前靠服务端 active conversation 恢复来压低串数据风险
+  - 后续仍建议补成本地 scope key
+
+## 1.11 2026-03-27（workspace-aware persistence 第一刀）
+
+### ✅ 本轮已完成
+
+- 为黄金坩埚新增最小持久化骨架：
+  - `server/crucible-persistence.ts`
+  - 统一为当前主链生成：
+    - `workspaceId`
+    - `conversationId`
+    - `active conversation pointer`
+- 坩埚 turn 写入已开始进入 `workspace / conversation` 语义：
+  - 认证开启时写入 `runtime/crucible/workspaces/<workspaceId>/conversations/<conversationId>.json`
+  - 本地未启用 auth 时继续兼容 legacy `projectId` 目录语义
+- conversation 文件当前已开始承载：
+  - `turns`
+  - `messages`
+  - `artifacts`
+  - `sourceContext`
+- workspace 目录下新增最小索引与兼容镜像：
+  - `active_conversation.json`
+  - `conversations/index.json`
+  - `turn_log.json`（兼容观察口径）
+- 前端坩埚主链已开始透传并持有 `conversationId`：
+  - `src/components/crucible/CrucibleWorkspaceView.tsx`
+  - 首轮无 `conversationId` 时由后端生成，后续轮次续用
+- 前端快照已从“只写 localStorage”升级为：
+  - `localStorage + /api/crucible/autosave`
+  - 快照中已开始保存 `conversationId`
+- reset 语义已补齐最小闭环：
+  - 清空本地快照
+  - 清空服务端 autosave
+  - 清空 active conversation pointer
+- 补上后端 SSE 主链挂载：
+  - `POST /api/crucible/turn/stream`
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- `./node_modules/.bin/tsx --eval "import './server/crucible-persistence.ts'; import './server/crucible.ts'"`：通过
+- 当前说明：
+  - SaaS 主链已经具备最小 `workspaceId / conversationId` 持久化骨架
+  - 但还没有做“历史对话列表读取 UI”与“conversation 查询接口”
+
+### ⚠️ 当前剩余事项
+
+- 当前已把写入主链切到 `workspace / conversation`，但读取面还没补齐：
+  - 历史对话列表接口
+  - conversation 恢复接口
+  - artifact 下载 / 导出接口
+- `projectId / scriptPath` 仍存在于部分预览与宿主链路中
+  - 目前已不再作为坩埚主持久化主 identity
+  - 但还未从全链路完全删除
+- browser `localStorage` 仍是缓存层
+  - 当前真实来源已经开始转向服务端 autosave / conversation 文件
+  - 但还没做 workspace 维度的本地 key 拆分
+
+## 1.10 2026-03-27（SaaS 主链入口分仓 + 历史类型债隔离）
+
+### ✅ 本轮已完成
+
+- 当前默认前端入口已切到独立 SaaS 壳：
+  - `src/SaaSApp.tsx`
+  - `src/main.tsx`
+  - 当前 production / Railway 构建不再经过旧的 `src/App.tsx`
+- SaaS 壳已只保留当前主线能力：
+  - `黄金坩埚`
+  - `分发终端`
+  - 不再 import 导演 / Shorts / 营销等历史交付模块
+- Header 已改成可配置模块口径：
+  - `src/components/Header.tsx`
+  - 当前 SaaS 入口只展示 `crucible / distribution`
+  - 在 SaaS 壳里，project / script 选择器不再因为位于坩埚页而被锁死
+- 构建与类型检查已正式分仓：
+  - 新增 `tsconfig.saas.json`
+  - 新增 `npm run typecheck:saas`
+  - `npm run build` / `npm run build:railway` 现走 `typecheck:saas + vite build`
+  - `npm run typecheck:full` 保留为整仓历史债务清单
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- SaaS 前端产物体积已下降：
+  - 由 `721.22 kB` 降到 `562.12 kB`
+  - 说明旧 Delivery 模块已不再进入当前默认打包主链
+- `npm run typecheck:full`：仍失败，但失败项已明确退回历史模块：
+  - `src/components/market/*`
+  - `src/components/MarketingSection.tsx`
+  - `src/components/ScheduleModal.tsx`
+  - `src/components/StatusDashboard.tsx`
+  - 这些旧债当前已不再阻塞 SaaS 主链 build
+
+### ⚠️ 当前剩余事项
+
+- `Crucible turn / conversation / artifact` 仍未完成全量 `workspace-aware`
+  - 当前只完成了登录、workspace bootstrap、autosave 分仓
+- Google 登录已可用，但登录后态仍需继续补齐：
+  - 头像菜单真实功能接线
+  - 历史对话 / 下载 / 会员计划等菜单项
+- 微信网站应用登录仍待接通
+- 整仓历史类型债仍存在
+  - 但已经从当前 SaaS 交付链路中隔离出来
+  - 后续若要清债，应作为独立收口任务推进，不应再阻塞 `MIN-105` 主线
+
+## 1.9 2026-03-26（多账号 Phase 0/1 骨架接入）
+
+### ✅ 本轮已完成
+
+- 按 `docs/plans/2026-03-26_GoldenCrucible_SSE_Multi_Account_Research_and_Plan.md` 落下首批实现骨架：
+  - `Better Auth + Postgres + personal workspace bootstrap`
+- 新增后端 auth/workspace 基础层：
+  - `server/auth/index.ts`
+  - `server/auth/account-router.ts`
+  - `server/auth/workspace-store.ts`
+  - 支持：
+    - Better Auth 路由挂载
+    - `GET /api/account/status`
+    - `GET /api/account/session`
+    - `POST /api/account/active-workspace`
+    - personal workspace 自动初始化
+- 新增迁移入口：
+  - `scripts/run-auth-migrations.ts`
+  - `package.json` 新增 `npm run auth:migrate`
+- 前端已接最小登录门禁：
+  - `src/auth/*`
+  - `src/main.tsx`
+  - 未登录时进入注册 / 登录界面
+  - 登录后自动拉取 account session 与 active workspace
+- 三类登录入口已进入首批接线状态：
+  - `邮箱注册 / 登录` 已可用
+  - `Google 登录` 已接入 provider 配置位与前端入口
+  - `微信扫码登录` 已按“微信开放平台网站应用”口径预留 provider 配置位与前端入口
+- Header 已接入当前登录态摘要与退出入口：
+  - `src/components/Header.tsx`
+- Crucible autosave 已开始按 workspace 落隔离路径：
+  - 未启用 auth 时继续兼容旧路径 `runtime/crucible/autosave.json`
+  - 启用 auth 后切换为 `runtime/crucible/workspaces/<workspaceId>/autosave.json`
+- 补上 crucible autosave 清理路由：
+  - `DELETE /api/crucible/autosave`
+
+### 🎯 本轮验证结论
+
+- 新增前端 auth 层定向 lint 已通过：
+  - `src/auth/AppAuthContext.ts`
+  - `src/auth/AuthBoundary.tsx`
+  - `src/auth/AuthProvider.tsx`
+  - `src/auth/AuthScreen.tsx`
+  - `src/auth/client.ts`
+  - `src/auth/types.ts`
+  - `src/auth/useAppAuth.ts`
+  - `src/main.tsx`
+  - `src/App.tsx`
+- 新增服务端 auth 模块已可被 `tsx` 真实加载：
+  - 输出：`auth-module-ok`
+- `npm run build` 仍未通过，但阻塞仍集中在仓库既有前端类型债：
+  - `src/components/market/*`
+  - `src/components/ScheduleModal.tsx`
+  - `src/components/StatusDashboard.tsx`
+  - `src/components/ChatPanel.tsx`
+  - 当前未出现新的 auth/workspace 构建阻塞项
+- Railway 侧已完成第一轮真实打通：
+  - `GoldenCrucible-SaaS-Staging` 已 link 到当前 worktree
+  - 已新增 Railway Postgres
+  - `golden-crucible-saas` 已写入：
+    - `DATABASE_URL`
+    - `BETTER_AUTH_SECRET`
+    - `BETTER_AUTH_URL`
+  - `npm run auth:migrate` 已成功执行
+  - Railway Postgres 已验表存在：
+    - `user`
+    - `session`
+    - `account`
+    - `verification`
+    - `workspace`
+    - `workspace_member`
+    - `workspace_invitation`
+    - `active_workspace`
+  - Staging 部署已成功
+  - 线上核验已通过：
+    - `GET /health`
+    - `GET /api/account/status`
+    - 返回 `authEnabled: true`
+    - Google provider 已完成 production 接通并验证 `googleEnabled: true`
+    - 微信 provider 是否可用仍取决于对应开放平台资料与密钥是否补齐
+
+### ⚠️ 当前剩余事项
+
+- 还没有把 `Crucible turn / conversation / artifact` 全量切到 workspace-aware
+  - 当前只先收口 autosave
+- Google 登录已完成真实 smoke，可作为当前可用登录入口
+  - production `googleEnabled: true`
+  - 首页按钮已可点击
+  - 已能跳转 Google 授权页并命中正确 callback
+  - 当前剩余的是登录后态细节与头像菜单功能补齐，不再是“能不能登录”的问题
+- 微信真实线上登录还未完成 smoke
+  - 当前已经预留 UI 与 provider 配置位
+  - 仍需补齐对应的 `CLIENT_ID / CLIENT_SECRET` 与开放平台资料
+- 已新增微信网站应用准备清单：
+  - `docs/plans/2026-03-26_GoldenCrucible_SSE_WeChat_Web_Login_Preparation_Checklist.md`
+- 为了让 `railway up` 成功，已新增：
+  - `.railwayignore`
+  - `railway.json`
+  - `build:railway`
+  - `start`
+  - 当前 staging 已能用 Express 托管 `dist` 静态产物
+- 整仓 `npm run build` 仍会被既有前端类型债拦住：
+  - 主要集中在 `src/components/market/*`
+  - 以及依赖旧 `DeliveryState.modules` 结构的历史面板组件
+  - 当前 `build:railway` 已绕开这批 unrelated 前端债，先保障 SaaS 主链可部署
+
+## 1.8 2026-03-24（黄金坩埚“老张已搜索”回归排错修复）
+
+### ✅ 本轮已完成
+
+- 修复 SSE 坩埚里“老张口头说去搜，但后台并未真正执行搜索”的回归：
+  - `server/crucible.ts`
+  - `server/crucible-research.ts`
+  - 当前主链会在检测到明确联网搜索诉求后，先执行真实外部检索，再把 `research` 证据块写回 prompt 与 `turn_log.json`
+- 补强搜索证据落盘：
+  - `meta.searchRequested`
+  - `meta.searchConnected`
+  - `research.query`
+  - `research.sources`
+- 修正搜索 query 生成：
+  - 当用户最新一句只是“去网上搜一下最新进展、补充我们的对话”这类泛化指令时，不再直接拿空话去搜
+  - 优先回退到 `topicTitle + 最新研究`，减少无关结果
+- 新增 / 更新回归测试：
+  - `src/__tests__/crucible-research.test.ts`
+  - 覆盖“泛化搜索指令回退到议题 query”场景
+
+### 🎯 本轮验证结论
+
+- 本地真实请求已确认重新接通搜索链路：
+  - `POST /api/crucible/turn`
+  - `roundIndex: 20`
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+  - 最新 turn 已写入：
+    - `meta.searchRequested: true`
+    - `meta.searchConnected: true`
+    - `research.query`
+    - `research.sources: 5`
+- 当前最小回归已通过：
+  - `npm run test:run -- src/__tests__/crucible-research.test.ts src/__tests__/crucible-prompt.test.ts src/components/crucible/sse.test.ts`
+
+### ⚠️ 剩余观察
+
+- 搜索“有没有执行”这一层已修复
+- 但 Bing RSS 结果质量仍会受 query 质量影响；当前已避免把“补充我们的对话”之类空话直接送去检索，后续仍可继续优化 query 组装与来源筛选
+
+---
+
+## 1.7 2026-03-23（SSE 轻量 SaaS 上云清单 + Linear 收口）
+
+### ✅ 本轮已完成
+
+- 新增当前 SSE 分支可直接执行的上云清单：
+  - `docs/plans/2026-03-23_GoldenCrucible_SSE_SaaS_Cloud_Launch_Checklist.md`
+- 明确从代码现场看仍需处理的 SaaS 阻塞：
+  - 仍存在 Delivery 宿主壳
+  - 坩埚链路仍残留 `projectId / scriptPath` 语义
+  - 会话恢复仍主要依赖 `localStorage`
+  - 仓库内尚无明确 Railway / Vercel 正式部署配置
+- Linear 已重新收口：
+  - `MIN-104` 已补完成说明与验证结果，并关闭为 `Done`
+  - `MIN-105` 已改为 `In Progress`，步骤收束为 SaaS 外壳、去本地依赖、最小持久化、部署配置、线上 smoke
+  - `MIN-106` 保持 `Todo`，明确不得抢在 SaaS 宿主前推进
+  - `MIN-94` 继续作为总协调卡保留
+
+### 🎯 当前统一口径
+
+- `MIN-104` 已结束，当前下一窗口的唯一主线应转入 `MIN-105`
+- 本轮不是再讨论“大而全 SaaS”，而是把当前 SSE 版黄金坩埚抽成一个轻量在线宿主
+- 目标明确为：给少量朋友、合作方、投资人做稳定演示
+
+---
+
+## 1.6 2026-03-22（坩埚主链收回宿主业务判断）
+
+### ✅ 本轮已完成
+
+- 删除宿主侧 Research bridge：
+  - 删除 `server/crucible-research.ts`
+  - 删除旧测试 `src/__tests__/crucible-research.test.ts`
+- 删除宿主侧 orchestrator 业务判断：
+  - `server/crucible-orchestrator.ts` 只保留 prompt 组装，不再判断 `phase / searchRequested / toolRoutes`
+  - 坩埚后端不再替苏格拉底决定是否搜索、是否查证、是否调用 `Researcher / FactChecker`
+- 删除宿主兜底业务输出：
+  - server / frontend 在 LLM 失败时不再伪造追问、黑板或“fallback 讨论内容”
+  - 失败时只保留技术层错误回传，不再冒充苏格拉底继续对话
+- 收紧坩埚主链 prompt：
+  - `server/crucible.ts`
+  - `buildSocratesPrompt()` 现在显式声明宿主只做上下文与结果回传，业务判断全部由苏格拉底依据 SKILL.md 自行处理
+- 前端 SSE 消费同步瘦身：
+  - `src/components/crucible/CrucibleWorkspaceView.tsx`
+  - `src/components/crucible/types.ts`
+  - 去掉对后端 `meta/orchestrator/searchConnected` 业务元信息的依赖
+- 新增回归测试：
+  - `src/__tests__/crucible-prompt.test.ts`
+  - 验证宿主边界已进入 prompt，且用户搜索诉求会被要求由苏格拉底正面响应
+
+### 🎯 当前统一口径
+
+- 黄金坩埚里，所有讨论业务都由苏格拉底负责
+- 宿主层只做 HTTP / SSE、状态同步、结果桥接、日志落盘
+- 如果用户要求联网搜索或事实核查，响应与调派逻辑都应来自苏格拉底 skill，而不是 server 侧桥接代码
+
+## 1.5 2026-03-22（当前执行面重构为 SSE / SaaS / Roundtable 三主线）
+
+### ✅ 本轮已完成
+
+- 将黄金坩埚当前执行面收束为三项主工作：
+  - 坩埚主链修订为 `HTTP + SSE` 版本并完成验收
+  - 完成 SaaS 版架构设计、环境需求确认与部署上线
+  - 在黄金坩埚内开启 Roundtable 分支，并要求本地版与 SaaS 版同步推进后再合并
+- 新增当前执行面 SSOT 文档：
+  - `docs/plans/2026-03-22_GoldenCrucible_SSE_SaaS_Roundtable_Execution_Plan.md`
+- 更新 `docs/02_design/crucible/_master.md`
+- Linear 已同步修订：
+  - 总协调卡：`MIN-94` `Crucible SSE / SaaS / Roundtable Tranche`
+  - 新主执行卡：`MIN-104`、`MIN-105`、`MIN-106`
+  - 上一轮 `MIN-95 ~ MIN-99` 已退回 Backlog，保留为历史拆卡背景
+- 明确纪律：本次对话中涉及但不在上述三项中的内容，一律暂列“未尽事宜”，后续再跟进
+- `MIN-104` 已开始实施第一刀：
+  - 后端新增黄金坩埚 SSE 流式接口：`POST /api/crucible/turn/stream`
+  - 坩埚 turn 生成逻辑已收敛为共享核心，原 JSON 接口与新 SSE 接口共用同一套生成逻辑
+  - 前端坩埚主链已改为 `POST + SSE` 流式消费
+  - 新增 SSE 解析单测：`src/components/crucible/sse.test.ts`
+  - 当前最小回归：`sse.test.ts`、`hostRouting.test.ts`、`crucible-research.test.ts` 已通过
+  - `npm run build` 仍被市场模块与旧 DeliveryState 类型债阻塞；本轮未新增新的坩埚类型错误
+- 分支资源隔离已完成：
+  - `MHSDC-GC-SSE` 保持当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+  - `MHSDC-GC` 稳定线已独立为 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-GC`
+  - `MHSDC-GC-SSE` 独立端口：后端 `3009` / 前端 `5182`
+  - `MHSDC-GC` 稳定线保留原端口：后端 `3004` / 前端 `5176`
+  - `MHSDC-GC-SSE` 已写入全局端口账本 `~/.vibedir/global_ports_registry.yml`
 
 ---
 
@@ -1650,3 +2151,62 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - **双格式输出**：.md（结构化存档）/ .plain.txt（分发终端直读）
 - **session_expired 短路**：TubeBuddy 评分时遇 session 过期立即中止整批评分
 - **slugify + stripMarkdown**：confirm 路由中对关键词生成安全文件名，对内容二次清洗
+
+---
+
+## 2026-03-26 - SaaS -> SSE 共享底座反向同步（第一轮）
+
+### 背景
+- 三线分工已明确：
+  - `GC` 作为本地稳定基线
+  - `SSE` 作为 GC-only 研发主线
+  - `SaaS` 作为对外 staging / 发布线
+- 因此本轮目标不是把 `SaaS` 整线 merge 回 `SSE`，而是只回灌后续多账号研发必须依赖的共享底座。
+
+### 本轮已落地
+1. 搜索修复对齐
+   - `server/crucible-research.ts`
+   - `src/__tests__/crucible-research.test.ts`
+   - 结果：SSE 与 SaaS 在黄金坩埚搜索修复上重新对齐
+
+2. Skill Sync 收口
+   - `server/skill-sync.ts`
+   - 结果：删除 GC 无关的前五个 skill，仅保留黄金坩埚当前需要的同步项
+
+3. 统一项目根目录抽象
+   - 新增：`server/project-root.ts`
+   - 已切换模块：
+     - `server/chat.ts`
+     - `server/assets.ts`
+     - `server/upload_handler.ts`
+     - `server/director.ts`
+     - `server/music.ts`
+     - `server/shorts.ts`
+     - `server/pipeline_engine.ts`
+     - `server/xml-generator.ts`
+     - `server/market.ts`
+     - `server/youtube-auth.ts`
+     - `server/distribution.ts`
+     - `server/index.ts`（仅做最小导入桥接）
+
+4. 前端运行时 / 存储底座对齐
+   - `src/config/runtime.ts`
+   - `src/components/crucible/storage.ts`
+   - 结果：dev 模式下 API/Socket 可走同源口径；autosave 存储层已具备“本地 + 服务端接口”双通道能力，但尚未把 `App.tsx` / `CrucibleWorkspaceView.tsx` 整体改成 SaaS 版本
+
+### 验证
+- `npm run test:run -- src/__tests__/crucible-research.test.ts`
+  - 结果：`5 passed`
+- `npm run build`
+  - 结果：未通过
+  - 阻塞集中在 SSE 既有前端类型问题：
+    - `src/components/market/*`
+    - `src/components/StatusDashboard.tsx`
+    - `src/components/ScheduleModal.tsx`
+    - `src/components/ChatPanel.tsx`
+  - 判断：不属于本轮共享底座回灌直接引入的问题
+
+### 当前边界
+- 这轮还没有把 SaaS 的 session/autosave/runtime 前端口径整包灌进 SSE
+- 多账号研发还未开始
+- 这批改动按“共享底座回灌包”单独提交，不与其他脏改动混提
