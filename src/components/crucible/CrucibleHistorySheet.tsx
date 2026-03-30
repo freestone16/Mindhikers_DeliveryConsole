@@ -53,6 +53,38 @@ const summarizeFocus = (value: string) => {
     return normalized.length > 64 ? `${normalized.slice(0, 64)}...` : normalized;
 };
 
+const getConversationStateLabel = (item: Pick<CrucibleConversationSummary, 'status' | 'saveMode' | 'hasDraftInput'>) => {
+    if (item.status === 'archived') {
+        return '已归档';
+    }
+    if (item.hasDraftInput) {
+        return '草稿未发送';
+    }
+    if (item.saveMode === 'manual') {
+        return '已手动保存';
+    }
+    if (item.saveMode === 'autosave') {
+        return '自动保存';
+    }
+    return '对话沉淀';
+};
+
+const getConversationStateHint = (item: Pick<CrucibleConversationSummary, 'status' | 'saveMode' | 'hasDraftInput'>) => {
+    if (item.status === 'archived') {
+        return '这条话题已归档，不会再作为当前活跃话题自动恢复。';
+    }
+    if (item.hasDraftInput) {
+        return '这条话题还有未发送输入，恢复后会直接回到草稿状态。';
+    }
+    if (item.saveMode === 'manual') {
+        return '这条话题已经被明确保存，适合随时切回继续推进。';
+    }
+    if (item.saveMode === 'autosave') {
+        return '这条话题当前主要依赖自动保存快照恢复。';
+    }
+    return '这条话题已沉淀为常规对话状态，可继续往下聊。';
+};
+
 const normalizeConversationList = (items: CrucibleConversationSummary[]) => (
     items
         .slice()
@@ -338,6 +370,7 @@ export const CrucibleHistorySheet = ({
                             <h2 className="text-base font-semibold">话题中心</h2>
                             </div>
                         <p className="mt-1 text-xs text-[var(--ink-3)]">在这里切换话题、继续旧讨论，或者直接开一个新话题。</p>
+                        <p className="mt-1 text-[11px] text-[var(--ink-3)]">口径说明：草稿未发送 = 输入框里还有内容；自动保存 = 系统临时保进度；已手动保存 = 你明确按过保存。</p>
                         </div>
                     <button
                         type="button"
@@ -453,7 +486,7 @@ export const CrucibleHistorySheet = ({
                                             )}
                                             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-3)]">
                                                 <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{selectedDetail.summary.isActive ? '当前活跃' : '历史会话'}</span>
-                                                <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{selectedDetail.summary.status === 'archived' ? '已归档' : '进行中'}</span>
+                                                <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{getConversationStateLabel(selectedDetail.summary)}</span>
                                                 <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">轮次 {selectedDetail.summary.roundIndex}</span>
                                             </div>
                                         </div>
@@ -463,6 +496,7 @@ export const CrucibleHistorySheet = ({
                                         <div>
                                             <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-3)]">焦点摘要</div>
                                             <p className="mt-1 leading-6">{summarizeFocus(selectedDetail.summary.lastFocus)}</p>
+                                            <p className="mt-2 text-xs text-[var(--ink-3)]">{getConversationStateHint(selectedDetail.summary)}</p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--ink-3)]">
                                             <div className="rounded-2xl bg-[rgba(255,252,247,0.86)] px-3 py-2">
@@ -575,7 +609,7 @@ export const CrucibleHistorySheet = ({
                                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-3)]">
                                             <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">消息 {item.messageCount}</span>
                                             <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">产物 {item.artifactCount}</span>
-                                            <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{item.status === 'archived' ? '已归档' : '进行中'}</span>
+                                            <span className="rounded-full bg-[rgba(246,236,221,0.72)] px-2.5 py-1">{getConversationStateLabel(item)}</span>
                                         </div>
                                         <div className="mt-4 flex items-center gap-2">
                                             <button

@@ -24,6 +24,8 @@ export interface CrucibleConversationSummary {
     topicTitle: string;
     status: 'active' | 'archived';
     isActive?: boolean;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    hasDraftInput?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -115,6 +117,9 @@ export interface CrucibleSnapshot {
     isThinking?: boolean;
     questionSource?: 'static' | 'socrates' | 'fallback';
     engineMode?: CrucibleEngineMode;
+    draftInputText?: string;
+    updatedAt?: string;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
 }
 
 export interface CrucibleRound {

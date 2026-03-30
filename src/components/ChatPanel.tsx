@@ -5,6 +5,7 @@ import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
 import {
     getCrucibleSnapshotStorageKey,
+    persistCrucibleSnapshot,
     readScopedCrucibleSnapshot,
     savePersistedCrucibleConversation,
 } from './crucible/storage';
@@ -124,6 +125,26 @@ const truncateTopicTitle = (value: string, maxLength = 24) => (
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
 );
 
+const getCrucibleDraftBadge = (options: {
+    inputText: string;
+    hasMessages: boolean;
+    snapshot?: CrucibleSnapshot | null;
+}) => {
+    if (options.inputText.trim()) {
+        return '草稿未发送';
+    }
+    if (options.snapshot?.saveMode === 'manual') {
+        return '已手动保存';
+    }
+    if (options.snapshot?.saveMode === 'autosave') {
+        return '自动保存';
+    }
+    if (options.snapshot?.saveMode === 'conversation') {
+        return '对话沉淀';
+    }
+    return options.hasMessages ? '自动保存' : '新话题';
+};
+
 const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCrucibleMode: boolean) => {
     const normalizedNext = next.content.trim();
     if (!normalizedNext) {
@@ -174,7 +195,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [inputText, setInputText] = useState('');
+    const [inputText, setInputText] = useState(() => (
+        expertId === 'GoldenMetallurgist' ? (readScopedCrucibleSnapshot(workspaceId)?.draftInputText || '') : ''
+    ));
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [contextLoaded, setContextLoaded] = useState(false);
@@ -185,6 +208,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isComposingRef = useRef(false);
+    const crucibleDraftPersistTimerRef = useRef<number | null>(null);
 
     const currentScopeRef = useRef({ expertId, projectId, scriptPath });
     const prevScopeKeyRef = useRef<string | null>(null);
@@ -325,6 +349,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             sendGuardRef.current = false;
         }
     }, [externalMessages, isCrucibleMode]);
+
+    useEffect(() => {
+        if (!isCrucibleMode) {
+            return;
+        }
+        const snapshot = readScopedCrucibleSnapshot(workspaceId);
+        if (!snapshot) {
+            return;
+        }
+
+        if (crucibleDraftPersistTimerRef.current) {
+            window.clearTimeout(crucibleDraftPersistTimerRef.current);
+        }
+
+        const nextSnapshot: CrucibleSnapshot = {
+            ...snapshot,
+            draftInputText: inputText.trim() ? inputText : undefined,
+        };
+
+        crucibleDraftPersistTimerRef.current = window.setTimeout(() => {
+            void persistCrucibleSnapshot(nextSnapshot, { workspaceId });
+        }, 250);
+
+        return () => {
+            if (crucibleDraftPersistTimerRef.current) {
+                window.clearTimeout(crucibleDraftPersistTimerRef.current);
+            }
+        };
+    }, [inputText, isCrucibleMode, workspaceId]);
 
     useEffect(() => {
         if (!isCrucibleMode) {
@@ -760,9 +813,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
         [workspaceId],
     );
+    const currentSnapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [messages, inputText, workspaceId]);
+    const crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
+        inputText,
+        hasMessages: messages.length > 0,
+        snapshot: currentSnapshot,
+    }), [currentSnapshot, inputText, messages.length]);
 
     const handleSaveTopic = useCallback(async () => {
         try {
+            const saveTimestamp = new Date().toISOString();
             const snapshot = readScopedCrucibleSnapshot(workspaceId);
             const raw = localStorage.getItem(scopedSnapshotKey);
             if (raw) {
@@ -803,6 +863,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 activePresentableId: snapshot?.activePresentableId,
                 topicTitle: nextTitle,
                 openingPrompt: snapshot?.openingPrompt || firstUserMessage || undefined,
+                draftInputText: inputText.trim() ? inputText : undefined,
                 roundAnchors: snapshot?.roundAnchors || [],
                 lastDialogue: snapshot?.lastDialogue,
                 submittedAt: snapshot?.submittedAt,
@@ -810,6 +871,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 isThinking: false,
                 questionSource: snapshot?.questionSource || 'static',
                 engineMode: snapshot?.engineMode || 'roundtable_discovery',
+                updatedAt: saveTimestamp,
+                saveMode: 'manual',
             };
 
             const detail = await savePersistedCrucibleConversation({
@@ -825,7 +888,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         } catch {
             showToast('保存话题失败');
         }
-    }, [displayName, expertName, messages, onPersistedSnapshotSaved, projectId, resolvedCurrentUserBadge.name, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast, workspaceId]);
+    }, [displayName, expertName, inputText, messages, onPersistedSnapshotSaved, projectId, resolvedCurrentUserBadge.name, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast, workspaceId]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
@@ -909,11 +972,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从本地临时快照恢复"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    title="从本地草稿快照恢复"
+                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <span className="text-[11px] font-bold leading-none">L</span>
+                                    <span className="text-[11px] font-medium">草稿</span>
                                 </button>
+                                <span className="rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-2.5 py-1 text-[11px] text-[var(--ink-3)]">
+                                    {crucibleDraftBadge}
+                                </span>
                             </>
                         )}
                         {isCrucibleMode && onResetAll ? (

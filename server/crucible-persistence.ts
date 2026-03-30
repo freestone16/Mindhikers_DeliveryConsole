@@ -29,6 +29,8 @@ export interface CrucibleConversationSummary {
     topicTitle: string;
     status: 'active' | 'archived';
     isActive?: boolean;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    hasDraftInput?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -77,6 +79,7 @@ export interface CrucibleConversationSnapshot {
     activePresentableId?: string;
     topicTitle: string;
     openingPrompt?: string;
+    draftInputText?: string;
     roundAnchors: Array<{
         id: string;
         title: string;
@@ -92,6 +95,8 @@ export interface CrucibleConversationSnapshot {
     isThinking: false;
     questionSource: 'static' | 'socrates' | 'fallback';
     engineMode: 'roundtable_discovery' | 'socratic_refinement';
+    updatedAt?: string;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
 }
 
 export interface CrucibleConversationDetail {
@@ -288,6 +293,8 @@ const normalizeConversationSnapshot = (
         conversationId: string;
         topicTitle: string;
         roundIndex?: number;
+        updatedAt?: string;
+        saveMode?: 'autosave' | 'manual' | 'conversation';
     },
 ): CrucibleConversationSnapshot => {
     const presentables = Array.isArray(snapshot?.presentables) ? snapshot.presentables : [];
@@ -304,6 +311,7 @@ const normalizeConversationSnapshot = (
         activePresentableId: snapshot?.activePresentableId || presentables[0]?.id,
         topicTitle: normalizeSnapshotTopicTitle(snapshot?.topicTitle, options.topicTitle),
         openingPrompt: snapshot?.openingPrompt?.trim() || undefined,
+        draftInputText: snapshot?.draftInputText?.trim() || undefined,
         roundAnchors,
         lastDialogue: snapshot?.lastDialogue || undefined,
         roundIndex,
@@ -314,6 +322,8 @@ const normalizeConversationSnapshot = (
         engineMode: snapshot?.engineMode === 'roundtable_discovery' || snapshot?.engineMode === 'socratic_refinement'
             ? snapshot.engineMode
             : (roundIndex <= 1 ? 'roundtable_discovery' : 'socratic_refinement'),
+        updatedAt: snapshot?.updatedAt || options.updatedAt,
+        saveMode: snapshot?.saveMode || options.saveMode || 'conversation',
     };
 };
 
@@ -333,6 +343,8 @@ const buildConversationSummary = (
         topicTitle: conversation.topicTitle,
         status: conversation.status,
         isActive: fallback?.isActive,
+        saveMode: snapshot?.saveMode || fallback?.saveMode || 'conversation',
+        hasDraftInput: Boolean(snapshot?.draftInputText?.trim()) || fallback?.hasDraftInput || false,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
         roundIndex: Math.max(conversation.roundIndex, snapshot?.roundIndex || 0),
@@ -353,6 +365,8 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
             conversationId: conversation.id,
             topicTitle: conversation.topicTitle,
             roundIndex: conversation.roundIndex,
+            updatedAt: conversation.updatedAt,
+            saveMode: conversation.snapshot.saveMode || 'conversation',
         });
     }
 
@@ -393,6 +407,7 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
         activePresentableId: presentables[0]?.id,
         topicTitle: conversation.topicTitle,
         openingPrompt: openingPrompt || undefined,
+        draftInputText: undefined,
         roundAnchors: presentables.map((artifact) => ({
             id: `anchor_${artifact.id}`,
             title: artifact.title,
@@ -408,6 +423,8 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
         conversationId: conversation.id,
         topicTitle: conversation.topicTitle,
         roundIndex: conversation.roundIndex,
+        updatedAt: conversation.updatedAt,
+        saveMode: 'conversation',
     });
 };
 
@@ -659,6 +676,8 @@ export const saveCrucibleConversationSnapshot = async (
         conversationId: conversation.id,
         topicTitle,
         roundIndex: Math.max(conversation.roundIndex, Number(options.snapshot.roundIndex || 0)),
+        updatedAt: now,
+        saveMode: 'manual',
     });
     conversation.roundIndex = Math.max(conversation.roundIndex, conversation.snapshot.roundIndex || 0);
     conversation.updatedAt = now;

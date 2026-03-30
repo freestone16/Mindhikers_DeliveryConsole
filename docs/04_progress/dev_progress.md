@@ -4,6 +4,81 @@
 
 ---
 
+## 1.21 2026-03-30（草稿态产品语义拆分）
+
+### ✅ 本轮已完成
+
+- `draft / autosave / manual save` 三层语义已开始明确外显：
+  - 聊天头部 `L` 已改成 `草稿`
+  - 聊天头部新增状态 badge：
+    - `新话题`
+    - `草稿未发送`
+    - `自动保存`
+    - `已手动保存`
+    - `对话沉淀`
+- 话题中心已补充产品说明与状态标签：
+  - 说明文案直接解释三者差异
+  - 列表项与详情卡都会展示当前话题的状态语义
+- 未发送输入框草稿已正式纳入产品语义，而不再只是底层字段：
+  - `draftInputText` 会随 snapshot 自动保存
+  - 恢复时可回到未发送草稿状态
+- conversation summary 已补齐语义字段：
+  - `saveMode`
+  - `hasDraftInput`
+  这样历史列表无需展开详情，也能知道当前是草稿、自动保存还是已手动保存
+
+### 🎯 本轮验证结论
+
+- `npm run test:run -- src/components/crucible/storage.test.ts`：通过（`2 passed`）
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 页面核验通过：
+  - 聊天头部已显示 `草稿` 按钮
+  - 头部状态 badge 已显示
+  - 话题中心已显示三层语义说明文案与状态标签
+
+### ⚠️ 当前说明
+
+- 这轮已把“产品语义可见化”做好第一版，但还没有把三层状态进一步做成独立的设置/过滤/切换策略
+- 下一步如继续深化，建议优先考虑：
+  - 是否在话题中心增加按状态筛选
+  - 是否为“草稿未发送”增加更强的恢复提示
+  - 是否把 autosave 的时间戳也更明显展示给用户
+
+## 1.20 2026-03-30（多 Topic autosave / manual save 恢复优先级修正）
+
+### ✅ 本轮已完成
+
+- 为 `CrucibleSnapshot` 补充了最小持久化元数据：
+  - `updatedAt`
+  - `saveMode`
+  - `draftInputText`
+- `autosave` 写入现在会显式记录为最新快照：
+  - `persistCrucibleSnapshot` 会在本地与远端 autosave 同步写入 `updatedAt`
+  - 手动 `保存` 时也会显式写入 `saveMode: manual`
+  - 未发送输入框草稿现在也会跟随 snapshot 一起持久化
+- 启动恢复逻辑已从“固定顺序取 active conversation”改成“按快照新鲜度选最新状态”：
+  - 优先比较 `updatedAt`
+  - 时间戳缺失时再按 `remote autosave > local snapshot > active conversation` 兜底
+  - 目标是避免“用户在已保存话题上继续改了一些内容，但刷新后又被旧 active conversation 覆盖”
+- 新增单测：
+  - `src/components/crucible/storage.test.ts`
+  - 覆盖“本地草稿更新得更晚”与“远端 autosave 更新得更晚”两个恢复场景
+  - 两个场景都已包含 `draftInputText` 恢复断言
+
+### 🎯 本轮验证结论
+
+- `npm run test:run -- src/components/crucible/storage.test.ts`：通过（`2 passed`）
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 最小页面核验：
+  - 在输入框中键入未发送草稿后，`localStorage` 对应 snapshot 已写入 `draftInputText`
+
+### ⚠️ 当前说明
+
+- `3455d48` 已作为 `Phase A + Phase B` checkpoint commit 提交
+- 本条 `autosave / manual save` 恢复优先级修正目前仍在工作树中，尚未单独 commit
+
 ## 1.19 2026-03-30（多 Topic 并行会话 Phase B 实现）
 
 ### ✅ 本轮已完成

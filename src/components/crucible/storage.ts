@@ -83,6 +83,49 @@ const normalizeSnapshotPayload = (payload: unknown): CrucibleSnapshot | null => 
     return normalizeCrucibleSnapshot(JSON.stringify(candidate));
 };
 
+const toSnapshotTimestamp = (snapshot?: CrucibleSnapshot | null) => {
+    if (!snapshot?.updatedAt) {
+        return Number.NaN;
+    }
+
+    return new Date(snapshot.updatedAt).getTime();
+};
+
+const pickPreferredSnapshot = (
+    candidates: Array<{
+        snapshot: CrucibleSnapshot | null;
+        priority: number;
+    }>,
+): CrucibleSnapshot | null => {
+    const available = candidates.filter((item) => item.snapshot);
+    if (!available.length) {
+        return null;
+    }
+
+    available.sort((left, right) => {
+        const rightTime = toSnapshotTimestamp(right.snapshot);
+        const leftTime = toSnapshotTimestamp(left.snapshot);
+        const hasRightTime = Number.isFinite(rightTime);
+        const hasLeftTime = Number.isFinite(leftTime);
+
+        if (hasRightTime || hasLeftTime) {
+            if (!hasLeftTime) {
+                return 1;
+            }
+            if (!hasRightTime) {
+                return -1;
+            }
+            if (rightTime !== leftTime) {
+                return rightTime - leftTime;
+            }
+        }
+
+        return right.priority - left.priority;
+    });
+
+    return available[0]?.snapshot || null;
+};
+
 export const readCrucibleSnapshot = (): CrucibleSnapshot | null => {
     const key = getScopedSnapshotKey();
     purgeLegacySnapshots();
@@ -118,6 +161,8 @@ export const clearCrucibleSnapshot = (options?: { workspaceId?: string | null })
 
 export const readPersistedCrucibleSnapshot = async (options?: { workspaceId?: string | null }): Promise<CrucibleSnapshot | null> => {
     const localSnapshot = readScopedCrucibleSnapshot(options?.workspaceId);
+    let activeSnapshot: CrucibleSnapshot | null = null;
+    let remoteAutosaveSnapshot: CrucibleSnapshot | null = null;
 
     try {
         const activeResponse = await fetch(buildApiUrl('/api/crucible/conversations/active'), {
@@ -125,11 +170,7 @@ export const readPersistedCrucibleSnapshot = async (options?: { workspaceId?: st
         });
 
         if (activeResponse.ok) {
-            const activePayload = normalizeSnapshotPayload(await activeResponse.json());
-            if (activePayload) {
-                writeCrucibleSnapshot(activePayload, options);
-                return activePayload;
-            }
+            activeSnapshot = normalizeSnapshotPayload(await activeResponse.json());
         } else if (activeResponse.status !== 404) {
             throw new Error(`conversation read failed: ${activeResponse.status}`);
         }
@@ -139,18 +180,30 @@ export const readPersistedCrucibleSnapshot = async (options?: { workspaceId?: st
         });
 
         if (autosaveResponse.status === 404) {
-            return localSnapshot;
+            const preferredSnapshot = pickPreferredSnapshot([
+                { snapshot: activeSnapshot, priority: 1 },
+                { snapshot: localSnapshot, priority: 2 },
+            ]);
+            if (preferredSnapshot) {
+                writeCrucibleSnapshot(preferredSnapshot, options);
+            }
+            return preferredSnapshot;
         }
 
         if (!autosaveResponse.ok) {
             throw new Error(`autosave read failed: ${autosaveResponse.status}`);
         }
 
-        const remoteSnapshot = normalizeCrucibleSnapshot(await autosaveResponse.text());
-        if (remoteSnapshot) {
-            writeCrucibleSnapshot(remoteSnapshot, options);
-            return remoteSnapshot;
+        remoteAutosaveSnapshot = normalizeCrucibleSnapshot(await autosaveResponse.text());
+        const preferredSnapshot = pickPreferredSnapshot([
+            { snapshot: remoteAutosaveSnapshot, priority: 3 },
+            { snapshot: localSnapshot, priority: 2 },
+            { snapshot: activeSnapshot, priority: 1 },
+        ]);
+        if (preferredSnapshot) {
+            writeCrucibleSnapshot(preferredSnapshot, options);
         }
+        return preferredSnapshot;
     } catch (error) {
         console.warn('[CrucibleStorage] Failed to read persisted snapshot:', error);
     }
@@ -162,14 +215,20 @@ export const persistCrucibleSnapshot = async (
     snapshot: CrucibleSnapshot,
     options?: { workspaceId?: string | null },
 ) => {
-    writeCrucibleSnapshot(snapshot, options);
+    const nextSnapshot: CrucibleSnapshot = {
+        ...snapshot,
+        updatedAt: new Date().toISOString(),
+        saveMode: 'autosave',
+    };
+
+    writeCrucibleSnapshot(nextSnapshot, options);
 
     try {
         await fetch(buildApiUrl('/api/crucible/autosave'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify(snapshot),
+            body: JSON.stringify(nextSnapshot),
         });
     } catch (error) {
         console.warn('[CrucibleStorage] Failed to persist snapshot:', error);
