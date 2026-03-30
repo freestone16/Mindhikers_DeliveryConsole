@@ -1,178 +1,39 @@
-🕐 Last updated: 2026-03-27 14:38
+🕐 Last updated: 2026-03-30 16:10
 🌿 Branch: MHSDC-GC-SSE
 
 ## 当前状态
-- 当前默认前端入口已切为独立 SaaS 壳：`src/SaaSApp.tsx`
-- 当前 `build` / `build:railway` 已不再被导演 / 营销等历史模块类型债阻塞
-- Google 登录已完成真实 smoke，可作为当前可用登录入口
-- 黄金坩埚 SaaS 总体方案 Ver1.0 已落盘到：
-  - `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`
-- `workspace-aware persistence` 已完成第一刀：
-  - 当前 turn 写入已开始进入 `workspaceId / conversationId` 语义
-  - reset 已能同步清掉 autosave 与 active conversation pointer
-- `workspace-aware persistence` 已完成第二刀：
-  - conversation 读侧 API 已补齐
-  - 前端启动恢复已优先走 active conversation
-- 邮箱注册已完成线上真实 smoke：
-  - 生产环境注册成功
-  - personal workspace 自动创建成功
-- `SSE / SAAS` 的 Railway 域名治理口径已定：
-  - `SSE` 域名只做测试线
-  - `SAAS` 域名只做稳定生产线
-
-## 本轮关键结果
-- 新增坩埚持久化骨架：
-  - `server/crucible-persistence.ts`
-  - 统一解析：
-    - `workspaceId`
-    - `conversationId`
-    - workspace runtime dir
-- turn 写入已开始落到：
-  - `runtime/crucible/workspaces/<workspaceId>/conversations/<conversationId>.json`
-  - 并同步维护：
-    - `active_conversation.json`
-    - `conversations/index.json`
-    - `turn_log.json` 兼容镜像
-- conversation 读侧已补齐：
-  - `GET /api/crucible/conversations`
-  - `GET /api/crucible/conversations/active`
-  - `GET /api/crucible/conversations/:conversationId`
-  - `POST /api/crucible/conversations/:conversationId/activate`
-- conversation detail 已统一带回：
-  - `summary`
-  - `snapshot`
-  - `artifacts`
-  - `sourceContext`
-- artifact 已补上最小独立导出：
-  - `GET /api/crucible/conversations/:conversationId/artifacts/export`
-  - 当前先导出结构化 bundle JSON
-  - `format` 参数已留位，后续可扩成 markdown / docx / pdf
-- 前端坩埚主链已开始保存和续用 `conversationId`
-- 快照持久化已升级为：
-  - `localStorage + /api/crucible/autosave`
-- 前端恢复优先级已改为：
-  - active conversation
-  - autosave
-  - localStorage 缓存
-- SaaS 已接入最小历史对话入口：
-  - 头像菜单可打开 history sheet
-  - 可恢复历史 conversation，并重新设为 active
-  - 可对单条历史 conversation 触发“导出产物”
-- history sheet 已升级为轻量历史中心：
-  - 搜索
-  - 排序
-  - 基础元数据
-  - 扩展位预留
-- 导出参数位已从接口打到 UI：
-  - 当前仅开放 `bundle-json`
-  - 后续可继续加 markdown / docx / pdf
-- 后端 SSE 路由已正式挂载：
-  - `POST /api/crucible/turn/stream`
-- 基于当前代码现场补齐了一版 Ver1.0 总体方案，统一口径为：
-  - `安全`
-  - `健壮`
-  - `简单`
-  - `高效`
-- 方案明确：
-  - Ver1.0 采用 `单前端 + 单 Web 服务 + 单数据库 + 最小文件持久化`
-  - auth 用 `Better Auth + Postgres`
-  - workspace kernel 继续自建
-  - 下一步唯一主线是完整的 `workspace-aware persistence`
-- 新增独立 SaaS 主壳：
-  - `src/SaaSApp.tsx`
-  - 只保留 `黄金坩埚` 与 `分发终端`
-  - 当前默认入口不再 import `Director / Shorts / Marketing` 历史交付模块
-- Header 已支持模块白名单：
-  - `src/components/Header.tsx`
-  - SaaS 壳只显示 `crucible / distribution`
-  - 在 SaaS 壳里 project / script 选择器不再因处于坩埚页而锁死
-- 构建链路已完成分仓：
-  - `tsconfig.saas.json`
-  - `npm run typecheck:saas`
-  - `npm run build` / `npm run build:railway` 改为校验 SaaS 主链
-  - `npm run typecheck:full` 保留整仓历史债清单
-- 当前打包体积已明显下降：
-  - `721.22 kB -> 562.12 kB`
-- 线上邮箱注册 smoke 结果：
-  - 环境：`https://golden-crucible-saas-production.up.railway.app/`
-  - 测试邮箱：`codex.gc.smoke.20260327.1417@example.com`
-  - `GET /api/account/session` 返回：
-    - `authenticated: true`
-    - `workspaceName: Codex Smoke 的工作区`
-    - `workspaceId: 3b1633f7-efcc-4955-9cfe-7f6f30492aa5`
-- 部署治理新结论：
-  - 当前 `golden-crucible-saas-production.up.railway.app` 确实是 Railway 的 SaaS 生产域名
-  - 线上已有发布版本
-  - 但后续不应再由 `SSE` 研发线直接覆盖该域名
-  - 正确流程应是：`SSE` 验证完成 -> 合并到 `SAAS` -> 由 `SAAS` 统一发布生产域名
-
-## 本轮代码落点
-- 新增：
-  - `src/SaaSApp.tsx`
-  - `tsconfig.saas.json`
-  - `docs/02_design/crucible/2026-03-27_GoldenCrucible_SaaS_V1.0.md`
-  - `server/crucible-persistence.ts`
-- 修改：
-  - `docs/02_design/crucible/_master.md`
-  - `server/crucible.ts`
-  - `src/components/crucible/storage.ts`
-  - `server/index.ts`
-  - `src/components/crucible/CrucibleWorkspaceView.tsx`
-  - `src/components/crucible/types.ts`
-  - `src/main.tsx`
-  - `src/components/Header.tsx`
-  - `package.json`
-  - `docs/04_progress/dev_progress.md`
-  - `docs/04_progress/rules.md`
-
-## 验证结果
-- `./node_modules/.bin/tsx --eval "import './server/crucible-persistence.ts'; import './server/crucible.ts'"`：通过
-- `npm run typecheck:saas`：通过
-- `npm run build`：通过
-- `npm run typecheck:full`：失败，但失败项已退回历史模块：
-  - `src/components/market/*`
-  - `src/components/MarketingSection.tsx`
-  - `src/components/ScheduleModal.tsx`
-  - `src/components/StatusDashboard.tsx`
+- 本窗口已完成多 Topic 并行会话 `Phase A + Phase B` 实现与验证，主要包括：
+  - 聊天侧新增 `话题 / 保存 / 新话题`
+  - `历史中心` 升级为 `话题中心`
+  - `Save` 已升级为 conversation 级 snapshot 持久化
+  - 新话题状态流已收稳，不再被旧 active conversation 立即回灌
+  - 无 `conversationId` 的新话题也可一键保存为可恢复 topic
+- 当前统一判断：
+  - 当前底盘已能承接“一人多 topic 切换恢复”
+  - `Phase B` 已把“按过保存即可回来继续”的主语义补齐
+  - 后续是否开新窗口，主要取决于要不要继续做 draft / autosave / Topic Switcher 升级
 
 ## 当前 WIP
-- 已完成：
-  - Google 登录真实 smoke
-  - SaaS 主链入口分仓
-  - 历史类型债对当前 build 的阻塞隔离
-  - SaaS Ver1.0 总体方案落盘
-  - `workspace-aware persistence` 第一刀（写入骨架）
-  - `workspace-aware persistence` 第二刀（恢复 / 查询读侧）
-- 未完成：
-  - `Crucible` 更完整的历史中心 UI
-  - 归档 / 重命名 / 标签等管理能力
-  - `artifact` 更多格式导出
-  - 用户登录后态的头像菜单真实功能接线
-  - 微信网站应用登录接通
-  - 建立独立 `SSE` Railway 测试域名
-  - 将最新稳定 `SSE` 成果合并到 `SAAS`
-  - 再由 `SAAS` 覆盖当前生产域名并切真实外部域名
+- `Phase A / Phase B` 已完成，本窗口可继续就地推进
+- 若下一步继续做，建议优先评估：
+  - 是否把“手动保存 / 自动保存 / draft 草稿”三者语义拆开
+  - 是否把 `话题中心` 从右侧 sheet 再升级成更强的 Topic Switcher
+  - 是否要支持“输入框未发送内容”级别的草稿保存
+
+## 本轮新增文档
+- 设计文档：
+  - `docs/02_design/crucible/2026-03-30_Crucible_Multi_Topic_Conversation_Design.md`
+- 已同步更新：
+  - `docs/02_design/crucible/_master.md`
+  - `docs/04_progress/dev_progress.md`
 
 ## 待解决问题
-- 当前只是把历史模块从 SaaS 主链入口和 build 中切掉了，整仓旧债本身并未清除
-- 若后续要彻底清债，应单开历史模块收口任务，不要再回灌进 `MIN-105`
-- Google `Client Secret` 已在对话中出现，测试完成后建议旋转一版
-- 当前 persistence 已完成“写 + 读接口”闭环，但还没补：
-  - 更完整的历史对话 UI
-  - artifact 多格式导出
-  - localStorage 的 workspace scope key
-- 本地 `.env.local` 仍未启用 auth：
-  - 缺 `DATABASE_URL`
-  - 所以本地无法直接复现邮箱注册 smoke
-- 当前生产环境登录后仍落旧宿主壳，不是仓库里最新的 `SaaSApp` 形态
-- 当前不要再追查历史部署事件，直接按新治理口径推进最稳：
-  - `SSE` 先稳
-  - 合并到 `SAAS`
-  - 再发布生产域名
+- 当前 `Save` 主语义已经成立，但更细的 draft / autosave 规则仍未拆清
+- 当前 `话题中心` 仍是 sheet 形态，不是常驻 topic 导航
+- 后续仍可继续补强：
+  - 输入框草稿级保存
+  - autosave 与 manual save 的边界
+  - 更高频的 Topic Switcher 入口
 
-## 新窗口直接怎么做
-1. 先建立独立 `SSE` Railway 测试域名
-2. 继续在 `SSE` 线上把功能收稳，不直接碰 `SAAS` 生产域名
-3. 收稳后整理一版 `SSE -> SAAS` 合并清单
-4. 合并到 `SAAS` 后，再统一覆盖当前 `golden-crucible-saas-production.up.railway.app`
-5. 最后把 `SAAS` 绑定真实外部正式域名
+## 一句话结论
+- 当前 `Phase B` 已完成并通过构建、本地 UI 核验与 runtime 落盘验证；如果下一步还是沿着这个特性继续做，建议先不要开新窗口，当前上下文仍然最完整。

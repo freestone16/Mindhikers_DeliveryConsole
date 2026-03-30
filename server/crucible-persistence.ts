@@ -28,6 +28,7 @@ export interface CrucibleConversationSummary {
     workspaceId: string;
     topicTitle: string;
     status: 'active' | 'archived';
+    isActive?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -174,6 +175,7 @@ interface StoredCrucibleConversation {
     messages: StoredCrucibleMessage[];
     turns: StoredCrucibleTurn[];
     artifacts: CrucibleConversationArtifact[];
+    snapshot?: CrucibleConversationSnapshot;
 }
 
 const sanitizePathSegment = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -225,8 +227,16 @@ const resolveActiveConversationId = (workspaceDir: string) => {
         return activeConversationId;
     }
 
-    const latestConversation = readConversationIndex(workspaceDir)[0];
+    const latestConversation = readConversationIndex(workspaceDir).find((item) => item.status !== 'archived')
+        || readConversationIndex(workspaceDir)[0];
     return latestConversation?.id?.trim() || null;
+};
+
+const deleteActiveConversationPointer = (workspaceDir: string) => {
+    const pointerPath = getActiveConversationPointerPath(workspaceDir);
+    if (fs.existsSync(pointerPath)) {
+        fs.unlinkSync(pointerPath);
+    }
 };
 
 const writeActiveConversationPointer = (workspaceDir: string, conversationId: string, topicTitle: string) => {
@@ -246,8 +256,69 @@ const updateConversationIndex = (workspaceDir: string, entry: CrucibleConversati
     fs.writeFileSync(indexPath, JSON.stringify(next.slice(0, 200), null, 2), 'utf-8');
 };
 
+const getConversationSummaryWithActiveState = (
+    workspaceDir: string,
+    items: CrucibleConversationSummary[],
+) => {
+    const activeConversationId = readActiveConversationId(workspaceDir);
+    return items.map((item) => ({
+        ...item,
+        isActive: item.id === activeConversationId,
+    }));
+};
+
 const toSnapshotPresentableType = (type: CrucibleConversationArtifact['type']) => (
     type === 'asset' ? 'mindmap' : type
+);
+
+const normalizeSnapshotTopicTitle = (value?: string, fallback = '标题待定') => {
+    const normalized = value?.trim();
+    if (!normalized) {
+        return fallback;
+    }
+    if (normalized === '标题待定' || normalized === '标题待收敛...' || normalized.toUpperCase() === 'TBD') {
+        return fallback;
+    }
+    return normalized;
+};
+
+const normalizeConversationSnapshot = (
+    snapshot: Partial<CrucibleConversationSnapshot> | null | undefined,
+    options: {
+        conversationId: string;
+        topicTitle: string;
+        roundIndex?: number;
+    },
+): CrucibleConversationSnapshot => {
+    const presentables = Array.isArray(snapshot?.presentables) ? snapshot.presentables : [];
+    const crystallizedQuotes = Array.isArray(snapshot?.crystallizedQuotes) ? snapshot.crystallizedQuotes : [];
+    const roundAnchors = Array.isArray(snapshot?.roundAnchors) ? snapshot.roundAnchors : [];
+    const messages = Array.isArray(snapshot?.messages) ? snapshot.messages.filter((item) => item?.id && item?.createdAt) : [];
+    const roundIndex = Number.isFinite(snapshot?.roundIndex) ? Number(snapshot?.roundIndex) : (options.roundIndex || 0);
+
+    return {
+        conversationId: options.conversationId,
+        messages,
+        presentables,
+        crystallizedQuotes,
+        activePresentableId: snapshot?.activePresentableId || presentables[0]?.id,
+        topicTitle: normalizeSnapshotTopicTitle(snapshot?.topicTitle, options.topicTitle),
+        openingPrompt: snapshot?.openingPrompt?.trim() || undefined,
+        roundAnchors,
+        lastDialogue: snapshot?.lastDialogue || undefined,
+        roundIndex,
+        isThinking: false,
+        questionSource: snapshot?.questionSource === 'socrates' || snapshot?.questionSource === 'fallback'
+            ? snapshot.questionSource
+            : 'static',
+        engineMode: snapshot?.engineMode === 'roundtable_discovery' || snapshot?.engineMode === 'socratic_refinement'
+            ? snapshot.engineMode
+            : (roundIndex <= 1 ? 'roundtable_discovery' : 'socratic_refinement'),
+    };
+};
+
+const countSnapshotArtifacts = (snapshot?: CrucibleConversationSnapshot) => (
+    (snapshot?.presentables?.length || 0) + (snapshot?.crystallizedQuotes?.length || 0)
 );
 
 const buildConversationSummary = (
@@ -255,22 +326,36 @@ const buildConversationSummary = (
     fallback?: Partial<CrucibleConversationSummary>,
 ): CrucibleConversationSummary => {
     const lastTurn = conversation.turns[conversation.turns.length - 1];
+    const snapshot = conversation.snapshot;
     return {
         id: conversation.id,
         workspaceId: conversation.workspaceId,
         topicTitle: conversation.topicTitle,
         status: conversation.status,
+        isActive: fallback?.isActive,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
-        roundIndex: conversation.roundIndex,
-        lastSpeaker: lastTurn?.bridgeOutput.dialogue.speaker || fallback?.lastSpeaker || 'assistant',
-        lastFocus: lastTurn?.bridgeOutput.dialogue.focus || fallback?.lastFocus || '',
-        messageCount: conversation.messages.length || fallback?.messageCount || 0,
-        artifactCount: conversation.artifacts.length || fallback?.artifactCount || 0,
+        roundIndex: Math.max(conversation.roundIndex, snapshot?.roundIndex || 0),
+        lastSpeaker: lastTurn?.bridgeOutput.dialogue.speaker || snapshot?.lastDialogue?.speaker || fallback?.lastSpeaker || 'draft',
+        lastFocus: lastTurn?.bridgeOutput.dialogue.focus
+            || snapshot?.lastDialogue?.focus
+            || snapshot?.topicTitle
+            || fallback?.lastFocus
+            || '',
+        messageCount: conversation.messages.length || snapshot?.messages?.length || fallback?.messageCount || 0,
+        artifactCount: conversation.artifacts.length || countSnapshotArtifacts(snapshot) || fallback?.artifactCount || 0,
     };
 };
 
 const buildConversationSnapshot = (conversation: StoredCrucibleConversation): CrucibleConversationSnapshot => {
+    if (conversation.snapshot) {
+        return normalizeConversationSnapshot(conversation.snapshot, {
+            conversationId: conversation.id,
+            topicTitle: conversation.topicTitle,
+            roundIndex: conversation.roundIndex,
+        });
+    }
+
     const lastTurn = conversation.turns[conversation.turns.length - 1];
     const openingPrompt = conversation.turns.find((turn) => turn.userInput.openingPrompt.trim())?.userInput.openingPrompt || '';
     const latestArtifacts = conversation.artifacts.filter((artifact) => artifact.roundIndex === conversation.roundIndex);
@@ -293,7 +378,7 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
             summary: artifact.summary,
         }));
 
-    return {
+    return normalizeConversationSnapshot({
         conversationId: conversation.id,
         messages: conversation.messages.map((message) => ({
             id: message.id,
@@ -319,7 +404,11 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
         isThinking: false,
         questionSource: lastTurn ? (lastTurn.source === 'socrates' ? 'socrates' : 'fallback') : 'static',
         engineMode: conversation.roundIndex <= 1 ? 'roundtable_discovery' : 'socratic_refinement',
-    };
+    }, {
+        conversationId: conversation.id,
+        topicTitle: conversation.topicTitle,
+        roundIndex: conversation.roundIndex,
+    });
 };
 
 const readStoredConversation = (workspaceDir: string, conversationId: string) => (
@@ -390,10 +479,7 @@ export const clearCrucibleActiveConversation = async (req: Request, fallbackProj
     const context = await resolveCruciblePersistenceContext(req, {
         projectId: fallbackProjectId,
     });
-    const pointerPath = getActiveConversationPointerPath(context.workspaceDir);
-    if (fs.existsSync(pointerPath)) {
-        fs.unlinkSync(pointerPath);
-    }
+    deleteActiveConversationPointer(context.workspaceDir);
 };
 
 export const appendTurnToCrucibleConversation = (
@@ -501,6 +587,7 @@ export const appendTurnToCrucibleConversation = (
         createdAt: now,
     }));
     conversation.artifacts.push(...artifacts);
+    conversation.snapshot = buildConversationSnapshot(conversation);
 
     fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
     writeActiveConversationPointer(context.workspaceDir, context.conversationId, params.topicTitle);
@@ -519,6 +606,77 @@ export const appendTurnToCrucibleConversation = (
     return conversation;
 };
 
+export const saveCrucibleConversationSnapshot = async (
+    req: Request,
+    options: {
+        conversationId?: string;
+        topicTitle?: string;
+        status?: 'active' | 'archived';
+        snapshot: Partial<CrucibleConversationSnapshot>;
+        projectId?: string;
+        scriptPath?: string;
+    },
+): Promise<CrucibleConversationDetail> => {
+    const requestedConversationId = options.conversationId?.trim()
+        || options.snapshot.conversationId?.trim();
+    const context = await resolveCruciblePersistenceContext(req, {
+        conversationId: requestedConversationId,
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const existing = readJsonFile<StoredCrucibleConversation | null>(conversationFile, null);
+    const now = new Date().toISOString();
+    const topicTitle = normalizeSnapshotTopicTitle(
+        options.topicTitle || options.snapshot.topicTitle || existing?.topicTitle,
+        '未命名议题',
+    );
+
+    const conversation: StoredCrucibleConversation = existing || {
+        id: context.conversationId,
+        workspaceId: context.workspaceId,
+        topicTitle,
+        status: options.status || 'active',
+        sourceContext: {
+            projectId: context.projectId,
+            scriptPath: context.scriptPath,
+        },
+        createdAt: now,
+        updatedAt: now,
+        roundIndex: 0,
+        messages: [],
+        turns: [],
+        artifacts: [],
+    };
+
+    conversation.topicTitle = topicTitle;
+    conversation.status = options.status || conversation.status || 'active';
+    conversation.sourceContext = {
+        projectId: context.projectId,
+        scriptPath: context.scriptPath,
+    };
+    conversation.snapshot = normalizeConversationSnapshot(options.snapshot, {
+        conversationId: conversation.id,
+        topicTitle,
+        roundIndex: Math.max(conversation.roundIndex, Number(options.snapshot.roundIndex || 0)),
+    });
+    conversation.roundIndex = Math.max(conversation.roundIndex, conversation.snapshot.roundIndex || 0);
+    conversation.updatedAt = now;
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    writeActiveConversationPointer(context.workspaceDir, conversation.id, conversation.topicTitle);
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    return {
+        summary: buildConversationSummary(conversation, {
+            isActive: true,
+        }),
+        snapshot: buildConversationSnapshot(conversation),
+        artifacts: conversation.artifacts,
+        sourceContext: conversation.sourceContext,
+    };
+};
+
 export const listCrucibleConversations = async (
     req: Request,
     options: {
@@ -527,7 +685,7 @@ export const listCrucibleConversations = async (
     } = {},
 ): Promise<CrucibleConversationSummary[]> => {
     const context = await resolveCruciblePersistenceContext(req, options);
-    return readConversationIndex(context.workspaceDir);
+    return getConversationSummaryWithActiveState(context.workspaceDir, readConversationIndex(context.workspaceDir));
 };
 
 export const getCrucibleConversationDetail = async (
@@ -550,7 +708,8 @@ export const getCrucibleConversationDetail = async (
         return null;
     }
 
-    const indexEntry = readConversationIndex(context.workspaceDir).find((item) => item.id === targetConversationId);
+    const indexEntry = getConversationSummaryWithActiveState(context.workspaceDir, readConversationIndex(context.workspaceDir))
+        .find((item) => item.id === targetConversationId);
     return {
         summary: buildConversationSummary(conversation, indexEntry),
         snapshot: buildConversationSnapshot(conversation),
@@ -582,6 +741,62 @@ export const activateCrucibleConversation = async (
     return detail;
 };
 
+export const updateCrucibleConversation = async (
+    req: Request,
+    options: {
+        conversationId: string;
+        topicTitle?: string;
+        status?: 'active' | 'archived';
+        projectId?: string;
+        scriptPath?: string;
+    },
+): Promise<CrucibleConversationDetail | null> => {
+    const conversationId = options.conversationId?.trim();
+    if (!conversationId) {
+        return null;
+    }
+
+    const context = await resolveCruciblePersistenceContext(req, options);
+    const conversationFile = getConversationFile(context.workspaceDir, conversationId);
+    const conversation = readJsonFile<StoredCrucibleConversation | null>(conversationFile, null);
+    if (!conversation) {
+        return null;
+    }
+
+    const nextTitle = options.topicTitle?.trim();
+    if (nextTitle) {
+        conversation.topicTitle = nextTitle;
+    }
+
+    if (options.status === 'active' || options.status === 'archived') {
+        conversation.status = options.status;
+    }
+
+    conversation.updatedAt = new Date().toISOString();
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    const activeConversationId = readActiveConversationId(context.workspaceDir);
+    if (conversation.status === 'archived' && activeConversationId === conversationId) {
+        const indexItems = readConversationIndex(context.workspaceDir);
+        const fallbackConversation = indexItems.find((item) => item.id !== conversationId && item.status !== 'archived');
+        if (fallbackConversation) {
+            writeActiveConversationPointer(context.workspaceDir, fallbackConversation.id, fallbackConversation.topicTitle);
+        } else {
+            deleteActiveConversationPointer(context.workspaceDir);
+        }
+    } else if (conversation.status === 'active' && activeConversationId === conversationId) {
+        writeActiveConversationPointer(context.workspaceDir, conversationId, conversation.topicTitle);
+    }
+
+    return getCrucibleConversationDetail(req, {
+        conversationId,
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+};
+
 export const buildCrucibleArtifactExport = (
     detail: CrucibleConversationDetail,
     options?: {
@@ -605,6 +820,47 @@ export const buildCrucibleArtifactExport = (
     };
 
     const safeTopicTitle = sanitizeFilenameSegment(detail.summary.topicTitle || 'crucible');
+    if (requestedFormat === 'markdown') {
+        const lines: string[] = [
+            `# ${detail.summary.topicTitle || '未命名议题'}`,
+            '',
+            `- 会话 ID：${detail.summary.id}`,
+            `- Workspace：${detail.summary.workspaceId}`,
+            `- 轮次：${detail.summary.roundIndex}`,
+            `- 更新时间：${detail.summary.updatedAt}`,
+            `- Project：${detail.sourceContext.projectId || '-'}`,
+            `- Script：${detail.sourceContext.scriptPath || '-'}`,
+            '',
+            '## 对话摘要',
+            '',
+            detail.summary.lastFocus || '当前未生成摘要焦点。',
+            '',
+            '## 产物列表',
+            '',
+        ];
+
+        for (const artifact of detail.artifacts) {
+            lines.push(`### ${artifact.title || `产物 ${artifact.id}`}`);
+            lines.push('');
+            lines.push(`- 类型：${artifact.type}`);
+            lines.push(`- 轮次：${artifact.roundIndex}`);
+            lines.push(`- 创建时间：${artifact.createdAt}`);
+            lines.push('');
+            if (artifact.summary?.trim()) {
+                lines.push(artifact.summary.trim());
+                lines.push('');
+            }
+            lines.push(artifact.content?.trim() || '(空内容)');
+            lines.push('');
+        }
+
+        return {
+            filename: `${safeTopicTitle}-${detail.summary.id}-artifacts.md`,
+            contentType: 'text/markdown; charset=utf-8',
+            body: lines.join('\n'),
+        };
+    }
+
     return {
         filename: `${safeTopicTitle}-${detail.summary.id}-artifacts.json`,
         contentType: 'application/json; charset=utf-8',

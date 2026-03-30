@@ -28,7 +28,7 @@ interface UserAvatarMenuProps {
 
 const MENU_ITEMS: MenuItem[] = [
     { id: 'downloads', label: '下载', icon: Download },
-    { id: 'history', label: '历史对话', icon: History },
+    { id: 'history', label: '话题中心', icon: History },
     { id: 'membership', label: '会员计划', icon: Crown },
     { id: 'about', label: '关于我们', icon: Info },
     { id: 'updates', label: '检查更新', icon: RefreshCcw },

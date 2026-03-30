@@ -23,6 +23,7 @@ export interface CrucibleConversationSummary {
     workspaceId: string;
     topicTitle: string;
     status: 'active' | 'archived';
+    isActive?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -50,6 +51,20 @@ export interface CrucibleConversationDetail {
         projectId: string;
         scriptPath: string;
     };
+}
+
+export interface UpdateCrucibleConversationPayload {
+    topicTitle?: string;
+    status?: 'active' | 'archived';
+}
+
+export interface SaveCrucibleConversationPayload {
+    conversationId?: string;
+    topicTitle?: string;
+    status?: 'active' | 'archived';
+    projectId?: string;
+    scriptPath?: string;
+    snapshot: CrucibleSnapshot;
 }
 
 export type CrucibleSseEventName = 'turn' | 'error' | 'done';

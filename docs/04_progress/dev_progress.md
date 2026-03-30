@@ -1,8 +1,199 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-27 CST
+> **更新日期**: 2026-03-30 CST
 
 ---
+
+## 1.19 2026-03-30（多 Topic 并行会话 Phase B 实现）
+
+### ✅ 本轮已完成
+
+- `Save` 已正式升级为 conversation 级 snapshot 持久化：
+  - 新增 `POST /api/crucible/conversations/save`
+  - 即使当前还没有 `conversationId`，点击 `保存` 也会直接创建一段可恢复的话题
+  - 保存完成后，前端会立即拿到新的 `conversationId` 并把当前话题切换到服务端持久化态
+- conversation 文件现已支持直接保存完整 snapshot：
+  - `server/crucible-persistence.ts` 为 conversation 增加 `snapshot`
+  - 话题摘要、详情、恢复逻辑都优先使用已保存 snapshot，避免只靠 turns/artifacts 反推
+- 聊天侧 `保存` 语义已收稳：
+  - 空白 topic 点击 `保存`，不会发请求，会直接提示“当前还没有内容可保存”
+  - 有内容的新话题点击 `保存`，会生成新 conversation 并提示“新话题已保存，可随时回来继续”
+  - 已存在 `conversationId` 的话题再次保存，会覆盖为最新 snapshot
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 本地 UI / 运行时核验通过：
+  - 空白 topic 点击 `保存`，未触发任何保存请求
+  - 注入最小有效话题后点击 `保存`，成功触发 `POST /api/crucible/conversations/save`
+  - 前端本地快照成功写回新的 `conversationId`
+  - 从空白新话题切走后，可再次恢复到刚保存的话题内容
+- runtime 落盘已确认：
+  - `active_conversation.json`
+  - `conversations/index.json`
+  - `conversations/<id>.json`
+  - `runtime/crucible/autosave.json`
+  均已写入本轮保存生成的话题信息
+
+### ⚠️ 当前剩余事项
+
+- 现在的 `Save` 已满足“按过保存后随时再开”的主语义，但仍偏向“手动保存当前完整快照”，还不是更细分的 draft / autosave 策略治理
+- `话题中心` 仍是右侧 sheet，不是常驻 Topic 导航
+- 若继续下一阶段，建议优先考虑：
+  - 是否把草稿态、自动保存、手动保存进一步拆清
+  - 是否补充“未发送输入框内容”级别的 draft 保存
+  - 是否把 Topic Switcher 从 sheet 升级为更高频入口
+
+## 1.18 2026-03-30（多 Topic 并行会话 Phase A 实现）
+
+### ✅ 本轮已完成
+
+- SaaS 坩埚聊天侧已补出 Phase A 入口动作：
+  - `话题`
+  - `保存`
+  - `新话题`
+- `历史中心` 已正式升级为 `话题中心`：
+  - 文案切换到 topic 语义
+  - 可直接从面板内点击“开始新话题”
+- `Save` 语义已从纯本地 `S/L` 心智前进一步：
+  - 若当前已有 `conversationId`，会回写服务端 conversation，确保该 topic 保持为可恢复状态
+  - 若当前还没有首轮 conversation，则明确提示“首轮完成后会自动保存为新话题”，并保留本地兜底快照
+- 新话题状态流已补稳：
+  - 新开 topic 时不再被旧 `active conversation` 立即回灌
+  - ChatPanel 已随 `resetToken` / `key` 重置，避免跨 topic 串消息
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 本地 UI 核验通过：
+  - 直接观察到 `话题 / 保存 / 新话题` 按钮
+  - 可打开 `话题中心`
+  - “开始新话题”后页面回到空白 topic 状态
+  - 页面文本确认旧对话正文不再残留到新 topic
+  - 空白 topic 点击 `保存` 时，会给出 Phase A 预期提示
+
+### ⚠️ 当前剩余事项
+
+- 当前 `话题` 按钮已可打开 `话题中心`，但 Topic Switcher 仍以右侧 sheet 为主，不是常驻侧栏
+- `Save` 现在已具备 conversation 级回写语义，但对“首轮前草稿”仍只是本地兜底，不是 Phase B 的正式 draft 持久化
+- 若后续进入 Phase B，重点仍是：
+  - conversation 级 snapshot
+  - draft conversation
+  - 更完整的 topic 恢复一致性
+
+## 1.16 2026-03-30（MIN-94 收口复核 + SAAS 测试交接）
+
+### ✅ 本轮已确认
+
+- `MIN-94` 下属旧拆卡已收口完毕：
+  - `MIN-95 ~ MIN-99`：均已为 `Duplicate`
+  - `MIN-104`：已为 `Done`
+- `MIN-94` 当前不应关闭：
+  - 原因不是 SSE 主链未完成
+  - 而是 `MIN-105` 仍在 `In Progress`
+  - `MIN-106` 仍保留为后续同步线 `Todo`
+- 线上 `SAAS` 当前口径：
+  - 本轮同步进生产的关键业务代码已吃到
+  - 干净浏览器页可停留在 `https://golden-crucible-saas-production.up.railway.app/`
+  - 页面首屏已能进入 `Checking account session...`
+
+### 🎯 给隔壁 SAAS 测试的交接口径
+
+- 现在可以围绕当前 `Railway` 临时域名做一轮初测
+- 但 `MIN-94` 不算整体收口，正式测试前仍有一项域名治理遗留：
+  - `GoldenCrucible` 产品子域名必须与 Homepage / CMS 隔离
+  - 当前拟定正式主域名：`gc.mindhikers.com`
+- 在正式测试前，请优先补齐并统一：
+  - Railway 自定义域名绑定
+  - `APP_BASE_URL`
+  - `BETTER_AUTH_URL`
+  - `CORS_ORIGIN`
+  - Google / 微信 OAuth 回调域名
+- 测试范围优先覆盖：
+  - auth session
+  - personal workspace
+  - Crucible 历史中心
+  - markdown 导出
+  - 首页可达性与登录后基本链路
+
+### ⚠️ 当前结论
+
+- 这轮“该收的”已经收掉，但 `MIN-94` 本卡本身现在还不能关
+- 正确状态应该是：
+  - `MIN-94`：继续 `In Progress`
+  - 由隔壁围绕 `MIN-105` 做正式 SaaS 测试
+  - 待 `gc.mindhikers.com` 及正式 smoke 收口后，再决定是否关闭 `MIN-94`
+
+## 1.17 2026-03-30（多 Topic 并行会话特性评估落盘）
+
+### ✅ 本轮已确认
+
+- “一个用户维护多条话题、随时切换恢复”的能力，在当前 `SAAS` 架构下可做
+- 当前底盘不需要推翻：
+  - 已有 `workspace -> conversations/* -> active_conversation.json`
+  - 已有 conversation list / detail / activate / update 接口
+  - `turn/stream` 已支持 `conversationId`
+- 当前缺口主要不在底层 conversation 模型，而在产品语义：
+  - 主界面仍偏“单当前会话”
+  - `S/L` 仍是 localStorage 级快照备份，不是用户理解里的“保存话题”
+  - 缺少明确的 `New Topic` 入口
+
+### 🎯 设计结论
+
+- 该能力建议作为新的 SaaS feature 单独排期
+- 推荐分两步做：
+  - `Phase A`：先做多话题切换 / 恢复 / 重命名 / 归档，复用现有 conversation/history 底盘
+  - `Phase B`：再把 `Save` 升级成 conversation 级持久化，补足 draft / snapshot 语义
+- 设计文档已落盘：
+  - `docs/02_design/crucible/2026-03-30_Crucible_Multi_Topic_Conversation_Design.md`
+
+### ⚠️ 当前说明
+
+- 本轮仅完成架构评估与设计落盘，未进入实现
+- 若后续只要求“聊过至少一轮的话题可恢复”，现有架构已具备较高复用度
+- 若要求“哪怕未完成首轮也能按 Save 独立留档”，则需补充 conversation 级 draft/snapshot 持久化
+
+---
+
+## 1.15 2026-03-27（历史中心闭环增强 + 发布治理落盘）
+
+### ✅ 本轮已完成
+
+- Crucible 本地快照已切到 `workspace` 作用域：
+  - `localStorage` 不再只用全局单 key
+  - SaaS / ChatPanel 手动 `S/L` 快照也已跟随 workspace scope
+- 历史中心已从“轻量入口”升级为可管理闭环：
+  - 会话详情预览
+  - 标题重命名
+  - 归档 / 恢复活动态
+  - `bundle-json / markdown` 双导出格式
+- 后端已补齐历史中心管理接口：
+  - `PATCH /api/crucible/conversations/:conversationId`
+  - 支持更新 `topicTitle / status`
+- 导出链路已补齐 markdown：
+  - `GET /api/crucible/conversations/:conversationId/artifacts/export?format=markdown`
+- `SSE / SAAS` 发布治理文档已正式落盘：
+  - `docs/02_design/crucible/2026-03-27_GoldenCrucible_SSE_SAAS_Release_Governance.md`
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- agent-browser 本地页面壳已确认可正常加载，未出现白屏
+- 本地 fixture API smoke 已验证通过：
+  - 历史列表读取
+  - conversation 详情读取
+  - 标题重命名
+  - markdown 导出
+  - 归档后状态回写
+
+### ⚠️ 当前说明
+
+- 本地 `.env.local` 仍未启用 auth，所以无法直接在本地 UI 中点开头像菜单验证历史中心入口
+- 因此本轮对历史中心的“真实页面壳”做了浏览器核验，对“历史详情 / 重命名 / 归档 / 导出”做了本地 API smoke 核验
+- Railway CLI 在当前执行环境里因外部握手限制未能重新拉取在线项目映射；治理文档沿用仓库已确认口径，不额外宣称新的线上发现
 
 ## 1.14 2026-03-27（SSE / SAAS Railway 域名治理收口）
 
@@ -2073,3 +2264,41 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 - 这轮还没有把 SaaS 的 session/autosave/runtime 前端口径整包灌进 SSE
 - 多账号研发还未开始
 - 这批改动按“共享底座回灌包”单独提交，不与其他脏改动混提
+
+---
+
+## 2026-03-27 SAAS 拉齐与线上发布
+
+### 已完成
+1. 对账 `SSE` 与 `SAAS` 现状
+   - 结论：`MHSDC-GC-SSE` 相对 `codex/min-105-saas-shell` 仍有 `10` 个提交差异，`SAAS` 生产域名最初未吃到这批最新内容
+
+2. 将本轮 `Crucible` 关键改动同步到 `SAAS`
+   - 同步范围：
+     - `server/crucible.ts`
+     - `server/crucible-persistence.ts`
+     - `server/index.ts`
+     - `src/App.tsx`
+     - `src/SaaSApp.tsx`
+     - `src/components/ChatPanel.tsx`
+     - `src/components/crucible/*`
+     - 本轮相关文档
+   - 结果：生产候选文件集与 `SSE` 已对齐，逐文件 `cmp` 复核无差异
+
+3. 修复 `SAAS` 部署阻塞并重新发布 Railway
+   - 根因：`server/index.ts` 已注册 `streamCrucibleTurn`，但 `SAAS` 当时的 `server/crucible.ts` 未导出该 handler，导致新部署启动即崩
+   - 动作：把 `SSE` 最新 `server/crucible.ts` 同步到 `SAAS` 后重新构建并部署
+   - 结果：`railway up --ci --service golden-crucible-saas` 发布成功
+
+### 验证
+- `SAAS` 工作树：
+  - `npm run typecheck:saas`：通过
+  - `npm run build`：通过
+- 生产域名：
+  - `https://golden-crucible-saas-production.up.railway.app/health` 返回 `200`
+  - 健康检查 `uptime` 约 `16s`，证明域名已切到新实例，不再是旧进程
+  - agent-browser 打开首页正常，登录页壳可见
+
+### 当前口径
+- 现在 `SAAS` 生产域名已经发布到本轮同步后的最新内容
+- 下一步新开发继续回到 `SSE` 线开展

@@ -1,8 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
+import { AlertCircle, BookmarkCheck, Check, FolderTree, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
+import {
+    getCrucibleSnapshotStorageKey,
+    readScopedCrucibleSnapshot,
+    savePersistedCrucibleConversation,
+} from './crucible/storage';
+import type { CrucibleSnapshot } from './crucible/types';
 
 interface ChatPanelProps {
     isOpen: boolean;
@@ -30,9 +36,12 @@ interface ChatPanelProps {
     externalMessages?: ChatMessage[];
     onUserMessage?: (content: string) => void;
     onRouteAsset?: (asset: HostRoutedAsset) => void;
+    onOpenTopicCenter?: () => void;
+    onPersistedSnapshotSaved?: (snapshot: CrucibleSnapshot) => void;
     onResetAll?: () => void;
     blackboardHint?: string | null;
     crucibleTurnSettledToken?: number;
+    workspaceId?: string | null;
     socket: any;
 }
 
@@ -106,6 +115,15 @@ const getCrucibleStatusMessage = (msg: ChatMessage) => {
     return msg.content;
 };
 
+const isPlaceholderTopicTitle = (value?: string) => {
+    const normalized = value?.trim();
+    return !normalized || normalized === '标题待定' || normalized === '标题待收敛...' || normalized.toUpperCase() === 'TBD';
+};
+
+const truncateTopicTitle = (value: string, maxLength = 24) => (
+    value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
+);
+
 const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCrucibleMode: boolean) => {
     const normalizedNext = next.content.trim();
     if (!normalizedNext) {
@@ -147,9 +165,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     externalMessages = [],
     onUserMessage,
     onRouteAsset,
+    onOpenTopicCenter,
+    onPersistedSnapshotSaved,
     onResetAll,
     blackboardHint,
     crucibleTurnSettledToken = 0,
+    workspaceId,
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -486,8 +507,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [socket, matchesCurrentScope, defaultAssistantMeta, isCrucibleMode]);
 
     useEffect(() => {
-        // Crucible mode manages its own message history via externalMessages; skip socket-based load/reset
-        if (isCrucibleMode) return;
+        if (isCrucibleMode) {
+            if (prevResetTokenRef.current !== resetToken) {
+                prevResetTokenRef.current = resetToken;
+                queueMicrotask(resetPanelState);
+            }
+            return;
+        }
         if (!socket || !isOpen || !projectId) return;
 
         if (prevScopeKeyRef.current !== scopeKey) {
@@ -684,9 +710,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const handleResetAll = useCallback(() => {
+        if (isCrucibleMode) {
+            if (!window.confirm('确定开启一个新话题吗？当前话题会保留在话题中心，可随时回来继续。')) return;
+            onResetAll?.();
+            return;
+        }
+
         if (!window.confirm('确定要重置工作区并清空对话吗？')) return;
         onResetAll?.();
-    }, [onResetAll]);
+    }, [isCrucibleMode, onResetAll]);
 
     const handleExportMarkdown = useCallback(() => {
         const title = (displayName || expertName || '黄金坩埚对话').trim();
@@ -723,30 +755,92 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [displayName, expertName, messages, headerBadges, showToast]);
 
     const SNAPSHOT_BACKUP_KEY = 'golden-crucible-manual-backup-v8';
+    const scopedSnapshotKey = useMemo(() => getCrucibleSnapshotStorageKey(workspaceId), [workspaceId]);
+    const scopedBackupKey = useMemo(
+        () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
+        [workspaceId],
+    );
 
-    const handleSaveAutosave = useCallback(() => {
+    const handleSaveTopic = useCallback(async () => {
         try {
-            const raw = localStorage.getItem('golden-crucible-workspace-v8');
-            if (!raw) { showToast('当前没有状态可保存'); return; }
-            localStorage.setItem(SNAPSHOT_BACKUP_KEY, raw);
-            showToast('快照已保存');
-        } catch { showToast('保存失败'); }
-    }, [showToast]);
+            const snapshot = readScopedCrucibleSnapshot(workspaceId);
+            const raw = localStorage.getItem(scopedSnapshotKey);
+            if (raw) {
+                localStorage.setItem(scopedBackupKey, raw);
+            }
+
+            const hasMeaningfulState = messages.some((message) => message.content.trim().length > 0)
+                || Boolean(snapshot?.openingPrompt?.trim())
+                || Boolean(snapshot?.presentables?.length)
+                || Boolean(snapshot?.crystallizedQuotes?.length)
+                || Boolean(snapshot?.roundAnchors?.length);
+
+            if (!hasMeaningfulState) {
+                showToast('当前还没有内容可保存');
+                return;
+            }
+
+            const firstUserMessage = messages.find((message) => message.role === 'user' && message.content.trim().length > 0)?.content.trim();
+            const candidateTitle = isPlaceholderTopicTitle(snapshot?.topicTitle)
+                ? (firstUserMessage || snapshot?.openingPrompt || displayName || expertName || '未命名议题')
+                : (snapshot?.topicTitle || displayName || expertName || '未命名议题');
+            const nextTitle = truncateTopicTitle(candidateTitle.replace(/\s+/g, ' ').trim() || '未命名议题');
+
+            const nextSnapshot: CrucibleSnapshot = {
+                conversationId: snapshot?.conversationId,
+                messages: messages.map((message) => ({
+                    id: message.id,
+                    speaker: message.role === 'user' ? 'user' : (message.meta?.authorId || 'assistant'),
+                    name: message.role === 'user'
+                        ? (resolvedCurrentUserBadge.name || '你')
+                        : (message.meta?.authorName || expertName || '助手'),
+                    content: message.content,
+                    createdAt: message.timestamp,
+                    timestamp: message.timestamp,
+                })),
+                presentables: snapshot?.presentables || [],
+                crystallizedQuotes: snapshot?.crystallizedQuotes || [],
+                activePresentableId: snapshot?.activePresentableId,
+                topicTitle: nextTitle,
+                openingPrompt: snapshot?.openingPrompt || firstUserMessage || undefined,
+                roundAnchors: snapshot?.roundAnchors || [],
+                lastDialogue: snapshot?.lastDialogue,
+                submittedAt: snapshot?.submittedAt,
+                roundIndex: snapshot?.roundIndex || 0,
+                isThinking: false,
+                questionSource: snapshot?.questionSource || 'static',
+                engineMode: snapshot?.engineMode || 'roundtable_discovery',
+            };
+
+            const detail = await savePersistedCrucibleConversation({
+                conversationId: snapshot?.conversationId,
+                topicTitle: nextTitle,
+                status: 'active',
+                snapshot: nextSnapshot,
+                projectId,
+                scriptPath,
+            });
+            onPersistedSnapshotSaved?.(detail.snapshot);
+            showToast(snapshot?.conversationId ? '当前话题已保存，可随时从话题中心继续' : '新话题已保存，可随时回来继续');
+        } catch {
+            showToast('保存话题失败');
+        }
+    }, [displayName, expertName, messages, onPersistedSnapshotSaved, projectId, resolvedCurrentUserBadge.name, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast, workspaceId]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
-            const raw = localStorage.getItem(SNAPSHOT_BACKUP_KEY);
+            const raw = localStorage.getItem(scopedBackupKey);
             if (!raw) { showToast('还没有保存过快照'); return; }
             const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.presentables)) {
                 showToast('快照数据损坏');
                 return;
             }
-            localStorage.setItem('golden-crucible-workspace-v8', raw);
+            localStorage.setItem(scopedSnapshotKey, raw);
             showToast('快照已载入，刷新中...');
             setTimeout(() => window.location.reload(), 600);
         } catch { showToast('载入失败'); }
-    }, [showToast]);
+    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
 
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
@@ -795,16 +889,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         </button>
                         {isCrucibleMode && (
                             <>
+                                {onOpenTopicCenter ? (
+                                    <button
+                                        onClick={() => onOpenTopicCenter()}
+                                        title="打开话题中心"
+                                        className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    >
+                                        <FolderTree className="h-3.5 w-3.5" />
+                                        <span className="text-[11px] font-medium">话题</span>
+                                    </button>
+                                ) : null}
                                 <button
-                                    onClick={handleSaveAutosave}
-                                    title="保存快照到本地（localStorage）"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    onClick={() => void handleSaveTopic()}
+                                    title="保存当前话题到服务端历史中心"
+                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <span className="text-[11px] font-bold leading-none">S</span>
+                                    <BookmarkCheck className="h-3.5 w-3.5" />
+                                    <span className="text-[11px] font-medium">保存</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从本地（localStorage）载入快照"
+                                    title="从本地临时快照恢复"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">L</span>
@@ -814,11 +919,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         {isCrucibleMode && onResetAll ? (
                             <button
                                 onClick={handleResetAll}
-                                title="重置工作区并清空对话"
+                                title="开启一个新话题"
                                 className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                             >
                                 <RotateCcw className="h-3.5 w-3.5" />
-                                <span className="text-[11px] font-medium">重置</span>
+                                <span className="text-[11px] font-medium">新话题</span>
                             </button>
                         ) : (
                             <button
