@@ -1,10 +1,11 @@
 # SD222 黄金坩埚 Phase 1 Artifact-Lite 中屏方案
 
 > 日期：2026-03-14
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：方案草案，等待人工审核
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：本文中的方案内容仍保留，但涉及路径和当前启动口径时应以 `MHSDC` worktree 为准。
 
 ## 1. 本稿目的
 

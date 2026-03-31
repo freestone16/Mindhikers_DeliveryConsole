@@ -1,9 +1,10 @@
 # SD210 黄金冶炼师 Skill 架构方案
 
 > 日期：2026-03-10
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：本文成稿时仍处于旧目录阶段；当前工作线默认目录已迁入 `MHSDC` worktree 体系。
 
 ## 1. 本轮定稿目标
 

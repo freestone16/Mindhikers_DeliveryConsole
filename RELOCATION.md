@@ -1,4 +1,11 @@
-# Delivery Console 搬迁记录
+# Delivery Console 历史搬迁记录
+
+> 说明：这是一份 **2025-02-20 的历史迁移记录**。
+> 当前 MHSDC 系列 worktree 已迁移到 `/Users/luzhoua/MHSDC/*`；
+> 若你要启动当前工作线，请优先参考当前 worktree 内的 `README.md`、`docs/dev_logs/HANDOFF.md` 和端口账本，而不是把本文当作现行启动说明。
+>
+> 当前 SSE 工作线默认目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史 `/Users/luzhoua/DeliveryConsole` 路径只用于回看 2025-02-20 搬迁过程，不应再作为现行启动口径。
 
 **日期：** 2025-02-20  
 **执行人：** AI Assistant  
@@ -93,11 +100,11 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ---
 
-## 📋 后续开发注意事项
+## 📋 当前口径与历史注意事项
 
-### 1. 启动项目
+### 1. 当前工作线启动（优先参考）
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/GoldenCrucible-SSE
 npm run dev
 ```
 
@@ -115,13 +122,13 @@ npm run dev
 - ❌ 备份目录（`delivery_console_backup_*`）
 
 ### 5. 可以删除的内容
-- ✅ 原位置的 delivery_console 目录（已清空）
+- ✅ 原位置的 `delivery_console` 目录（历史迁移完成后）
 
 ---
 
-## 🆘 回退方案
+## 🆘 历史回退方案（仅回看 2025-02-20 现场时使用）
 
-如需回退到搬迁前状态：
+如需回退到 2025-02-20 搬迁前状态：
 
 ```bash
 # 1. 停止当前服务
@@ -145,8 +152,8 @@ npm run dev
 
 ## 📚 相关文档
 
-- **项目 README：** `/Users/luzhoua/DeliveryConsole/README.md`
-- **Makefile 帮助：** `cd /Users/luzhoua/DeliveryConsole && make help`
+- **当前工作线 README：** `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/README.md`
+- **当前交接说明：** `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/dev_logs/HANDOFF.md`
 - **项目数据：** `/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/`
 
 ---

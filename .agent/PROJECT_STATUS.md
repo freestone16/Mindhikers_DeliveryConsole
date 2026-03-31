@@ -1,10 +1,10 @@
-# 📊 DeliveryConsole 项目状态板
+# 📊 GoldenCrucible-SSE 项目状态板
 
-> 最后更新: 2026-03-14 23:20 CST
-> 当前工作树: `/Users/luzhoua/MHSDC/GoldenCrucible`
-> 分支: `codex/crucible-main`
+> 最后更新: 2026-03-25 00:35 CST
+> 当前工作树: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 分支: `MHSDC-GC-SSE`
 > 最新里程碑: `SD210` (黄金坩埚人格层 / 工具层架构定稿)
-> 建议 Commit: `chore: close GoldenCrucible migration runtime gap`
+> 当前治理主题: `MHSDC worktree migration cleanup`
 
 ---
 
@@ -30,11 +30,13 @@
 1. 黄金坩埚当前已明确“右侧对话 / 中屏呈现 / Socrates 主导 / 老师与黑板”的模块专用协议，但中屏黑板视图仍待继续压缩，尚未完全摆脱卡片面板感。
 2. `server/crucible.ts` 已开始升级为 `skillOutput + bridgeOutput + turn_log` 首版，但前后端类型与旧字段兼容仍在过渡态。
 3. 黄金冶炼师已被定性为后台导演 skill，但当前尚未实际实现该 skill，也未完成与 `Socrates / Researcher / FactChecker / ThesisWriter` 的编排接线。
-4. 主动 / 被动互联网搜索仍未真实接入；当前只做了 `searchRequested` 透明提示，没有真正补 Researcher 搜索执行链。
-5. 当前工作区是重度脏状态，本轮仅继续收黄金坩埚链路并保存进度，不对其他模块改动做清理或归并。
+4. 仓库入口文档与一批活跃计划文档仍残留旧 `DeliveryConsole` 目录口径，容易误导后续窗口继续把 `/Users/luzhoua/DeliveryConsole` 当作当前工作目录。
+5. 当前工作区仍是重度脏状态；目录治理必须继续与“老张搜索链路排错”拆开推进，不把路径清仓和业务修复混成一刀。
 
 ## 最新变更
 
+- **2026-03-25**: ✅ `MHSDC-GC-SSE` 已与远端同步到 `2dcd736`，目录治理提交与入口文档清理提交均已单独落远端。
+- **2026-03-25**: 🚧 当前继续推进“完全弃用 `/Users/luzhoua/DeliveryConsole` 旧目录口径”，优先清理入口级文档与活跃计划文档。
 - **2026-03-14**: ✅ 完成 GoldenCrucible 迁移收口首轮：统一前端 runtime 入口、清除旧 host/port 与 Docker 路径硬编码、修复 `dev:check` 的 `EPERM` 假阳性、恢复依赖层。
 - **2026-03-14**: ⚠️ 全仓 `build` 仍被 unrelated 存量问题阻塞，当前已确认主要集中在营销大师 `TubeBuddyScore` 类型债与旧 `DeliveryState.modules` 兼容层，未在本轮混修。
 

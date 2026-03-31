@@ -1,10 +1,11 @@
 # SD223 Soul Inference Schema v0.1
 
 > 日期：2026-03-19
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：统一 schema 定稿 / 作为后续实施手册基础
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：schema 内容仍有效，但涉及本地绝对路径时应以 `MHSDC` worktree 新目录为准。
 
 ## 1. 本稿定位
 

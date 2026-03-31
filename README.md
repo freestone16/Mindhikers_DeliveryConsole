@@ -1,34 +1,31 @@
-# Delivery Console
+# Golden Crucible SSE Workspace
 
-MindHikers 项目的内容交付管理控制台。用于管理视频项目的制作流程，包括导演、音乐、缩略图、营销等模块。
+MindHikers Delivery Console 体系中的黄金坩埚 SSE / SaaS 集成工作线。仓库历史文案里仍可能出现 “Delivery Console”，但当前启动、排障与协作都以本 worktree 为准。
 
 ---
 
 ## 📁 项目结构
 
-**⚠️ 重要变更（2025-02-20）：项目已分离到独立目录**
+**⚠️ 重要变更（2026-03-24 更新）：当前代码已迁入 `MHSDC` worktree 体系，旧 `DeliveryConsole` 路径仅保留为历史记录，不再是默认启动位置。**
 
 ```
-/Users/luzhoua/
-├── DeliveryConsole/                    ← 本项目代码
-│   ├── src/                            ← React 前端代码
-│   ├── server/                         ← Node.js 后端
-│   ├── skills/                         ← Python Skill 执行器
-│   ├── .env                            ← 配置文件（关键）
-│   └── README.md                       ← 本文档
-│
-└── Mylife_lawrence/
-    └── Obsidian_Antigravity/
-        └── Projects/
-            └── MindHikers/
-                └── Projects/           ← 项目数据（保留在原处）
-                    ├── CSET-SP3/       ← 当前激活项目
-                    ├── CSET-EP4/
-                    ├── CSET-EP5/
-                    └── ...
+/Users/luzhoua/MHSDC/
+├── GoldenCrucible-GC/                  ← 黄金坩埚稳定线
+├── GoldenCrucible-SSE/                 ← 黄金坩埚 SSE / SaaS 集成线
+├── GoldenCrucible-SaaS/                ← 黄金坩埚 SaaS 抽壳线
+├── DeliveryConsole/                    ← 历史遗留目录，待整体迁出当前主工作流
+└── ...
+
+/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/
+└── ...                                 ← 项目数据目录（保留在原处）
 ```
 
-**数据分离原因：** 摆脱 Obsidian 索引负担，node_modules 不再影响笔记库性能。
+当前仓库是多 worktree 体系的一部分，因此：
+
+1. **代码目录以当前 worktree 为准**
+2. **项目数据目录仍由 `PROJECTS_BASE` 指向**
+3. **端口以 `~/.vibedir/global_ports_registry.yml` + 当前 worktree 的 `.env.local` 为准**
+4. **凡是提到旧 `DeliveryConsole` 路径的说明，默认视为历史背景，而不是当前启动入口**
 
 ---
 
@@ -37,18 +34,20 @@ MindHikers 项目的内容交付管理控制台。用于管理视频项目的制
 ### 方式 1：本地开发（推荐）
 
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/GoldenCrucible-SSE
 npm run dev
 ```
 
 服务启动后：
-- 前端：`http://localhost:5176`
-- 后端：`http://localhost:3004`
+- 若存在 `.env.local`，以前端 `VITE_APP_PORT` / 后端 `PORT` 为准
+- 当前 `MHSDC-GC-SSE` worktree 默认口径：
+  - 前端：`http://localhost:5182`
+  - 后端：`http://localhost:3009`
 
 ### 方式 2：Docker（网络稳定时使用）
 
 ```bash
-cd /Users/luzhoua/DeliveryConsole
+cd /Users/luzhoua/MHSDC/GoldenCrucible-SSE
 make dev
 ```
 
@@ -67,16 +66,22 @@ make dev
 PROJECT_NAME=CSET-SP3
 
 # 服务端口
-PORT=3004
+PORT=3009
+VITE_APP_PORT=5182
 
 # 项目数据基础路径（⚠️ 关键配置）
-# delivery_console 和数据已分离，必须指定完整路径
+# 代码 worktree 可迁移，但数据目录保持在外部 Projects 根目录
 PROJECTS_BASE=/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects
 
 # LLM 配置
 LLM_PROVIDER=deepseek
-DEEPSEEK_API_KEY=sk-9372b8945e474177bc55ace85176bf19
+DEEPSEEK_API_KEY=<your-deepseek-api-key>
 ```
+
+**安全提醒：**
+1. 不要把真实 API key 写进 README、设计文档或提交记录
+2. 需要按 worktree 覆盖端口时，优先放到 `.env.local`
+3. 修改 `.env` / `.env.local` 后必须重启服务
 
 **修改项目：**
 1. 编辑 `.env` 中的 `PROJECT_NAME`
@@ -182,9 +187,15 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 ### v2.0.1 (2025-02-20)
 
-- **变更：** 项目代码从 Obsidian 目录分离到 `/Users/luzhoua/DeliveryConsole/`
+- **变更：** 当时项目代码从 Obsidian 目录分离到 `/Users/luzhoua/DeliveryConsole/`（后续已进一步迁入 `MHSDC` worktree 体系）
 - **修复：** `registry.py` 模型名称读取逻辑错误
 - **说明：** 数据目录（Projects/）保留在原处，不受影响
+
+### v2.1.0 (2026-03-24)
+
+- **变更：** 当前启动说明切换到 `MHSDC` worktree 体系
+- **修复：** 清理旧 `DeliveryConsole` 启动路径误导
+- **安全：** 移除 README 中的敏感 key 示例
 
 ### v2.0.0 (2025-02-13)
 
@@ -196,17 +207,17 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 
 **如需在 Antigravity 中继续开发：**
 
-1. **项目位置：** `/Users/luzhoua/DeliveryConsole/`
+1. **项目位置：** 以当前 worktree 为准，例如 `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/`
 2. **数据位置：** `/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/`
-3. **启动方式：** `cd /Users/luzhoua/DeliveryConsole && npm run dev`
-4. **关键配置：** 检查 `.env` 中的 `PROJECTS_BASE` 路径是否正确
-5. **注意事项：** 不要移动 Projects/ 数据目录，只需修改 `.env` 即可
+3. **启动方式：** `cd <当前 worktree> && npm run dev`
+4. **关键配置：** 检查 `.env` / `.env.local` 中的 `PROJECTS_BASE` 与端口是否正确
+5. **注意事项：** 不要移动 Projects/ 数据目录；多 worktree 并行时优先使用 `.env.local` 区分端口
 
 ---
 
 ## 📞 联系方式
 
-如有问题，请参考 `docs/` 目录或查看 Makefile 中的帮助信息。
+如有问题，请优先参考 `docs/dev_logs/HANDOFF.md`、`docs/04_progress/dev_progress.md` 与 `docs/` 目录，再查看 Makefile 中的帮助信息。
 
 ```bash
 make help
@@ -214,5 +225,5 @@ make help
 
 ---
 
-**最后更新：** 2025-02-20
+**最后更新：** 2026-03-24
 **文档维护：** AI Assistant

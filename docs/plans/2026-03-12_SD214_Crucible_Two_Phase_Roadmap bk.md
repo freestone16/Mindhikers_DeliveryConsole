@@ -1,10 +1,11 @@
 # SD214 黄金坩埚两阶段实施方案
 
 > 日期：2026-03-12
-> 工作目录：`/Users/luzhoua/DeliveryConsole`
-> 分支：`codex/sd208-golden-crucible`
+> 当前工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+> 历史落盘分支：`codex/sd208-golden-crucible`
 > 状态：设计方案 / 待实施
 > 作者：Codex（按 OldYang 协议落盘）
+> 迁移说明：本文是旧 worktree 时期的方案记录；当前执行若涉及目录与启动，请统一切到 `MHSDC` 新目录体系。
 > 依据：
 > - `docs/02_design/crucible/draft_crucible_v2_architecture.md`
 > - `docs/02_design/crucible/interaction_contract.md`
