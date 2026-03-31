@@ -41,6 +41,59 @@ const toCrucibleInjectedMessages = (snapshot?: CrucibleSnapshot | null): ChatMes
     }));
 };
 
+const toSnapshotTime = (snapshot?: CrucibleSnapshot | null) => {
+    if (!snapshot?.updatedAt) {
+        return Number.NaN;
+    }
+
+    return new Date(snapshot.updatedAt).getTime();
+};
+
+const shouldHydratePersistedSnapshot = (
+    persistedSnapshot?: CrucibleSnapshot | null,
+    localSnapshot?: CrucibleSnapshot | null,
+) => {
+    if (!persistedSnapshot?.topicTitle || !persistedSnapshot.messages?.length) {
+        return false;
+    }
+
+    if (!localSnapshot) {
+        return true;
+    }
+
+    const persistedTime = toSnapshotTime(persistedSnapshot);
+    const localTime = toSnapshotTime(localSnapshot);
+    const persistedHasTime = Number.isFinite(persistedTime);
+    const localHasTime = Number.isFinite(localTime);
+
+    if ((persistedSnapshot.conversationId || '') !== (localSnapshot.conversationId || '')) {
+        if (!localHasTime) {
+            return true;
+        }
+        if (!persistedHasTime) {
+            return persistedSnapshot.messages.length > (localSnapshot.messages?.length || 0);
+        }
+        return persistedTime >= localTime;
+    }
+
+    if ((persistedSnapshot.topicTitle || '') !== (localSnapshot.topicTitle || '')) {
+        return true;
+    }
+
+    if (!localHasTime) {
+        return true;
+    }
+    if (!persistedHasTime) {
+        return persistedSnapshot.messages.length > (localSnapshot.messages?.length || 0);
+    }
+
+    if (persistedTime !== localTime) {
+        return persistedTime > localTime;
+    }
+
+    return persistedSnapshot.messages.length > (localSnapshot.messages?.length || 0);
+};
+
 function useHashRoute() {
     const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
 
@@ -157,13 +210,9 @@ function SaaSApp() {
 
         const hydrateFromAutosave = async () => {
             try {
-                const hasBootstrapped = window.localStorage.getItem(crucibleAutosaveBootstrapKey) === 'done';
-                if (hasBootstrapped) {
-                    return;
-                }
-
+                const localSnapshot = readScopedCrucibleSnapshot(crucibleWorkspaceId);
                 const persistedSnapshot = await readPersistedCrucibleSnapshot({ workspaceId: crucibleWorkspaceId });
-                if (!persistedSnapshot?.topicTitle || !persistedSnapshot.messages?.length || cancelled) {
+                if (!persistedSnapshot || cancelled || !shouldHydratePersistedSnapshot(persistedSnapshot, localSnapshot)) {
                     return;
                 }
 
