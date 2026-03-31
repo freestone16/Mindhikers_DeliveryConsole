@@ -15,6 +15,8 @@ export interface CrucibleSearchResult {
 
 const SEARCH_TIMEOUT_MS = 12000;
 const MAX_SEARCH_RESULTS = 5;
+const SEARCH_INTENT_PATTERN = /(搜索|联网|查证|检索|调研|最新|现状|新闻|研究|论文)/;
+const SEARCH_NEGATION_PATTERN = /(不需要|不用|不要|别|无需|暂时不|先不)(联网|搜索|查证|检索|调研)|不走外部搜索/;
 const SEARCH_FILLER_PATTERN = /(基于我们刚才这个问题|基于刚才这个问题|围绕我们刚才这个问题|我想先|先|联网搜索一下|联网搜索|搜索一下|搜索|再继续(往下)?聊|再继续讨论|之后再继续|最近一两年(关于)?)/g;
 const GENERIC_QUERY_PATTERN = /(我需要你|我需要|我想|请你|请|帮我|到互联网|去互联网|到网上|去网上|互联网|网上|网络|联网|搜索一下|搜索|搜一下|搜|查一下|查|最新进展|最新|进展|补充我们的对话|补充对话|补充一下|继续对话|再继续往下聊|再继续讨论|继续往下聊|继续讨论|这个问题|这个议题|这个话题|一下|先)/g;
 
@@ -46,6 +48,25 @@ const stripXmlTags = (value: string) => value.replace(/<[^>]+>/g, ' ');
 const extractXmlTag = (xml: string, tag: string) => {
     const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'));
     return match?.[1] || '';
+};
+
+export const detectCrucibleSearchIntent = (
+    context: Pick<PromptContext, 'topicTitle' | 'seedPrompt' | 'latestUserReply'> & {
+        previousCards?: Array<{ prompt?: string; answer?: string }>;
+    }
+) => {
+    const corpus = [
+        context.topicTitle || '',
+        context.seedPrompt || '',
+        context.latestUserReply || '',
+        ...(context.previousCards || []).flatMap((card) => [card.prompt || '', card.answer || '']),
+    ].join('\n');
+
+    if (SEARCH_NEGATION_PATTERN.test(corpus)) {
+        return false;
+    }
+
+    return SEARCH_INTENT_PATTERN.test(corpus);
 };
 
 export const buildCrucibleSearchQuery = (context: Pick<PromptContext, 'topicTitle' | 'seedPrompt' | 'latestUserReply'>) => {

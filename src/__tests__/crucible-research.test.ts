@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     buildCrucibleResearchPromptAddon,
     buildCrucibleSearchQuery,
+    detectCrucibleSearchIntent,
     parseBingSearchRss,
     performCrucibleExternalSearch,
 } from '../../server/crucible-research';
@@ -17,6 +18,22 @@ describe('crucible research bridge', () => {
         expect(query).toContain('AI 内容泛滥');
         expect(query).toContain('创作者核心竞争力变化');
         expect(query).not.toContain('联网搜索一下');
+    });
+
+    it('detects an explicit search intent from the latest user reply', () => {
+        expect(detectCrucibleSearchIntent({
+            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
+            seedPrompt: 'AI 让很多人都能比较快地做出 70 分的内容',
+            latestUserReply: '我想先联网搜索一下这个议题的最新研究，再继续聊。',
+            previousCards: [],
+        })).toBe(true);
+
+        expect(detectCrucibleSearchIntent({
+            topicTitle: '长期主义为什么越来越难',
+            seedPrompt: '我想做一个稳定的长期产品',
+            latestUserReply: '你继续追问我，不需要联网。',
+            previousCards: [],
+        })).toBe(false);
     });
 
     it('falls back to the topic when the latest request is only a generic search instruction', () => {

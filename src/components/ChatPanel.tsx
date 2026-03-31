@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
-import { buildApiUrl } from '../config/runtime';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
+import { getCrucibleSnapshotStorageKey } from './crucible/storage';
 
 interface ChatPanelProps {
     isOpen: boolean;
@@ -14,6 +14,13 @@ interface ChatPanelProps {
     resetToken: number;
     displayName?: string;
     panelTitle?: string;
+    currentUserBadge?: {
+        id?: string;
+        name: string;
+        role?: string;
+        avatarText?: string;
+        avatarImage?: string;
+    };
     headerBadges?: Array<{
         id: string;
         name: string;
@@ -27,6 +34,26 @@ interface ChatPanelProps {
     onResetAll?: () => void;
     blackboardHint?: string | null;
     crucibleTurnSettledToken?: number;
+    workspaceId?: string | null;
+    trialStatus?: {
+        enabled: boolean;
+        mode: 'platform';
+        limits: {
+            conversationLimit: number;
+            turnLimitPerConversation: number;
+        };
+        usage: {
+            conversationsUsed: number;
+            conversationsRemaining: number;
+            currentConversationId?: string;
+            currentConversationTurnsUsed: number;
+            currentConversationTurnsRemaining: number;
+        };
+        status: 'inactive' | 'active' | 'conversation_exhausted' | 'quota_exhausted';
+        requiresByok: boolean;
+        message: string;
+    } | null;
+    externalWarning?: string | null;
     socket: any;
 }
 
@@ -75,13 +102,14 @@ const getBubbleTone = (msg: ChatMessage) => {
 const getMessageAuthor = (
     msg: ChatMessage,
     headerBadges?: ChatPanelProps['headerBadges'],
-    fallbackName?: string
+    fallbackName?: string,
+    currentUserBadge?: ChatPanelProps['currentUserBadge'],
 ) => {
     if (msg.role === 'user') {
-        return headerBadges?.find((badge) => badge.id === 'user') || {
+        return headerBadges?.find((badge) => badge.id === 'user') || currentUserBadge || {
             id: 'user',
             name: '你',
-            role: '命题发起',
+            role: '当前用户',
             avatarText: '你',
         };
     }
@@ -135,6 +163,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     resetToken,
     displayName,
     panelTitle,
+    currentUserBadge,
     headerBadges,
     externalMessages = [],
     onUserMessage,
@@ -142,6 +171,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onResetAll,
     blackboardHint,
     crucibleTurnSettledToken = 0,
+    workspaceId,
+    trialStatus,
+    externalWarning,
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -176,6 +208,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
         try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
     });
+    const warningTimerRef = useRef<number | null>(null);
 
     const saveConfirmSetting = (value: boolean) => {
         setConfirmBeforeSend(value);
@@ -187,11 +220,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setToastMessage(msg);
         toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2000);
     }, []);
+    const flashWarning = useCallback((msg: string) => {
+        if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current);
+        setWarning(msg);
+        warningTimerRef.current = window.setTimeout(() => setWarning(null), 4000);
+    }, []);
 
     const defaultAssistantMeta = useMemo(
         () => buildDefaultAssistantMeta(isCrucibleMode, expertId, expertName),
         [isCrucibleMode, expertId, expertName]
     );
+    const resolvedCurrentUserBadge = useMemo(() => ({
+        id: currentUserBadge?.id || 'user',
+        name: currentUserBadge?.name || '你',
+        role: currentUserBadge?.role || '当前用户',
+        avatarText: currentUserBadge?.avatarText || currentUserBadge?.name?.slice(0, 1) || '你',
+        avatarImage: currentUserBadge?.avatarImage,
+    }), [currentUserBadge]);
     const lastOldluMessageId = useMemo(() => {
         for (let index = messages.length - 1; index >= 0; index -= 1) {
             const message = messages[index];
@@ -234,6 +279,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     useEffect(() => {
         streamingContentRef.current = streamingContent;
     }, [streamingContent]);
+
+    useEffect(() => {
+        if (!externalWarning) {
+            return;
+        }
+
+        flashWarning(externalWarning);
+    }, [externalWarning, flashWarning]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -315,6 +368,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const timer = window.setInterval(tick, 1000);
         return () => window.clearInterval(timer);
     }, [crucibleThinkingStartedAt, isCrucibleMode, isStreaming]);
+
+    useEffect(() => () => {
+        if (warningTimerRef.current) {
+            window.clearTimeout(warningTimerRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         if (!socket) return;
@@ -498,6 +557,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (!inputText.trim() && attachments.length === 0) return;
         if (!socket || sendGuardRef.current) return;
         if (isStreaming && !isCrucibleMode) return;
+        if (
+            isCrucibleMode
+            && trialStatus?.enabled
+            && (trialStatus.status === 'conversation_exhausted' || trialStatus.status === 'quota_exhausted')
+        ) {
+            flashWarning(trialStatus.message);
+            return;
+        }
         if (confirmBeforeSend && !window.confirm('确认发送这条消息？')) return;
 
         const normalizedInput = inputText.trim();
@@ -522,8 +589,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             attachments: attachments.length > 0 ? [...attachments] : undefined,
             meta: {
                 authorId: 'user',
-                authorName: '你',
-                authorRole: '命题发起',
+                authorName: resolvedCurrentUserBadge.name,
+                authorRole: resolvedCurrentUserBadge.role,
                 classification: 'dialogue',
             },
         };
@@ -559,7 +626,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend, isCrucibleMode, resolvedCurrentUserBadge, trialStatus, flashWarning]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
@@ -708,30 +775,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [displayName, expertName, messages, headerBadges, showToast]);
 
     const SNAPSHOT_BACKUP_KEY = 'golden-crucible-manual-backup-v8';
+    const scopedSnapshotKey = useMemo(() => getCrucibleSnapshotStorageKey(workspaceId), [workspaceId]);
+    const scopedBackupKey = useMemo(
+        () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
+        [workspaceId],
+    );
 
     const handleSaveAutosave = useCallback(() => {
         try {
-            const raw = localStorage.getItem('golden-crucible-workspace-v8');
-            if (!raw) { showToast('当前没有状态可备份'); return; }
-            localStorage.setItem(SNAPSHOT_BACKUP_KEY, raw);
-            showToast('手动备份已保存');
-        } catch { showToast('备份失败'); }
-    }, [showToast]);
+            const raw = localStorage.getItem(scopedSnapshotKey);
+            if (!raw) { showToast('当前没有状态可保存'); return; }
+            localStorage.setItem(scopedBackupKey, raw);
+            showToast('快照已保存');
+        } catch { showToast('保存失败'); }
+    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
-            const raw = localStorage.getItem(SNAPSHOT_BACKUP_KEY);
-            if (!raw) { showToast('还没有手动备份'); return; }
+            const raw = localStorage.getItem(scopedBackupKey);
+            if (!raw) { showToast('还没有保存过快照'); return; }
             const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.presentables)) {
-                showToast('备份数据损坏');
+                showToast('快照数据损坏');
                 return;
             }
-            localStorage.setItem('golden-crucible-workspace-v8', raw);
-            showToast('手动备份已载入，刷新中...');
+            localStorage.setItem(scopedSnapshotKey, raw);
+            showToast('快照已载入，刷新中...');
             setTimeout(() => window.location.reload(), 600);
         } catch { showToast('载入失败'); }
-    }, [showToast]);
+    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
 
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
@@ -739,6 +811,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
         return `开始和 ${expertName} 对话`;
     }, [isCrucibleMode, expertName]);
+    const isTrialBlocked = Boolean(
+        isCrucibleMode
+        && trialStatus?.enabled
+        && (trialStatus.status === 'conversation_exhausted' || trialStatus.status === 'quota_exhausted')
+    );
+    const showTrialBanner = Boolean(isCrucibleMode && trialStatus?.enabled);
+    const trialBannerTone = isTrialBlocked
+        ? 'border-[rgba(201,118,81,0.3)] bg-[rgba(255,241,233,0.96)] text-[var(--ink-1)]'
+        : 'border-[rgba(184,144,77,0.2)] bg-[rgba(255,248,232,0.96)] text-[var(--ink-2)]';
 
     return (
         <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,250,244,0.98)_0%,rgba(248,239,226,0.96)_100%)]">
@@ -782,14 +863,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <>
                                 <button
                                     onClick={handleSaveAutosave}
-                                    title="保存当前工作台的手动备份"
+                                    title="保存快照到本地（localStorage）"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">S</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从手动备份恢复当前工作台"
+                                    title="从本地（localStorage）载入快照"
                                     className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
                                     <span className="text-[11px] font-bold leading-none">L</span>
@@ -871,6 +952,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
             )}
 
+            {showTrialBanner && trialStatus && (
+                <div className={`mx-4 mt-3 rounded-2xl border px-3 py-2.5 text-[12px] ${trialBannerTone}`}>
+                    <div className="font-medium">
+                        免费试用：剩余 {trialStatus.usage.conversationsRemaining} / {trialStatus.limits.conversationLimit} 个对话
+                        {trialStatus.usage.currentConversationId
+                            ? `，当前对话剩余 ${trialStatus.usage.currentConversationTurnsRemaining} / ${trialStatus.limits.turnLimitPerConversation} 轮`
+                            : ''}
+                    </div>
+                    <div className="mt-1 text-[11px] opacity-80">{trialStatus.message}</div>
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto px-4 py-4" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
                 {messages.length === 0 && !streamingContent ? (
                     <div className="mt-8 rounded-[24px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.38)] px-4 py-6 text-center text-sm text-[var(--ink-3)]">
@@ -879,7 +972,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) : (
                     <div className="space-y-4">
                         {messages.map((msg) => {
-                            const author = getMessageAuthor(msg, headerBadges, expertName);
+                            const author = getMessageAuthor(msg, headerBadges, expertName, resolvedCurrentUserBadge);
                             const isUser = msg.role === 'user';
 
                             return (
@@ -994,8 +1087,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
-                        你
+                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                        {resolvedCurrentUserBadge.avatarImage ? (
+                            <img
+                                src={resolvedCurrentUserBadge.avatarImage}
+                                alt={resolvedCurrentUserBadge.name}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            resolvedCurrentUserBadge.avatarText || resolvedCurrentUserBadge.name.slice(0, 1)
+                        )}
                     </div>
                     <label className="flex-shrink-0 cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
                         <Paperclip className="h-4 w-4" />
@@ -1020,11 +1121,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         placeholder={isCrucibleMode ? '继续把你的判断往下说。' : '继续输入。'}
                         className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
                         rows={3}
-                        disabled={isCrucibleMode ? false : isStreaming}
+                        disabled={isCrucibleMode ? isTrialBlocked : isStreaming}
                     />
                     <button
                         onClick={handleSend}
-                        disabled={(isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
+                        disabled={isTrialBlocked || (isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
                         className="flex-shrink-0 grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
                     >
                         {(isStreaming && !isCrucibleMode) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

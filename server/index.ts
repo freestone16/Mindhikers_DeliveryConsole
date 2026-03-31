@@ -6,10 +6,10 @@ import cors from 'cors';
 import chokidar from 'chokidar';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import multer from 'multer';
+import { toNodeHandler } from 'better-auth/node';
 
 import youtubeAuthRouter from './youtube-auth';
 import distributionRouter from './distribution';
@@ -21,7 +21,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
-import { generateCrucibleTurn, generateSocraticQuestions } from './crucible';
+import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -29,7 +29,25 @@ import { ensureExpertState, loadExpertState, saveExpertState, EXPERT_OUTPUT_DIRS
 import marketRouter from './market';
 import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
-import { DEFAULT_PROJECT_NAME, ensureProjectRoot, getProjectRoot, listAvailableProjects, PROJECTS_BASE } from './project-root';
+import { getProjectRoot, PROJECTS_BASE } from './project-root';
+import { accountRouter } from './auth/account-router';
+import { AUTH_ROUTE_BASE, closeAuthPool, getAuth, getAuthPool, getSessionFromRequest, isAuthEnabled } from './auth';
+import { ensurePersonalWorkspace } from './auth/workspace-store';
+import {
+    activateCrucibleConversation,
+    buildCrucibleArtifactExport,
+    clearCrucibleActiveConversation,
+    getCrucibleConversationDetail,
+    listCrucibleConversations,
+    updateCrucibleConversation,
+} from './crucible-persistence';
+import {
+    clearCrucibleByokConfig,
+    getCrucibleByokStatus,
+    saveCrucibleByokConfig,
+    testCrucibleByokConfig,
+} from './crucible-byok';
+import { getCrucibleTrialStatus } from './crucible-trial';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -38,121 +56,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
-const CLIENT_DIST_DIR = path.resolve(__dirname, '../dist');
-const LEGACY_CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
-const APP_SESSION_COOKIE = 'gc_session';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const SESSION_SECRET = process.env.SESSION_SECRET?.trim() || 'golden-crucible-dev-session-secret';
 
-const parseCookies = (cookieHeader?: string) => {
-    const entries = (cookieHeader || '')
-        .split(';')
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .map((item) => {
-            const separatorIndex = item.indexOf('=');
-            if (separatorIndex < 0) {
-                return null;
-            }
-            return [item.slice(0, separatorIndex), decodeURIComponent(item.slice(separatorIndex + 1))] as const;
-        })
-        .filter((item): item is readonly [string, string] => Boolean(item));
+if (process.env.NODE_ENV === 'production') {
+    console.log('[AuthEnv] runtime flags', {
+        authEnabled: Boolean(process.env.DATABASE_URL?.trim()),
+        googleEnabled: Boolean(process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim()),
+        wechatEnabled: Boolean(process.env.WECHAT_CLIENT_ID?.trim() && process.env.WECHAT_CLIENT_SECRET?.trim()),
+        betterAuthUrl: process.env.BETTER_AUTH_URL?.trim() || null,
+    });
+}
 
-    return Object.fromEntries(entries);
+const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const allowedOrigins = new Set([
+    process.env.APP_BASE_URL?.trim(),
+    process.env.CORS_ORIGIN?.trim(),
+    process.env.VITE_API_BASE_URL?.trim(),
+    process.env.VITE_APP_PORT ? `http://localhost:${process.env.VITE_APP_PORT}` : '',
+    process.env.VITE_APP_PORT ? `http://127.0.0.1:${process.env.VITE_APP_PORT}` : '',
+].filter(Boolean));
+
+const corsOptions = {
+    origin(origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) {
+        if (!origin || allowedOrigins.has(origin) || localOriginPattern.test(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
 };
-
-const signSessionId = (sessionId: string) => crypto
-    .createHmac('sha256', SESSION_SECRET)
-    .update(sessionId)
-    .digest('hex');
-
-const verifySessionId = (rawValue?: string | null) => {
-    if (!rawValue) {
-        return null;
-    }
-
-    const separatorIndex = rawValue.lastIndexOf('.');
-    if (separatorIndex <= 0 || separatorIndex >= rawValue.length - 1) {
-        return null;
-    }
-
-    const sessionId = rawValue.slice(0, separatorIndex);
-    const signature = rawValue.slice(separatorIndex + 1);
-    const expected = signSessionId(sessionId);
-
-    if (signature.length !== expected.length) {
-        return null;
-    }
-
-    const isValid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-    return isValid ? sessionId : null;
-};
-
-const buildSessionCookie = (sessionId: string) => {
-    const value = `${sessionId}.${signSessionId(sessionId)}`;
-    const parts = [
-        `${APP_SESSION_COOKIE}=${encodeURIComponent(value)}`,
-        'Path=/',
-        `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
-        'HttpOnly',
-        'SameSite=Lax',
-    ];
-
-    if (process.env.NODE_ENV === 'production') {
-        parts.push('Secure');
-    }
-
-    return parts.join('; ');
-};
-
-const ensureSessionId = (req: express.Request, res: express.Response) => {
-    const cookies = parseCookies(req.headers.cookie);
-    const verified = verifySessionId(cookies[APP_SESSION_COOKIE]);
-    if (verified) {
-        return verified;
-    }
-
-    const nextSessionId = crypto.randomUUID();
-    res.setHeader('Set-Cookie', buildSessionCookie(nextSessionId));
-    return nextSessionId;
-};
-
-const getCrucibleAutosavePath = (sessionId: string) => path.resolve(
-    __dirname,
-    '../runtime/crucible/sessions',
-    sessionId,
-    'autosave.json'
-);
-
-const resolveAllowedOrigins = () => {
-    const configured = [
-        process.env.CORS_ORIGIN,
-        process.env.APP_BASE_URL,
-    ]
-        .filter(Boolean)
-        .flatMap((value) => (value as string).split(','))
-        .map((value) => value.trim())
-        .filter(Boolean);
-
-    if (configured.length > 0) {
-        return configured;
-    }
-
-    return true;
-};
-
-const corsOrigin = resolveAllowedOrigins();
 
 const app = express();
-app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use((req, res, next) => {
-    res.locals.appSessionId = ensureSessionId(req, res);
-    next();
-});
+app.set('trust proxy', 1);
+app.use(cors(corsOptions));
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: corsOrigin,
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -209,7 +150,13 @@ function getAppVersion(): string {
     }
 }
 
+const auth = getAuth();
+if (auth) {
+    app.all(`${AUTH_ROUTE_BASE}/*splat`, toNodeHandler(auth));
+}
+
 app.use(express.json());
+app.use('/api/account', accountRouter);
 
 // Mount YouTube Auth Routes
 app.use(youtubeAuthRouter);
@@ -300,49 +247,267 @@ app.get('/api/music/assets', music.getAssets);
 
 // Crucible Routes (SD-210)
 app.post('/api/crucible/turn', generateCrucibleTurn);
+app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
-
-// Crucible Autosave (S/L buttons — no file dialog)
-app.get('/api/crucible/autosave', (req, res) => {
-    const sessionId = res.locals.appSessionId as string;
-    const autosavePath = getCrucibleAutosavePath(sessionId);
-    const fallbackPath = fs.existsSync(autosavePath) ? autosavePath : LEGACY_CRUCIBLE_AUTOSAVE_PATH;
-
-    if (!fs.existsSync(fallbackPath)) {
-        return res.status(404).json({ error: 'No autosave found', sessionId });
-    }
-
+app.get('/api/crucible/trial-status', async (req, res) => {
     try {
-        const data = fs.readFileSync(fallbackPath, 'utf-8');
-        res.setHeader('Content-Type', 'application/json');
-        res.send(data);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to read autosave' });
+        const status = await getCrucibleTrialStatus(req, {
+            conversationId: typeof req.query.conversationId === 'string' ? req.query.conversationId : undefined,
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        res.json(status);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({
+            error: statusCode === 401 ? 'Authentication required' : 'Failed to read trial status',
+        });
     }
 });
-app.post('/api/crucible/autosave', (req, res) => {
+app.get('/api/crucible/byok', async (req, res) => {
     try {
-        const sessionId = res.locals.appSessionId as string;
-        const autosavePath = getCrucibleAutosavePath(sessionId);
+        const status = await getCrucibleByokStatus(req);
+        res.json(status);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({
+            error: statusCode === 401 ? 'Authentication required' : 'Failed to read BYOK status',
+        });
+    }
+});
+app.post('/api/crucible/byok', async (req, res) => {
+    try {
+        await saveCrucibleByokConfig(req, {
+            baseUrl: typeof req.body?.baseUrl === 'string' ? req.body.baseUrl : '',
+            apiKey: typeof req.body?.apiKey === 'string' ? req.body.apiKey : '',
+            model: typeof req.body?.model === 'string' ? req.body.model : '',
+            providerLabel: typeof req.body?.providerLabel === 'string' ? req.body.providerLabel : undefined,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({
+            error: (error as Error).message || 'Failed to save BYOK config',
+        });
+    }
+});
+app.post('/api/crucible/byok/test', async (req, res) => {
+    try {
+        const result = await testCrucibleByokConfig({
+            baseUrl: typeof req.body?.baseUrl === 'string' ? req.body.baseUrl : '',
+            apiKey: typeof req.body?.apiKey === 'string' ? req.body.apiKey : '',
+            model: typeof req.body?.model === 'string' ? req.body.model : '',
+            providerLabel: typeof req.body?.providerLabel === 'string' ? req.body.providerLabel : undefined,
+        });
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: (error as Error).message || 'Failed to test BYOK config',
+        });
+    }
+});
+app.delete('/api/crucible/byok', async (req, res) => {
+    try {
+        await clearCrucibleByokConfig(req);
+        res.json({ success: true });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({
+            error: (error as Error).message || 'Failed to clear BYOK config',
+        });
+    }
+});
+app.get('/api/crucible/conversations', async (req, res) => {
+    try {
+        const items = await listCrucibleConversations(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        res.json({ items });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to list conversations' });
+    }
+});
+app.get('/api/crucible/conversations/active', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'No active conversation found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read active conversation' });
+    }
+});
+app.get('/api/crucible/conversations/:conversationId', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read conversation' });
+    }
+});
+app.post('/api/crucible/conversations/:conversationId/activate', async (req, res) => {
+    try {
+        const detail = await activateCrucibleConversation(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.body?.projectId === 'string'
+                ? req.body.projectId
+                : typeof req.query.projectId === 'string'
+                    ? req.query.projectId
+                    : undefined,
+            scriptPath: typeof req.body?.scriptPath === 'string'
+                ? req.body.scriptPath
+                : typeof req.query.scriptPath === 'string'
+                    ? req.query.scriptPath
+                    : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to activate conversation' });
+    }
+});
+app.patch('/api/crucible/conversations/:conversationId', async (req, res) => {
+    try {
+        const detail = await updateCrucibleConversation(req, {
+            conversationId: req.params.conversationId,
+            topicTitle: typeof req.body?.topicTitle === 'string' ? req.body.topicTitle : undefined,
+            status: req.body?.status === 'active' || req.body?.status === 'archived' ? req.body.status : undefined,
+            projectId: typeof req.body?.projectId === 'string'
+                ? req.body.projectId
+                : typeof req.query.projectId === 'string'
+                    ? req.query.projectId
+                    : undefined,
+            scriptPath: typeof req.body?.scriptPath === 'string'
+                ? req.body.scriptPath
+                : typeof req.query.scriptPath === 'string'
+                    ? req.query.scriptPath
+                    : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to update conversation' });
+    }
+});
+app.get('/api/crucible/conversations/:conversationId/artifacts/export', async (req, res) => {
+    try {
+        const detail = await getCrucibleConversationDetail(req, {
+            conversationId: req.params.conversationId,
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        if (!detail) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        const artifactExport = buildCrucibleArtifactExport(detail, {
+            format: typeof req.query.format === 'string' ? req.query.format : undefined,
+        });
+        res.setHeader('Content-Type', artifactExport.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${artifactExport.filename}"`);
+        res.send(artifactExport.body);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to export artifacts' });
+    }
+});
+
+// Crucible Autosave (S/L buttons — no file dialog)
+const LEGACY_CRUCIBLE_AUTOSAVE_PATH = path.resolve(__dirname, '../runtime/crucible/autosave.json');
+
+function sanitizePathSegment(value: string) {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+async function resolveCrucibleAutosavePath(req: express.Request) {
+    if (!isAuthEnabled()) {
+        return LEGACY_CRUCIBLE_AUTOSAVE_PATH;
+    }
+
+    const session = await getSessionFromRequest(req);
+    if (!session?.user?.id) {
+        const error = new Error('Authentication required');
+        (error as Error & { statusCode?: number }).statusCode = 401;
+        throw error;
+    }
+
+    const workspace = await ensurePersonalWorkspace(getAuthPool(), {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+    });
+
+    return path.resolve(
+        __dirname,
+        '../runtime/crucible/workspaces',
+        sanitizePathSegment(workspace.activeWorkspace.id),
+        'autosave.json',
+    );
+}
+
+app.get('/api/crucible/autosave', async (req, res) => {
+    try {
+        const autosavePath = await resolveCrucibleAutosavePath(req);
+        if (!fs.existsSync(autosavePath)) {
+            return res.status(404).json({ error: 'No autosave found' });
+        }
+
+        const data = fs.readFileSync(autosavePath, 'utf-8');
+        res.setHeader('Content-Type', 'application/json');
+        res.send(data);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to read autosave' });
+    }
+});
+
+app.post('/api/crucible/autosave', async (req, res) => {
+    try {
+        const autosavePath = await resolveCrucibleAutosavePath(req);
         const dir = path.dirname(autosavePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(autosavePath, JSON.stringify(req.body, null, 2), 'utf-8');
-        res.json({ ok: true, sessionId });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to write autosave' });
+        res.json({ ok: true });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to write autosave' });
     }
 });
-app.delete('/api/crucible/autosave', (_req, res) => {
+
+app.delete('/api/crucible/autosave', async (req, res) => {
     try {
-        const sessionId = res.locals.appSessionId as string;
-        const autosavePath = getCrucibleAutosavePath(sessionId);
+        const autosavePath = await resolveCrucibleAutosavePath(req);
         if (fs.existsSync(autosavePath)) {
             fs.unlinkSync(autosavePath);
         }
-        res.json({ ok: true, sessionId });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to clear autosave' });
+        await clearCrucibleActiveConversation(req);
+        res.json({ ok: true });
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to clear autosave' });
     }
 });
 
@@ -365,7 +530,7 @@ function matchARollToShorts(filename: string, shortsList: any[]): string | null 
 */
 
 function ensureDeliveryFile(projectId: string) {
-    const projectRoot = ensureProjectRoot(projectId);
+    const projectRoot = getProjectRoot(projectId);
     const deliveryFile = path.join(projectRoot, 'delivery_store.json');
 
     const initialState = {
@@ -384,8 +549,7 @@ function ensureDeliveryFile(projectId: string) {
         // but we don't want to overwrite existing data unless explicitly migrating.
         // For now, just ensure projectId is correct and add selectedScript if missing.
         const data = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-        data.modules = data.modules || {};
-        if (!data.modules.shorts || Array.isArray(data.modules.shorts?.shorts)) {
+        if (!data.modules.shorts || Array.isArray(data.modules.shorts.shorts)) {
             // Migration or initialization
             console.log('Migrating/Initializing shorts module to v2 Structure');
             // Backup old data if exists
@@ -1008,13 +1172,19 @@ app.get('/api/chat/history/:expertId', (req, res) => {
 // List all available projects under Projects/
 app.get('/api/projects', (req, res) => {
     try {
-        const activeProject = currentProjectName || DEFAULT_PROJECT_NAME;
-        const dirs = listAvailableProjects().map((name) => ({
-            name,
-            isActive: name === activeProject,
-            hasDeliveryStore: fs.existsSync(path.join(getProjectRoot(name), 'delivery_store.json')),
-        }));
-        res.json({ projects: dirs, active: activeProject, defaultProjectId: DEFAULT_PROJECT_NAME });
+        if (!fs.existsSync(PROJECTS_BASE)) {
+            return res.json({ projects: [], active: currentProjectName });
+        }
+        const dirs = fs.readdirSync(PROJECTS_BASE, { withFileTypes: true })
+            .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+            .map(d => ({
+                name: d.name,
+                isActive: d.name === currentProjectName,
+                hasDeliveryStore: fs.existsSync(
+                    path.join(PROJECTS_BASE, d.name, 'delivery_store.json')
+                )
+            }));
+        res.json({ projects: dirs, active: currentProjectName });
     } catch (error: any) {
         console.error('Projects API Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -1028,9 +1198,9 @@ app.post('/api/projects/switch', (req, res) => {
         return res.status(400).json({ error: 'Missing projectName' });
     }
 
-    const newRoot = getProjectRoot(projectName);
+    const newRoot = path.resolve(PROJECTS_BASE, projectName);
     if (!fs.existsSync(newRoot)) {
-        return res.status(404).json({ error: `项目目录不存在: ${projectName}` });
+        return res.status(404).json({ error: `项目目录不存在: Projects/${projectName}` });
     }
 
     // Update mutable project context
@@ -1417,20 +1587,6 @@ app.post('/api/experts/run', (req, res) => {
     }
 });
 
-// Setup Health Check Endpoints
-setupHealthCheck(app);
-
-const clientIndexPath = path.join(CLIENT_DIST_DIR, 'index.html');
-if (fs.existsSync(clientIndexPath)) {
-    app.use(express.static(CLIENT_DIST_DIR));
-    app.get(/^(?!\/(?:api|health|socket\.io)\b).*/, (_req, res) => {
-        res.sendFile(clientIndexPath);
-    });
-    console.log(`🧱 Serving built frontend from ${CLIENT_DIST_DIR}`);
-} else {
-    console.log('🪶 No built frontend detected at /dist yet; API/socket server will run standalone.');
-}
-
 // Start Server
 httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🔒 Server running on http://0.0.0.0:${PORT} (Docker Friendly)`);
@@ -1462,6 +1618,22 @@ shutdownManager.registerCleanup(async () => {
     closeVisualPlanWatcher();
     console.log('    ✓ Visual Plan Watcher 已关闭');
 });
+
+shutdownManager.registerCleanup(async () => {
+    await closeAuthPool();
+    console.log('    ✓ Auth Postgres Pool 已关闭');
+});
+
+// Setup Health Check Endpoints
+setupHealthCheck(app);
+
+const distDir = path.resolve(__dirname, '../dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.get(/^(?!\/api|\/socket\.io).*/, (_req, res) => {
+        res.sendFile(path.join(distDir, 'index.html'));
+    });
+}
 
 // --- Global Error Handlers (prevent server crashes from unhandled async errors) ---
 process.on('uncaughtException', (err) => {

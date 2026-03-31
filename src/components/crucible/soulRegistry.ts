@@ -6,7 +6,7 @@ import registryRaw from '../../../docs/02_design/crucible/soul_registry.yml?raw'
 import oldzhangProfileRaw from '../../../docs/02_design/crucible/souls/oldzhang_soul.profile.yml?raw';
 import oldluProfileRaw from '../../../docs/02_design/crucible/souls/oldlu_soul.profile.yml?raw';
 
-type CrucibleHeaderBadge = {
+export type CrucibleHeaderBadge = {
   id: string;
   name: string;
   role: string;
@@ -119,8 +119,21 @@ export const CRUCIBLE_DEFAULT_PAIR = {
   synthesizer: parsedRegistry.default_pair.synthesizer || foregroundSouls[1]?.identity.slug || 'oldlu',
 };
 
-export const CRUCIBLE_HEADER_BADGES: CrucibleHeaderBadge[] = [
-  { id: 'user', name: '你', role: '抛出命题', avatarText: '你' },
+const DEFAULT_USER_BADGE: CrucibleHeaderBadge = {
+  id: 'user',
+  name: '你',
+  role: '当前用户',
+  avatarText: '你',
+};
+
+export const buildCrucibleHeaderBadges = (userBadge?: Partial<CrucibleHeaderBadge>): CrucibleHeaderBadge[] => [
+  {
+    ...DEFAULT_USER_BADGE,
+    ...userBadge,
+    avatarText: userBadge?.avatarImage
+      ? userBadge.avatarText
+      : userBadge?.avatarText || userBadge?.name?.slice(0, 1) || DEFAULT_USER_BADGE.avatarText,
+  },
   ...foregroundSouls.map((profile) => {
     const override = UI_OVERRIDES[profile.identity.slug] || {};
     return {
@@ -132,6 +145,8 @@ export const CRUCIBLE_HEADER_BADGES: CrucibleHeaderBadge[] = [
     };
   }),
 ];
+
+export const CRUCIBLE_HEADER_BADGES: CrucibleHeaderBadge[] = buildCrucibleHeaderBadges();
 
 export function getCrucibleSpeakerMeta(speaker: string): ChatMessageMeta {
   const badge = CRUCIBLE_HEADER_BADGES.find((item) => item.id === speaker);

@@ -1,22 +1,7 @@
 export type SpeakerId = string;
 export type CrucibleEngineMode = 'roundtable_discovery' | 'socratic_refinement';
-export type CrucibleRuntimePhase = 'topic_lock' | 'deep_dialogue' | 'crystallization';
-export type CrucibleToolName = 'Socrates' | 'Researcher' | 'FactChecker' | 'ThesisWriter';
-export type CrucibleToolRouteMode = 'primary' | 'support' | 'hold';
 
 export type CanvasAssetType = 'ascii' | 'mindmap' | 'quote' | 'remotion' | 'reference';
-
-export interface CrucibleToolRoute {
-    tool: CrucibleToolName;
-    mode: CrucibleToolRouteMode;
-    reason: string;
-}
-
-export interface CrucibleOrchestratorState {
-    engineMode: CrucibleEngineMode;
-    phase: CrucibleRuntimePhase;
-    toolRoutes: CrucibleToolRoute[];
-}
 
 export interface CrucibleDialogue {
     speaker: SpeakerId;
@@ -25,16 +10,58 @@ export interface CrucibleDialogue {
 }
 
 export interface CrucibleTurnResponse {
+    conversationId?: string;
     source?: 'socrates' | 'fallback';
     warning?: string;
-    searchRequested?: boolean;
-    searchConnected?: boolean;
     dialogue?: CrucibleDialogue;
     presentables?: Array<{ type?: 'reference' | 'quote' | 'asset'; title?: string; summary?: string; content?: string }>;
-    engineMode?: CrucibleEngineMode;
-    phase?: CrucibleRuntimePhase;
-    orchestrator?: CrucibleOrchestratorState;
     topicSuggestion?: string;
+}
+
+export interface CrucibleConversationSummary {
+    id: string;
+    workspaceId: string;
+    topicTitle: string;
+    status: 'active' | 'archived';
+    isActive?: boolean;
+    createdAt: string;
+    updatedAt: string;
+    roundIndex: number;
+    lastSpeaker: string;
+    lastFocus: string;
+    messageCount: number;
+    artifactCount: number;
+}
+
+export interface CrucibleConversationArtifact {
+    id: string;
+    type: 'reference' | 'quote' | 'asset';
+    title: string;
+    summary: string;
+    content: string;
+    roundIndex: number;
+    createdAt: string;
+}
+
+export interface CrucibleConversationDetail {
+    summary: CrucibleConversationSummary;
+    snapshot: CrucibleSnapshot;
+    artifacts: CrucibleConversationArtifact[];
+    sourceContext: {
+        projectId: string;
+        scriptPath: string;
+    };
+}
+
+export interface UpdateCrucibleConversationPayload {
+    topicTitle?: string;
+    status?: 'active' | 'archived';
+}
+
+export type CrucibleSseEventName = 'turn' | 'error' | 'done';
+
+export interface CrucibleRemotionPreviewResponse {
+    imageUrl?: string;
 }
 
 export interface CrucibleMessage {
@@ -65,6 +92,7 @@ export interface RoundAnchor {
 }
 
 export interface CrucibleSnapshot {
+    conversationId?: string;
     messages?: CrucibleMessage[];
     presentables: CanvasAsset[];
     crystallizedQuotes?: CanvasAsset[];
