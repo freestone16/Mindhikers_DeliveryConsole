@@ -30,3 +30,8 @@ coverage/
 # Temporary files
 *.tmp
 .cache/
+
+# Runtime artifacts
+runtime/crucible/autosave.json
+runtime/crucible/projects/
+runtime/crucible/sessions/
