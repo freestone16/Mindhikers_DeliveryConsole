@@ -213,6 +213,8 @@ export const CrucibleHistorySheet = ({
     }, [items, searchQuery, sortMode]);
 
     const hasItems = filteredItems.length > 0;
+    const totalCountLabel = isLoading ? '正在读取会话...' : `共 ${items.length} 段会话`;
+    const visibleCountLabel = isLoading ? '当前展示 -' : `当前展示 ${filteredItems.length} 段`;
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -349,8 +351,8 @@ export const CrucibleHistorySheet = ({
                     <div className="mb-4 space-y-3">
                         <div className="grid gap-2 rounded-[26px] border border-[rgba(156,117,76,0.14)] bg-[rgba(255,255,255,0.7)] px-4 py-4 shadow-[0_10px_24px_rgba(133,101,69,0.05)]">
                             <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ink-3)]">
-                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">共 {items.length} 段会话</span>
-                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">当前展示 {filteredItems.length} 段</span>
+                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">{totalCountLabel}</span>
+                                <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">{visibleCountLabel}</span>
                                 <span className="rounded-full bg-[rgba(246,236,221,0.8)] px-2.5 py-1">workspace {workspaceId?.slice(0, 8) || 'legacy'}</span>
                             </div>
                             <label className="flex items-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-3 py-2">

@@ -101,6 +101,7 @@ export interface CrucibleSnapshot {
     openingPrompt?: string;
     roundAnchors?: RoundAnchor[];
     lastDialogue?: CrucibleDialogue;
+    updatedAt?: string;
     submittedAt?: string;
     roundIndex?: number;
     isThinking?: boolean;

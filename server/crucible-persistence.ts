@@ -89,6 +89,7 @@ export interface CrucibleConversationSnapshot {
         utterance: string;
         focus: string;
     };
+    updatedAt: string;
     roundIndex: number;
     isThinking: false;
     questionSource: 'static' | 'socrates' | 'fallback';
@@ -339,6 +340,7 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
             content: artifact.content,
         })),
         lastDialogue: lastTurn?.bridgeOutput.dialogue,
+        updatedAt: conversation.updatedAt,
         roundIndex: conversation.roundIndex,
         isThinking: false,
         questionSource: lastTurn ? (lastTurn.source === 'socrates' ? 'socrates' : 'fallback') : 'static',

@@ -529,6 +529,7 @@ function SaaSApp() {
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
                             onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
+                            onOpenHistory={handleOpenCrucibleHistory}
                             blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             workspaceId={crucibleWorkspaceId}

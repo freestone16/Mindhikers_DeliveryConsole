@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, History, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -32,6 +32,7 @@ interface ChatPanelProps {
     onUserMessage?: (content: string) => void;
     onRouteAsset?: (asset: HostRoutedAsset) => void;
     onResetAll?: () => void;
+    onOpenHistory?: () => void;
     blackboardHint?: string | null;
     crucibleTurnSettledToken?: number;
     workspaceId?: string | null;
@@ -169,6 +170,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onUserMessage,
     onRouteAsset,
     onResetAll,
+    onOpenHistory,
     blackboardHint,
     crucibleTurnSettledToken = 0,
     workspaceId,
@@ -895,6 +897,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 <Trash2 className="h-4 w-4" />
                             </button>
                         )}
+                        {isCrucibleMode && onOpenHistory ? (
+                            <button
+                                onClick={onOpenHistory}
+                                title="打开历史话题"
+                                className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            >
+                                <History className="h-3.5 w-3.5" />
+                                <span className="text-[11px] font-medium">话题</span>
+                            </button>
+                        ) : null}
                         <button
                             onClick={() => setShowSettings((prev) => !prev)}
                             title="对话设置"
