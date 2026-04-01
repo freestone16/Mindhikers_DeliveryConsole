@@ -4,7 +4,7 @@
 > 当前讨论对象：
 > - Stable：`/Users/luzhoua/MHSDC/GoldenCrucible-GC` / `MHSDC-GC`
 > - R&D：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE` / `MHSDC-GC-SSE`
-> - Release/Staging：`/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` / `codex/min-105-saas-shell`
+> - Release/Staging：`/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` / `MHSDC-GC-SAAS-staging`
 > 状态：待讨论 / 待审批
 
 ---
@@ -82,7 +82,7 @@
 
 1. SaaS 这条线已经沉淀了不少**共享底座改进**
 2. 但 SaaS 里同时也混入了不少**发布线专属改动**
-3. 如果整条把 `codex/min-105-saas-shell` 反向 merge 到 `MHSDC-GC-SSE`，SSE 会被 staging / Railway / 发布线文档污染
+3. 如果整条把 `MHSDC-GC-SAAS-staging` 反向 merge 到 `MHSDC-GC-SSE`，SSE 会被 staging / Railway / 发布线文档污染
 4. 如果什么都不回灌，SSE 接下来做多账号会站在一套更旧、更散的底座上，后续再回 SaaS 会更痛
 
 所以结论不是：
@@ -301,7 +301,7 @@ SSE 完成回灌后，至少要验这几项：
 
 建议：
 
-1. 不在当前 `codex/min-105-saas-shell` 上继续做多账号
+1. 不在当前 `MHSDC-GC-SAAS-staging` 上继续做多账号
 2. 在 SSE 对齐完成后，从 SSE 再切多账号功能分支
 
 命名建议：

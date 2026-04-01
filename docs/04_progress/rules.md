@@ -230,9 +230,13 @@
 88. **修改 `.env` 后必须重启服务器** 才能生效
 89. **Skill 文件同步是正常的，截断才是问题**：skill-sync 会正确复制完整文件；`skill-loader.ts` 中 `extractCoreContent(raw, maxChars)` 的 `maxChars` 才是控制 LLM 实际看到多少内容的关键参数。当 Skill 行为异常时，先查 `maxChars` 是否过小（当前：24000）
 88. **Skill 的业务逻辑绝不在后端硬编码，但“工具是否真的执行过”必须由宿主留证**：宿主不能替苏格拉底决定 phase、结论、追问方向或工具编排；但只要回复里可能声称“已经搜索/已查到”，宿主就必须负责最小证据桥接与落盘，至少写明 `searchRequested / searchConnected / research.sources`，绝不能只让模型口头声称已搜索
-90. **GoldenCrucible 的 Railway 域名必须分成 `SSE` 与 `SAAS` 两条线**：`SSE` 域名只用于新功能测试与 smoke，`SAAS` 域名只承载稳定对外版本，不能混用
-91. **`SSE` 分支的成果默认先在 `SSE` Railway 域名验证，不得直接覆盖 `SAAS` 生产域名**；只有当功能稳定、口径收敛后，才允许进入 `SAAS` 合并与发布流程
-92. **`SAAS` 是全量生产库，不是临时测试分支**：`SAAS` 线应不定期合并 `SSE` 已验证成果，再统一发布到生产域名与真实外部域名；不要出现“未合并稳定线却先改生产域名”的流程漂移
+90. **GoldenCrucible 以后只认 3 条发布线**：`MHSDC-GC-SSE` 是新功能开发线，`MHSDC-GC-SAAS-staging` 是 SaaS 集成/预发线，`main` 是正式发布线；不要再临时发明新的 staging Git 分支
+91. **Railway 环境映射必须固定**：`staging` 只吃 `MHSDC-GC-SAAS-staging`，`production` 只吃 `main`；`gc.mindhikers.com` 只绑定 `production`，不能混看本地、Git 分支和线上部署
+92. **SSE 新功能进入 SaaS 的唯一顺序**：先在 `MHSDC-GC-SSE` 开发，再摘樱桃/合并到 `MHSDC-GC-SAAS-staging`，先上 Railway `staging` 验收，通过后才允许进入 `main`
+93. **`staging` 是云端预发环境，不是本地环境、也不是正式域名**：验收 staging 时默认使用 Railway 测试域名或独立 staging 域名；不要把 `gc.mindhikers.com` 当 staging 用
+94. **讨论线上问题时先问“这是本地、staging、还是 production”**：凡是用户提到 `gc.mindhikers.com`，默认指 Railway `production` 已部署版本；没有确认环境前，不能把本地修复当成线上结果
+95. **日常上线优先走 Git 分支驱动，不走本地直推 production**：本地 `railway up` 只用于调试或临时验证；正式发布默认通过 `MHSDC-GC-SAAS-staging -> main -> Railway production` 完成
+96. **当前阶段 Google 登录可作为 staging / production 的验收基线，微信登录不是本轮上线阻塞项**：不要因为微信未完成而阻塞已经通过 Google 登录验收的 SaaS 发布
 
 ---
 

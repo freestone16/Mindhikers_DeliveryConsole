@@ -1,7 +1,7 @@
 ## 2026-03-25 GoldenCrucible SaaS Railway Entrypoint
 
 ### 分支
-- `codex/min-105-saas-shell`
+- `MHSDC-GC-SAAS-staging`
 
 ### 今日目标
 - 继续按 `MIN-105` 推进 SaaS 壳
@@ -24,7 +24,7 @@
 - 完成 Git 落盘：
   - `608a849` `refs MIN-105 strip app to crucible saas shell`
   - `ab89d10` `refs MIN-105 add railway single-service entrypoint`
-  - 两个 commit 均已推到 `origin/codex/min-105-saas-shell`
+  - 两个 commit 均已推到 `origin/MHSDC-GC-SAAS-staging`
 - 完成 Railway CLI 与 MCP 前置：
   - 安装 `@railway/cli`
   - 完成 CLI 登录，账号为 `contact.mindhiker@gmail.com`
@@ -43,7 +43,7 @@
 ### 下一步建议
 - 刷新 Codex 会话，确认 Railway MCP 生效
 - 进入 Railway：
-  - 绑定 `codex/min-105-saas-shell`
+  - 绑定 `MHSDC-GC-SAAS-staging`
   - 创建 `golden-crucible-app` service
   - 填写环境变量并部署
 - 部署稳定后再继续拆：

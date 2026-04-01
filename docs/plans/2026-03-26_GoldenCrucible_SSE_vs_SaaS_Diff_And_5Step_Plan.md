@@ -1,7 +1,7 @@
 # 2026-03-26 GoldenCrucible SSE vs SaaS 差异整理与五步工作计划
 
 > 日期：2026-03-26
-> 当前 SaaS 分支：`codex/min-105-saas-shell`
+> 当前 SaaS 分支：`MHSDC-GC-SAAS-staging`
 > 对照 SSE 分支：`MHSDC-GC-SSE`
 > 状态：执行中
 

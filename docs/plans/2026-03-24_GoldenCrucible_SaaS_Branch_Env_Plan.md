@@ -73,7 +73,7 @@
 |---|---|---|---|---|---|---|---|
 | Stable | 稳定基线，对照和回看 | `/Users/luzhoua/MHSDC/GoldenCrucible-GC` | `MHSDC-GC` | 暂不部署 | 暂无 | 暂无 | 不建议继续做新开发 |
 | Integration | SSE/SaaS 集成主线，收成熟成果 | `/Users/luzhoua/MHSDC/GoldenCrucible-SSE` | `MHSDC-GC-SSE` | demo/prod 候选来源 | `golden-crucible-demo` | 后续正式挂 `app.mindhikers.com` 或正式 demo 域名 | 只收已经在 staging 验过的改动 |
-| Feature | 当前 SaaS 开发线 | `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` | `codex/min-105-saas-shell` | staging | `golden-crucible-staging` | 先用平台临时域名 | 主要做代码开发和云端验证 |
+| Feature | 当前 SaaS 开发线 | `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` | `MHSDC-GC-SAAS-staging` | staging | `golden-crucible-staging` | 先用平台临时域名 | 主要做代码开发和云端验证 |
 
 ---
 
@@ -175,7 +175,7 @@ demo/prod 是“给人看”的地方。
 
 1. 以当前 `MHSDC-GC-SSE` 的 **HEAD 提交** 为基线
 2. 在 `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` 建立独立 worktree
-3. 切出新分支：`codex/min-105-saas-shell`
+3. 切出新分支：`MHSDC-GC-SAAS-staging`
 4. 让这个目录只承接 `MIN-105` 的新改动
 5. 当前 `GoldenCrucible-SSE` 保留为集成线，不继续把 SaaS 抽壳工作直接堆进去
 
@@ -196,7 +196,7 @@ demo/prod 是“给人看”的地方。
 ### 阶段 A：准备好 Feature 工作区
 
 1. 在 `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` 建独立 worktree
-2. 分支名使用：`codex/min-105-saas-shell`
+2. 分支名使用：`MHSDC-GC-SAAS-staging`
 3. 这条线专门负责：
    - SaaS 外壳抽离
    - 去 Delivery 宿主语义
@@ -215,7 +215,7 @@ demo/prod 是“给人看”的地方。
 
 ### 阶段 C：云端 staging 验证
 
-从 `codex/min-105-saas-shell` 部署到 staging service：
+从 `MHSDC-GC-SAAS-staging` 部署到 staging service：
 
 1. service 名：`golden-crucible-staging`
 2. 域名：先用平台临时域名
@@ -280,7 +280,7 @@ demo/prod 是“给人看”的地方。
    - 分支：`MHSDC-GC-SSE`
 3. **Feature**
    - 文件夹：`/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
-   - 分支：`codex/min-105-saas-shell`
+   - 分支：`MHSDC-GC-SAAS-staging`
 4. **staging service**
    - 名称：`golden-crucible-staging`
 5. **demo/prod service**

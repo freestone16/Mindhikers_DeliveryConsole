@@ -1,5 +1,5 @@
 🕐 Last updated: 2026-03-31 12:23
-🌿 Branch: codex/min-105-saas-shell
+🌿 Branch: MHSDC-GC-SAAS-staging
 
 ## 当前状态
 - `MIN-105` 下的脏工作区已按主题拆成 4 个独立 commit，当前工作树已恢复干净

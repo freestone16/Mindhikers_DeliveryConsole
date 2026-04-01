@@ -1,7 +1,7 @@
 # 2026-03-25 GoldenCrucible SaaS 下一阶段实施方案
 
 > 日期：2026-03-25
-> 分支：`codex/min-105-saas-shell`
+> 分支：`MHSDC-GC-SAAS-staging`
 > 状态：执行中
 
 ---
