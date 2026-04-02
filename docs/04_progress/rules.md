@@ -239,6 +239,9 @@
 96. **当前阶段 Google 登录可作为 staging / production 的验收基线，微信登录不是本轮上线阻塞项**：不要因为微信未完成而阻塞已经通过 Google 登录验收的 SaaS 发布
 97. **GoldenCrucible-SaaS 主 worktree 默认必须停在 `MHSDC-GC-SAAS-staging`**：除非用户明确要求检查本地 `main` 历史，否则不要为了发布、比对或排障把主 SaaS worktree 临时切到本地 `main`；若必须查看其他分支，优先用 `git show`、独立 worktree 或临时目录完成
 98. **任何一次发布/排障结束前，都必须执行“主 worktree 复位验收”**：至少核对 `git branch --show-current` 必须回到 `MHSDC-GC-SAAS-staging`，再核对 `git status --short` 必须干净；未完成这两步，不得把现场视为收尾完成
+99. **黄金坩埚的业务判断必须交给 Socrates，不得由宿主硬编码替代**：是否需要 Researcher / FactChecker、何时联网、搜什么、校验什么，都应由 Socrates 先产出结构化决策；SaaS 宿主只负责传递上下文、执行工具、持久化证据链和回传错误
+100. **黄金坩埚宿主允许保留的越界只能是“确定性执行职责”**：允许留在宿主的只有账号登录、workspace/conversation 权限边界、HTTP/SSE/stream 生命周期、持久化与恢复、工具执行器接驳、最小证据链落盘、技术层错误回传、配额/会员/BYOK/访问控制；不允许留在宿主的包括是否联网、搜索 query、toolRoutes、phase/engineMode 的业务判定、对话结构、fallback 业务内容、虚假的 skill 执行展示
+101. **宿主边界治理必须先出“根治型 implementation plan”再开发，禁止边改边补**：像搜索正则、query fallback、host fallback 文案、静态 skill 展示这类补丁式修法，一律不算完成；必须先明确目标契约、迁移顺序、废弃字段和验收口径，再进入实现
 
 ---
 
