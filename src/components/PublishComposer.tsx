@@ -1,15 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Film, Globe, Send, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, Check, Film, Globe, Loader2, Send, Sparkles } from 'lucide-react';
 
 interface VideoAsset {
     name: string;
     path: string;
     type: string;
-}
-
-interface MarketingFile {
-    name: string;
-    path: string;
 }
 
 interface PlatformConfig {
@@ -51,7 +46,6 @@ const AVAILABLE_PLATFORMS: PlatformConfig[] = [
 
 export const PublishComposer = ({ projectId: propProjectId }: PublishComposerProps) => {
     const [videos, setVideos] = useState<VideoAsset[]>([]);
-    const [marketingFiles, setMarketingFiles] = useState<MarketingFile[]>([]);
     const [selectedVideo, setSelectedVideo] = useState<VideoAsset | null>(null);
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -69,35 +63,37 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
     useEffect(() => {
         if (!propProjectId) {
             setVideos([]);
-            setMarketingFiles([]);
             setComposerSources(null);
             return;
         }
-        fetchAssets();
+
+        void fetchAssets();
     }, [propProjectId]);
 
     useEffect(() => {
-        setPlatforms((current) => current.map((platform) => {
-            if (!selectedVideo || !platform.aspectRatio) {
-                return platform;
-            }
+        setPlatforms((current) =>
+            current.map((platform) => {
+                if (!selectedVideo || !platform.aspectRatio) {
+                    return platform;
+                }
 
-            const isCompatible = platform.aspectRatio === selectedVideo.type;
-            if (isCompatible) {
-                return platform;
-            }
+                if (platform.aspectRatio === selectedVideo.type) {
+                    return platform;
+                }
 
-            return {
-                ...platform,
-                enabled: false,
-            };
-        }));
+                return {
+                    ...platform,
+                    enabled: false,
+                };
+            })
+        );
     }, [selectedVideo]);
 
     const fetchAssets = async () => {
         if (!propProjectId) {
             return;
         }
+
         setLoading(true);
         try {
             const params = new URLSearchParams({ projectId: propProjectId });
@@ -105,10 +101,9 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             const data = await res.json();
             if (data.success) {
                 setVideos(data.videos || []);
-                setMarketingFiles(data.marketingFiles || []);
             }
-        } catch (e) {
-            console.error('Failed to fetch assets:', e);
+        } catch (error) {
+            console.error('Failed to fetch assets:', error);
         } finally {
             setLoading(false);
         }
@@ -144,29 +139,36 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             if (sources.suggestedTags.length > 0) {
                 setTags(sources.suggestedTags.join(', '));
             }
-        } catch (e) {
-            console.error('Failed to fill from marketing:', e);
-            alert(e instanceof Error ? e.message : 'Magic Fill 失败');
+        } catch (error) {
+            console.error('Failed to fill from marketing:', error);
+            alert(error instanceof Error ? error.message : 'Magic Fill 失败');
         } finally {
             setMagicFillLoading(false);
         }
     };
 
     const togglePlatform = (platformId: string) => {
-        setPlatforms(prev => prev.map((platform) => {
-            const isCompatible = !selectedVideo || !platform.aspectRatio || platform.aspectRatio === selectedVideo.type;
-            if (platform.id !== platformId || !isCompatible) {
-                return platform;
-            }
+        setPlatforms((current) =>
+            current.map((platform) => {
+                const isCompatible =
+                    !selectedVideo || !platform.aspectRatio || platform.aspectRatio === selectedVideo.type;
 
-            return { ...platform, enabled: !platform.enabled };
-        }));
+                if (platform.id !== platformId || !isCompatible) {
+                    return platform;
+                }
+
+                return {
+                    ...platform,
+                    enabled: !platform.enabled,
+                };
+            })
+        );
     };
 
     const handlePlatformSetting = (platformId: string, field: 'customTitle' | 'customTags', value: string) => {
-        setPlatforms(prev => prev.map(p =>
-            p.id === platformId ? { ...p, [field]: value } : p
-        ));
+        setPlatforms((current) =>
+            current.map((platform) => (platform.id === platformId ? { ...platform, [field]: value } : platform))
+        );
     };
 
     const handleSubmit = async () => {
@@ -174,9 +176,9 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
             alert('请先选择项目');
             return;
         }
-        const selectedPlatforms = platforms.filter(p => p.enabled).map(p => p.id);
 
-        if (selectedPlatforms.length === 0) {
+        const activePlatforms = platforms.filter((platform) => platform.enabled).map((platform) => platform.id);
+        if (activePlatforms.length === 0) {
             alert('请至少选择一个发布平台');
             return;
         }
@@ -200,12 +202,16 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                     nextEntry.title = platform.customTitle.trim();
                 }
                 if (platform.customTags?.trim()) {
-                    nextEntry.tags = platform.customTags.split(',').map((item) => item.trim()).filter(Boolean);
+                    nextEntry.tags = platform.customTags
+                        .split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean);
                 }
 
                 if (nextEntry.title || nextEntry.tags?.length) {
                     acc[platform.id] = nextEntry;
                 }
+
                 return acc;
             }, {});
 
@@ -214,30 +220,32 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId: propProjectId,
-                    platforms: selectedPlatforms,
+                    platforms: activePlatforms,
                     assets: {
                         mediaUrl: selectedVideo.path,
                         title: title || selectedVideo.name,
                         textDraft: content,
-                        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+                        tags: tags
+                            .split(',')
+                            .map((item) => item.trim())
+                            .filter(Boolean),
                         sourceFiles: composerSources?.sourceFiles.map((source) => source.path) || [],
                         platformOverrides,
-                        visibility: 'private'
+                        visibility: 'private',
                     },
                     scheduleTime: isScheduleMode ? scheduleTime : null,
-                    timezone: isScheduleMode ? timezone : null
-                })
+                    timezone: isScheduleMode ? timezone : null,
+                }),
             });
 
             const data = await res.json();
-
             if (data.success) {
                 setSubmitResult({
                     success: true,
-                    message: isScheduleMode ? '定时发布任务已创建' : '已加入发布队列'
+                    message: isScheduleMode ? '定时发布任务已创建' : '已加入发布队列',
                 });
 
-                setTimeout(() => {
+                window.setTimeout(() => {
                     setSelectedVideo(null);
                     setTitle('');
                     setContent('');
@@ -247,108 +255,137 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                     setComposerSources(null);
                     setSubmitResult(null);
                 }, 2000);
-            } else {
-                setSubmitResult({
-                    success: false,
-                    message: data.error || '创建任务失败'
-                });
+                return;
             }
-        } catch (e) {
+
             setSubmitResult({
                 success: false,
-                message: '网络错误'
+                message: data.error || '创建任务失败',
+            });
+        } catch (error) {
+            console.error('Failed to create distribution task:', error);
+            setSubmitResult({
+                success: false,
+                message: '网络错误',
             });
         } finally {
             setSubmitting(false);
         }
     };
 
+    const selectedPlatforms = platforms.filter((platform) => platform.enabled);
+    const incompatiblePlatforms = selectedVideo
+        ? platforms.filter((platform) => platform.aspectRatio && platform.aspectRatio !== selectedVideo.type)
+        : [];
+    const validationItems = [
+        selectedVideo ? '已选择视频资产' : '请选择一个视频资产',
+        title.trim() ? '标题已就绪' : '标题仍为空',
+        content.trim() ? '正文已就绪' : '正文仍为空',
+        selectedPlatforms.length > 0 ? `已选择 ${selectedPlatforms.length} 个平台` : '尚未选择发布平台',
+        composerSources?.sourceFiles.length
+            ? `已命中 ${composerSources.sourceFiles.length} 个真实来源`
+            : '可选：使用真实产物自动装填',
+    ];
+
     return (
-        <div className="max-w-6xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-white">Publish Composer</h1>
-                <p className="text-slate-400 text-sm mt-1">跨平台提稿机 - 一键分发全网</p>
+        <div className="space-y-6">
+            <div className="rounded-3xl border border-module/15 bg-gradient-to-r from-module/10 via-module-secondary/5 to-transparent p-6">
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center rounded-full border border-module/30 bg-module/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-module-light">
+                        Mixpost-style Composer
+                    </span>
+                    {propProjectId && (
+                        <span className="inline-flex items-center rounded-full border border-border bg-surface/60 px-3 py-1 text-xs text-text-secondary">
+                            Project · {propProjectId}
+                        </span>
+                    )}
+                </div>
+                <h1 className="mt-4 text-3xl font-bold text-text">Publish Composer</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
+                    围绕一条内容组织全局文案与平台差异。左侧专注内容编辑，右侧固定承接发射策略与最终 CTA。
+                </p>
             </div>
 
             {!propProjectId && (
-                <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                <div className="rounded-xl border border-module/30 bg-module/10 px-4 py-3 text-sm text-module-light">
                     请先在顶部选择项目，再创建发布任务。
                 </div>
             )}
 
             {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                <div className="flex h-64 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-module-mid" />
                 </div>
             ) : (
-                <div className="grid grid-cols-12 gap-6">
-                    {/* Step 1: Asset Selection */}
-                    <div className="col-span-3">
-                        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
-                            <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-                                <Film className="w-4 h-4" />
-                                步骤 1: 选择资产
-                            </h3>
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="space-y-6">
+                        <section className="rounded-3xl border border-border bg-surface/60 p-5">
+                            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-text">
+                                <Film className="h-4 w-4 text-module-light" />
+                                内容身份
+                            </div>
 
-                            <div className="space-y-2 max-h-80 overflow-y-auto">
+                            <div className="space-y-3">
                                 {videos.length === 0 ? (
-                                    <p className="text-xs text-slate-500 py-4 text-center">暂无视频资产</p>
+                                    <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-text-muted">
+                                        暂无视频资产
+                                    </p>
                                 ) : (
                                     videos.map((video) => (
                                         <button
                                             key={video.path}
                                             onClick={() => setSelectedVideo(video)}
-                                            className={`w-full text-left p-3 rounded-lg border transition-all ${selectedVideo?.path === video.path
-                                                    ? 'bg-blue-600/20 border-blue-500/50'
-                                                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                                                }`}
+                                            className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                                                selectedVideo?.path === video.path
+                                                    ? 'border-module/40 bg-gradient-to-r from-module/12 to-module-secondary/8'
+                                                    : 'border-border bg-bg/40 hover:border-module/20'
+                                            }`}
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs px-1.5 py-0.5 bg-slate-700 rounded text-slate-300">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="truncate text-sm font-medium text-text">{video.name}</div>
+                                                    <div className="mt-1 truncate text-xs text-text-muted">{video.path}</div>
+                                                </div>
+                                                <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] text-text-secondary">
                                                     {video.type}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-slate-200 mt-1 truncate">{video.name}</p>
                                         </button>
                                     ))
                                 )}
                             </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Step 2: Content */}
-                    <div className="col-span-5">
-                        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
-                            <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-yellow-400" />
-                                步骤 2: 全局文案
-                            </h3>
+                        <section className="rounded-3xl border border-border bg-surface/60 p-5">
+                            <div className="mb-4 flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                                        <Sparkles className="h-4 w-4 text-module-light" />
+                                        核心文案
+                                    </div>
+                                    <p className="mt-1 text-sm text-text-secondary">先把这条内容本身编辑清楚，再处理平台差异。</p>
+                                </div>
 
-                            <button
-                                onClick={handleMagicFill}
-                                disabled={magicFillLoading || !propProjectId}
-                                className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm font-medium rounded-lg transition-all"
-                            >
-                                {magicFillLoading ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-4 h-4" />
-                                )}
-                                从真实产物自动装填
-                            </button>
+                                <button
+                                    onClick={handleMagicFill}
+                                    disabled={magicFillLoading || !propProjectId}
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-module/30 bg-gradient-to-r from-module to-module-secondary px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-110 disabled:border-border disabled:bg-surface-alt disabled:text-text-muted"
+                                >
+                                    {magicFillLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                    从真实产物自动装填
+                                </button>
+                            </div>
 
                             {composerSources && (
-                                <div className="mb-4 rounded-lg border border-slate-700 bg-slate-800/40 p-3">
-                                    <div className="text-xs text-slate-300">
-                                        来源：
-                                        <span className="ml-1 text-slate-400">
-                                            {composerSources.sourceFiles.map((source) => source.name).join(' · ') || '未命中'}
-                                        </span>
+                                <div className="mb-4 rounded-2xl border border-module/15 bg-module/5 p-4">
+                                    <div className="text-xs uppercase tracking-[0.18em] text-module-light/80">Source Files</div>
+                                    <div className="mt-2 text-sm text-text">
+                                        {composerSources.sourceFiles.map((source) => source.name).join(' · ') || '未命中'}
                                     </div>
                                     {composerSources.warnings.length > 0 && (
-                                        <div className="mt-2 space-y-1">
+                                        <div className="mt-3 space-y-1">
                                             {composerSources.warnings.map((warning) => (
-                                                <div key={warning} className="text-xs text-amber-300">
+                                                <div key={warning} className="text-xs text-module-light">
                                                     {warning}
                                                 </div>
                                             ))}
@@ -357,187 +394,236 @@ export const PublishComposer = ({ projectId: propProjectId }: PublishComposerPro
                                 </div>
                             )}
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs text-slate-400 mb-1 block">标题</label>
+                                    <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">标题</label>
                                     <input
                                         type="text"
                                         value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
+                                        onChange={(event) => setTitle(event.target.value)}
                                         placeholder="输入视频标题..."
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                        className="w-full rounded-2xl border border-border bg-bg/60 px-4 py-3 text-sm text-text placeholder-text-muted focus:border-module focus:outline-none"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs text-slate-400 mb-1 block">正文</label>
+                                    <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">正文</label>
                                     <textarea
                                         value={content}
-                                        onChange={(e) => setContent(e.target.value)}
+                                        onChange={(event) => setContent(event.target.value)}
                                         placeholder="输入视频描述..."
-                                        rows={4}
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
+                                        rows={12}
+                                        className="w-full rounded-2xl border border-border bg-bg/60 px-4 py-3 text-sm leading-6 text-text placeholder-text-muted focus:border-module focus:outline-none resize-none"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="text-xs text-slate-400 mb-1 block">Tags (逗号分隔)</label>
+                                    <label className="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">Tags</label>
                                     <input
                                         type="text"
                                         value={tags}
-                                        onChange={(e) => setTags(e.target.value)}
+                                        onChange={(event) => setTags(event.target.value)}
                                         placeholder="#AI #MindHikers ..."
-                                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                        className="w-full rounded-2xl border border-border bg-bg/60 px-4 py-3 text-sm text-text placeholder-text-muted focus:border-module focus:outline-none"
                                     />
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        </section>
 
-                    {/* Step 3: Platforms */}
-                    <div className="col-span-4">
-                        <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
-                            <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-                                <Globe className="w-4 h-4" />
-                                步骤 3: 发射平台
-                            </h3>
+                        <section className="rounded-3xl border border-border bg-surface/60 p-5">
+                            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-text">
+                                <Globe className="h-4 w-4 text-module-light" />
+                                Platform Versions
+                            </div>
 
-                            <div className="space-y-2 mb-4">
-                                {platforms.map((platform) => (
-                                    (() => {
-                                        const isCompatible =
-                                            !selectedVideo ||
-                                            !platform.aspectRatio ||
-                                            platform.aspectRatio === selectedVideo.type;
+                            <div className="grid gap-3 lg:grid-cols-2">
+                                {platforms.map((platform) => {
+                                    const isCompatible =
+                                        !selectedVideo || !platform.aspectRatio || platform.aspectRatio === selectedVideo.type;
 
-                                        return (
-                                    <div
-                                        key={platform.id}
-                                        className={`p-3 rounded-lg border transition-all ${platform.enabled
-                                                ? 'bg-blue-600/10 border-blue-500/30'
-                                                : !isCompatible
-                                                    ? 'bg-slate-900/60 border-slate-800 opacity-50'
-                                                    : 'bg-slate-800/30 border-slate-700'
+                                    return (
+                                        <div
+                                            key={platform.id}
+                                            className={`rounded-2xl border p-4 transition-all ${
+                                                platform.enabled
+                                                    ? 'border-module/35 bg-gradient-to-br from-module/10 to-module-secondary/5'
+                                                    : !isCompatible
+                                                        ? 'border-border bg-bg/20 opacity-55'
+                                                        : 'border-border bg-bg/40 hover:border-module/15'
                                             }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={platform.enabled}
-                                                    onChange={() => togglePlatform(platform.id)}
-                                                    disabled={!isCompatible}
-                                                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-slate-200">
-                                                    {platform.icon} {platform.name}
-                                                </span>
-                                            </label>
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <label className="flex cursor-pointer items-start gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={platform.enabled}
+                                                        onChange={() => togglePlatform(platform.id)}
+                                                        disabled={!isCompatible}
+                                                        className="mt-1 h-4 w-4 rounded border-border bg-surface-alt text-module focus:ring-module"
+                                                    />
+                                                    <div>
+                                                        <div className="text-sm font-medium text-text">
+                                                            {platform.icon} {platform.name}
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-text-muted">
+                                                            {platform.aspectRatio
+                                                                ? !isCompatible && selectedVideo
+                                                                    ? `当前素材不兼容，仅支持 ${platform.aspectRatio}`
+                                                                    : `支持 ${platform.aspectRatio}`
+                                                                : '通用图文平台'}
+                                                        </div>
+                                                    </div>
+                                                </label>
 
-                                            {platform.aspectRatio && (
-                                                <span className="text-xs text-slate-500">
-                                                    {!isCompatible && selectedVideo ? `仅 ${platform.aspectRatio}` : platform.aspectRatio}
-                                                </span>
+                                                {platform.aspectRatio && (
+                                                    <span
+                                                        className={`rounded-full px-2 py-1 text-[11px] ${
+                                                            isCompatible ? 'bg-surface-alt text-text-secondary' : 'bg-module/10 text-module-light'
+                                                        }`}
+                                                    >
+                                                        {isCompatible ? platform.aspectRatio : `仅 ${platform.aspectRatio}`}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {platform.enabled && (
+                                                <div className="mt-4 space-y-3">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="自定义标题 (可选)"
+                                                        value={platform.customTitle || ''}
+                                                        onChange={(event) => handlePlatformSetting(platform.id, 'customTitle', event.target.value)}
+                                                        className="w-full rounded-xl border border-border bg-bg/60 px-3 py-2 text-xs text-text placeholder-text-muted focus:border-module focus:outline-none"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="自定义 Tags (可选)"
+                                                        value={platform.customTags || ''}
+                                                        onChange={(event) => handlePlatformSetting(platform.id, 'customTags', event.target.value)}
+                                                        className="w-full rounded-xl border border-border bg-bg/60 px-3 py-2 text-xs text-text placeholder-text-muted focus:border-module focus:outline-none"
+                                                    />
+                                                </div>
                                             )}
                                         </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </div>
 
-                                        {platform.enabled && (
-                                            <div className="mt-2 pl-6 space-y-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="自定义标题 (可选)"
-                                                    value={platform.customTitle || ''}
-                                                    onChange={(e) => handlePlatformSetting(platform.id, 'customTitle', e.target.value)}
-                                                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    placeholder="自定义 Tags (可选)"
-                                                    value={platform.customTags || ''}
-                                                    onChange={(e) => handlePlatformSetting(platform.id, 'customTags', e.target.value)}
-                                                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                        );
-                                    })()
-                                ))}
+                    <aside className="space-y-4 xl:sticky xl:top-0 xl:self-start">
+                        <div className="rounded-3xl border border-module/20 bg-bg/70 p-5">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-module-light/80">Platform Summary</div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {selectedPlatforms.length > 0 ? (
+                                    selectedPlatforms.map((platform) => (
+                                        <span key={platform.id} className="rounded-full border border-module/25 bg-module/10 px-3 py-1 text-xs text-module-light">
+                                            {platform.icon} {platform.name}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-sm text-text-muted">尚未选择平台</span>
+                                )}
                             </div>
 
-                            {/* Schedule */}
-                            <div className="border-t border-slate-700 pt-4 mb-4">
-                                <label className="text-xs text-slate-400 mb-2 block">发帖策略</label>
-
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="scheduleMode"
-                                            checked={!isScheduleMode}
-                                            onChange={() => setIsScheduleMode(false)}
-                                            className="w-4 h-4 border-slate-600 bg-slate-800 text-blue-500"
-                                        />
-                                        <span className="text-sm text-slate-300">立即进入安全队列</span>
-                                    </label>
-
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="scheduleMode"
-                                            checked={isScheduleMode}
-                                            onChange={() => setIsScheduleMode(true)}
-                                            className="w-4 h-4 border-slate-600 bg-slate-800 text-blue-500"
-                                        />
-                                        <span className="text-sm text-slate-300">定时发布</span>
-                                    </label>
-
-                                    {isScheduleMode && (
-                                        <div className="pl-6 space-y-2 mt-2">
-                                            <input
-                                                type="datetime-local"
-                                                value={scheduleTime}
-                                                onChange={(e) => setScheduleTime(e.target.value)}
-                                                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                                            />
-                                            <select
-                                                value={timezone}
-                                                onChange={(e) => setTimezone(e.target.value)}
-                                                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-                                            >
-                                                <option value="Asia/Shanghai">🌎 上海 (Asia/Shanghai)</option>
-                                                <option value="America/New_York">🌎 纽约 (America/New_York)</option>
-                                                <option value="America/Los_Angeles">🌎 洛杉矶 (America/Los_Angeles)</option>
-                                                <option value="Europe/London">🌎 伦敦 (Europe/London)</option>
-                                            </select>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Submit */}
-                            {submitResult && (
-                                <div className={`mb-3 p-3 rounded-lg flex items-center gap-2 ${submitResult.success ? 'bg-emerald-600/20 text-emerald-400' : 'bg-red-600/20 text-red-400'
-                                    }`}>
-                                    {submitResult.success ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                                    <span className="text-sm">{submitResult.message}</span>
+                            {incompatiblePlatforms.length > 0 && (
+                                <div className="mt-4 rounded-2xl border border-module/10 bg-module/5 p-3 text-xs leading-6 text-module-light">
+                                    当前素材为 <span className="font-semibold">{selectedVideo?.type}</span>，
+                                    {incompatiblePlatforms.map((platform) => platform.name).join('、')} 暂不可选。
                                 </div>
                             )}
-
-                            <button
-                                onClick={handleSubmit}
-                                disabled={submitting || platforms.filter(p => p.enabled).length === 0}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-all"
-                            >
-                                {submitting ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Send className="w-4 h-4" />
-                                )}
-                                确认起飞 ({platforms.filter(p => p.enabled).length})
-                            </button>
                         </div>
-                    </div>
+
+                        <div className="rounded-3xl border border-border bg-surface/60 p-5">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-text-muted">Publish Mode</div>
+                            <div className="mt-4 space-y-3">
+                                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-bg/40 px-4 py-3">
+                                    <input
+                                        type="radio"
+                                        name="scheduleMode"
+                                        checked={!isScheduleMode}
+                                        onChange={() => setIsScheduleMode(false)}
+                                        className="h-4 w-4 border-border bg-surface-alt text-module"
+                                    />
+                                    <div>
+                                        <div className="text-sm font-medium text-text">加入安全队列</div>
+                                        <div className="text-xs text-text-muted">保持当前一期的审慎发射策略</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-bg/40 px-4 py-3">
+                                    <input
+                                        type="radio"
+                                        name="scheduleMode"
+                                        checked={isScheduleMode}
+                                        onChange={() => setIsScheduleMode(true)}
+                                        className="h-4 w-4 border-border bg-surface-alt text-module"
+                                    />
+                                    <div>
+                                        <div className="text-sm font-medium text-text">定时发布</div>
+                                        <div className="text-xs text-text-muted">为后续 queue slot / calendar 预留入口</div>
+                                    </div>
+                                </label>
+
+                                {isScheduleMode && (
+                                    <div className="space-y-3 rounded-2xl border border-module/10 bg-module/5 p-3">
+                                        <input
+                                            type="datetime-local"
+                                            value={scheduleTime}
+                                            onChange={(event) => setScheduleTime(event.target.value)}
+                                            className="w-full rounded-xl border border-border bg-bg/60 px-3 py-2 text-sm text-text focus:border-module focus:outline-none"
+                                        />
+                                        <select
+                                            value={timezone}
+                                            onChange={(event) => setTimezone(event.target.value)}
+                                            className="w-full rounded-xl border border-border bg-bg/60 px-3 py-2 text-sm text-text focus:border-module focus:outline-none"
+                                        >
+                                            <option value="Asia/Shanghai">🌎 上海 (Asia/Shanghai)</option>
+                                            <option value="America/New_York">🌎 纽约 (America/New_York)</option>
+                                            <option value="America/Los_Angeles">🌎 洛杉矶 (America/Los_Angeles)</option>
+                                            <option value="Europe/London">🌎 伦敦 (Europe/London)</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-border bg-surface/60 p-5">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-text-muted">Validation</div>
+                            <div className="mt-4 space-y-2">
+                                {validationItems.map((item) => (
+                                    <div key={item} className="flex items-start gap-2 text-sm text-text-secondary">
+                                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-module-mid/80" />
+                                        <span>{item}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {submitResult && (
+                            <div
+                                className={`rounded-2xl border p-4 ${
+                                    submitResult.success
+                                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                                        : 'border-red-500/20 bg-red-500/10 text-red-300'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 text-sm">
+                                    {submitResult.success ? <Check className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                                    <span>{submitResult.message}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting || selectedPlatforms.length === 0}
+                            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-module to-module-secondary px-4 py-3 text-sm font-semibold text-white transition-all hover:brightness-110 disabled:bg-surface-alt disabled:text-text-muted"
+                        >
+                            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            确认起飞 ({selectedPlatforms.length})
+                        </button>
+                    </aside>
                 </div>
             )}
         </div>

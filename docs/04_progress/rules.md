@@ -22,15 +22,16 @@
 6. 服务器启动后验证关键环境变量是否正确加载
 7. **ESM 模块不要在顶层缓存依赖 dotenv 的环境变量**；像 `PROJECTS_BASE` 这类值必须在函数调用时读取，否则 import 先于 `dotenv.config()` 会拿到错误 fallback
 8. **项目路径解析必须统一走共享 helper**（如 `server/project-paths.ts`）；禁止在 `server/*` 里各自实现 `getProjectRoot()` 或各自写 `PROJECTS_BASE` fallback
+9. **启动或验收前先核对端口账本**：以 `~/.vibedir/global_ports_registry.yml` / `.env.local` / runtime 为准；禁止为了图省事临时换到别的前端端口做验证，尤其不要占用其他项目已在使用的端口
 
 ---
 
 ## 文件操作
 
-9. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
-10. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
-11. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
-12. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
+10. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
+11. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
+12. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
+13. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
 
 ---
 

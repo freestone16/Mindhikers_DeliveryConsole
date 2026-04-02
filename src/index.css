@@ -1,12 +1,147 @@
 @import "tailwindcss";
 
+/* ─── Theme Token System ─── */
+@theme {
+  --color-module: #f59e0b;
+  --color-module-light: #fbbf24;
+  --color-module-mid: #d97706;
+  --color-module-secondary: #ea580c;
+  --color-bg: #0e0a03;
+  --color-surface: #1a1406;
+  --color-surface-alt: #261e0a;
+  --color-text: #f5e8cc;
+  --color-text-secondary: #c9a86c;
+  --color-text-muted: #907040;
+  --color-border: #3d2e10;
+}
+
+/* Amber — 琥珀·暗房 */
+[data-theme="amber"], :root {
+  --color-module: #f59e0b;
+  --color-module-light: #fbbf24;
+  --color-module-mid: #d97706;
+  --color-module-secondary: #ea580c;
+  --color-bg: #0e0a03;
+  --color-surface: #1a1406;
+  --color-surface-alt: #261e0a;
+  --color-text: #f5e8cc;
+  --color-text-secondary: #c9a86c;
+  --color-text-muted: #907040;
+  --color-border: #3d2e10;
+}
+
+/* Cream — 暖米·坩埚 */
+[data-theme="cream"] {
+  --color-module: #92400e;
+  --color-module-light: #d97706;
+  --color-module-mid: #b45309;
+  --color-module-secondary: #78716c;
+  --color-bg: #faf6f1;
+  --color-surface: #ede8df;
+  --color-surface-alt: #e2d9ce;
+  --color-text: #2f261b;
+  --color-text-secondary: #61533f;
+  --color-text-muted: #8f7d66;
+  --color-border: #c4b49a;
+}
+
+/* Emerald — 深林 */
+[data-theme="emerald"] {
+  --color-module: #10b981;
+  --color-module-light: #34d399;
+  --color-module-mid: #059669;
+  --color-module-secondary: #0891b2;
+  --color-bg: #030e06;
+  --color-surface: #071a0c;
+  --color-surface-alt: #0c2714;
+  --color-text: #d4ede2;
+  --color-text-secondary: #7ec4a0;
+  --color-text-muted: #4a8a68;
+  --color-border: #1a4030;
+}
+
+/* Blue — 深海 */
+[data-theme="blue"] {
+  --color-module: #3b82f6;
+  --color-module-light: #60a5fa;
+  --color-module-mid: #2563eb;
+  --color-module-secondary: #7c3aed;
+  --color-bg: #020610;
+  --color-surface: #050d1c;
+  --color-surface-alt: #08142a;
+  --color-text: #d8e8f8;
+  --color-text-secondary: #7aafd4;
+  --color-text-muted: #4472a0;
+  --color-border: #142040;
+}
+
+/* Rose — 黄昏 */
+[data-theme="rose"] {
+  --color-module: #f43f5e;
+  --color-module-light: #fb7185;
+  --color-module-mid: #e11d48;
+  --color-module-secondary: #c026d3;
+  --color-bg: #0e0306;
+  --color-surface: #1a0710;
+  --color-surface-alt: #260c18;
+  --color-text: #f5d4db;
+  --color-text-secondary: #c47888;
+  --color-text-muted: #8a4458;
+  --color-border: #3d1020;
+}
+
+/* Cyan — 极地 */
+[data-theme="cyan"] {
+  --color-module: #06b6d4;
+  --color-module-light: #22d3ee;
+  --color-module-mid: #0891b2;
+  --color-module-secondary: #0284c7;
+  --color-bg: #020e10;
+  --color-surface: #051a1e;
+  --color-surface-alt: #08262b;
+  --color-text: #cceef5;
+  --color-text-secondary: #5abcd4;
+  --color-text-muted: #347a8a;
+  --color-border: #0d3540;
+}
+
+/* Violet — 星云 */
+[data-theme="violet"] {
+  --color-module: #8b5cf6;
+  --color-module-light: #a78bfa;
+  --color-module-mid: #7c3aed;
+  --color-module-secondary: #db2777;
+  --color-bg: #05020e;
+  --color-surface: #0c061e;
+  --color-surface-alt: #140a2c;
+  --color-text: #e8d8f8;
+  --color-text-secondary: #a888e0;
+  --color-text-muted: #6648a0;
+  --color-border: #281460;
+}
+
+/* Orange — 熔岩 */
+[data-theme="orange"] {
+  --color-module: #f97316;
+  --color-module-light: #fb923c;
+  --color-module-mid: #ea580c;
+  --color-module-secondary: #eab308;
+  --color-bg: #0e0602;
+  --color-surface: #1c0e05;
+  --color-surface-alt: #2a1608;
+  --color-text: #f8e4cc;
+  --color-text-secondary: #cc9050;
+  --color-text-muted: #885830;
+  --color-border: #3d1c08;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
 body {
-  background-color: #060b14;
-  color: #e2e8f0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
 }
 
 /* Custom Scrollbar Styles for Dark Theme */
@@ -20,18 +155,16 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  /* slate-700 */
+  background: var(--color-border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-  /* slate-600 */
+  background: var(--color-text-muted);
 }
 
 /* For Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: var(--color-border) transparent;
 }

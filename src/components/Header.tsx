@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-react';
+import { ChevronDown, FolderOpen, Database, FileText, Settings, Palette } from 'lucide-react';
 
 interface Project {
     name: string;
@@ -97,7 +97,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
     return (
         <>
-            <header className="bg-[#0b1529]/80 backdrop-blur-xl border-b border-blue-900/40 px-6 py-4 relative z-[100]">
+            <header className="bg-surface/80 backdrop-blur-xl border-b border-border px-6 py-4 relative z-[100]">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <img src="/logo.png" alt="MindHikers Logo" className="w-10 h-10 rounded-lg shadow-sm object-cover overflow-hidden" />
@@ -107,12 +107,12 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                     </div>
 
                     {/* Module Switcher */}
-                    <div className="flex bg-[#060b14]/80 p-1 rounded-lg border border-blue-900/30">
+                    <div className="flex bg-bg/80 p-1 rounded-lg border border-border/30">
                         <button
                             onClick={() => onModuleChange('crucible')}
                             className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'crucible'
                                 ? 'bg-amber-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                                : 'text-text-secondary hover:text-text'
                                 }`}
                         >
                             🔥 黄金坩埚
@@ -121,7 +121,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             onClick={() => onModuleChange('delivery')}
                             className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'delivery'
                                 ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                                : 'text-text-secondary hover:text-text'
                                 }`}
                         >
                             🏭 交付终端
@@ -130,7 +130,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             onClick={() => onModuleChange('distribution')}
                             className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${activeModule === 'distribution'
                                 ? 'bg-emerald-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
+                                : 'text-text-secondary hover:text-text'
                                 }`}
                         >
                             📡 分发终端
@@ -146,20 +146,20 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                                     setIsDropdownOpen(!isDropdownOpen);
                                     if (!isDropdownOpen) fetchProjects();
                                 }}
-                                className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-white transition-colors cursor-pointer group"
+                                className="flex items-center gap-1.5 text-text-secondary text-sm font-mono hover:text-text transition-colors cursor-pointer group"
                             >
                                 <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                                <span className="text-slate-300 group-hover:text-white max-w-[120px] truncate">{projectId}</span>
+                                <span className="text-text-secondary group-hover:text-text max-w-[120px] truncate">{projectId}</span>
                                 <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isDropdownOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
-                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
+                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-text-muted uppercase tracking-wider">
                                         Available Projects
                                     </div>
                                     {projects.length === 0 ? (
-                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">加载中...</div>
+                                        <div className="px-3 py-4 text-sm text-text-muted text-center">加载中...</div>
                                     ) : (
                                         <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {projects.map(p => (
@@ -168,7 +168,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                                                     onClick={() => handleSwitch(p.name)}
                                                     className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${p.isActive
                                                         ? 'bg-blue-600/10 text-blue-400 border-l-2 border-blue-500'
-                                                        : 'text-slate-300 hover:bg-slate-700/50 border-l-2 border-transparent'
+                                                        : 'text-text-secondary hover:bg-slate-700/50 border-l-2 border-transparent'
                                                         }`}
                                                 >
                                                     <FolderOpen className="w-4 h-4 flex-shrink-0 opacity-60" />
@@ -194,7 +194,7 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                                     setIsScriptDropdownOpen(!isScriptDropdownOpen);
                                     if (!isScriptDropdownOpen) fetchScripts();
                                 }}
-                                className="flex items-center gap-1.5 text-slate-400 text-sm font-mono hover:text-emerald-400 transition-colors cursor-pointer group"
+                                className="flex items-center gap-1.5 text-text-secondary text-sm font-mono hover:text-emerald-400 transition-colors cursor-pointer group"
                             >
                                 <FileText className="w-4 h-4 flex-shrink-0" />
                                 <span className="flex items-center whitespace-nowrap">
@@ -205,11 +205,11 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
                             {isScriptDropdownOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[9999] overflow-hidden">
-                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
+                                    <div className="px-3 py-2 border-b border-slate-700 text-xs text-text-muted uppercase tracking-wider">
                                         02_Script 文稿
                                     </div>
                                     {scripts.length === 0 ? (
-                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">暂无文稿</div>
+                                        <div className="px-3 py-4 text-sm text-text-muted text-center">暂无文稿</div>
                                     ) : (
                                         <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {scripts.map(s => (
@@ -218,13 +218,13 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                                                     onClick={() => handleScriptSelect(s.path)}
                                                     className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors ${s.path === selectedScriptPath
                                                         ? 'bg-emerald-600/10 text-emerald-400 border-l-2 border-emerald-500'
-                                                        : 'text-slate-300 hover:bg-slate-700/50 border-l-2 border-transparent'
+                                                        : 'text-text-secondary hover:bg-slate-700/50 border-l-2 border-transparent'
                                                         }`}
                                                 >
                                                     <FileText className="w-4 h-4 flex-shrink-0 opacity-60" />
                                                     <span className="flex-1 truncate">{s.name}</span>
-                                                    <span className="text-xs text-slate-500">{formatSize(s.size)}</span>
-                                                    <span className="text-xs text-slate-500">{s.modifiedAt}</span>
+                                                    <span className="text-xs text-text-muted">{formatSize(s.size)}</span>
+                                                    <span className="text-xs text-text-muted">{s.modifiedAt}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -233,10 +233,19 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                             )}
                         </div>
 
+                        {/* Theme Config Button */}
+                        <button
+                            onClick={() => window.location.hash = '/theme-config'}
+                            className="p-2 text-text-secondary hover:text-violet-400 hover:bg-slate-800 rounded-lg transition-colors"
+                            title="Theme Configuration"
+                        >
+                            <Palette className="w-5 h-5" />
+                        </button>
+
                         {/* Settings Button */}
                         <button
                             onClick={() => window.open('/#/llm-config', '_blank')}
-                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                            className="p-2 text-text-secondary hover:text-text hover:bg-slate-800 rounded-lg transition-colors"
                             title="LLM Configuration"
                         >
                             <Settings className="w-5 h-5" />
