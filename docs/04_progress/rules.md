@@ -237,6 +237,8 @@
 94. **讨论线上问题时先问“这是本地、staging、还是 production”**：凡是用户提到 `gc.mindhikers.com`，默认指 Railway `production` 已部署版本；没有确认环境前，不能把本地修复当成线上结果
 95. **日常上线优先走 Git 分支驱动，不走本地直推 production**：本地 `railway up` 只用于调试或临时验证；正式发布默认通过 `MHSDC-GC-SAAS-staging -> main -> Railway production` 完成
 96. **当前阶段 Google 登录可作为 staging / production 的验收基线，微信登录不是本轮上线阻塞项**：不要因为微信未完成而阻塞已经通过 Google 登录验收的 SaaS 发布
+97. **GoldenCrucible-SaaS 主 worktree 默认必须停在 `MHSDC-GC-SAAS-staging`**：除非用户明确要求检查本地 `main` 历史，否则不要为了发布、比对或排障把主 SaaS worktree 临时切到本地 `main`；若必须查看其他分支，优先用 `git show`、独立 worktree 或临时目录完成
+98. **任何一次发布/排障结束前，都必须执行“主 worktree 复位验收”**：至少核对 `git branch --show-current` 必须回到 `MHSDC-GC-SAAS-staging`，再核对 `git status --short` 必须干净；未完成这两步，不得把现场视为收尾完成
 
 ---
 
