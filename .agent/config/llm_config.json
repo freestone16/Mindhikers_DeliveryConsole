@@ -11,7 +11,11 @@
   "experts": {
     "crucible": {
       "enabled": true,
-      "llm": null,
+      "llm": {
+        "provider": "kimi",
+        "model": "kimi-k2.5",
+        "baseUrl": null
+      },
       "imageModel": null,
       "videoModel": null
     },

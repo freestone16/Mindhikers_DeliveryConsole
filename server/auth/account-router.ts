@@ -9,6 +9,7 @@ import {
     isWeChatAuthEnabled,
     resolveAuthBaseUrl,
 } from './index';
+import { resolveAccountTier } from './account-tier';
 import { ensurePersonalWorkspace, getWorkspaceContext, setActiveWorkspace } from './workspace-store';
 
 interface AuthenticatedRequest extends Request {
@@ -72,6 +73,7 @@ router.get('/session', requireAuth, async (req: AuthenticatedRequest, res: Respo
             authenticated: true,
             session,
             workspace,
+            accountTier: resolveAccountTier(session.user.email),
         });
     } catch (error) {
         next(error);

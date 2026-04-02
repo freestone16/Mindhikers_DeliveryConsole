@@ -1,5 +1,6 @@
 import type { Request } from 'express';
-import { isAuthEnabled } from './auth';
+import { getSessionFromRequest, isAuthEnabled } from './auth';
+import { resolveAccountTier } from './auth/account-tier';
 import { getCrucibleByokStatus } from './crucible-byok';
 import {
     getCrucibleConversationDetail,
@@ -18,6 +19,7 @@ export type CrucibleTrialStatusCode =
 export interface CrucibleTrialStatus {
     enabled: boolean;
     mode: 'platform' | 'byok';
+    accountTier?: 'standard' | 'vip';
     limits: {
         conversationLimit: number;
         turnLimitPerConversation: number;
@@ -77,6 +79,7 @@ export const getCrucibleTrialStatus = async (
         return {
             enabled: false,
             mode: 'platform',
+            accountTier: 'standard',
             limits: {
                 conversationLimit: CRUCIBLE_TRIAL_CONVERSATION_LIMIT,
                 turnLimitPerConversation: CRUCIBLE_TRIAL_TURN_LIMIT,
@@ -93,7 +96,30 @@ export const getCrucibleTrialStatus = async (
         };
     }
 
+    const session = await getSessionFromRequest(req);
+    const accountTier = resolveAccountTier(session?.user?.email);
     const byokStatus = await getCrucibleByokStatus(req);
+
+    if (accountTier === 'vip') {
+        return {
+            enabled: false,
+            mode: byokStatus.configured ? 'byok' : 'platform',
+            accountTier,
+            limits: {
+                conversationLimit: CRUCIBLE_TRIAL_CONVERSATION_LIMIT,
+                turnLimitPerConversation: CRUCIBLE_TRIAL_TURN_LIMIT,
+            },
+            usage: {
+                conversationsUsed: 0,
+                conversationsRemaining: CRUCIBLE_TRIAL_CONVERSATION_LIMIT,
+                currentConversationTurnsUsed: 0,
+                currentConversationTurnsRemaining: CRUCIBLE_TRIAL_TURN_LIMIT,
+            },
+            status: 'inactive',
+            requiresByok: false,
+            message: '当前账号已升级为 VIP，不受黄金坩埚平台试用额度限制。',
+        };
+    }
 
     const items = await listCrucibleConversations(req, {
         projectId: options.projectId,
@@ -140,6 +166,7 @@ export const getCrucibleTrialStatus = async (
     return {
         enabled: true,
         mode,
+        accountTier,
         limits: {
             conversationLimit: CRUCIBLE_TRIAL_CONVERSATION_LIMIT,
             turnLimitPerConversation: CRUCIBLE_TRIAL_TURN_LIMIT,

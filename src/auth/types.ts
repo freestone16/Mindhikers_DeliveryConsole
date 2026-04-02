@@ -43,4 +43,5 @@ export interface AccountSessionPayload {
         session: AuthSessionRecord;
     };
     workspace: WorkspaceContext;
+    accountTier?: 'standard' | 'vip';
 }
