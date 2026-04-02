@@ -1,4 +1,4 @@
-🕐 Last updated: 2026-04-02 20:00
+🕐 Last updated: 2026-04-02 21:30
 🌿 Branch: MHSDC-DT
 
 # 交接快照 | 2026-04-02（MHSDC-DT）
@@ -11,46 +11,35 @@
 | 项目 | 状态 |
 |---|---|
 | 分支 | `MHSDC-DT` |
-| 最新 commit | `432c298`（上轮）；本轮 theme 改动尚未提交 |
-| 当前任务 | Theme System 全量重设计完成，8 套主题各有独立背景大气层，Distribution 三大组件完全走 CSS 变量 |
-| 代码状态 | 本轮改动未提交，服务正在运行 |
+| 最新 commit | `5a51df1`（已 push） |
+| 当前任务 | Theme System v2 完成，9 套主题，全量推送远端 |
+| 代码状态 | 干净，无未提交改动 |
 | 端口口径 | 前端 `5181`、后端 `3008` |
 
 ## 本轮完成事项
 
 | 事项 | 结果 |
 |---|---|
-| Theme 重设计 | 8 套主题（琥珀·暗房 / 暖米·坩埚 / 深林 / 深海 / 黄昏 / 极地 / 星云 / 熔岩），每套 bg/surface/surfaceAlt/text/textSecondary/textMuted/border 均向主色调倾斜，各有独立大气层 |
-| ThemedModule 修复 | 去掉 `className="contents"`，改为真实 flex 容器，绑 `backgroundColor/color` CSS 变量，背景色终于能被渲染 |
-| index.css 全量同步 | 8 套 `[data-theme]` 全部更新，`@theme` 默认值与 amber 一致 |
-| App.tsx nav 去硬编码 | 左侧栏 / 右侧栏的 `bg-[#0b1529]` / `text-slate-*` / `border-slate-*` 全换成 `bg-surface` / `text-text-*` / `border-border` 语义 class |
-| 三大组件清洁 | `AccountsHub` / `PublishComposer` / `DistributionQueue` 残留的 slate hardcoded 色（offline badge / queued badge / text-slate-100）全部替换 |
-| HMR 验证 | Vite HMR 无报错，5 个文件均热更新成功 |
+| 9 套新主题 | 霓虹赛博 / 极光深林 / 日出晨曦 / 深海耀斑 / 复古迈阿密 / 赤热熔岩 / 极简高反差 / 星云全息 / 坩埚暖白 |
+| 背景全局跟随 | `ThemedModule` effect 同步写 `document.documentElement`，外层 app shell `bg` 随主题切换 |
+| ThemeConfigPage 去硬编码 | 所有 section/button/badge 改用 `previewColors.*` inline style，浅色（日出晨曦/坩埚暖白）可正常渲染 |
+| 预设卡片增强 | 新增 bg/surface/surfaceAlt 三色条，切换主题直观对比背景差异 |
+| 防黑屏修复 | `getEffectiveColors` 兜底从 `getPresetById('amber')!` 改为 `THEME_PRESETS[0].colors` |
+| localStorage 校验 | `loadFromStorage` 对每个 presetId 做合法性验证，旧 ID 自动回退到新默认值 |
+| DEFAULT_MODULE_THEMES | 8 个模块默认主题全部更新为新 preset ID |
 
 ## 当前设计结论
 
-1. Theme 系统已达到"切换即整体大气层替换"的目标，不再只是换领结
-2. cream（暖米·坩埚）是浅色系唯一一套，其他 7 套均为各自色调的深色
-3. 所有分发终端组件 100% 走 CSS 变量，自定义颜色立即生效
-4. ThemeConfigPage 的 Live Preview 也已正确展示真实 bg/surface 色块
+1. Theme System 现有 9 套，覆盖深色 × 7 + 浅色 × 2（日出晨曦/坩埚暖白）
+2. 坩埚暖白 (`crucible`) 是 `crucible` 模块的默认主题，还原黄金坩埚奶油风
+3. 所有主题均有完整 11 个 CSS 变量，组件 100% 走变量
+4. ThemeConfigPage 自身也随当前选中模块主题变色
 
 ## 下一轮工作建议
 
-1. **提交本轮 theme 改动**（`theme-presets.ts` / `index.css` / `App.tsx` / 三大组件）
-2. 在浏览器里逐一验收 8 套主题的视觉效果，做必要的微调
-3. 若主题满意，可考虑把相同 CSS 变量体系推广到 Header / StatusFooter
-
-## 当前未提交改动
-
-- `src/config/theme-presets.ts`
-- `src/index.css`
-- `src/App.tsx`
-- `src/components/AccountsHub.tsx`
-- `src/components/PublishComposer.tsx`
-- `src/components/DistributionQueue.tsx`
-- `docs/04_progress/dev_progress.md`
-- `docs/dev_logs/HANDOFF.md`
-- （以及上轮遗留的所有未提交文件，见上一版 HANDOFF）
+1. 在浏览器逐一验收 9 套主题的视觉效果，做必要微调
+2. 可考虑把 CSS 变量体系推广到 Header / StatusFooter（目前仍有少量硬编码色）
+3. 若需要可在 ThemeConfigPage 加主题预览的 bg 文字 tooltip（鼠标 hover 显示色值）
 
 ## 环境信息
 
@@ -63,8 +52,8 @@ PROJECTS_BASE=/Users/luzhoua/Mindhikers/Mindhikers_workspace/Projects
 
 ## 关键文档
 
-- `src/config/theme-presets.ts` — 8 套主题色值定义
-- `src/index.css` — CSS 变量 `[data-theme]` 全量定义
-- `src/hooks/useTheme.ts` — ThemeContext / applyThemeToElement
-- `src/components/ThemeConfigPage.tsx` — Theme 配置 UI
-- `src/App.tsx` — ThemedModule 包裹逻辑 + DistributionLayout nav
+- `src/config/theme-presets.ts` — 9 套主题色值定义 + ModuleId / DEFAULT_MODULE_THEMES
+- `src/index.css` — CSS 变量 `[data-theme]` 全量定义（可选，主要走 inline style）
+- `src/hooks/useTheme.ts` — ThemeContext / applyThemeToElement / loadFromStorage 校验
+- `src/components/ThemeConfigPage.tsx` — Theme 配置 UI，全部 inline style
+- `src/App.tsx` — ThemedModule 包裹逻辑，写 documentElement

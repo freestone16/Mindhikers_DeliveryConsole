@@ -40,7 +40,7 @@
 | v4.2.5 | 2026-03-22 | **Distribution MIN-102 + MIN-103A 收口** - Queue 接入 SSE 实时可观测性并完成统一验收；`Publish Composer` 的 `Magic Fill` 切换到真实 Marketing / Script 数据源，支持 `sourceFiles / platformOverrides` 入队，验收见 `TREQ-2026-03-22-DISTRIBUTION-006 / 009 / 010` |
 | v4.2.6 | 2026-03-22 | **Distribution MIN-103B/C 收口** - 新增 `X` 与 `微信公众号` connector，一期以 `artifact_ready / draft_ready` 模式写入项目内 `06_Distribution/outbound/`；Queue 联调通过，验收见 `TREQ-2026-03-22-DISTRIBUTION-011` |
 | v4.2.7 | 2026-03-22 | **Distribution 前端 IA 重排完成** - 参考 Mixpost 的信息架构，将 Distribution 宿主切到”左栏二级模块 / 中间主业务 / 右栏控制与解释”布局；`Publish Composer / Queue / Accounts Hub` 已完成第一版黄金坩埚同系 UI 收口，其中 Accounts Hub 进一步补齐账号健康总览与风险工作台 |
-| v4.2.8 | 2026-04-02 | **全局 Theme System 重设计** - 8 套主题（琥珀·暗房 / 暖米·坩埚 / 深林 / 深海 / 黄昏 / 极地 / 星云 / 熔岩）各有独立背景大气层；修复 `ThemedModule` 的 `contents` 穿透问题，Distribution 三大组件完全走 CSS 变量，背景/文字/边框随主题整体切换 |
+| v4.2.8 | 2026-04-02 | **全局 Theme System 重设计** - 9 套主题（霓虹赛博 / 极光深林 / 日出晨曦 / 深海耀斑 / 复古迈阿密 / 赤热熔岩 / 极简高反差 / 星云全息 / 坩埚暖白）；外层 app shell 随主题整体切换背景；ThemeConfigPage 全部去硬编码，浅/深色方案并存；useTheme 兜底与 localStorage 旧 ID 校验防黑屏；commit `5a51df1` |
 
 ---
 
