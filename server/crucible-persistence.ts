@@ -218,6 +218,79 @@ const readConversationIndex = (workspaceDir: string) => (
     readJsonFile<CrucibleConversationSummary[]>(getConversationIndexPath(workspaceDir), [])
 );
 
+const hasWorkspaceConversationState = (workspaceDir: string) => {
+    if (readConversationIndex(workspaceDir).length > 0) {
+        return true;
+    }
+
+    if (readActiveConversationId(workspaceDir)) {
+        return true;
+    }
+
+    return fs.existsSync(getCompatTurnLogPath(workspaceDir));
+};
+
+const writeConversationIndex = (workspaceDir: string, items: CrucibleConversationSummary[]) => {
+    fs.writeFileSync(getConversationIndexPath(workspaceDir), JSON.stringify(items, null, 2), 'utf-8');
+};
+
+const seedWorkspaceFromLegacySnapshot = (
+    workspaceDir: string,
+    workspaceId: string,
+    projectId: string,
+) => {
+    const legacyWorkspaceDir = getWorkspaceRoot(projectId, 'legacy');
+    if (!fs.existsSync(legacyWorkspaceDir) || hasWorkspaceConversationState(workspaceDir)) {
+        return;
+    }
+
+    const legacyIndex = readConversationIndex(legacyWorkspaceDir);
+    if (legacyIndex.length === 0) {
+        return;
+    }
+
+    const nextIndex = legacyIndex.map((item) => ({
+        ...item,
+        workspaceId,
+    }));
+
+    for (const entry of nextIndex) {
+        const legacyConversation = readStoredConversation(legacyWorkspaceDir, entry.id);
+        if (!legacyConversation) {
+            continue;
+        }
+
+        const nextConversation: StoredCrucibleConversation = {
+            ...legacyConversation,
+            workspaceId,
+        };
+
+        fs.writeFileSync(
+            getConversationFile(workspaceDir, entry.id),
+            JSON.stringify(nextConversation, null, 2),
+            'utf-8',
+        );
+    }
+
+    writeConversationIndex(workspaceDir, nextIndex);
+
+    const activeConversationId = readActiveConversationId(legacyWorkspaceDir);
+    if (activeConversationId) {
+        const activeEntry = nextIndex.find((item) => item.id === activeConversationId) || nextIndex[0];
+        if (activeEntry) {
+            writeActiveConversationPointer(workspaceDir, activeEntry.id, activeEntry.topicTitle);
+        }
+    }
+
+    const legacyTurnLog = readJsonFile<Record<string, unknown> | null>(getCompatTurnLogPath(legacyWorkspaceDir), null);
+    if (legacyTurnLog) {
+        fs.writeFileSync(getCompatTurnLogPath(workspaceDir), JSON.stringify({
+            ...legacyTurnLog,
+            workspaceId,
+        }, null, 2), 'utf-8');
+    }
+};
+
 const readActiveConversationId = (workspaceDir: string) => {
     const pointer = readJsonFile<{ conversationId?: string } | null>(getActiveConversationPointerPath(workspaceDir), null);
     return pointer?.conversationId?.trim() || null;
@@ -398,6 +471,7 @@ export const resolveCruciblePersistenceContext = async (
     const workspaceDir = getWorkspaceRoot(workspaceId, 'workspace');
     ensureDirectory(workspaceDir);
     ensureDirectory(getConversationDirectory(workspaceDir));
+    seedWorkspaceFromLegacySnapshot(workspaceDir, workspaceId, projectId);
     const conversationId = options.conversationId?.trim()
         || readActiveConversationId(workspaceDir)
         || randomUUID();
