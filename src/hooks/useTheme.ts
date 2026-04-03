@@ -5,13 +5,16 @@ import {
     getPresetById,
     type ModuleId,
     type ThemeColors,
+    type TextureConfig,
 } from '../config/theme-presets';
+import { textureToCss } from '../utils/texture';
 
 const STORAGE_KEY = 'mhsdc-theme-config';
 
 export type ModuleThemeConfig = {
     presetId: string;
     custom?: ThemeColors;
+    texture?: TextureConfig;
 };
 
 type ThemeState = Record<ModuleId, ModuleThemeConfig>;
@@ -64,6 +67,19 @@ function getEffectiveColors(config: ModuleThemeConfig): ThemeColors {
     return THEME_PRESETS[0].colors;
 }
 
+function getEffectiveTexture(config: ModuleThemeConfig): TextureConfig {
+    // Explicit override stored in state takes priority
+    if (config.texture) {
+        return config.texture;
+    }
+    // Fall back to preset default
+    const preset = getPresetById(config.presetId);
+    if (preset) {
+        return preset.texture;
+    }
+    return THEME_PRESETS[0].texture;
+}
+
 export function applyThemeToElement(element: HTMLElement, colors: ThemeColors) {
     element.style.setProperty('--color-module', colors.module);
     element.style.setProperty('--color-module-light', colors.moduleLight);
@@ -78,10 +94,29 @@ export function applyThemeToElement(element: HTMLElement, colors: ThemeColors) {
     element.style.setProperty('--color-surface-alt', colors.surfaceAlt);
 }
 
+export function applyTextureToElement(
+    element: HTMLElement,
+    texture: TextureConfig,
+    moduleColor: string,
+) {
+    const css = textureToCss(texture, moduleColor);
+    if (css) {
+        element.style.backgroundImage = css.backgroundImage;
+        element.style.backgroundSize = css.backgroundSize;
+        element.style.backgroundRepeat = 'repeat';
+    } else {
+        element.style.backgroundImage = '';
+        element.style.backgroundSize = '';
+        element.style.backgroundRepeat = '';
+    }
+}
+
 interface ThemeContextValue {
     themeState: ThemeState;
     setModuleTheme: (moduleId: ModuleId, presetId: string, custom?: ThemeColors) => void;
+    setModuleTexture: (moduleId: ModuleId, texture: TextureConfig) => void;
     getModuleColors: (moduleId: ModuleId) => ThemeColors;
+    getModuleTexture: (moduleId: ModuleId) => TextureConfig;
     getModuleDataTheme: (moduleId: ModuleId) => string;
 }
 
@@ -98,7 +133,17 @@ export function useThemeProvider() {
         (moduleId: ModuleId, presetId: string, custom?: ThemeColors) => {
             setThemeState((prev) => ({
                 ...prev,
-                [moduleId]: { presetId, custom },
+                [moduleId]: { ...prev[moduleId], presetId, custom },
+            }));
+        },
+        [],
+    );
+
+    const setModuleTexture = useCallback(
+        (moduleId: ModuleId, texture: TextureConfig) => {
+            setThemeState((prev) => ({
+                ...prev,
+                [moduleId]: { ...prev[moduleId], texture },
             }));
         },
         [],
@@ -111,6 +156,13 @@ export function useThemeProvider() {
         [themeState],
     );
 
+    const getModuleTexture = useCallback(
+        (moduleId: ModuleId): TextureConfig => {
+            return getEffectiveTexture(themeState[moduleId]);
+        },
+        [themeState],
+    );
+
     const getModuleDataTheme = useCallback(
         (moduleId: ModuleId): string => {
             return themeState[moduleId].presetId;
@@ -118,7 +170,7 @@ export function useThemeProvider() {
         [themeState],
     );
 
-    return { themeState, setModuleTheme, getModuleColors, getModuleDataTheme };
+    return { themeState, setModuleTheme, setModuleTexture, getModuleColors, getModuleTexture, getModuleDataTheme };
 }
 
 export function useTheme() {

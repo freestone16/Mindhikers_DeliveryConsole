@@ -1,14 +1,33 @@
 /**
  * Theme Presets - 各模块的预设配色方案
  *
- * ThemeColors 定义 6 个 CSS 变量：
- *   module          - 主色调 (按钮、badge、边框高亮)
- *   moduleLight     - 浅色文字/图标
- *   moduleMid       - 中间色调 (小圆点、次要文字)
- *   moduleSecondary - 渐变终点/辅助色
- *   bg              - 页面主背景色
- *   surface         - 卡片/面板背景色
+ * ThemeColors 定义 11 个 CSS 变量。
+ * TextureConfig 控制背景 SVG 纹理（图案/透明度/缩放）。
  */
+
+// ─── Texture Types ─────────────────────────────────────────────────────────────
+
+export type TexturePattern =
+    | 'diamond'
+    | 'triangles'
+    | 'dots'
+    | 'hexagons'
+    | 'diagonal'
+    | 'grid'
+    | 'waves'
+    | 'linen'
+    | 'circuit'
+    | 'none';
+
+export interface TextureConfig {
+    pattern: TexturePattern;
+    /** 0.01 – 0.20，纹理叠加透明度 */
+    opacity: number;
+    /** 0.5 – 3.0，tile 尺寸倍率 */
+    scale: number;
+}
+
+// ─── Color Types ───────────────────────────────────────────────────────────────
 
 export interface ThemeColors {
     module: string;
@@ -29,6 +48,7 @@ export interface ThemePreset {
     name: string;
     nameZh: string;
     colors: ThemeColors;
+    texture: TextureConfig;
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -49,6 +69,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#4A7A88',
             border: '#1E253A',
         },
+        texture: { pattern: 'circuit', opacity: 0.06, scale: 1 },
     },
     {
         id: 'aurora',
@@ -67,6 +88,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#4A8A68',
             border: '#1A4030',
         },
+        texture: { pattern: 'hexagons', opacity: 0.07, scale: 1.2 },
     },
     {
         id: 'sunrise',
@@ -85,6 +107,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#6B7280',
             border: '#D1D5DB',
         },
+        texture: { pattern: 'dots', opacity: 0.08, scale: 1 },
     },
     {
         id: 'deep-sea',
@@ -103,6 +126,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#4A7A9A',
             border: '#0E2840',
         },
+        texture: { pattern: 'waves', opacity: 0.06, scale: 1.5 },
     },
     {
         id: 'miami',
@@ -121,6 +145,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#8060A8',
             border: '#3D1F5A',
         },
+        texture: { pattern: 'diagonal', opacity: 0.07, scale: 1 },
     },
     {
         id: 'magma',
@@ -139,6 +164,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#9A5050',
             border: '#3D1010',
         },
+        texture: { pattern: 'triangles', opacity: 0.05, scale: 1 },
     },
     {
         id: 'mono',
@@ -157,6 +183,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#A3A3A3',
             border: '#2A2A2A',
         },
+        texture: { pattern: 'grid', opacity: 0.06, scale: 1 },
     },
     {
         id: 'crucible',
@@ -175,6 +202,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#8a6a52',
             border: '#e0d5c5',
         },
+        texture: { pattern: 'linen', opacity: 0.04, scale: 1 },
     },
     {
         id: 'nebula',
@@ -193,6 +221,7 @@ export const THEME_PRESETS: ThemePreset[] = [
             textMuted: '#7060A8',
             border: '#2A2050',
         },
+        texture: { pattern: 'diamond', opacity: 0.06, scale: 1 },
     },
 ];
 

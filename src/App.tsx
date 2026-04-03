@@ -16,7 +16,7 @@ import { StatusFooter } from './components/StatusFooter';
 import { CrucibleHome } from './components/CrucibleHome';
 import { LLMConfigPage } from './components/LLMConfigPage';
 import { ThemeConfigPage } from './components/ThemeConfigPage';
-import { ThemeContext, useThemeProvider, useTheme, applyThemeToElement } from './hooks/useTheme';
+import { ThemeContext, useThemeProvider, useTheme, applyThemeToElement, applyTextureToElement } from './hooks/useTheme';
 import type { ModuleId } from './config/theme-presets';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
@@ -225,18 +225,20 @@ function App() {
 
 const ThemedModule = ({ moduleId, children }: { moduleId: ModuleId; children: React.ReactNode }) => {
     const ref = useRef<HTMLDivElement>(null);
-    const { themeState, getModuleColors, getModuleDataTheme } = useTheme();
+    const { themeState, getModuleColors, getModuleTexture, getModuleDataTheme } = useTheme();
 
     useEffect(() => {
         const colors = getModuleColors(moduleId);
+        const texture = getModuleTexture(moduleId);
+
         if (ref.current) {
             applyThemeToElement(ref.current, colors);
+            applyTextureToElement(ref.current, texture, colors.module);
         }
         // Also apply to document root so the outer app shell inherits the theme
         applyThemeToElement(document.documentElement, colors);
 
         return () => {
-            // Clean up when switching away from this module
             const vars = [
                 '--color-bg', '--color-surface', '--color-surface-alt',
                 '--color-text', '--color-text-secondary', '--color-text-muted',
@@ -245,7 +247,7 @@ const ThemedModule = ({ moduleId, children }: { moduleId: ModuleId; children: Re
             ];
             vars.forEach((v) => document.documentElement.style.removeProperty(v));
         };
-    }, [themeState, moduleId, getModuleColors]);
+    }, [themeState, moduleId, getModuleColors, getModuleTexture]);
 
     return (
         <div

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Check, Palette, RotateCcw } from 'lucide-react';
-import { useTheme, applyThemeToElement } from '../hooks/useTheme';
+import { useTheme, applyThemeToElement, applyTextureToElement } from '../hooks/useTheme';
 import {
     THEME_PRESETS,
     MODULE_LABELS,
@@ -9,15 +9,17 @@ import {
     getPresetById,
     type ModuleId,
     type ThemeColors,
+    type TextureConfig,
+    type TexturePattern,
 } from '../config/theme-presets';
-import { useEffect, useRef } from 'react';
+import { TEXTURE_LABELS, textureToCss } from '../utils/texture';
 
 interface ThemeConfigPageProps {
     onClose: () => void;
 }
 
 export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
-    const { themeState, setModuleTheme, getModuleColors } = useTheme();
+    const { themeState, setModuleTheme, setModuleTexture, getModuleColors, getModuleTexture } = useTheme();
     const [activeModule, setActiveModule] = useState<ModuleId>('distribution');
     const [isCustomMode, setIsCustomMode] = useState(false);
     const [customColors, setCustomColors] = useState<ThemeColors>(() => getModuleColors(activeModule));
@@ -25,15 +27,16 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     const currentConfig = themeState[activeModule];
-
     const previewColors = isCustomMode ? customColors : getModuleColors(activeModule);
+    const previewTexture = getModuleTexture(activeModule);
 
-    // Apply CSS vars to wrapper so var(--color-*) works in children
+    // Apply CSS vars + texture to wrapper so Live Preview reflects changes
     useEffect(() => {
         if (wrapperRef.current) {
             applyThemeToElement(wrapperRef.current, previewColors);
+            applyTextureToElement(wrapperRef.current, previewTexture, previewColors.module);
         }
-    }, [previewColors]);
+    }, [previewColors, previewTexture]);
 
     const handleModuleSwitch = (moduleId: ModuleId) => {
         setActiveModule(moduleId);
@@ -70,8 +73,14 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
         const preset = getPresetById(defaultPresetId);
         if (preset) {
             setCustomColors(preset.colors);
+            setModuleTexture(activeModule, preset.texture);
         }
         flashSaved();
+    };
+
+    const handleTextureChange = (key: keyof TextureConfig, value: TexturePattern | number) => {
+        const next: TextureConfig = { ...previewTexture, [key]: value };
+        setModuleTexture(activeModule, next);
     };
 
     const flashSaved = () => {
@@ -106,11 +115,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                         <button
                             onClick={onClose}
                             className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
-                            style={{
-                                borderColor: c.border,
-                                backgroundColor: c.surfaceAlt,
-                                color: c.textSecondary,
-                            }}
+                            style={{ borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.textSecondary }}
                         >
                             <ArrowLeft className="h-4 w-4" />
                             返回
@@ -124,11 +129,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                     {saved && (
                         <div
                             className="flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
-                            style={{
-                                borderColor: `${c.module}50`,
-                                backgroundColor: `${c.module}18`,
-                                color: c.moduleLight,
-                            }}
+                            style={{ borderColor: `${c.module}50`, backgroundColor: `${c.module}18`, color: c.moduleLight }}
                         >
                             <Check className="h-4 w-4" />
                             已保存
@@ -140,7 +141,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
             <div className="mx-auto max-w-5xl px-6 py-8">
                 <div className="mb-8">
                     <p className="text-sm" style={{ color: c.textMuted }}>
-                        为每个模块选择预设配色或自定义颜色。修改会实时生效并自动保存到本地。
+                        为每个模块选择预设配色或自定义颜色，并配置背景纹理。修改会实时生效并自动保存到本地。
                     </p>
                 </div>
 
@@ -148,10 +149,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                 <div className="mb-8 space-y-4">
                     {MODULE_GROUPS.map((group) => (
                         <div key={group.label}>
-                            <div
-                                className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]"
-                                style={{ color: c.textMuted }}
-                            >
+                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: c.textMuted }}>
                                 {group.label}
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -166,26 +164,13 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                                             className="rounded-2xl border px-4 py-2.5 text-left transition-all"
                                             style={
                                                 isActive
-                                                    ? {
-                                                          borderColor: `${c.module}60`,
-                                                          backgroundColor: `${c.module}18`,
-                                                          color: c.text,
-                                                      }
-                                                    : {
-                                                          borderColor: c.border,
-                                                          backgroundColor: c.surfaceAlt,
-                                                          color: c.textSecondary,
-                                                      }
+                                                    ? { borderColor: `${c.module}60`, backgroundColor: `${c.module}18`, color: c.text }
+                                                    : { borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.textSecondary }
                                             }
                                         >
                                             <div className="flex items-center gap-2.5">
-                                                <div
-                                                    className="h-3.5 w-3.5 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: colors.module }}
-                                                />
-                                                <div className="text-xs font-medium whitespace-nowrap">
-                                                    {meta.emoji} {meta.nameZh}
-                                                </div>
+                                                <div className="h-3.5 w-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: colors.module }} />
+                                                <div className="text-xs font-medium whitespace-nowrap">{meta.emoji} {meta.nameZh}</div>
                                             </div>
                                         </button>
                                     );
@@ -198,13 +183,8 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                 <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
                     <div className="space-y-6">
                         {/* Preset Selector */}
-                        <section
-                            className="rounded-3xl border p-6"
-                            style={{ borderColor: c.border, backgroundColor: c.surface }}
-                        >
-                            <div className="mb-4 text-sm font-semibold" style={{ color: c.text }}>
-                                预设方案
-                            </div>
+                        <section className="rounded-3xl border p-6" style={{ borderColor: c.border, backgroundColor: c.surface }}>
+                            <div className="mb-4 text-sm font-semibold" style={{ color: c.text }}>预设方案</div>
                             <div className="grid grid-cols-3 gap-3">
                                 {THEME_PRESETS.map((preset) => {
                                     const isActive = currentConfig.presetId === preset.id && !isCustomMode;
@@ -215,52 +195,24 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                                             className="group rounded-2xl border p-4 text-left transition-all"
                                             style={
                                                 isActive
-                                                    ? {
-                                                          borderColor: `${c.module}60`,
-                                                          backgroundColor: `${c.module}18`,
-                                                      }
-                                                    : {
-                                                          borderColor: c.border,
-                                                          backgroundColor: c.surfaceAlt,
-                                                      }
+                                                    ? { borderColor: `${c.module}60`, backgroundColor: `${c.module}18` }
+                                                    : { borderColor: c.border, backgroundColor: c.surfaceAlt }
                                             }
                                         >
                                             <div className="mb-3 flex gap-1.5">
-                                                <span
-                                                    className="h-5 w-5 rounded-full"
-                                                    style={{ backgroundColor: preset.colors.module }}
-                                                />
-                                                <span
-                                                    className="h-5 w-5 rounded-full"
-                                                    style={{ backgroundColor: preset.colors.moduleLight }}
-                                                />
-                                                <span
-                                                    className="h-5 w-5 rounded-full"
-                                                    style={{ backgroundColor: preset.colors.moduleSecondary }}
-                                                />
+                                                <span className="h-5 w-5 rounded-full" style={{ backgroundColor: preset.colors.module }} />
+                                                <span className="h-5 w-5 rounded-full" style={{ backgroundColor: preset.colors.moduleLight }} />
+                                                <span className="h-5 w-5 rounded-full" style={{ backgroundColor: preset.colors.moduleSecondary }} />
                                             </div>
-                                            {/* Mini bg/surface preview strip */}
+                                            {/* bg/surface color strip */}
                                             <div className="mb-3 flex gap-1 rounded-lg overflow-hidden" style={{ border: `1px solid ${c.border}` }}>
-                                                <div
-                                                    className="flex-1 h-4"
-                                                    style={{ backgroundColor: preset.colors.bg }}
-                                                />
-                                                <div
-                                                    className="flex-1 h-4"
-                                                    style={{ backgroundColor: preset.colors.surface }}
-                                                />
+                                                <div className="flex-1 h-4" style={{ backgroundColor: preset.colors.bg }} />
+                                                <div className="flex-1 h-4" style={{ backgroundColor: preset.colors.surface }} />
                                             </div>
-                                            <div className="text-sm font-medium" style={{ color: c.text }}>
-                                                {preset.nameZh}
-                                            </div>
-                                            <div className="mt-0.5 text-xs" style={{ color: c.textMuted }}>
-                                                {preset.name}
-                                            </div>
+                                            <div className="text-sm font-medium" style={{ color: c.text }}>{preset.nameZh}</div>
+                                            <div className="mt-0.5 text-xs" style={{ color: c.textMuted }}>{preset.name}</div>
                                             {isActive && (
-                                                <div
-                                                    className="mt-2 inline-flex items-center gap-1 text-xs"
-                                                    style={{ color: c.moduleLight }}
-                                                >
+                                                <div className="mt-2 inline-flex items-center gap-1 text-xs" style={{ color: c.moduleLight }}>
                                                     <Check className="h-3 w-3" />
                                                     当前
                                                 </div>
@@ -271,24 +223,100 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                             </div>
                         </section>
 
-                        {/* Custom Colors */}
-                        <section
-                            className="rounded-3xl border p-6"
-                            style={{ borderColor: c.border, backgroundColor: c.surface }}
-                        >
-                            <div className="mb-1 flex items-center justify-between">
-                                <div className="text-sm font-semibold" style={{ color: c.text }}>
-                                    自定义颜色
+                        {/* Texture Config */}
+                        <section className="rounded-3xl border p-6" style={{ borderColor: c.border, backgroundColor: c.surface }}>
+                            <div className="mb-1 text-sm font-semibold" style={{ color: c.text }}>背景纹理</div>
+                            <p className="mb-5 text-xs" style={{ color: c.textMuted }}>
+                                选择纹理图案，调整透明度与缩放；颜色自动跟随主色调。
+                            </p>
+
+                            {/* Pattern picker */}
+                            <div className="mb-5">
+                                <div className="mb-2 text-xs font-medium" style={{ color: c.textSecondary }}>图案</div>
+                                <div className="grid grid-cols-5 gap-2">
+                                    {(Object.keys(TEXTURE_LABELS) as TexturePattern[]).map((pat) => {
+                                        const isActive = previewTexture.pattern === pat;
+                                        // mini preview swatch
+                                        const swatchCss = pat !== 'none'
+                                            ? textureToCss({ pattern: pat, opacity: 0.15, scale: 1 }, c.module)
+                                            : null;
+                                        return (
+                                            <button
+                                                key={pat}
+                                                onClick={() => handleTextureChange('pattern', pat)}
+                                                className="rounded-xl border py-3 px-2 text-center transition-all"
+                                                style={
+                                                    isActive
+                                                        ? { borderColor: `${c.module}60`, backgroundColor: `${c.module}18` }
+                                                        : { borderColor: c.border, backgroundColor: c.surfaceAlt }
+                                                }
+                                            >
+                                                {/* swatch */}
+                                                <div
+                                                    className="mx-auto mb-2 h-8 w-full max-w-[40px] rounded-lg"
+                                                    style={{
+                                                        backgroundColor: c.bg,
+                                                        backgroundImage: swatchCss?.backgroundImage ?? 'none',
+                                                        backgroundSize: swatchCss?.backgroundSize ?? 'auto',
+                                                        backgroundRepeat: 'repeat',
+                                                        border: `1px solid ${c.border}`,
+                                                    }}
+                                                />
+                                                <div className="text-[10px] leading-tight" style={{ color: isActive ? c.moduleLight : c.textMuted }}>
+                                                    {TEXTURE_LABELS[pat]}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            </div>
+
+                            {/* Opacity slider */}
+                            <div className="mb-4">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <span className="text-xs font-medium" style={{ color: c.textSecondary }}>透明度</span>
+                                    <span className="text-xs" style={{ color: c.textMuted }}>{Math.round(previewTexture.opacity * 100)}%</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={1}
+                                    max={20}
+                                    step={1}
+                                    value={Math.round(previewTexture.opacity * 100)}
+                                    onChange={(e) => handleTextureChange('opacity', Number(e.target.value) / 100)}
+                                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                                    style={{ accentColor: c.module, backgroundColor: c.surfaceAlt }}
+                                />
+                            </div>
+
+                            {/* Scale slider */}
+                            <div>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <span className="text-xs font-medium" style={{ color: c.textSecondary }}>缩放</span>
+                                    <span className="text-xs" style={{ color: c.textMuted }}>{previewTexture.scale.toFixed(1)}×</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={5}
+                                    max={30}
+                                    step={1}
+                                    value={Math.round(previewTexture.scale * 10)}
+                                    onChange={(e) => handleTextureChange('scale', Number(e.target.value) / 10)}
+                                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                                    style={{ accentColor: c.module, backgroundColor: c.surfaceAlt }}
+                                />
+                            </div>
+                        </section>
+
+                        {/* Custom Colors */}
+                        <section className="rounded-3xl border p-6" style={{ borderColor: c.border, backgroundColor: c.surface }}>
+                            <div className="mb-1 flex items-center justify-between">
+                                <div className="text-sm font-semibold" style={{ color: c.text }}>自定义颜色</div>
                                 {!isCustomMode && (
                                     <button
                                         onClick={handleEnterCustom}
                                         className="rounded-xl border px-3 py-1.5 text-xs transition-colors"
-                                        style={{
-                                            borderColor: c.border,
-                                            backgroundColor: c.surfaceAlt,
-                                            color: c.textSecondary,
-                                        }}
+                                        style={{ borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.textSecondary }}
                                     >
                                         开始自定义
                                     </button>
@@ -296,11 +324,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                                 {isCustomMode && (
                                     <span
                                         className="rounded-full border px-2.5 py-1 text-[11px]"
-                                        style={{
-                                            borderColor: `${c.module}50`,
-                                            backgroundColor: `${c.module}18`,
-                                            color: c.moduleLight,
-                                        }}
+                                        style={{ borderColor: `${c.module}50`, backgroundColor: `${c.module}18`, color: c.moduleLight }}
                                     >
                                         自定义模式
                                     </span>
@@ -309,7 +333,6 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                             <p className="mb-4 text-xs" style={{ color: c.textMuted }}>
                                 基于当前预设微调颜色，修改后自动切换到自定义模式。
                             </p>
-
                             <div className="space-y-4">
                                 {colorFields.map(({ key, label, desc }) => (
                                     <div key={key} className="flex items-center gap-4">
@@ -321,20 +344,12 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                                             style={{ borderColor: c.border }}
                                         />
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-medium" style={{ color: c.text }}>
-                                                {label}
-                                            </div>
-                                            <div className="text-xs" style={{ color: c.textMuted }}>
-                                                {desc}
-                                            </div>
+                                            <div className="text-sm font-medium" style={{ color: c.text }}>{label}</div>
+                                            <div className="text-xs" style={{ color: c.textMuted }}>{desc}</div>
                                         </div>
                                         <code
                                             className="rounded-lg border px-2 py-1 text-xs"
-                                            style={{
-                                                borderColor: c.border,
-                                                backgroundColor: c.surfaceAlt,
-                                                color: c.textSecondary,
-                                            }}
+                                            style={{ borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.textSecondary }}
                                         >
                                             {customColors[key]}
                                         </code>
@@ -347,11 +362,7 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
                         <button
                             onClick={handleReset}
                             className="flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-colors"
-                            style={{
-                                borderColor: c.border,
-                                backgroundColor: c.surfaceAlt,
-                                color: c.textSecondary,
-                            }}
+                            style={{ borderColor: c.border, backgroundColor: c.surfaceAlt, color: c.textSecondary }}
                         >
                             <RotateCcw className="h-4 w-4" />
                             重置 {MODULE_LABELS[activeModule].nameZh} 为默认配色
@@ -360,17 +371,11 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
 
                     {/* Live Preview */}
                     <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">
-                        <div
-                            className="rounded-3xl border p-6"
-                            style={{ borderColor: c.border, backgroundColor: c.surface }}
-                        >
-                            <div
-                                className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em]"
-                                style={{ color: c.textMuted }}
-                            >
+                        <div className="rounded-3xl border p-6" style={{ borderColor: c.border, backgroundColor: c.surface }}>
+                            <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: c.textMuted }}>
                                 Live Preview
                             </div>
-                            <PreviewCard colors={c} moduleName={MODULE_LABELS[activeModule].nameZh} />
+                            <PreviewCard colors={c} texture={previewTexture} moduleName={MODULE_LABELS[activeModule].nameZh} />
                         </div>
                     </aside>
                 </div>
@@ -379,7 +384,18 @@ export const ThemeConfigPage = ({ onClose }: ThemeConfigPageProps) => {
     );
 };
 
-const PreviewCard = ({ colors, moduleName }: { colors: ThemeColors; moduleName: string }) => {
+const PreviewCard = ({
+    colors,
+    texture,
+    moduleName,
+}: {
+    colors: ThemeColors;
+    texture: TextureConfig;
+    moduleName: string;
+}) => {
+    // Compute texture CSS for preview panel
+    const texCss = textureToCss(texture, colors.module);
+
     return (
         <div className="space-y-4">
             {/* Background preview strip */}
@@ -404,6 +420,22 @@ const PreviewCard = ({ colors, moduleName }: { colors: ThemeColors; moduleName: 
                 </div>
             </div>
 
+            {/* Texture preview panel */}
+            <div
+                className="rounded-2xl h-20 flex items-center justify-center"
+                style={{
+                    backgroundColor: colors.bg,
+                    backgroundImage: texCss?.backgroundImage ?? 'none',
+                    backgroundSize: texCss?.backgroundSize ?? 'auto',
+                    backgroundRepeat: 'repeat',
+                    border: `1px solid ${colors.border}`,
+                }}
+            >
+                <span className="text-xs font-medium rounded-full px-3 py-1" style={{ backgroundColor: `${colors.surface}cc`, color: colors.textMuted }}>
+                    纹理预览
+                </span>
+            </div>
+
             {/* Hero banner preview */}
             <div
                 className="rounded-2xl border p-4"
@@ -415,66 +447,39 @@ const PreviewCard = ({ colors, moduleName }: { colors: ThemeColors; moduleName: 
             >
                 <span
                     className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]"
-                    style={{
-                        borderColor: `${colors.module}4d`,
-                        backgroundColor: `${colors.module}1a`,
-                        color: colors.moduleLight,
-                    }}
+                    style={{ borderColor: `${colors.module}4d`, backgroundColor: `${colors.module}1a`, color: colors.moduleLight }}
                 >
                     Module Badge
                 </span>
-                <div className="mt-2 text-lg font-bold" style={{ color: colors.text }}>
-                    {moduleName}
-                </div>
-                <p className="mt-1 text-sm" style={{ color: colors.textSecondary }}>
-                    预览模块的整体视觉效果
-                </p>
+                <div className="mt-2 text-lg font-bold" style={{ color: colors.text }}>{moduleName}</div>
+                <p className="mt-1 text-sm" style={{ color: colors.textSecondary }}>预览模块的整体视觉效果</p>
             </div>
 
             {/* Button preview */}
             <div className="flex gap-3">
                 <button
                     className="rounded-xl px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-110"
-                    style={{
-                        background: `linear-gradient(to right, ${colors.module}, ${colors.moduleSecondary})`,
-                    }}
+                    style={{ background: `linear-gradient(to right, ${colors.module}, ${colors.moduleSecondary})` }}
                 >
                     主操作按钮
                 </button>
                 <button
                     className="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
-                    style={{
-                        borderColor: `${colors.module}40`,
-                        backgroundColor: `${colors.module}1a`,
-                        color: colors.moduleLight,
-                    }}
+                    style={{ borderColor: `${colors.module}40`, backgroundColor: `${colors.module}1a`, color: colors.moduleLight }}
                 >
                     次要按钮
                 </button>
             </div>
 
             {/* Card preview */}
-            <div
-                className="rounded-2xl border p-4"
-                style={{ borderColor: `${colors.module}26`, backgroundColor: colors.surfaceAlt }}
-            >
-                <div
-                    className="text-[11px] font-semibold uppercase tracking-[0.2em]"
-                    style={{ color: `${colors.moduleLight}cc` }}
-                >
+            <div className="rounded-2xl border p-4" style={{ borderColor: `${colors.module}26`, backgroundColor: colors.surfaceAlt }}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: `${colors.moduleLight}cc` }}>
                     Section Label
                 </div>
-                <div className="mt-2 text-sm" style={{ color: colors.textSecondary }}>
-                    卡片内容预览区域
-                </div>
+                <div className="mt-2 text-sm" style={{ color: colors.textSecondary }}>卡片内容预览区域</div>
                 <div className="mt-3 flex items-center gap-2">
-                    <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: `${colors.moduleMid}cc` }}
-                    />
-                    <span className="text-xs" style={{ color: colors.textMuted }}>
-                        列表项预览
-                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `${colors.moduleMid}cc` }} />
+                    <span className="text-xs" style={{ color: colors.textMuted }}>列表项预览</span>
                 </div>
             </div>
 
@@ -482,11 +487,7 @@ const PreviewCard = ({ colors, moduleName }: { colors: ThemeColors; moduleName: 
             <div className="flex flex-wrap gap-2">
                 <span
                     className="rounded-full border px-3 py-1 text-xs"
-                    style={{
-                        borderColor: `${colors.module}66`,
-                        backgroundColor: `${colors.module}1a`,
-                        color: colors.moduleLight,
-                    }}
+                    style={{ borderColor: `${colors.module}66`, backgroundColor: `${colors.module}1a`, color: colors.moduleLight }}
                 >
                     选中标签
                 </span>
