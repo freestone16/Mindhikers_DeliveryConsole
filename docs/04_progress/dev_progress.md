@@ -41,6 +41,7 @@
 | v4.2.6 | 2026-03-22 | **Distribution MIN-103B/C 收口** - 新增 `X` 与 `微信公众号` connector，一期以 `artifact_ready / draft_ready` 模式写入项目内 `06_Distribution/outbound/`；Queue 联调通过，验收见 `TREQ-2026-03-22-DISTRIBUTION-011` |
 | v4.2.7 | 2026-03-22 | **Distribution 前端 IA 重排完成** - 参考 Mixpost 的信息架构，将 Distribution 宿主切到”左栏二级模块 / 中间主业务 / 右栏控制与解释”布局；`Publish Composer / Queue / Accounts Hub` 已完成第一版黄金坩埚同系 UI 收口，其中 Accounts Hub 进一步补齐账号健康总览与风险工作台 |
 | v4.2.8 | 2026-04-02 | **全局 Theme System 重设计** - 9 套主题（霓虹赛博 / 极光深林 / 日出晨曦 / 深海耀斑 / 复古迈阿密 / 赤热熔岩 / 极简高反差 / 星云全息 / 坩埚暖白）；外层 app shell 随主题整体切换背景；ThemeConfigPage 全部去硬编码，浅/深色方案并存；useTheme 兜底与 localStorage 旧 ID 校验防黑屏；commit `5a51df1` |
+| v4.2.9 | 2026-04-03 | **SVG 背景纹理系统** - 新增 9 种纯 SVG 纹理图案（菱形/三角/点阵/六边形/斜线/细网格/波浪线/麻布纹/电路板）；ThemeConfigPage 新增纹理面板（图案选择器 + 透明度/缩放滑块）；颜色自动跟随主色调，配置持久化 localStorage；修复 SVG data URI 编码问题；commit `6a8aa93` |
 
 ---
 
