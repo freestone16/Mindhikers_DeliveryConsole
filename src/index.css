@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --shell-bg: #f4eee3;
+  --shell-bg-strong: #ece2d4;
+  --surface-0: rgba(255, 251, 245, 0.84);
+  --surface-1: #fffaf2;
+  --surface-2: #f5ecdf;
+  --surface-3: #eadfce;
+  --line-soft: rgba(104, 84, 55, 0.14);
+  --line-strong: rgba(104, 84, 55, 0.24);
+  --ink-1: #2f261b;
+  --ink-2: #61533f;
+  --ink-3: #8f7d66;
+  --accent: #8e6337;
+  --accent-soft: #dcc3a2;
+  --accent-muted: #b79672;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(217, 187, 148, 0.18), transparent 26%),
+    linear-gradient(180deg, #f8f3eb 0%, #f4eee3 100%);
+  color: var(--ink-1);
+}
+
+h1,
+h2,
+h3,
+.mh-display {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(143, 125, 102, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(143, 125, 102, 0.72);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(143, 125, 102, 0.5) transparent;
+}
