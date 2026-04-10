@@ -538,3 +538,45 @@ export function generateFallbackOptions(
   }));
 }
 
+// ========== Roundtable LLM 分层路由 ==========
+
+export type ModelTier = 'fast' | 'standard' | 'premium';
+
+interface RoundtableLlmParams {
+  messages: LLMMessage[];
+  tier: ModelTier;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * Roundtable 专用 LLM 调用
+ * 支持模型分层路由，v2.1 统一使用 kimi-k2.5
+ * 
+ * @param params - 调用参数
+ * @returns LLM 返回的文本内容
+ */
+export async function callRoundtableLlm(params: RoundtableLlmParams): Promise<string> {
+  const { messages, tier, maxTokens = 2000 } = params;
+  
+  // v2.1: 统一使用 kimi-k2.5，后续可按 tier 切换其他模型
+  const model = 'kimi-k2.5';
+  
+  // kimi-k2.5 只支持 temperature = 1
+  // 如需更确定性的输出，通过 prompt engineering 控制
+  const effectiveTemp = 1;
+  
+  try {
+    const response = await callLLM(
+      messages,
+      'kimi',
+      model
+    );
+    
+    return response.content;
+  } catch (error) {
+    console.error(`[callRoundtableLlm] tier=${tier} model=${model} failed:`, error);
+    throw error;
+  }
+}
+

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import { setupHealthCheck } from './health';
+import { applySharpenedProposition, sharpenProposition } from './proposition-sharpener';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local'), override: true });
@@ -39,7 +40,59 @@ app.use(express.json());
 // Health check
 setupHealthCheck(app);
 
-// Roundtable API placeholder
+// ========== Roundtable API ==========
+
+// POST /api/roundtable/sharpen - 检测并锐化命题
+app.post('/api/roundtable/sharpen', async (req, res) => {
+  const { proposition, mode = 'sharpen' } = req.body;
+
+  if (!proposition || typeof proposition !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid proposition' });
+  }
+
+  try {
+    const result = await sharpenProposition(proposition, { mode });
+    res.json({
+      ...result,
+      original: proposition,
+    });
+  } catch (error) {
+    console.error('[POST /api/roundtable/sharpen] Error:', error);
+    // Fallback：返回原命题，标记为已锐化（降级策略）
+    res.json({
+      isSharp: true,
+      original: proposition,
+      sharpened: proposition,
+      reasoning: 'Fallback due to error',
+    });
+  }
+});
+
+// POST /api/roundtable/sharpen/apply - 应用锐化结果
+app.post('/api/roundtable/sharpen/apply', (req, res) => {
+  const { selectedProposition, original } = req.body;
+
+  if (!selectedProposition || typeof selectedProposition !== 'string') {
+    return res.status(400).json({ error: 'Missing selectedProposition' });
+  }
+
+  if (!original || typeof original !== 'string') {
+    return res.status(400).json({ error: 'Missing original' });
+  }
+
+  const result = applySharpenedProposition(original, selectedProposition);
+
+  if (!result.success) {
+    return res.status(400).json({ error: 'Invalid selection' });
+  }
+
+  res.json({
+    success: true,
+    finalProposition: result.finalProposition,
+  });
+});
+
+// Placeholder for future roundtable endpoints
 app.post('/api/roundtable/start', (_req, res) => {
   res.json({ status: 'ok', message: 'Roundtable engine not yet implemented' });
 });
