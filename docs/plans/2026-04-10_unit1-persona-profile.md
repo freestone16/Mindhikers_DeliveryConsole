@@ -1,17 +1,21 @@
 ---
-title: "Unit 1 V2.1: PersonaProfile 契约 + Loader + 7 哲人 — 实施口径锁定"
+title: "Unit 1: PersonaProfile 契约 + Loader + 7 哲人"
 type: implementation-plan
-status: active
+status: completed
 date: 2026-04-10
 owner: OldYang
 supersedes: docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md §7 Unit 1
+seeAlso:
+  - docs/plans/2026-04-10_unit2-proposition-sharpener.md
+  - docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md
 ---
 
-# Unit 1 V2.1: PersonaProfile 契约 + Loader + 7 哲人
+# Unit 1: PersonaProfile 契约 + Loader + 7 哲人
 
 > **定位**：本文件锁定 Unit 1 的实施口径，消除 v2 方案中的歧义。
 > **与 v2 的关系**：v2 §7 Unit 1 说"直接复用原版 §3"，本文件补充 Roundtable 仓的实际路径决策和实施顺序。
 > **审批状态**：已获老卢确认（2026-04-10）。
+> **后续单元**：Unit 2+ 参见 `docs/plans/2026-04-10_unit2-proposition-sharpener.md`
 
 ---
 
@@ -54,7 +58,21 @@ loadAllPersonas() 被调用时：
 - B. 启动加载 + 手动刷新 API（`POST /api/roundtable/personas/reload`）
 - C. 文件监听（chokidar watch，自动更新缓存）
 
-### 0.3 git 初始化（已执行）
+### 0.3 LLM 模型选择（跨单元统一决策）
+
+> **注意**：此为跨单元统一决策，在 Unit 1 阶段预留，Unit 2+ 实施
+
+| Tier | 模型 | 用途 |
+|------|------|------|
+| fast | `kimi-k2.5` | 命题锐化、简单改写 |
+| standard | `kimi-k2.5` | Speaker Selection、Moderator、Spike 提取 |
+| premium | `kimi-k2.5` | 哲人发言（核心体验） |
+
+**关键约束**：kimi-k2.5 只支持 temperature = 1，通过 prompt engineering 补偿确定性。
+
+**详细设计**：参见 `docs/plans/2026-04-10_unit2-proposition-sharpener-v2.1.md` §1
+
+### 0.4 git 初始化（已执行）
 
 - ✅ `git init`
 - ✅ 创建分支 `feat/unit1-persona-profile`

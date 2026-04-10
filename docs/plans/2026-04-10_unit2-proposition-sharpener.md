@@ -1,17 +1,21 @@
 ---
-title: "Unit 2 V2.1: 命题锐化模块 — 实施口径锁定"
+title: "Unit 2: 命题锐化模块"
 type: implementation-plan
-status: active
+status: completed
 date: 2026-04-10
 owner: OldYang
 supersedes: docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md §7 Unit 2
+seeAlso:
+  - docs/plans/2026-04-10_unit1-persona-profile.md
+  - docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md
 ---
 
-# Unit 2 V2.1: 命题锐化模块 (Proposition Sharpener)
+# Unit 2: 命题锐化模块 (Proposition Sharpener)
 
 > **定位**：本文件锁定 Unit 2 的实施口径，明确模型选择为 kimi-k2.5。
 > **与 v2 的关系**：v2 §7 Unit 2 说"使用 tier:fast"，本文件锁定 fast tier 具体模型为 kimi-k2.5，并补充详细实施步骤。
 > **审批状态**：已获老卢确认（2026-04-10）。
+> **前置依赖**：Unit 1 参见 `docs/plans/2026-04-10_unit1-persona-profile.md`
 
 ---
 
