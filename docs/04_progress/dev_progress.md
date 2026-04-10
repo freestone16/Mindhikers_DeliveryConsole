@@ -1,7 +1,7 @@
 # Development Progress - GoldenCrucible-Roundtable
 
 > **Project**: GoldenCrucible-Roundtable  
-> **Current Phase**: Unit 1 Complete - PersonaProfile Foundation  
+> **Current Phase**: Unit 2 Complete - Proposition Sharpener  
 > **Last Updated**: 2026-04-10
 
 ---
@@ -14,7 +14,7 @@
 **Commit**: `5e021fa`  
 **分支**: `feat/unit1-persona-profile`
 
-#### 交付物
+**交付物**:
 
 | 组件 | 文件路径 | 状态 |
 |------|----------|------|
@@ -24,13 +24,13 @@
 | 7 哲人配置 | `personas/*.json` | ✅ |
 | Loader 测试 | `server/__tests__/persona-loader.test.ts` | ✅ (7 passing) |
 
-#### 关键决策
+**关键决策**:
 
 - **Persona 目录**: `personas/`（仓根）— 便于运营编辑和摘樱桃
 - **热插拔策略**: 按需重读（无缓存、无 watch）— 满足 Unit 1 需求，后续可升级
 - **Schema 设计**: 身份 + 认知定位 + 立场向量 + 发言规则 + 对比锚点 + 诚实边界
 
-#### 7 哲人名单
+**7 哲人名单**:
 
 1. 苏格拉底（🏛️）— 诘问式追问，无知之知
 2. 尼采（⚡）— 权力意志，重估价值
@@ -40,28 +40,52 @@
 6. 理查德·费曼（🔬）— 构建即理解，反 cargo cult
 7. 赫伯特·西蒙（🎯）— 有限理性，满意原则
 
-#### 质量指标
+---
 
-- **TypeCheck**: 零错误 ✅
-- **Tests**: 7 项全部通过 ✅
-- **Loader 行为**: 
-  - 空目录返回 `[]` ✅
-  - 坏文件跳过 + warning ✅
-  - 新增 JSON 无需重启 ✅
+### Unit 2: 命题锐化模块 (Proposition Sharpener) ✅
+
+**完成日期**: 2026-04-10  
+**Commit**: `983e86e`  
+**分支**: `feat/unit1-persona-profile`
+
+**交付物**:
+
+| 组件 | 文件路径 | 状态 |
+|------|----------|------|
+| V2.1 方案文档 | `docs/plans/2026-04-10_unit2-proposition-sharpener-v2.1.md` | ✅ |
+| LLM 分层路由 | `server/llm.ts` 扩展 | ✅ |
+| 锐化逻辑 | `server/proposition-sharpener.ts` | ✅ |
+| API 端点 | `server/index.ts` - POST /api/roundtable/sharpen | ✅ |
+| 测试 | `server/__tests__/proposition-sharpener.test.ts` | ✅ (17 passing) |
+
+**关键决策**:
+
+- **模型选择**: kimi-k2.5（v2.1 锁定）— 速度快、成本低
+- **Temperature**: 固定为 1（kimi-k2.5 限制）— 通过 prompt engineering 控制确定性
+- **API 契约**: SharpenResult `{ isSharp, sharpened?, clarifyingQuestions?, reasoning? }`
+- **降级策略**: LLM 失败或校验失败时返回 isSharp=true，不阻塞用户
+
+**API 端点**:
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/roundtable/sharpen` | POST | 检测并锐化命题 |
+| `/api/roundtable/sharpen/apply` | POST | 应用锐化结果 |
 
 ---
 
 ## 下一阶段
 
-### Unit 2: 命题锐化模块 🔄
+### Unit 3: 圆桌引擎核心 🔄
 
-**目标**: 实现命题锐化 LLM 调用和 API 端点
+**目标**: 实现圆桌讨论引擎核心（Speaker Selection、Moderator、Philosopher Loop）
 
 **交付物**:
-- `server/proposition-sharpener.ts`
-- `POST /api/roundtable/sharpen` 端点
+- `server/roundtable-engine.ts`
+- `server/roundtable-types.ts`
+- `POST /api/roundtable/turn/stream` (SSE)
 
-**参考文档**: `docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md` §7 Unit 2
+**参考文档**: `docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md` §7 Unit 3
 
 ---
 
@@ -70,7 +94,7 @@
 | 指标 | 状态 | 备注 |
 |------|------|------|
 | TypeScript | ✅ 零错误 | `tsc -b` 通过 |
-| 测试 | ✅ 7 passing | 覆盖率待补 |
+| 测试 | ✅ 24 passing | Unit 1 (7) + Unit 2 (17) |
 | 构建 | ✅ 干净 | 无警告 |
 | Git | ✅ 已初始化 | `feat/unit1-persona-profile` |
 
@@ -78,7 +102,7 @@
 
 ## 技术债务
 
-- [ ] 无（Unit 1 阶段）
+- [ ] 无（Unit 1-2 阶段）
 
 ## 风险登记
 
@@ -86,6 +110,7 @@
 |------|------|----------|
 | 7 哲人差异不足 | 低 | 后续通过实际 prompt dump 验证 |
 | 热插拔性能 | 低 | Unit 3 视需要升级为缓存版 |
+| kimi-k2.5 temperature=1 | 中 | 通过 prompt engineering 补偿确定性 |
 
 ---
 
