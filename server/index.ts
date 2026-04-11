@@ -4,6 +4,7 @@ import express from 'express';
 import path from 'path';
 import { setupHealthCheck } from './health';
 import { applySharpenedProposition, sharpenProposition } from './proposition-sharpener';
+import { getSession, handleDirectorCommand, startRoundtable } from './roundtable-engine';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local'), override: true });
@@ -92,9 +93,52 @@ app.post('/api/roundtable/sharpen/apply', (req, res) => {
   });
 });
 
-// Placeholder for future roundtable endpoints
-app.post('/api/roundtable/start', (_req, res) => {
-  res.json({ status: 'ok', message: 'Roundtable engine not yet implemented' });
+app.post('/api/roundtable/turn/stream', async (req, res) => {
+  const { proposition, sharpenedProposition, contrastAnchor, preferredPersonas } = req.body;
+
+  if (!proposition || typeof proposition !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid proposition' });
+  }
+
+  try {
+    await startRoundtable(
+      { proposition, sharpenedProposition, contrastAnchor, preferredPersonas },
+      res
+    );
+  } catch (error) {
+    console.error('[POST /api/roundtable/turn/stream] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/roundtable/director', async (req, res) => {
+  const { sessionId, command, payload } = req.body;
+
+  if (!sessionId || typeof sessionId !== 'string') {
+    return res.status(400).json({ error: 'Missing sessionId' });
+  }
+
+  if (!command || typeof command !== 'string') {
+    return res.status(400).json({ error: 'Missing command' });
+  }
+
+  try {
+    await handleDirectorCommand({ sessionId, command, payload }, res);
+  } catch (error) {
+    console.error('[POST /api/roundtable/director] Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/roundtable/session/:id', (req, res) => {
+  const { id } = req.params;
+  const session = getSession(id);
+
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  res.json(session);
 });
 
 // Static serving for production

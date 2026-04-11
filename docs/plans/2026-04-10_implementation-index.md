@@ -19,8 +19,8 @@ owner: OldYang
 |------|------|------|------|--------|
 | Unit 1 | PersonaProfile 契约 + Loader + 7 哲人 | [2026-04-10_unit1-persona-profile.md](2026-04-10_unit1-persona-profile.md) | ✅ 完成 | `5e021fa` |
 | Unit 2 | 命题锐化模块 (kimi-k2.5) | [2026-04-10_unit2-proposition-sharpener.md](2026-04-10_unit2-proposition-sharpener.md) | ✅ 完成 | `983e86e` |
-| Unit 3 | 圆桌引擎核心 | TBD | 🔄 待开发 | - |
-| Unit 4 | Spike 提取 + 持久化 | TBD | ⏳ 待开发 | - |
+| Unit 3 | 圆桌引擎核心 | [2026-04-11_unit3-roundtable-engine.md](2026-04-11_unit3-roundtable-engine.md) | ✅ 完成 | - |
+| Unit 4 | Spike 提取 + 持久化 | [2026-04-11_unit4-spike-extractor-persistence.md](2026-04-11_unit4-spike-extractor-persistence.md) | 📝 方案审核中 | - |
 | Unit 5 | Spike → 深聊桥接 | TBD | ⏳ 待开发 | - |
 | Unit 6 | 前端侧边栏 + 导演 UI | TBD | ⏳ 待开发 | - |
 | Unit 7 | GUI 风格对齐 | TBD | ⏳ 待开发 | - |
