@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Response } from 'express';
 import {
   buildRoundMemory,
   getSession,
+  handleDirectorCommand,
   saveSession,
   selectSpeakers,
 } from '../roundtable-engine';
 import type { PersonaProfile } from '../../src/schemas/persona';
-import type { RoundtableSession } from '../roundtable-types';
+import type { RoundtableSession, Spike } from '../roundtable-types';
+import { extractSpikesFromSession } from '../spike-extractor';
+
+vi.mock('../spike-extractor', () => ({
+  extractSpikesFromSession: vi.fn(),
+}));
 
 const mockPersonas: PersonaProfile[] = [
   {
@@ -93,6 +100,18 @@ vi.mock('../persona-loader', () => ({
   loadAllPersonas: () => mockPersonas,
   loadPersonaBySlug: (slug: string) => mockPersonas.find(p => p.slug === slug) || null,
 }));
+
+const createMockResponse = () => {
+  const res = {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+    setHeader: vi.fn(),
+    end: vi.fn(),
+    write: vi.fn(),
+  } satisfies Partial<Response>;
+
+  return res as Response;
+};
 
 describe('RoundtableEngine', () => {
   describe('Session Store', () => {
@@ -216,6 +235,98 @@ describe('RoundtableEngine', () => {
 
       expect(estimatedTokens).toBeGreaterThan(0);
       expect(estimatedTokens).toBeLessThan(text.length);
+    });
+  });
+
+  describe('Director Stop Command', () => {
+    it('should return structured spikes payload for happy path', async () => {
+      const session: RoundtableSession = {
+        id: 'director-stop-happy',
+        proposition: '技术进步是否必然带来公平？',
+        selectedSlugs: ['socrates', 'mao-zedong', 'naval'],
+        status: 'awaiting',
+        rounds: [
+          { roundIndex: 0, turns: [], synthesis: { summary: '起始', focusPoint: '公平定义', tensionLevel: 2, suggestedDirections: [] } },
+          { roundIndex: 1, turns: [], synthesis: { summary: '对立', focusPoint: '自由与公平', tensionLevel: 4, suggestedDirections: [] } },
+          { roundIndex: 2, turns: [], synthesis: { summary: '收束', focusPoint: '制度约束', tensionLevel: 3, suggestedDirections: [] } },
+        ],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      saveSession(session);
+
+      const spikes: Spike[] = [
+        {
+          id: 'spike-1',
+          title: '公平分配',
+          summary: '技术红利分配不均',
+          content: '技术进步带来财富集中，需要制度补偿',
+          bridgeHint: '追问制度如何介入分配',
+          sourceSpeaker: 'mao-zedong',
+          roundIndex: 1,
+          timestamp: Date.now(),
+          tensionLevel: 4,
+        },
+        {
+          id: 'spike-2',
+          title: '自由市场',
+          summary: '市场效率与公平冲突',
+          content: '市场效率可能牺牲弱者公平',
+          bridgeHint: '讨论效率与公平边界',
+          sourceSpeaker: 'naval',
+          roundIndex: 2,
+          timestamp: Date.now(),
+          isFallback: true,
+        },
+      ];
+
+      vi.mocked(extractSpikesFromSession).mockResolvedValueOnce(spikes);
+
+      const res = createMockResponse();
+      await handleDirectorCommand({ sessionId: session.id, command: '止' }, res);
+
+      expect(res.json).toHaveBeenCalledWith({
+        spikes,
+        sessionId: session.id,
+        spikeCount: spikes.length,
+        artifactCount: spikes.length,
+        isFallback: true,
+      });
+    });
+
+    it('should return zero spike count for empty session', async () => {
+      const session: RoundtableSession = {
+        id: 'director-stop-empty',
+        proposition: '何为公平？',
+        selectedSlugs: ['socrates'],
+        status: 'awaiting',
+        rounds: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      saveSession(session);
+
+      vi.mocked(extractSpikesFromSession).mockResolvedValueOnce([]);
+
+      const res = createMockResponse();
+      await handleDirectorCommand({ sessionId: session.id, command: '止' }, res);
+
+      expect(res.json).toHaveBeenCalledWith({
+        spikes: [],
+        sessionId: session.id,
+        spikeCount: 0,
+        artifactCount: 0,
+        isFallback: false,
+      });
+    });
+
+    it('should return 404 for non-existent session', async () => {
+      const res = createMockResponse();
+
+      await handleDirectorCommand({ sessionId: 'missing-session', command: '止' }, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Session not found' });
     });
   });
 });

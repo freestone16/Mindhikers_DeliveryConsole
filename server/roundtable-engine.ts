@@ -3,10 +3,13 @@ import { Response } from 'express';
 import { loadAllPersonas, loadPersonaBySlug } from './persona-loader';
 import { callRoundtableLlm } from './llm';
 import { activeConfig, estimateHistoryTokens } from './compression-config';
+import { appendSpikesToCrucibleConversation, CruciblePersistenceContext } from './crucible-persistence';
+import { extractSpikesFromSession } from './spike-extractor';
 import type {
   PersonaProfile,
 } from '../src/schemas/persona';
 import type {
+  DirectorStopResult,
   DirectorCommandRequest,
   PhilosopherAction,
   PhilosopherTurn,
@@ -20,6 +23,10 @@ import type {
 } from './roundtable-types';
 
 const sessionStore = new Map<string, RoundtableSession>();
+
+interface DirectorCommandContext {
+  persistenceContext?: CruciblePersistenceContext;
+}
 
 export function getSession(sessionId: string): RoundtableSession | null {
   return sessionStore.get(sessionId) || null;
@@ -484,7 +491,8 @@ async function runDiscussionLoop(
 
 export async function handleDirectorCommand(
   req: DirectorCommandRequest,
-  res: Response
+  res: Response,
+  context?: DirectorCommandContext
 ): Promise<void> {
   const { sessionId, command, payload } = req;
   const session = getSession(sessionId);
@@ -496,8 +504,49 @@ export async function handleDirectorCommand(
 
   switch (command) {
     case '止': {
-      const spikes = extractSpikes(session);
-      res.json({ spikes });
+      session.status = 'spike_extracting';
+      saveSession(session);
+
+      const spikes = await extractSpikes(session);
+      let artifactCount = spikes.length;
+
+      if (context?.persistenceContext) {
+        try {
+          const topicTitle = session.sharpenedProposition || session.proposition;
+          const persisted = appendSpikesToCrucibleConversation(context.persistenceContext, {
+            sessionId: session.id,
+            topicTitle,
+            spikes: spikes.map((spike) => ({
+              id: spike.id,
+              title: spike.title,
+              summary: spike.summary,
+              content: spike.content,
+              sourceSpeaker: spike.sourceSpeaker,
+              roundIndex: spike.roundIndex,
+              bridgeHint: spike.bridgeHint,
+              tensionLevel: spike.tensionLevel,
+              isFallback: spike.isFallback,
+            })),
+          });
+          artifactCount = persisted.artifacts.length;
+        } catch (error) {
+          console.error('[handleDirectorCommand] Failed to persist spikes:', error);
+        }
+      }
+
+      const result: DirectorStopResult = {
+        spikes,
+        sessionId: session.id,
+        spikeCount: spikes.length,
+        artifactCount,
+        isFallback: spikes.some((spike) => spike.isFallback),
+      };
+
+      session.status = 'completed';
+      session.updatedAt = Date.now();
+      saveSession(session);
+
+      res.json(result);
       break;
     }
 
@@ -643,24 +692,8 @@ async function runAdditionalRound(
   res.end();
 }
 
-function extractSpikes(session: RoundtableSession): Spike[] {
-  const spikes: Spike[] = [];
-
-  for (const round of session.rounds) {
-    for (const turn of round.turns) {
-      if (turn.action === '质疑' || turn.action === '反驳' || turn.stanceVector) {
-        spikes.push({
-          id: randomUUID(),
-          content: turn.briefSummary,
-          sourceSpeaker: turn.speakerSlug,
-          roundIndex: round.roundIndex,
-          timestamp: turn.timestamp,
-        });
-      }
-    }
-  }
-
-  return spikes.slice(0, 5);
+async function extractSpikes(session: RoundtableSession): Promise<Spike[]> {
+  return extractSpikesFromSession(session);
 }
 
 export async function synthesizeRound(

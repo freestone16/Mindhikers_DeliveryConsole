@@ -8,7 +8,7 @@ import { ensurePersonalWorkspace } from './auth/workspace-store';
 const CRUCIBLE_RUNTIME_ROOT = path.resolve(process.cwd(), 'runtime', 'crucible');
 
 export interface MaterializedCruciblePresentable {
-    type: 'reference' | 'quote' | 'asset';
+    type: 'reference' | 'quote' | 'asset' | 'spike';
     title: string;
     summary: string;
     content: string;
@@ -42,7 +42,7 @@ export interface CrucibleConversationSummary {
 
 export interface CrucibleConversationArtifact {
     id: string;
-    type: 'reference' | 'quote' | 'asset';
+    type: 'reference' | 'quote' | 'asset' | 'spike';
     title: string;
     summary: string;
     content: string;
@@ -62,7 +62,7 @@ export interface CrucibleConversationSnapshot {
     }>;
     presentables: Array<{
         id: string;
-        type: 'reference' | 'quote' | 'mindmap';
+        type: 'reference' | 'quote' | 'mindmap' | 'spike';
         title: string;
         subtitle: string;
         content: string;
@@ -885,4 +885,77 @@ export const buildCrucibleArtifactExport = (
         contentType: 'application/json; charset=utf-8',
         body: JSON.stringify(bundle, null, 2),
     };
+};
+
+export const appendSpikesToCrucibleConversation = (
+    context: CruciblePersistenceContext,
+    params: {
+        sessionId: string;
+        topicTitle: string;
+        spikes: Array<{
+            id: string;
+            title: string;
+            summary: string;
+            content: string;
+            sourceSpeaker: string;
+            roundIndex: number;
+            bridgeHint?: string;
+            tensionLevel?: 1 | 2 | 3 | 4 | 5;
+            isFallback?: boolean;
+        }>;
+    },
+) => {
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const now = new Date().toISOString();
+    const existing = readJsonFile<StoredCrucibleConversation | null>(conversationFile, null);
+    const conversation: StoredCrucibleConversation = existing || {
+        id: context.conversationId,
+        workspaceId: context.workspaceId,
+        topicTitle: params.topicTitle,
+        status: 'active',
+        sourceContext: {
+            projectId: context.projectId,
+            scriptPath: context.scriptPath,
+        },
+        createdAt: now,
+        updatedAt: now,
+        roundIndex: 0,
+        messages: [],
+        turns: [],
+        artifacts: [],
+    };
+
+    conversation.updatedAt = now;
+    conversation.topicTitle = params.topicTitle;
+
+    const maxRoundIndex = Math.max(
+        conversation.roundIndex,
+        ...params.spikes.map((spike) => spike.roundIndex),
+    );
+    conversation.roundIndex = Math.max(conversation.roundIndex, maxRoundIndex);
+
+    const spikeArtifacts: CrucibleConversationArtifact[] = params.spikes.map((spike, index) => ({
+        id: `spike_${Date.now()}_${index + 1}`,
+        type: 'spike' as const,
+        title: spike.title,
+        summary: spike.summary,
+        content: [
+            spike.content,
+            spike.bridgeHint ? `\n桥接线索：${spike.bridgeHint}` : '',
+            `\n来源：${spike.sourceSpeaker}，第 ${spike.roundIndex + 1} 轮`,
+            spike.tensionLevel ? `\n张力等级：${spike.tensionLevel}/5` : '',
+            spike.isFallback ? '\n（规则兜底生成）' : '',
+        ].join(''),
+        roundIndex: spike.roundIndex,
+        createdAt: now,
+    }));
+
+    conversation.artifacts.push(...spikeArtifacts);
+    conversation.snapshot = buildConversationSnapshot(conversation);
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    writeActiveConversationPointer(context.workspaceDir, context.conversationId, params.topicTitle);
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    return conversation;
 };

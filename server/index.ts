@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
+import { resolveCruciblePersistenceContext } from './crucible-persistence';
 import { setupHealthCheck } from './health';
 import { applySharpenedProposition, sharpenProposition } from './proposition-sharpener';
 import { getSession, handleDirectorCommand, startRoundtable } from './roundtable-engine';
@@ -123,7 +124,20 @@ app.post('/api/roundtable/director', async (req, res) => {
   }
 
   try {
-    await handleDirectorCommand({ sessionId, command, payload }, res);
+    let persistenceContext = undefined;
+
+    if (command === '止') {
+      try {
+        persistenceContext = await resolveCruciblePersistenceContext(req, {
+          conversationId: sessionId,
+        });
+      } catch (error) {
+        console.error('[POST /api/roundtable/director] Failed to resolve persistence context:', error);
+      }
+    }
+
+    const directorContext = command === '止' ? { persistenceContext } : undefined;
+    await handleDirectorCommand({ sessionId, command, payload }, res, directorContext);
   } catch (error) {
     console.error('[POST /api/roundtable/director] Error:', error);
     res.status(500).json({ error: 'Internal server error' });

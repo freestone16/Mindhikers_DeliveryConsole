@@ -1,8 +1,8 @@
 # Development Progress - GoldenCrucible-Roundtable
 
 > **Project**: GoldenCrucible-Roundtable  
-> **Current Phase**: Unit 2 Complete - Proposition Sharpener  
-> **Last Updated**: 2026-04-10
+> **Current Phase**: Unit 4 Complete - Spike 提取 + 持久化  
+> **Last Updated**: 2026-04-12
 
 ---
 
@@ -74,18 +74,81 @@
 
 ---
 
-## 下一阶段
+### Unit 3: 圆桌引擎核心 (Roundtable Engine) ✅
 
-### Unit 3: 圆桌引擎核心 🔄
-
-**目标**: 实现圆桌讨论引擎核心（Speaker Selection、Moderator、Philosopher Loop）
+**完成日期**: 2026-04-12  
+**Commit**: `e891067`  
+**分支**: `MHSDC-GC-RT`  
+**Linear Issue**: MIN-114
 
 **交付物**:
-- `server/roundtable-engine.ts`
-- `server/roundtable-types.ts`
-- `POST /api/roundtable/turn/stream` (SSE)
 
-**参考文档**: `docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md` §7 Unit 3
+| 组件 | 文件路径 | 状态 |
+|------|----------|------|
+| 方案文档 | `docs/plans/2026-04-11_unit3-roundtable-engine.md` | ✅ |
+| 类型定义 | `server/roundtable-types.ts` | ✅ |
+| 压缩配置 | `server/compression-config.ts` | ✅ |
+| 引擎核心 | `server/roundtable-engine.ts` | ✅ |
+| Skill Loader | `server/skill-loader.ts` | ✅ |
+| SSE 端点 | `server/index.ts` - turn/stream / director / session | ✅ |
+| 测试 | `server/__tests__/roundtable-engine.test.ts` | ✅ |
+
+**关键决策**:
+
+- **Speaker Selection**: 角色按顺序轮转 + 导演可干预
+- **Moderator**: 可选角色（proposition 阶段才激活）
+- **Context 压缩**: L0/L1/L2 三档（Kimi/GPT/Opus 分别适配）
+- **SSE 流式输出**: 两阶段 chunk + meta
+- **导演指令**: 继续/暂停/止/加人/踢人/改顺序
+
+---
+
+### Unit 4: Spike 提取 + 持久化 ✅
+
+**完成日期**: 2026-04-12  
+**Commit**: 待提交（refs MIN-115）  
+**分支**: `MHSDC-GC-RT`  
+**Linear Issue**: MIN-115
+
+**交付物**:
+
+| 组件 | 文件路径 | 状态 |
+|------|----------|------|
+| 方案文档 | `docs/plans/2026-04-11_unit4-spike-extractor-persistence.md` | ✅ |
+| Spike 提取器 | `server/spike-extractor.ts` (298 行) | ✅ |
+| Spike 富类型 | `server/roundtable-types.ts` 扩展 | ✅ |
+| 持久化扩展 | `server/crucible-persistence.ts` | ✅ |
+| 导演"止"链路 | `server/roundtable-engine.ts` + `server/index.ts` | ✅ |
+| 提取器单测 | `server/__tests__/spike-extractor.test.ts` (5 用例) | ✅ |
+| 持久化单测 | `server/__tests__/crucible-persistence.test.ts` | ✅ |
+| 导演指令测试 | `server/__tests__/roundtable-engine.test.ts` 扩展 | ✅ |
+| Auth stubs | `server/auth/index.ts` + `server/auth/workspace-store.ts` | ✅ |
+
+**关键决策**:
+
+- **Spike 富类型**: 在原 5 字段基础上新增 title/summary/bridgeHint/sourceTurnIds/tensionLevel/isFallback
+- **提取策略**: 三段式 — 规则初筛 → LLM 精炼 → 规则兜底
+- **持久化方式**: 并入现有 artifact 主干（不新建存储体系），CrucibleConversationArtifact.type 联合类型添加 `'spike'`
+- **导演"止"链路**: 混合方案 — index.ts 注入 persistence context → engine 内执行提取+持久化+返回 DirectorStopResult
+
+**变更统计**: 10 files, +794/-31 lines, 41 tests passed (净增 11)
+
+---
+
+## 下一阶段
+
+### Unit 5: Spike → 深聊桥接 🔄
+
+**目标**: 将提取的 Spike 桥接到深聊（DeepDive）模式
+
+**交付物**:
+- Spike → DeepDive 桥接逻辑
+- DeepDive 端点
+- 相关测试
+
+**参考文档**: 待创建
+
+**Linear Issue**: MIN-116
 
 ---
 
@@ -93,24 +156,25 @@
 
 | 指标 | 状态 | 备注 |
 |------|------|------|
-| TypeScript | ✅ 零错误 | `tsc -b` 通过 |
-| 测试 | ✅ 24 passing | Unit 1 (7) + Unit 2 (17) |
+| TypeScript | ✅ 零错误 | `typecheck:full` 通过 |
+| 测试 | ✅ 41 passing, 2 skipped | Unit 1-4 累计 |
 | 构建 | ✅ 干净 | 无警告 |
-| Git | ✅ 已初始化 | `feat/unit1-persona-profile` |
+| Git | ✅ `MHSDC-GC-RT` | Unit 4 待提交 |
 
 ---
 
 ## 技术债务
 
-- [ ] 无（Unit 1-2 阶段）
+- [ ] `server/auth/` — 目前仅 stub，需在 Unit 6/7 补充真实实现
+- [ ] Spike LLM 精炼的 prompt 可后续迭代优化
 
 ## 风险登记
 
 | 风险 | 等级 | 缓解措施 |
 |------|------|----------|
 | 7 哲人差异不足 | 低 | 后续通过实际 prompt dump 验证 |
-| 热插拔性能 | 低 | Unit 3 视需要升级为缓存版 |
 | kimi-k2.5 temperature=1 | 中 | 通过 prompt engineering 补偿确定性 |
+| Spike 提取质量 | 中 | 规则兜底保证基础质量，LLM 精炼为增量提升 |
 
 ---
 

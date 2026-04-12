@@ -6,6 +6,7 @@ export type RoundtableStatus =
   | 'discussing'
   | 'synthesizing'
   | 'awaiting'
+  | 'spike_extracting'
   | 'completed';
 
 export type PhilosopherAction = '陈述' | '质疑' | '补充' | '反驳' | '修正' | '综合';
@@ -65,9 +66,23 @@ export interface RoundtableSession {
 export interface Spike {
   id: string;
   content: string;
+  title: string;
+  summary: string;
+  bridgeHint: string;
   sourceSpeaker: string;
   roundIndex: number;
   timestamp: number;
+  sourceTurnIds?: string[];
+  tensionLevel?: 1 | 2 | 3 | 4 | 5;
+  isFallback?: boolean;
+}
+
+export interface DirectorStopResult {
+  spikes: Spike[];
+  sessionId: string;
+  spikeCount: number;
+  artifactCount: number;
+  isFallback: boolean;
 }
 
 export interface RoundtableSelectionEvent {
