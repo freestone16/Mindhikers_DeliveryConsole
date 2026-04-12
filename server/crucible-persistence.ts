@@ -738,6 +738,48 @@ export const appendTurnToCrucibleConversation = (
     return conversation;
 };
 
+export const appendCrucibleThesisArtifact = async (
+    req: Request,
+    options: {
+        conversationId: string;
+        title: string;
+        summary: string;
+        content: string;
+        projectId?: string;
+        scriptPath?: string;
+    },
+): Promise<{ artifactId: string; conversation: StoredCrucibleConversation }> => {
+    const context = await resolveCruciblePersistenceContext(req, {
+        conversationId: options.conversationId,
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const conversation = readStoredConversation(context.workspaceDir, context.conversationId);
+    if (!conversation) {
+        throw new Error('对话不存在');
+    }
+    const now = new Date().toISOString();
+    const artifactId = `thesis_${Date.now()}`;
+    const artifact: CrucibleConversationArtifact = {
+        id: artifactId,
+        type: 'asset',
+        title: options.title,
+        summary: options.summary,
+        content: options.content,
+        roundIndex: conversation.roundIndex,
+        createdAt: now,
+    };
+    conversation.artifacts.push(artifact);
+    conversation.updatedAt = now;
+    conversation.snapshot = buildDerivedConversationSnapshot(conversation);
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    return { artifactId, conversation };
+};
+
 export const saveCrucibleConversationSnapshot = async (
     req: Request,
     options: {

@@ -150,6 +150,8 @@ function SaaSApp() {
     const [crucibleTrialStatus, setCrucibleTrialStatus] = useState<CrucibleTrialStatus | null>(null);
     const [crucibleTrialWarning, setCrucibleTrialWarning] = useState<string | null>(null);
     const [crucibleThesisReady, setCrucibleThesisReady] = useState(false);
+    const [isGeneratingThesis, setIsGeneratingThesis] = useState(false);
+    const [thesisError, setThesisError] = useState<string | null>(null);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
@@ -260,6 +262,8 @@ function SaaSApp() {
         };
     }, [crucibleAutosaveBootstrapKey, crucibleWorkspaceId, hydrateCrucibleSnapshot]);
 
+    const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
+
     const handleOpenCrucibleHistory = useCallback(() => {
         setActiveModule('crucible');
         setHasBootedCrucible(true);
@@ -272,6 +276,49 @@ function SaaSApp() {
         setHasBootedCrucible(true);
         resetCrucibleState({ remount: true, clearPersisted: true });
     }, [resetCrucibleState]);
+
+    const handleEnterThesisWriter = useCallback(async () => {
+        if (isGeneratingThesis) return;
+        setIsGeneratingThesis(true);
+        setThesisError(null);
+        try {
+            const conversationId = crucibleConversationState.conversationId;
+            if (!conversationId) {
+                throw new Error('没有活跃对话');
+            }
+            const response = await fetch('/api/crucible/thesis/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversationId,
+                    projectId: crucibleProjectId,
+                    scriptPath: state.selectedScript?.path || '',
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: '论文生成失败' }));
+                throw new Error(errorData.message || errorData.error || '论文生成失败');
+            }
+            const data = await response.json();
+            setCrucibleThesisReady(false);
+            if (data.content) {
+                const blob = new Blob([data.content], { type: 'text/markdown;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${data.artifact?.title || '论文'}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            setCrucibleTrialWarning('论文已生成，已开始下载');
+        } catch (error: any) {
+            setThesisError(error.message || '论文生成失败');
+        } finally {
+            setIsGeneratingThesis(false);
+        }
+    }, [crucibleConversationState.conversationId, crucibleProjectId, isGeneratingThesis, state.selectedScript?.path]);
 
     const handleRestoreCrucibleHistory = useCallback((snapshot: CrucibleSnapshot) => {
         hydrateCrucibleSnapshot(snapshot);
@@ -436,7 +483,6 @@ function SaaSApp() {
         return () => window.clearTimeout(timer);
     }, [crucibleTrialWarning]);
 
-    const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
     const crucibleSidebarStyle = crucibleManualSidebarWidth
         ? { width: `${crucibleManualSidebarWidth}px` }
         : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
@@ -546,8 +592,9 @@ function SaaSApp() {
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             workspaceId={crucibleWorkspaceId}
                             trialStatus={crucibleTrialStatus}
-                            externalWarning={crucibleTrialWarning}
+                            externalWarning={crucibleTrialWarning || thesisError}
                             thesisReady={crucibleThesisReady}
+                            onEnterThesisWriter={handleEnterThesisWriter}
                             socket={socket}
                         />
                     </div>

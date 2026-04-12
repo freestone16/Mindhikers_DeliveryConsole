@@ -21,6 +21,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
+import { generateCrucibleThesis } from './crucible-thesiswriter';
 import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
@@ -251,6 +252,7 @@ app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
+app.post('/api/crucible/thesis/generate', generateCrucibleThesis);
 app.get('/api/crucible/trial-status', async (req, res) => {
     try {
         const status = await getCrucibleTrialStatus(req, {
