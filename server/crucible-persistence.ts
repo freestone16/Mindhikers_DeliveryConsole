@@ -8,7 +8,7 @@ import { ensurePersonalWorkspace } from './auth/workspace-store';
 const CRUCIBLE_RUNTIME_ROOT = path.resolve(process.cwd(), 'runtime', 'crucible');
 
 export interface MaterializedCruciblePresentable {
-    type: 'reference' | 'quote' | 'asset' | 'spike';
+    type: 'reference' | 'quote' | 'asset' | 'spike' | 'deepdive';
     title: string;
     summary: string;
     content: string;
@@ -42,7 +42,7 @@ export interface CrucibleConversationSummary {
 
 export interface CrucibleConversationArtifact {
     id: string;
-    type: 'reference' | 'quote' | 'asset' | 'spike';
+    type: 'reference' | 'quote' | 'asset' | 'spike' | 'deepdive';
     title: string;
     summary: string;
     content: string;
@@ -62,7 +62,7 @@ export interface CrucibleConversationSnapshot {
     }>;
     presentables: Array<{
         id: string;
-        type: 'reference' | 'quote' | 'mindmap' | 'spike';
+        type: 'reference' | 'quote' | 'mindmap' | 'spike' | 'deepdive';
         title: string;
         subtitle: string;
         content: string;
@@ -951,6 +951,80 @@ export const appendSpikesToCrucibleConversation = (
     }));
 
     conversation.artifacts.push(...spikeArtifacts);
+    conversation.snapshot = buildConversationSnapshot(conversation);
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    writeActiveConversationPointer(context.workspaceDir, context.conversationId, params.topicTitle);
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    return conversation;
+};
+
+export const appendDeepDiveToCrucibleConversation = (
+    context: CruciblePersistenceContext,
+    params: {
+        sessionId: string;
+        topicTitle: string;
+        deepDiveId: string;
+        spikeTitle: string;
+        sourceSpeaker: string;
+        summary: {
+            title: string;
+            coreInsight: string;
+            keyQuotes: string[];
+            remainingTension: string;
+            nextSteps: string[];
+        };
+        turnCount: number;
+    },
+) => {
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const now = new Date().toISOString();
+    const existing = readJsonFile<StoredCrucibleConversation | null>(conversationFile, null);
+    const conversation: StoredCrucibleConversation = existing || {
+        id: context.conversationId,
+        workspaceId: context.workspaceId,
+        topicTitle: params.topicTitle,
+        status: 'active',
+        sourceContext: {
+            projectId: context.projectId,
+            scriptPath: context.scriptPath,
+        },
+        createdAt: now,
+        updatedAt: now,
+        roundIndex: 0,
+        messages: [],
+        turns: [],
+        artifacts: [],
+    };
+
+    conversation.updatedAt = now;
+    conversation.topicTitle = params.topicTitle;
+
+    const contentParts = [
+        `核心洞察：${params.summary.coreInsight}`,
+        params.summary.keyQuotes.length > 0
+            ? `关键引述：\n${params.summary.keyQuotes.map(q => `  - ${q}`).join('\n')}`
+            : '',
+        params.summary.remainingTension
+            ? `未解张力：${params.summary.remainingTension}`
+            : '',
+        params.summary.nextSteps.length > 0
+            ? `后续方向：\n${params.summary.nextSteps.map(s => `  - ${s}`).join('\n')}`
+            : '',
+    ].filter(Boolean).join('\n\n');
+
+    const artifact: CrucibleConversationArtifact = {
+        id: `deepdive_${Date.now()}`,
+        type: 'deepdive' as const,
+        title: params.summary.title || `深聊：${params.spikeTitle}`,
+        summary: params.summary.coreInsight,
+        content: `与 ${params.sourceSpeaker} 的深聊（${params.turnCount} 轮追问）\n\n${contentParts}`,
+        roundIndex: conversation.roundIndex,
+        createdAt: now,
+    };
+
+    conversation.artifacts.push(artifact);
     conversation.snapshot = buildConversationSnapshot(conversation);
 
     fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');

@@ -139,7 +139,9 @@ export type RoundtableSseEvent =
   | RoundtableTurnMetaEvent
   | RoundtableAwaitingEvent
   | RoundtableErrorEvent
-  | RoundtableSpikesReadyEvent;
+  | RoundtableSpikesReadyEvent
+  | RoundtableDeepDiveChunkEvent
+  | RoundtableDeepDiveSummaryEvent;
 
 export interface StartRoundtableRequest {
   proposition: string;
@@ -157,6 +159,7 @@ export interface DirectorCommandRequest {
     injection?: string;
     newPersonaSlug?: string;
     targetPersona?: string;
+    spikeId?: string;
   };
 }
 
@@ -182,4 +185,69 @@ export interface PreloadCache {
   promise: Promise<PhilosopherTurn>;
   partialContext: string;
   timestamp: number;
+}
+
+// --- DeepDive 相关 ---
+
+export interface DeepDiveBridgeRequest {
+  sessionId: string;
+  spikeId: string;
+  /** 可选：用户自定义追问起点；不提供则用 spike.bridgeHint */
+  openingQuestion?: string;
+}
+
+export interface DeepDiveSession {
+  id: string;
+  parentSessionId: string;
+  spikeId: string;
+  spikeTitle: string;
+  spikeContent: string;
+  sourceSpeaker: string;
+  status: 'active' | 'summarizing' | 'completed';
+  turns: DeepDiveTurn[];
+  summary?: DeepDiveSummary;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface DeepDiveTurn {
+  role: 'user' | 'philosopher';
+  content: string;
+  timestamp: number;
+}
+
+export interface DeepDiveSummary {
+  title: string;
+  coreInsight: string;
+  keyQuotes: string[];
+  remainingTension: string;
+  nextSteps: string[];
+}
+
+export interface DeepDiveQuestionRequest {
+  deepDiveId: string;
+  question: string;
+}
+
+export interface DeepDiveSummarizeRequest {
+  deepDiveId: string;
+}
+
+export interface DirectorDeepResult {
+  deepDive: DeepDiveSession;
+  spikeId: string;
+  sourceSpeaker: string;
+}
+
+export interface RoundtableDeepDiveChunkEvent {
+  type: 'roundtable_deepdive_chunk';
+  data: {
+    deepDiveId: string;
+    chunk: string;
+  };
+}
+
+export interface RoundtableDeepDiveSummaryEvent {
+  type: 'roundtable_deepdive_summary';
+  data: DeepDiveSummary;
 }

@@ -2,7 +2,7 @@
 title: "Unit 5: Spike → 深聊桥接"
 type: implementation-plan
 unit: 5
-status: draft
+status: confirmed
 date: 2026-04-12
 owner: OldYang
 origin: docs/plans/2026-04-10_roundtable-engine-implementation-plan-v2.md

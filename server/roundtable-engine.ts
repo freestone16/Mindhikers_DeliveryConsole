@@ -5,10 +5,14 @@ import { callRoundtableLlm } from './llm';
 import { activeConfig, estimateHistoryTokens } from './compression-config';
 import { appendSpikesToCrucibleConversation, CruciblePersistenceContext } from './crucible-persistence';
 import { extractSpikesFromSession } from './spike-extractor';
+import { buildDeepDiveContext, askDeepDiveQuestion } from './deepdive-engine';
 import type {
   PersonaProfile,
 } from '../src/schemas/persona';
 import type {
+  DeepDiveSession,
+  DeepDiveTurn,
+  DirectorDeepResult,
   DirectorStopResult,
   DirectorCommandRequest,
   PhilosopherAction,
@@ -23,9 +27,32 @@ import type {
 } from './roundtable-types';
 
 const sessionStore = new Map<string, RoundtableSession>();
+const deepDiveSessionStore = new Map<string, DeepDiveSession>();
 
 interface DirectorCommandContext {
   persistenceContext?: CruciblePersistenceContext;
+}
+
+export function getDeepDiveSession(deepDiveId: string): DeepDiveSession | null {
+  return deepDiveSessionStore.get(deepDiveId) || null;
+}
+
+export function saveDeepDiveSession(session: DeepDiveSession): void {
+  deepDiveSessionStore.set(session.id, session);
+}
+
+function findSpikeInSession(session: RoundtableSession, spikeId: string): Spike | null {
+  for (const round of session.rounds) {
+    for (const turn of round.turns) {
+      if (turn.speakerSlug) continue;
+    }
+  }
+  return null;
+}
+
+export function getSpikeFromSession(session: RoundtableSession, spikeId: string): Spike | null {
+  const allSpikes = extractSpikesFromSession(session);
+  return allSpikes.find(s => s.id === spikeId) || null;
 }
 
 export function getSession(sessionId: string): RoundtableSession | null {
@@ -574,6 +601,64 @@ export async function handleDirectorCommand(
     }
 
     case '深': {
+      const spikeId = payload?.spikeId;
+      const hasSpikes = session.status === 'completed';
+
+      if (hasSpikes && spikeId) {
+        const spike = getSpikeFromSession(session, spikeId);
+        if (spike) {
+          const persona = loadPersonaBySlug(spike.sourceSpeaker);
+          if (!persona) {
+            res.status(400).json({ error: `Persona not found: ${spike.sourceSpeaker}` });
+            break;
+          }
+
+          const deepDiveSession: DeepDiveSession = {
+            id: randomUUID(),
+            parentSessionId: session.id,
+            spikeId: spike.id,
+            spikeTitle: spike.title,
+            spikeContent: spike.content,
+            sourceSpeaker: spike.sourceSpeaker,
+            status: 'active',
+            turns: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+
+          const openingQuestion = spike.bridgeHint;
+
+          try {
+            const philosopherTurn = await askDeepDiveQuestion({
+              deepDiveSession,
+              question: openingQuestion,
+              personaProfile: persona,
+              session,
+              spike,
+            });
+
+            deepDiveSession.turns.push(
+              { role: 'user', content: openingQuestion, timestamp: Date.now() },
+              philosopherTurn,
+            );
+            deepDiveSession.updatedAt = Date.now();
+            saveDeepDiveSession(deepDiveSession);
+
+            const result: DirectorDeepResult = {
+              deepDive: deepDiveSession,
+              spikeId: spike.id,
+              sourceSpeaker: spike.sourceSpeaker,
+            };
+
+            res.json(result);
+          } catch (error) {
+            console.error('[handleDirectorCommand] DeepDive failed:', error);
+            res.status(500).json({ error: 'Failed to start DeepDive' });
+          }
+          break;
+        }
+      }
+
       res.setHeader('Content-Type', 'text/event-stream');
       await runAdditionalRound(session, res);
       break;
