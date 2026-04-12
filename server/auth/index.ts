@@ -92,6 +92,7 @@ export const getAuth = () => {
             socialProviders,
             advanced: {
                 useSecureCookies: process.env.NODE_ENV === 'production',
+                databaseMigration: true,
             },
         });
     }
