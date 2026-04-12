@@ -15,6 +15,7 @@ import type {
     CrucibleConversationArtifact,
 } from './crucible-persistence';
 import { getCrucibleByokConfig } from './crucible-byok';
+import { assertCrucibleThesisTrialAccess } from './crucible-trial';
 import { detectThesisConvergence } from './crucible';
 import type { SocratesDecision } from './crucible-orchestrator';
 
@@ -255,11 +256,15 @@ export const generateCrucibleThesis = async (req: Request, res: Response) => {
             return res.status(400).json({ error: '对话尚未收敛，无法生成论文' });
         }
 
+        const byokConfig = await getCrucibleByokConfig(req);
+        if (!byokConfig) {
+            await assertCrucibleThesisTrialAccess(req, { projectId, scriptPath });
+        }
+
         const dialecticMap = buildDialecticMapFromConversation(detail, storedConversation);
         const skillKnowledge = loadSkillKnowledge('ThesisWriter');
         const prompt = buildThesisGenerationPrompt(skillKnowledge, dialecticMap);
 
-        const byokConfig = await getCrucibleByokConfig(req);
         const content = await callConfiguredLlm(prompt, byokConfig ? {
             providerLabel: byokConfig.providerLabel || undefined,
             model: byokConfig.model,

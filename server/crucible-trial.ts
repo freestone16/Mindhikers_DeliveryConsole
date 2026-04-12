@@ -201,3 +201,117 @@ export const assertCrucibleTrialAccess = async (
         trialStatus,
     );
 };
+
+// ── Thesis Trial Quota ──────────────────────────────────────────
+
+const CRUCIBLE_THESIS_TRIAL_LIMIT = 2;
+
+export interface CrucibleThesisTrialStatus {
+    enabled: boolean;
+    mode: 'platform' | 'byok';
+    accountTier?: 'standard' | 'vip';
+    thesisQuota: {
+        limit: number;
+        used: number;
+        remaining: number;
+    };
+    canGenerateThesis: boolean;
+    message: string;
+}
+
+export const getCrucibleThesisTrialStatus = async (
+    req: Request,
+    options: {
+        projectId?: string;
+        scriptPath?: string;
+    } = {},
+): Promise<CrucibleThesisTrialStatus> => {
+    if (!isAuthEnabled()) {
+        return {
+            enabled: false,
+            mode: 'platform',
+            thesisQuota: { limit: CRUCIBLE_THESIS_TRIAL_LIMIT, used: 0, remaining: CRUCIBLE_THESIS_TRIAL_LIMIT },
+            canGenerateThesis: true,
+            message: '当前环境未启用账号体系，论文额度限制未开启。',
+        };
+    }
+
+    const session = await getSessionFromRequest(req);
+    const accountTier = resolveAccountTier(session?.user?.email);
+    const byokStatus = await getCrucibleByokStatus(req);
+    const mode: CrucibleThesisTrialStatus['mode'] = byokStatus.configured ? 'byok' : 'platform';
+
+    if (accountTier === 'vip') {
+        return {
+            enabled: false,
+            mode,
+            accountTier,
+            thesisQuota: { limit: CRUCIBLE_THESIS_TRIAL_LIMIT, used: 0, remaining: CRUCIBLE_THESIS_TRIAL_LIMIT },
+            canGenerateThesis: true,
+            message: 'VIP 账号不受论文额度限制。',
+        };
+    }
+
+    if (mode === 'byok') {
+        return {
+            enabled: true,
+            mode,
+            accountTier,
+            thesisQuota: { limit: CRUCIBLE_THESIS_TRIAL_LIMIT, used: 0, remaining: CRUCIBLE_THESIS_TRIAL_LIMIT },
+            canGenerateThesis: true,
+            message: `你当前正在使用自己的 BYOK，论文生成不受额度限制。`,
+        };
+    }
+
+    const items = await listCrucibleConversations(req, {
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+    let thesisUsed = 0;
+    for (const item of items) {
+        const detail = await getCrucibleConversationDetail(req, {
+            conversationId: item.id,
+            projectId: options.projectId,
+            scriptPath: options.scriptPath,
+        });
+        if (detail) {
+            thesisUsed += detail.artifacts.filter((a) => a.id.startsWith('thesis_')).length;
+        }
+    }
+    const remaining = Math.max(0, CRUCIBLE_THESIS_TRIAL_LIMIT - thesisUsed);
+
+    return {
+        enabled: true,
+        mode,
+        accountTier,
+        thesisQuota: { limit: CRUCIBLE_THESIS_TRIAL_LIMIT, used: thesisUsed, remaining },
+        canGenerateThesis: thesisUsed < CRUCIBLE_THESIS_TRIAL_LIMIT,
+        message: thesisUsed >= CRUCIBLE_THESIS_TRIAL_LIMIT
+            ? `你的免费论文生成额度（${CRUCIBLE_THESIS_TRIAL_LIMIT} 次）已用完。继续生成论文请配置自己的 BYOK。`
+            : `免费论文生成剩余 ${remaining} 次。`,
+    };
+};
+
+export const assertCrucibleThesisTrialAccess = async (
+    req: Request,
+    options: {
+        projectId?: string;
+        scriptPath?: string;
+    } = {},
+): Promise<void> => {
+    const status = await getCrucibleThesisTrialStatus(req, options);
+    if (!status.canGenerateThesis) {
+        throw new CrucibleTrialLimitError(
+            'CRUCIBLE_TRIAL_QUOTA_EXHAUSTED',
+            {
+                enabled: true,
+                mode: 'platform',
+                limits: { conversationLimit: CRUCIBLE_TRIAL_CONVERSATION_LIMIT, turnLimitPerConversation: CRUCIBLE_TRIAL_TURN_LIMIT },
+                usage: { conversationsUsed: 0, conversationsRemaining: 0, currentConversationTurnsUsed: 0, currentConversationTurnsRemaining: 0 },
+                status: 'quota_exhausted',
+                requiresByok: true,
+                message: status.message,
+            },
+        );
+    }
+};

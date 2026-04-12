@@ -23,6 +23,7 @@ import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
 import { generateCrucibleThesis } from './crucible-thesiswriter';
 import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
+import { getCrucibleThesisTrialStatus } from './crucible-trial';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -253,6 +254,18 @@ app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
 app.post('/api/crucible/thesis/generate', generateCrucibleThesis);
+app.get('/api/crucible/thesis/trial-status', async (req, res) => {
+    try {
+        const status = await getCrucibleThesisTrialStatus(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        res.json(status);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: 'Failed to read thesis trial status' });
+    }
+});
 app.get('/api/crucible/trial-status', async (req, res) => {
     try {
         const status = await getCrucibleTrialStatus(req, {

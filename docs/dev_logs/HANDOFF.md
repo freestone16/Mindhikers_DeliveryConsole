@@ -1,19 +1,19 @@
-🕐 Last updated: 2026-04-12 16:40
+🕐 Last updated: 2026-04-12 17:05
 🌿 Branch: MHSDC-GC-SAAS-staging
 📍 Scope: MHSDC/GoldenCrucible-SaaS
 
 ## 当前状态
 
-### 本次变更（Unit 3 服务端）
-1. ✅ 新增 `server/crucible-thesiswriter.ts`：论文生成逻辑（对话收敛校验、辩证地图、ThesisWriter prompt、LLM 调用、artifact 保存）
-2. ✅ `server/crucible-persistence.ts` 新增 `appendCrucibleThesisArtifact`
-3. ✅ `server/index.ts` 注册 `POST /api/crucible/thesis/generate`
-4. ✅ 新增实施方案：`docs/plans/implementation_plan.md`
+### 本次变更（Unit 4 前端额度展示）
+1. ✅ `src/SaaSApp.tsx` 新增 thesis trial status state/effect，并在 CTA 与 warning 中展示额度限制（BYOK/VIP 排除）
+2. ✅ `handleEnterThesisWriter` 增加额度拦截与提示
+3. ✅ 更新 `docs/plans/implementation_plan.md`，补充 Unit 4 前端接入方案
 
 ### 验证结果
-- `lsp_diagnostics`：本机缺少 `typescript-language-server`，未能执行
+- `lsp_diagnostics`：
+  - TS LSP 缺失（`typescript-language-server` 未安装）
+  - Markdown 未配置 LSP
 - `npm run build`：通过（有 CSS minify warning 与 chunk size warning）
 
 ### 待处理
 - 如需 LSP 诊断，先安装 `typescript-language-server`
-- Unit 4 论文额度逻辑尚未接入（本次按 Unit 3 范围完成）

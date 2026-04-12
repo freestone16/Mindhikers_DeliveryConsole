@@ -39,6 +39,19 @@ type CrucibleTrialStatus = {
     message: string;
 };
 
+interface ThesisTrialStatus {
+    enabled: boolean;
+    mode: 'platform' | 'byok';
+    accountTier?: 'standard' | 'vip';
+    thesisQuota: {
+        limit: number;
+        used: number;
+        remaining: number;
+    };
+    canGenerateThesis: boolean;
+    message: string;
+}
+
 const CRUCIBLE_EXPERT_ID = 'GoldenMetallurgist';
 const CRUCIBLE_DEFAULT_PROJECT_ID = 'golden-crucible-sandbox';
 const getCrucibleAutosaveBootstrapKey = (workspaceId?: string | null) => (
@@ -149,6 +162,7 @@ function SaaSApp() {
     });
     const [crucibleTrialStatus, setCrucibleTrialStatus] = useState<CrucibleTrialStatus | null>(null);
     const [crucibleTrialWarning, setCrucibleTrialWarning] = useState<string | null>(null);
+    const [thesisTrialStatus, setThesisTrialStatus] = useState<ThesisTrialStatus | null>(null);
     const [crucibleThesisReady, setCrucibleThesisReady] = useState(false);
     const [isGeneratingThesis, setIsGeneratingThesis] = useState(false);
     const [thesisError, setThesisError] = useState<string | null>(null);
@@ -279,6 +293,14 @@ function SaaSApp() {
 
     const handleEnterThesisWriter = useCallback(async () => {
         if (isGeneratingThesis) return;
+        const isThesisQuotaBlocked = thesisTrialStatus
+            && thesisTrialStatus.mode !== 'byok'
+            && thesisTrialStatus.accountTier !== 'vip'
+            && !thesisTrialStatus.canGenerateThesis;
+        if (isThesisQuotaBlocked) {
+            setThesisError(thesisTrialStatus.message);
+            return;
+        }
         setIsGeneratingThesis(true);
         setThesisError(null);
         try {
@@ -318,7 +340,7 @@ function SaaSApp() {
         } finally {
             setIsGeneratingThesis(false);
         }
-    }, [crucibleConversationState.conversationId, crucibleProjectId, isGeneratingThesis, state.selectedScript?.path]);
+    }, [crucibleConversationState.conversationId, crucibleProjectId, isGeneratingThesis, state.selectedScript?.path, thesisTrialStatus]);
 
     const handleRestoreCrucibleHistory = useCallback((snapshot: CrucibleSnapshot) => {
         hydrateCrucibleSnapshot(snapshot);
@@ -475,6 +497,17 @@ function SaaSApp() {
     }, [refreshCrucibleTrialStatus]);
 
     useEffect(() => {
+        if (activeModule !== 'crucible' || !crucibleWorkspaceId) return;
+        const params = new URLSearchParams();
+        if (crucibleProjectId) params.set('projectId', crucibleProjectId);
+        if (state.selectedScript?.path) params.set('scriptPath', state.selectedScript.path);
+        fetch(`/api/crucible/thesis/trial-status?${params}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => setThesisTrialStatus(data))
+            .catch(() => setThesisTrialStatus(null));
+    }, [activeModule, crucibleWorkspaceId, crucibleProjectId, state.selectedScript?.path]);
+
+    useEffect(() => {
         if (!crucibleTrialWarning) {
             return;
         }
@@ -482,6 +515,13 @@ function SaaSApp() {
         const timer = window.setTimeout(() => setCrucibleTrialWarning(null), 4200);
         return () => window.clearTimeout(timer);
     }, [crucibleTrialWarning]);
+
+    const thesisQuotaWarning = thesisTrialStatus
+        && thesisTrialStatus.mode !== 'byok'
+        && thesisTrialStatus.accountTier !== 'vip'
+        && !thesisTrialStatus.canGenerateThesis
+        ? thesisTrialStatus.message
+        : null;
 
     const crucibleSidebarStyle = crucibleManualSidebarWidth
         ? { width: `${crucibleManualSidebarWidth}px` }
@@ -592,7 +632,7 @@ function SaaSApp() {
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             workspaceId={crucibleWorkspaceId}
                             trialStatus={crucibleTrialStatus}
-                            externalWarning={crucibleTrialWarning || thesisError}
+                            externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
                             thesisReady={crucibleThesisReady}
                             onEnterThesisWriter={handleEnterThesisWriter}
                             socket={socket}

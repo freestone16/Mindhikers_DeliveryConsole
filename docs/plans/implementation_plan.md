@@ -36,3 +36,30 @@
 ## 影响面与回滚
 - 新增 API 路由与持久化方法，局部可控。
 - 回滚：删除新增文件与路由，移除持久化新增函数。
+
+---
+
+# Unit 4 Thesis Trial Quota 前端接入方案
+
+## 目标
+在 SaaS 前端展示 thesis trial quota 状态，额度用尽时禁用 CTA 并提示，确保 `npm run build` 通过。
+
+## 范围与约束
+- 仅修改 `src/SaaSApp.tsx`。
+- 不修改 `ChatPanel.tsx` 与服务端代码。
+- BYOK 或 VIP 模式下不显示限制提示。
+- 不改动现有 `crucibleTrialStatus` 获取逻辑。
+
+## 变更清单
+1. 新增 `ThesisTrialStatus` 类型与 state。
+2. 在 `crucibleTrialStatus` fetch 附近新增 `thesis trial status` 获取 effect。
+3. `externalWarning` 合并 thesis quota 耗尽提示（排除 BYOK/VIP）。
+4. `handleEnterThesisWriter` 增加 quota 检查与错误提示（排除 BYOK/VIP）。
+
+## 验证
+1. 对 `src/SaaSApp.tsx` 执行 `lsp_diagnostics`。
+2. `npm run build` 通过。
+
+## 影响面与回滚
+- 仅前端状态与提示逻辑变更，影响面集中。
+- 回滚：移除新增类型、state、effect 与提示/禁用逻辑。
