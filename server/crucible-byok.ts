@@ -206,10 +206,56 @@ export const clearCrucibleByokConfig = async (req: Request) => {
     await getAuthPool().query(`DELETE FROM user_byok_config WHERE user_id = $1`, [userId]);
 };
 
-export const testCrucibleByokConfig = async (input: CrucibleByokConfigInput) => {
+/**
+ * PRD 5.1.6 BYOK 轻量诊断错误类别
+ * - config_incomplete: 配置不完整
+ * - timeout: 连接超时
+ * - key_invalid: API Key 无效
+ * - model_unavailable: 模型不可用
+ * - api_error: 其他 API 错误
+ */
+export type ByokDiagnosticCategory = 'config_incomplete' | 'timeout' | 'key_invalid' | 'model_unavailable' | 'api_error';
+
+export interface ByokTestResult {
+    success: boolean;
+    latency?: number;
+    error?: string;
+    errorCategory?: ByokDiagnosticCategory;
+}
+
+const classifyByokError = (status: number, body: string): ByokDiagnosticCategory => {
+    const lower = body.toLowerCase();
+
+    if (status === 401 || status === 403) {
+        return 'key_invalid';
+    }
+
+    if (lower.includes('invalid api key') || lower.includes('invalid_api_key') || lower.includes('incorrect api key')) {
+        return 'key_invalid';
+    }
+    if (lower.includes('model') && (lower.includes('not found') || lower.includes('not exist') || lower.includes('does not exist') || lower.includes('not_available'))) {
+        return 'model_unavailable';
+    }
+    if (lower.includes('unauthorized') || lower.includes('authentication')) {
+        return 'key_invalid';
+    }
+
+    return 'api_error';
+};
+
+export const testCrucibleByokConfig = async (input: CrucibleByokConfigInput): Promise<ByokTestResult> => {
     const baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
     const apiKey = input.apiKey.trim();
     const model = input.model.trim();
+
+    if (!baseUrl || !apiKey || !model) {
+        return {
+            success: false,
+            errorCategory: 'config_incomplete',
+            error: '配置不完整：Base URL、API Key 和 Model 均为必填项',
+        };
+    }
+
     const isKimiK25 = model.includes('kimi-k2') || model.includes('k2.5');
     const temperature = isKimiK25 ? 1 : 0.7;
     const controller = new AbortController();
@@ -234,11 +280,13 @@ export const testCrucibleByokConfig = async (input: CrucibleByokConfigInput) => 
 
         const latency = Date.now() - startedAt;
         if (!response.ok) {
-            const error = await response.text();
+            const errorBody = await response.text();
+            const category = classifyByokError(response.status, errorBody);
             return {
                 success: false,
                 latency,
-                error: `API Error: ${error.slice(0, 200)}`,
+                error: `API Error: ${errorBody.slice(0, 200)}`,
+                errorCategory: category,
             };
         }
 
@@ -247,9 +295,11 @@ export const testCrucibleByokConfig = async (input: CrucibleByokConfigInput) => 
             latency,
         };
     } catch (error: any) {
+        const isTimeout = error?.name === 'AbortError';
         return {
             success: false,
-            error: error?.name === 'AbortError' ? '请求超时' : (error?.message || '连接测试失败'),
+            error: isTimeout ? '请求超时，请检查 Base URL 是否正确或网络是否可达' : (error?.message || '连接测试失败'),
+            errorCategory: isTimeout ? 'timeout' : 'api_error',
         };
     } finally {
         clearTimeout(timeoutId);
