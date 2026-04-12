@@ -1,53 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-    buildCrucibleResearchPromptAddon,
-    buildCrucibleSearchQuery,
-    detectCrucibleSearchIntent,
     parseBingSearchRss,
     performCrucibleExternalSearch,
 } from '../../server/crucible-research';
 
-describe('crucible research bridge', () => {
-    it('builds a usable search query from a contextual request', () => {
-        const query = buildCrucibleSearchQuery({
-            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-            seedPrompt: 'AI 让很多人都能比较快地做出 70 分的内容',
-            latestUserReply: '基于我们刚才这个问题，我想先联网搜索一下最近一两年关于 AI 内容泛滥、高质量内容稀缺性，以及创作者核心竞争力变化的研究或讨论，再继续往下聊。',
-        });
-
-        expect(query).toContain('AI 内容泛滥');
-        expect(query).toContain('创作者核心竞争力变化');
-        expect(query).not.toContain('联网搜索一下');
-    });
-
-    it('detects an explicit search intent from the latest user reply', () => {
-        expect(detectCrucibleSearchIntent({
-            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-            seedPrompt: 'AI 让很多人都能比较快地做出 70 分的内容',
-            latestUserReply: '我想先联网搜索一下这个议题的最新研究，再继续聊。',
-            previousCards: [],
-        })).toBe(true);
-
-        expect(detectCrucibleSearchIntent({
-            topicTitle: '长期主义为什么越来越难',
-            seedPrompt: '我想做一个稳定的长期产品',
-            latestUserReply: '你继续追问我，不需要联网。',
-            previousCards: [],
-        })).toBe(false);
-    });
-
-    it('falls back to the topic when the latest request is only a generic search instruction', () => {
-        const query = buildCrucibleSearchQuery({
-            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-            seedPrompt: 'Seedance和小龙虾赋予了创作者几乎无尽的生产力',
-            latestUserReply: '我需要你到互联网搜一下最新进展 补充我们的对话',
-        });
-
-        expect(query).toContain('AI 时代高质量内容真正稀缺的东西是什么');
-        expect(query).toContain('最新研究');
-        expect(query).not.toContain('补充我们的对话');
-    });
-
+describe('crucible researcher executor', () => {
     it('parses Bing RSS results into structured sources', () => {
         const rss = `<?xml version="1.0" encoding="utf-8" ?>
 <rss version="2.0">
@@ -87,34 +44,19 @@ describe('crucible research bridge', () => {
         });
 
         const result = await performCrucibleExternalSearch(
-            {
-                topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-                seedPrompt: '',
-                latestUserReply: '我想先联网搜索一下最近一两年的研究。',
-            },
-            fetchMock as unknown as typeof fetch
+            'AI 时代创作的主体性 最新研究',
+            fetchMock as unknown as typeof fetch,
         );
 
         expect(result.connected).toBe(true);
+        expect(result.query).toBe('AI 时代创作的主体性 最新研究');
         expect(result.sources[0]?.url).toBe('https://example.com/a');
     });
 
-    it('injects connected search results into the LLM prompt addon', () => {
-        const addon = buildCrucibleResearchPromptAddon({
-            query: 'AI 内容泛滥 创作者竞争力 研究',
-            connected: true,
-            sources: [
-                {
-                    title: 'Result A',
-                    url: 'https://example.com/a',
-                    snippet: 'Snippet A',
-                },
-            ],
-        });
+    it('fails honestly when the query is missing', async () => {
+        const result = await performCrucibleExternalSearch('', vi.fn() as unknown as typeof fetch);
 
-        expect(addon).toContain('Researcher 外部调研补充');
-        expect(addon).toContain('https://example.com/a');
-        expect(addon).toContain('检索状态：已接通真实外部搜索');
-        expect(addon).toContain('不要再说“我现在去搜索”');
+        expect(result.connected).toBe(false);
+        expect(result.error).toContain('缺少 query');
     });
 });

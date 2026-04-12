@@ -149,6 +149,7 @@ function SaaSApp() {
     });
     const [crucibleTrialStatus, setCrucibleTrialStatus] = useState<CrucibleTrialStatus | null>(null);
     const [crucibleTrialWarning, setCrucibleTrialWarning] = useState<string | null>(null);
+    const [crucibleThesisReady, setCrucibleThesisReady] = useState(false);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
@@ -188,6 +189,7 @@ function SaaSApp() {
             conversationId: snapshot.conversationId || '',
             roundIndex: snapshot.roundIndex || 0,
         });
+        setCrucibleThesisReady(snapshot.thesisReady || false);
         setActiveModule('crucible');
         setHasBootedCrucible(true);
         setCrucibleWorkspaceKey((prev) => prev + 1);
@@ -211,6 +213,7 @@ function SaaSApp() {
             conversationId: '',
             roundIndex: 0,
         });
+        setCrucibleThesisReady(false);
         setChatResetToken((prev) => prev + 1);
         if (options?.remount) {
             setCrucibleWorkspaceKey((prev) => prev + 1);
@@ -262,6 +265,13 @@ function SaaSApp() {
         setHasBootedCrucible(true);
         setIsCrucibleHistoryOpen(true);
     }, []);
+
+    const handleStartNewCrucibleTopic = useCallback(() => {
+        setIsCrucibleHistoryOpen(false);
+        setActiveModule('crucible');
+        setHasBootedCrucible(true);
+        resetCrucibleState({ remount: true, clearPersisted: true });
+    }, [resetCrucibleState]);
 
     const handleRestoreCrucibleHistory = useCallback((snapshot: CrucibleSnapshot) => {
         hydrateCrucibleSnapshot(snapshot);
@@ -515,6 +525,7 @@ function SaaSApp() {
                         className="min-w-[280px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
                     >
                         <ChatPanel
+                            key={`crucible-chat-${chatResetToken}`}
                             isOpen={activeModule === 'crucible'}
                             onToggle={() => undefined}
                             expertId={CRUCIBLE_EXPERT_ID}
@@ -528,6 +539,7 @@ function SaaSApp() {
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
+                            onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
                             onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
                             onOpenHistory={handleOpenCrucibleHistory}
                             blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
@@ -535,6 +547,7 @@ function SaaSApp() {
                             workspaceId={crucibleWorkspaceId}
                             trialStatus={crucibleTrialStatus}
                             externalWarning={crucibleTrialWarning}
+                            thesisReady={crucibleThesisReady}
                             socket={socket}
                         />
                     </div>
@@ -549,6 +562,7 @@ function SaaSApp() {
                 isOpen={isCrucibleHistoryOpen}
                 workspaceId={crucibleWorkspaceId}
                 onClose={() => setIsCrucibleHistoryOpen(false)}
+                onStartNewTopic={handleStartNewCrucibleTopic}
                 onRestoreSnapshot={handleRestoreCrucibleHistory}
             />
         </div>

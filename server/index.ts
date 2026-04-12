@@ -39,6 +39,7 @@ import {
     clearCrucibleActiveConversation,
     getCrucibleConversationDetail,
     listCrucibleConversations,
+    saveCrucibleConversationSnapshot,
     updateCrucibleConversation,
 } from './crucible-persistence';
 import {
@@ -384,6 +385,36 @@ app.post('/api/crucible/conversations/:conversationId/activate', async (req, res
     } catch (error) {
         const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
         res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to activate conversation' });
+    }
+});
+app.post('/api/crucible/conversations/save', async (req, res) => {
+    try {
+        const snapshot = typeof req.body?.snapshot === 'object' && req.body.snapshot ? req.body.snapshot : null;
+        if (!snapshot) {
+            return res.status(400).json({ error: 'snapshot is required' });
+        }
+
+        const detail = await saveCrucibleConversationSnapshot(req, {
+            conversationId: typeof req.body?.conversationId === 'string' ? req.body.conversationId : undefined,
+            topicTitle: typeof req.body?.topicTitle === 'string' ? req.body.topicTitle : undefined,
+            status: req.body?.status === 'active' || req.body?.status === 'archived' ? req.body.status : undefined,
+            snapshot,
+            projectId: typeof req.body?.projectId === 'string'
+                ? req.body.projectId
+                : typeof req.query.projectId === 'string'
+                    ? req.query.projectId
+                    : undefined,
+            scriptPath: typeof req.body?.scriptPath === 'string'
+                ? req.body.scriptPath
+                : typeof req.query.scriptPath === 'string'
+                    ? req.query.scriptPath
+                    : undefined,
+        });
+
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to save conversation snapshot' });
     }
 });
 app.patch('/api/crucible/conversations/:conversationId', async (req, res) => {

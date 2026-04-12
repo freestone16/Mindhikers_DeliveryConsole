@@ -1,8 +1,39 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-30 CST
+> **更新日期**: 2026-04-02 CST
 
 ---
+
+## 1.18 2026-04-02（外部专家沟通概况文档收口）
+
+### ✅ 本轮已完成
+
+- 已基于当前 `docs/` 体系收口一份面向外部专家沟通的整体概况文档：
+  - `docs/02_design/crucible/2026-04-02_GoldenCrucible_Expert_Brief_And_Roadmap_Context.md`
+- 文档已统一整理：
+  - 黄金坩埚当前产品定位
+  - 当前开发进度
+  - 周边模块边界
+  - 已基本定下来的下一步构想
+  - 适合外部专家讨论的关键问题
+- `docs/02_design/crucible/_master.md` 已同步挂入新文档索引
+
+### 🎯 本轮结论
+
+- 黄金坩埚当前不再是“是否成立”的讨论阶段，而是：
+  - 如何把单人坩埚 SaaS 做成可信早期产品
+  - 如何把宿主边界收回到确定性执行职责
+  - 如何为下一阶段 roadmap 选择正确优先级
+- 对外部专家最值得讨论的已不是“要不要做”，而是：
+  - 早期付费单位与商业包装
+  - Socrates 与宿主边界治理
+  - 未来 `1-2` 个版本的资源投入顺序
+
+### ⚠️ 当前仍需继续对齐
+
+- 线上完整真人 smoke 仍未完成
+- `KIMI / DEEPSEEK` 等生产模型口径仍需以线上实测为准
+- `Researcher / FactChecker` 真实 runtime 工具链与轨迹留证仍在治理中
 
 ## 1.17 2026-03-30（`gc.mindhikers.com` 正式域名接入收口）
 
@@ -2415,6 +2446,157 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 4. 工具结果以结构化形式回填，再由 Socrates 生成最终输出
 5. 扩展 persistence 与前端状态，让 UI 只消费真实工具执行轨迹
 
+## 2026-04-02（晚）宿主边界根治第一刀：主链切到 decision -> tools -> composition
+
+### ✅ 本轮已完成
+
+- 已提交本轮治理文档基线：
+  - `5092972 refs MIN-105 record socrates host boundary governance`
+- 后端主链第一刀已落地：
+  - `server/crucible.ts`
+  - 当前不再由宿主直接做：
+    - `detectCrucibleSearchIntent(...)`
+    - host-side query builder
+    - `Researcher 外部调研补充` prompt addon
+  - 当前主链已改成：
+    - `Socrates Decision Pass`
+    - `Host Tool Execution Pass`
+    - `Socrates Composition Pass`
+- 新增结构化契约：
+  - `server/crucible-orchestrator.ts`
+  - 新增：
+    - `SocratesDecision`
+    - `SocratesToolRequest`
+    - `ToolExecutionTrace`
+    - `buildSocratesDecisionPrompt(...)`
+    - `buildSocratesCompositionPrompt(...)`
+- `Researcher` 已从“业务判断 + query 构造 + prompt 补丁”收缩成执行器：
+  - `server/crucible-research.ts`
+  - 当前仅保留：
+    - Bing RSS 执行
+    - RSS 解析
+    - timeout / error handling
+  - 已删除：
+    - 搜索意图判定
+    - host-side query 生成
+    - prompt addon 拼接
+- persistence 已开始记录真实链路：
+  - `server/crucible-persistence.ts`
+  - turn 现已开始写入：
+    - `decision`
+    - `toolTraces`
+    - `meta.decisionVersion`
+  - snapshot 现已开始对外提供：
+    - `decisionSummary`
+    - `toolTraces`
+- 前端状态第一刀已跟上：
+  - `src/components/crucible/types.ts`
+  - `src/components/crucible/storage.ts`
+  - `src/components/crucible/CrucibleWorkspaceView.tsx`
+  - 不再继续持久化 / 读取：
+    - `questionSource`
+    - `engineMode`
+  - 已开始持久化 / 消费：
+    - `decisionSummary`
+    - `toolTraces`
+- UI 误导口径已收一刀：
+  - `src/components/StatusFooter.tsx`
+  - `Loaded Skills` 已改成 `Skills Available`
+  - 避免继续暗示“已同步 skill = 本轮实际执行过”
+- 测试口径已翻过去：
+  - `src/__tests__/crucible-orchestrator.test.ts`
+  - `src/__tests__/crucible-research.test.ts`
+  - 已不再测试宿主判搜索 / 宿主拼 query
+  - 改为测试：
+    - decision prompt 契约
+    - composition prompt 注入真实 tool trace
+    - researcher executor 的解析与执行
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run test:run -- src/__tests__/crucible-orchestrator.test.ts src/__tests__/crucible-research.test.ts`：通过
+
+### ⚠️ 当前仍未完成
+
+- `FactChecker` 仍只有真实 trace 骨架，尚未接入完整执行器
+- 前端虽然已开始消费 `toolTraces`，但还没有形成完整的“历史中心可回看执行轨迹”体验
+- `server/crucible.ts` 主链已经从宿主判定退出，但尚未补更完整的 decision / tool schema 验证
+- 旧运行时数据里仍可能残留早期 `questionSource / engineMode` 快照，需要后续继续迁清
+
+### 下一步建议
+
+1. 继续做第二刀：
+   - 给 `FactChecker` 补真实执行器骨架
+   - 给 decision / tool trace 加 schema 校验
+2. 再做第三刀：
+   - 历史详情与前端 UI 更完整接入 trace
+   - 彻底把“已同步技能”和“本轮执行工具”拆开
+3. 最后再做真人 smoke：
+   - 不联网一轮
+   - 联网 research 一轮
+   - tool skipped / failed 一轮
+
+## 2026-04-02（晚）宿主边界根治第二刀：schema、FactChecker 骨架、历史 trace
+
+### ✅ 本轮已完成
+
+- 新增 runtime schema：
+  - `src/schemas/crucible-runtime.ts`
+  - 当前已正式校验：
+    - `SocratesDecision`
+    - `ToolExecutionTrace`
+    - composition 输出 payload
+- `server/crucible.ts` 已接入 schema 校验：
+  - decision pass 不再只是 JSON parse
+  - composition pass 也不再只是 JSON parse
+  - 两次 Socrates 输出都已进入 runtime schema 校验
+- `FactChecker` 独立执行器骨架已建立：
+  - `server/crucible-factcheck.ts`
+  - 当前行为是：
+    - 返回结构化 “checked=false / claims=[] / error=尚未接 provider”
+    - 不再由主链内联一段宿主占位逻辑冒充执行器
+- 历史中心已开始展示真实 trace：
+  - `src/components/crucible/CrucibleHistorySheet.tsx`
+  - 当前详情区已可看到：
+    - `decisionSummary`
+    - 本轮执行工具
+    - tool 状态
+    - query / error
+- 新增测试：
+  - `src/__tests__/crucible-factcheck.test.ts`
+  - `src/__tests__/schemas/crucible-runtime.test.ts`
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run test:run -- src/__tests__/crucible-orchestrator.test.ts src/__tests__/crucible-research.test.ts src/__tests__/crucible-factcheck.test.ts src/__tests__/schemas/crucible-runtime.test.ts`：通过
+- 代码面已确认不再存在这些旧宿主判定入口：
+  - `detectCrucibleSearchIntent`
+  - `buildCrucibleSearchQuery`
+  - `buildCrucibleResearchPromptAddon`
+  - `createCrucibleOrchestratorPlan`
+  - `questionSource`
+  - `engineMode`
+
+### ⚠️ 当前仍未完成
+
+- `FactChecker` 还只是结构化执行器骨架，未接真实 provider / claim 抽取逻辑
+- 历史中心目前能看 trace，但还没有更细的“decision 原文 / tool output 摘要 / claim 级明细”阅读体验
+- 当前工作区仍混有与本轮无关的设计文档现场：
+  - `docs/02_design/crucible/_master.md`
+  - `docs/02_design/crucible/2026-04-02_GoldenCrucible_Expert_Brief_And_Roadmap_Context.md`
+  - 后续提交本轮整改时需要与这两份分开处理
+
+### 下一步建议
+
+1. 继续做第三刀：
+   - 给 `FactChecker` 增加最小 claim 输入 / 输出协议
+   - 再补一层 tool output summary UI
+2. 然后做第四刀：
+   - agent-browser 走一轮真实网页 smoke
+   - 验证 research 成功 / skipped / failed 时的体验
+
 ### 本轮新增：下一轮整改必须先按根治方案推进
 
 用户进一步明确要求：
@@ -2433,3 +2615,81 @@ LLM_PROVIDER=siliconflow  # 修改前：deepseek
 2. 新深度方案文档
    - `docs/plans/2026-04-02_GoldenCrucible_Host_Boundary_RootFix_Implementation_Plan.md`
    - 该文档会作为下一轮代码整改的直接蓝图
+
+## 2026-04-02 17:06（按老杨协议补做交接落盘）
+
+### ✅ 本轮补充保存
+
+- 已重新核对当前分支：
+  - `MHSDC-GC-SAAS-staging`
+- 已重新核对当前 worktree：
+  - 宿主边界整改代码仍未提交，属于正常进行中现场
+  - 当前窗口可以直接压缩上下文或切新窗口，不需要重新梳理架构背景
+- 已补写 `docs/dev_logs/HANDOFF.md`
+  - 时间戳更新到分钟级
+  - 明确区分：
+    - 本轮整改相关代码
+    - 与本轮整改无关、提交时必须隔离的设计文档现场
+
+### 📌 当前可直接接续的开发面
+
+根治第二刀已经完成，当前真正的开发入口只剩：
+
+1. 第三刀：
+   - `FactChecker` 最小 claim 协议
+   - 更细的 tool output / trace UI
+2. 第四刀：
+   - `agent-browser` 真实网页 smoke
+   - 验证：
+     - 不联网一轮
+     - Researcher 一轮
+     - tool skipped / failed 一轮
+
+### ⚠️ 交接提醒
+
+- 下一轮继续开发时，不要再回到：
+  - 宿主判搜索
+  - 宿主拼 query
+  - 宿主写业务 fallback
+  - 静态 `Loaded Skills` 冒充本轮执行轨迹
+- 若准备提交本轮整改，先把下面两份与本轮无关的设计文档隔离：
+  - `docs/02_design/crucible/_master.md`
+  - `docs/02_design/crucible/2026-04-02_GoldenCrucible_Expert_Brief_And_Roadmap_Context.md`
+
+## 2026-04-06 20:51（MHSDC Codex 治理主线收口）
+
+### ✅ 本轮已完成
+
+- 已完成 `MHSDC` Codex 端治理主线收口，新增或收口的核心资产包括：
+  - `docs/dev_logs/2026-04-06_MHSDC_DeliveryConsole_Path_And_Git_Facts.md`
+  - `docs/plans/2026-04-06_MHSDC_OldYang_Governance_Structuring_And_Planning.md`
+  - `docs/plans/2026-04-06_MHSDC_Historical_Asset_Index.md`
+  - `docs/plans/2026-04-06_MHSDC_OldYang_Spec_Absorption_Checklist.md`
+  - `skills/oldyang/SKILL.md`
+  - `skills/oldyang/references/`
+  - `docs/plans/2026-04-06_MHSDC_Entry_Slimming_Checklist.md`
+  - `docs/dev_logs/2026-04-06_MHSDC_OldYang_Governance_Handoff.md`
+  - `docs/plans/2026-04-06_Claude_Team_Governance_Manual.md`
+- 已按老杨协议补齐：
+  - `docs/dev_logs/HANDOFF.md`
+  - `docs/dev_logs/2026-04-06.md`
+
+### 🎯 本轮结论
+
+- 当前 Codex 端已经不再缺治理骨架：
+  - 事实层稳定
+  - `oldyang` 真实骨架已落地
+  - 历史资产已完成第一轮编目
+  - 入口瘦身方向已明确
+  - 老杨与 Claude 两侧交接文档均已成稿
+- 后续若继续推进，更适合进入：
+  - 实际改写仓级 / 模块级入口
+  - 或按这套治理骨架推进后续协作
+
+### ⚠️ 当前说明
+
+- 当前 worktree 仍不干净；治理文档现场与宿主边界整改代码现场仍需隔离
+- 后续不要再回退到：
+  - `oldyang-global`
+  - 第二套重治理正文
+  - 重新脑补 `DeliveryConsole-main` / `DeliveryConsole` 的目录角色

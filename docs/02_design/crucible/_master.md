@@ -1,7 +1,7 @@
 # 🔥 黄金坩埚 (Golden Crucible) 大纲
 
 > **状态**: 本地 Phase 1-dev 已完成 | 产品 Phase 1（SaaS Demo）待推进 | Phase 2（Roundtable）待启动
-> **最新修订**: 2026-03-19
+> **最新修订**: 2026-04-02
 > **负责人**: OldYang
 
 ## 1. 模块概述
@@ -36,6 +36,7 @@
 ## 4. 关联设计文档
 | 文件 | 说明 | 状态 |
 | --- | --- | --- |
+| [2026-04-02_GoldenCrucible_Expert_Brief_And_Roadmap_Context.md](/Users/luzhoua/MHSDC/GoldenCrucible-SaaS/docs/02_design/crucible/2026-04-02_GoldenCrucible_Expert_Brief_And_Roadmap_Context.md) | 面向外部专家沟通的项目概况与路线图提纲 | ✅ |
 | [2026-03-19_GoldenCrucible_Phase_Definition_Alignment.md](/Users/luzhoua/MHSDC/GoldenCrucible/docs/plans/2026-03-19_GoldenCrucible_Phase_Definition_Alignment.md) | 当前阶段口径 SSOT | ✅ |
 | [2026-03-19_GoldenCrucible_SaaS_Implementation_Plan.md](/Users/luzhoua/MHSDC/GoldenCrucible/docs/plans/2026-03-19_GoldenCrucible_SaaS_Implementation_Plan.md) | SaaS Demo 实施方案 | ✅ |
 | [2026-03-12_SD214_Crucible_Two_Phase_Roadmap bk.md](/Users/luzhoua/MHSDC/GoldenCrucible/docs/plans/2026-03-12_SD214_Crucible_Two_Phase_Roadmap%20bk.md) | 本地主链收口与 Phase 2 圆桌前置层方案 | ✅ |
@@ -46,5 +47,6 @@
 ## 5. 变更日志
 | 日期 | 变更 | 关联 |
 | --- | --- | --- |
+| 2026-04-02 | 新增面向外部专家沟通的整体概况与路线图提纲 | Codex |
 | 2026-03-19 | 明确三条口径：本地 Phase 1-dev 已完成、产品 Phase 1 仍含 SaaS demo、Roundtable 归入 Phase 2 | 老杨 |
 | 2026-03-06 | 初始创建（文档体系重构） | 老杨 |

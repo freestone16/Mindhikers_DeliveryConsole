@@ -4,22 +4,29 @@ import type { Request, Response } from 'express';
 import { loadConfig } from './llm-config';
 import { loadSkillKnowledge } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
+import {
+    SkillOutputPayloadSchema,
+    SocratesDecisionSchema,
+    type SkillOutputPayloadShape,
+} from '../src/schemas/crucible-runtime';
 import { loadCrucibleSoulRegistry, loadRegisteredSoulProfiles } from './crucible-soul-loader';
 import {
-    buildSocratesPrompt,
+    buildSocratesCompositionPrompt,
+    buildSocratesDecisionPrompt,
     type CruciblePair,
     type DialoguePayload,
     type InputCard,
     type PresentableDraft,
     type PromptContext,
+    type SocratesDecision,
     type SkillOutputPayload,
+    type ToolExecutionTrace,
 } from './crucible-orchestrator';
 import {
-    buildCrucibleResearchPromptAddon,
-    detectCrucibleSearchIntent,
     performCrucibleExternalSearch,
     type CrucibleSearchResult,
 } from './crucible-research';
+import { performCrucibleFactCheck } from './crucible-factcheck';
 import {
     appendTurnToCrucibleConversation,
     resolveCruciblePersistenceContext,
@@ -273,6 +280,17 @@ interface CrucibleTurnParams {
     scriptPath: string;
 }
 
+export const detectThesisConvergence = (
+    roundIndex: number,
+    source: 'socrates' | 'fallback',
+    decision?: SocratesDecision,
+): boolean => (
+    roundIndex >= 5
+    && source === 'socrates'
+    && !!decision?.stageLabel
+    && decision.stageLabel === 'crystallization'
+);
+
 export interface CrucibleTurnResult {
     conversationId: string;
     source: 'socrates' | 'fallback';
@@ -280,6 +298,9 @@ export interface CrucibleTurnResult {
     dialogue: DialoguePayload;
     presentables: MaterializedPresentable[];
     topicSuggestion?: string;
+    decision?: SocratesDecision;
+    toolTraces?: ToolExecutionTrace[];
+    thesisReady?: boolean;
 }
 
 type CrucibleTurnEvent =
@@ -355,6 +376,152 @@ const callConfiguredLlm = async (
     return data.choices?.[0]?.message?.content || '';
 };
 
+const normalizeDecision = (
+    raw: Partial<SocratesDecision>,
+    roundIndex: number,
+): SocratesDecision => {
+    const toolRequests = Array.isArray(raw.toolRequests)
+        ? raw.toolRequests
+            .filter((item) => item?.tool === 'Researcher' || item?.tool === 'FactChecker')
+            .map((item) => ({
+                tool: item.tool,
+                mode: item.mode === 'primary' ? 'primary' : 'support',
+                reason: normalizeText(item.reason || '', `${item.tool} 在本轮进入支援位`),
+                ...(typeof item.query === 'string' && item.query.trim() ? { query: item.query.trim() } : {}),
+                ...(typeof item.goal === 'string' && item.goal.trim() ? { goal: item.goal.trim() } : {}),
+                ...(typeof item.scope === 'string' && item.scope.trim() ? { scope: item.scope.trim() } : {}),
+            }))
+        : [];
+
+    return {
+        version: 'decision-v1',
+        speaker: raw.speaker === DEFAULT_PAIR.synthesizerSlug ? DEFAULT_PAIR.synthesizerSlug : DEFAULT_PAIR.challengerSlug,
+        reflectionIntent: normalizeText(raw.reflectionIntent || '', '继续贴着用户刚才那句，把真正的焦点再压紧一层。'),
+        focus: normalizeText(raw.focus || '', roundIndex <= 2 ? '先把命题边界说清。' : '继续收束真正的焦点。'),
+        needsResearch: Boolean(raw.needsResearch || toolRequests.some((request) => request.tool === 'Researcher')),
+        needsFactCheck: Boolean(raw.needsFactCheck || toolRequests.some((request) => request.tool === 'FactChecker')),
+        toolRequests,
+        ...(typeof raw.stageLabel === 'string' && raw.stageLabel.trim() ? { stageLabel: raw.stageLabel.trim().slice(0, 24) } : {}),
+    };
+};
+
+const parseDecisionPayload = (raw: string, roundIndex: number): SocratesDecision => {
+    const parsed = JSON.parse(extractJsonObject(raw));
+    const validated = SocratesDecisionSchema.parse(parsed);
+    return normalizeDecision(validated as Partial<SocratesDecision>, roundIndex);
+};
+
+const parseSkillOutputPayload = (raw: string): SkillOutputPayloadShape => {
+    const parsed = JSON.parse(extractJsonObject(raw));
+    return SkillOutputPayloadSchema.parse(parsed);
+};
+
+const buildSkippedTrace = (
+    tool: 'Researcher' | 'FactChecker',
+    reason: string,
+    input: ToolExecutionTrace['input'],
+): ToolExecutionTrace => {
+    const timestamp = new Date().toISOString();
+    return {
+        tool,
+        requestedBy: 'Socrates',
+        mode: 'support',
+        status: 'skipped',
+        reason,
+        input,
+        error: reason,
+        startedAt: timestamp,
+        finishedAt: timestamp,
+    };
+};
+
+const executeRequestedTools = async (
+    decision: SocratesDecision,
+): Promise<{
+    toolTraces: ToolExecutionTrace[];
+    researchResult?: CrucibleSearchResult;
+}> => {
+    const toolTraces: ToolExecutionTrace[] = [];
+    let researchResult: CrucibleSearchResult | undefined;
+
+    for (const request of decision.toolRequests) {
+        const startedAt = new Date().toISOString();
+
+        if (request.tool === 'Researcher') {
+            if (!request.query) {
+                toolTraces.push({
+                    tool: 'Researcher',
+                    requestedBy: 'Socrates',
+                    mode: request.mode,
+                    status: 'skipped',
+                    reason: request.reason,
+                    input: {
+                        goal: request.goal,
+                        query: request.query,
+                    },
+                    error: 'Socrates 未提供 research query，宿主未执行 Researcher',
+                    startedAt,
+                    finishedAt: new Date().toISOString(),
+                });
+                continue;
+            }
+
+            const result = await performCrucibleExternalSearch(request.query);
+            researchResult = result;
+            toolTraces.push({
+                tool: 'Researcher',
+                requestedBy: 'Socrates',
+                mode: request.mode,
+                status: result.connected ? 'success' : 'failed',
+                reason: request.reason,
+                input: {
+                    query: request.query,
+                    goal: request.goal,
+                },
+                output: result,
+                ...(result.error ? { error: result.error } : {}),
+                startedAt,
+                finishedAt: new Date().toISOString(),
+            });
+            continue;
+        }
+
+        if (request.tool === 'FactChecker') {
+            const result = await performCrucibleFactCheck({
+                goal: request.goal,
+                scope: request.scope,
+            });
+            toolTraces.push({
+                tool: 'FactChecker',
+                requestedBy: 'Socrates',
+                mode: request.mode,
+                status: result.checked ? 'success' : 'skipped',
+                reason: request.reason,
+                input: {
+                    goal: request.goal,
+                    scope: request.scope,
+                },
+                output: result,
+                error: result.error,
+                startedAt,
+                finishedAt: new Date().toISOString(),
+            });
+        }
+    }
+
+    if (decision.needsResearch && !toolTraces.some((trace) => trace.tool === 'Researcher')) {
+        toolTraces.push(buildSkippedTrace('Researcher', 'Socrates 标记 needsResearch=true，但未给出 Researcher toolRequest', {}));
+    }
+    if (decision.needsFactCheck && !toolTraces.some((trace) => trace.tool === 'FactChecker')) {
+        toolTraces.push(buildSkippedTrace('FactChecker', 'Socrates 标记 needsFactCheck=true，但未给出 FactChecker toolRequest', {}));
+    }
+
+    return {
+        toolTraces,
+        researchResult,
+    };
+};
+
 const resolveCrucibleTurn = async (
     params: CrucibleTurnParams,
     persistence: CruciblePersistenceContext,
@@ -385,35 +552,47 @@ const resolveCrucibleTurn = async (
     };
     const skillSummary = loadSkillKnowledge('Socrates');
     const speakerSoul = loadSpeakerSoul(roundIndex, DEFAULT_PAIR);
-    const searchRequested = detectCrucibleSearchIntent(promptContext);
-    let researchResult: CrucibleSearchResult | undefined;
 
     try {
-        const promptStartedAt = Date.now();
-        if (searchRequested) {
-            const researchStartedAt = Date.now();
-            researchResult = await performCrucibleExternalSearch(promptContext);
+        const decisionPromptStartedAt = Date.now();
+        const decisionPrompt = buildSocratesDecisionPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul);
+        console.log(`[CrucibleTiming] decision-prompt round=${roundIndex} duration=${formatDurationMs(decisionPromptStartedAt)} promptChars=${decisionPrompt.length}`);
+
+        const decisionRaw = await callConfiguredLlm(decisionPrompt, options?.byokConfig || undefined);
+        const decision = parseDecisionPayload(decisionRaw, roundIndex);
+
+        const toolStartedAt = Date.now();
+        const { toolTraces, researchResult } = await executeRequestedTools(decision);
+        const researcherTrace = toolTraces.find((trace) => trace.tool === 'Researcher');
+        if (researcherTrace) {
             console.log(
-                `[CrucibleTiming] research round=${roundIndex} connected=${researchResult.connected} duration=${formatDurationMs(researchStartedAt)} query="${researchResult.query}" results=${researchResult.sources.length}`
+                `[CrucibleTiming] research round=${roundIndex} status=${researcherTrace.status} duration=${formatDurationMs(toolStartedAt)} query="${researchResult?.query || researcherTrace.input.query || ''}" results=${researchResult?.sources.length || 0}`
             );
-            if (!researchResult.connected && researchResult.error) {
-                console.warn(`[Crucible] External search unavailable: ${researchResult.error}`);
+            if (researcherTrace.error) {
+                console.warn(`[Crucible] Researcher trace: ${researcherTrace.error}`);
             }
         }
 
-        const prompt = `${buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul)}${
-            researchResult ? buildCrucibleResearchPromptAddon(researchResult) : ''
-        }`;
-        console.log(`[CrucibleTiming] prompt round=${roundIndex} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
+        const compositionPromptStartedAt = Date.now();
+        const compositionPrompt = buildSocratesCompositionPrompt(
+            promptContext,
+            DEFAULT_PAIR,
+            skillSummary,
+            speakerSoul,
+            decision,
+            toolTraces,
+        );
+        console.log(`[CrucibleTiming] composition-prompt round=${roundIndex} duration=${formatDurationMs(compositionPromptStartedAt)} promptChars=${compositionPrompt.length}`);
 
         const parseStartedAt = Date.now();
-        const raw = await callConfiguredLlm(prompt, options?.byokConfig || undefined);
-        const jsonText = extractJsonObject(raw);
-        const parsed = JSON.parse(jsonText) as Partial<SkillOutputPayload & { topicSuggestion?: string }>;
+        const raw = await callConfiguredLlm(compositionPrompt, options?.byokConfig || undefined);
+        const parsed = parseSkillOutputPayload(raw) as SkillOutputPayload & { topicSuggestion?: string };
         const topicSuggestion = (roundIndex >= 3 && typeof parsed.topicSuggestion === 'string')
             ? parsed.topicSuggestion.trim().slice(0, 32) || undefined
             : undefined;
-        const speaker = parsed.speaker === DEFAULT_PAIR.synthesizerSlug ? DEFAULT_PAIR.synthesizerSlug : DEFAULT_PAIR.challengerSlug;
+        const speaker = parsed.speaker === DEFAULT_PAIR.synthesizerSlug
+            ? DEFAULT_PAIR.synthesizerSlug
+            : (parsed.speaker === DEFAULT_PAIR.challengerSlug ? DEFAULT_PAIR.challengerSlug : decision.speaker);
         const reflection = normalizeText(
             parsed.reflection || '',
             speaker === DEFAULT_PAIR.synthesizerSlug
@@ -441,7 +620,9 @@ const resolveCrucibleTurn = async (
             accessMode: options?.accessMode || 'platform',
             seedPrompt,
             latestUserReply,
-            searchRequested,
+            decision,
+            toolTraces,
+            searchRequested: decision.needsResearch,
             searchConnected: researchResult?.connected || false,
             research: researchResult,
             speaker,
@@ -458,7 +639,10 @@ const resolveCrucibleTurn = async (
             source: 'socrates',
             dialogue,
             presentables,
+            decision,
+            toolTraces,
             ...(topicSuggestion ? { topicSuggestion } : {}),
+            thesisReady: detectThesisConvergence(roundIndex, 'socrates', decision) || undefined,
         };
     } catch (error: any) {
         console.error(`[Crucible] Turn generation failed after ${formatDurationMs(startedAt)}:`, error.message);
