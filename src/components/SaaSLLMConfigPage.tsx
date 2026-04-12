@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, Check, Eye, EyeOff, KeyRound, Loader2, Trash2 } from 'lucide-react';
+import {
+    AlertCircle,
+    ArrowLeft,
+    Check,
+    Clock,
+    Eye,
+    EyeOff,
+    HelpCircle,
+    KeyRound,
+    Loader2,
+    Sparkles,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { buildApiUrl } from '../config/runtime';
 
 interface SaaSLLMConfigPageProps {
@@ -41,6 +54,39 @@ const KIMI_DEFAULTS = {
     model: 'kimi-k2.5',
 };
 
+const RECOMMENDED_PROVIDERS = [
+    { label: 'Kimi 原厂', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.5', desc: '平台默认，稳定中文体验' },
+    { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'deepseek/deepseek-chat-v3-0324:free', desc: '聚合多模型，有免费额度' },
+    { label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', desc: '性价比高，中文能力强' },
+];
+
+const ERROR_CATEGORY_META: Record<string, { icon: typeof AlertCircle; toneClass: string; suggestion?: string }> = {
+    config_incomplete: {
+        icon: HelpCircle,
+        toneClass: 'border-[rgba(208,141,88,0.32)] bg-[rgba(255,248,237,0.95)] text-[rgb(150,96,49)]',
+        suggestion: '请检查所有必填字段是否已填写',
+    },
+    timeout: {
+        icon: Clock,
+        toneClass: 'border-[rgba(204,170,96,0.32)] bg-[rgba(255,252,236,0.95)] text-[rgb(140,108,44)]',
+        suggestion: '请检查 Base URL 是否正确，或网络是否可达',
+    },
+    key_invalid: {
+        icon: XCircle,
+        toneClass: 'border-[rgba(188,120,92,0.3)] bg-[rgba(255,241,238,0.95)] text-[rgb(145,84,57)]',
+        suggestion: 'API Key 无效，请检查是否正确复制',
+    },
+    model_unavailable: {
+        icon: Sparkles,
+        toneClass: 'border-[rgba(156,123,191,0.3)] bg-[rgba(247,240,255,0.95)] text-[rgb(112,83,156)]',
+        suggestion: '模型不可用，请确认服务商支持该模型 ID',
+    },
+    api_error: {
+        icon: AlertCircle,
+        toneClass: 'border-[rgba(188,120,92,0.24)] bg-[rgba(255,244,240,0.92)] text-[rgb(145,84,57)]',
+    },
+};
+
 export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConfigPageProps) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -54,7 +100,7 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
     const [apiKey, setApiKey] = useState('');
     const [notice, setNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [testResult, setTestResult] = useState<{ success: boolean; latency?: number; error?: string } | null>(null);
+    const [testResult, setTestResult] = useState<{ success: boolean; latency?: number; error?: string; errorCategory?: string } | null>(null);
 
     const refresh = async () => {
         setLoading(true);
@@ -207,6 +253,18 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
         return trialStatus.message;
     }, [trialStatus]);
 
+    const normalizedProvider = useMemo(() => ({
+        label: providerLabel.trim(),
+        baseUrl: baseUrl.trim(),
+        model: model.trim(),
+    }), [baseUrl, model, providerLabel]);
+
+    const errorMeta = testResult?.errorCategory
+        ? (ERROR_CATEGORY_META[testResult.errorCategory] || ERROR_CATEGORY_META.api_error)
+        : null;
+    const ErrorIcon = errorMeta?.icon || AlertCircle;
+    const errorToneClass = errorMeta?.toneClass || ERROR_CATEGORY_META.api_error.toneClass;
+
     return (
         <div className="min-h-screen bg-[var(--shell-bg)] text-[var(--ink-1)]">
             <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-6 lg:px-8">
@@ -233,7 +291,19 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                         <div>
                             <div className="text-sm font-medium text-[var(--ink-1)]">当前口径</div>
                             <div className="mt-1 text-sm leading-7 text-[var(--ink-2)]">
-                                平台默认推荐 <strong>Kimi 原厂 k2.5</strong>。如果免费额度用完，你可以填写自己的 `Base URL / API Key / Model` 继续使用。
+                                <details className="group">
+                                    <summary className="cursor-pointer text-sm leading-7 text-[var(--ink-2)]">
+                                        平台默认推荐 <strong>Kimi 原厂 k2.5</strong>，点击了解 BYOK 场景与字段说明。
+                                    </summary>
+                                    <div className="mt-2 space-y-2 text-[13px] leading-6 text-[var(--ink-2)]">
+                                        <div>何时需要 BYOK：免费额度用完 / 需要特定模型 / 需要更大 token 窗口。</div>
+                                        <ul className="space-y-1 text-[13px] text-[var(--ink-2)]">
+                                            <li><strong>Base URL</strong>：服务商的 OpenAI-compatible API 地址</li>
+                                            <li><strong>API Key</strong>：服务商后台获取</li>
+                                            <li><strong>Model</strong>：服务商支持的模型 ID</li>
+                                        </ul>
+                                    </div>
+                                </details>
                             </div>
                             <div className="mt-2 text-xs text-[var(--ink-3)]">{quotaHint}</div>
                         </div>
@@ -351,9 +421,14 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                                 ) : null}
 
                                 {error ? (
-                                    <div className="flex items-start gap-2 rounded-2xl border border-[rgba(188,120,92,0.24)] bg-[rgba(255,244,240,0.92)] px-3 py-2 text-sm text-[rgb(145,84,57)]">
-                                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                                        <span>{error}</span>
+                                    <div className={`flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm ${errorToneClass}`}>
+                                        <ErrorIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                                        <div>
+                                            <div>{error}</div>
+                                            {errorMeta?.suggestion ? (
+                                                <div className="mt-1 text-xs text-[var(--ink-3)]">建议：{errorMeta.suggestion}</div>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 ) : null}
                             </div>
@@ -380,10 +455,32 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                             </div>
                             <div className="rounded-2xl bg-[var(--surface-0)] px-3 py-3">
                                 <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">推荐模板</div>
-                                <div className="mt-2 space-y-1 text-[12px] text-[var(--ink-3)]">
-                                    <div>{KIMI_DEFAULTS.providerLabel}</div>
-                                    <div>{KIMI_DEFAULTS.baseUrl}</div>
-                                    <div>{KIMI_DEFAULTS.model}</div>
+                                <div className="mt-2 space-y-2 text-[12px] text-[var(--ink-3)]">
+                                    {RECOMMENDED_PROVIDERS.map((provider) => {
+                                        const isSelected = provider.label === normalizedProvider.label
+                                            && provider.baseUrl === normalizedProvider.baseUrl
+                                            && provider.model === normalizedProvider.model;
+                                        return (
+                                            <button
+                                                key={provider.label}
+                                                type="button"
+                                                onClick={() => {
+                                                    setProviderLabel(provider.label);
+                                                    setBaseUrl(provider.baseUrl);
+                                                    setModel(provider.model);
+                                                }}
+                                                className={`w-full rounded-2xl border px-3 py-2.5 text-left transition-colors ${isSelected
+                                                    ? 'border-[var(--accent)] bg-[rgba(255,243,226,0.92)] text-[var(--ink-1)] shadow-[0_10px_24px_rgba(166,121,78,0.14)]'
+                                                    : 'border-[var(--line-soft)] bg-white/70 text-[var(--ink-2)] hover:border-[var(--line-strong)]'
+                                                }`}
+                                            >
+                                                <div className="text-sm font-medium text-[var(--ink-1)]">{provider.label}</div>
+                                                <div className="mt-1 text-[12px] text-[var(--ink-3)]">{provider.desc}</div>
+                                                <div className="mt-2 text-[12px] text-[var(--ink-2)]">{provider.baseUrl}</div>
+                                                <div className="text-[11px] text-[var(--ink-3)]">{provider.model}</div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
