@@ -98,9 +98,8 @@ ${dialecticMap}
 3. 使用 Markdown 格式
 4. 直接输出论文全文，不要输出任何解释`;
 };
-
 const summarizeText = (value: string, maxLength = 96) => {
-    const normalized = value.replace(//g, '').trim();
+    const normalized = value.replace(/[\r\n]/g, '').trim();
     if (!normalized) {
         return '';
     }

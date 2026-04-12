@@ -1,4 +1,4 @@
-🕐 Last updated: 2026-04-12 18:10
+🕐 Last updated: 2026-04-12 20:30
 🌿 Branch: MHSDC-GC-SAAS-staging
 📍 Scope: MHSDC/GoldenCrucible-SaaS
 
@@ -6,7 +6,7 @@
 
 ## Goal
 
-执行 GoldenCrucible-SaaS V1 实施计划，当前在 **Phase 3 — Unit 7 Staging Acceptance** 前夜。
+执行 GoldenCrucible-SaaS V1 实施计划。**Phase 1/2/3 全部本地验证完成，staging 冒烟待执行。**
 
 ## 实施计划
 
@@ -34,44 +34,34 @@
 | Unit 3 ThesisWriter API + Artifact | MIN-120 | `db75abb` | `crucible-thesiswriter.ts` 新建 + `appendCrucibleThesisArtifact` + 前端下载 |
 | Unit 4 Thesis Trial Quota | MIN-121 | `f70d001` | 平台用户限 2 次论文 + BYOK/VIP 无限制 + 前端额度展示 |
 
-## Phase 3 — 待执行 🔲
+## Phase 3 — 本地验证完成 ✅ / Staging 冒烟待执行 🔲
 
-| Unit | Linear | 内容 |
-|------|--------|------|
-| Unit 7 Staging Acceptance | — | 全链路冒烟 + HANDOFF 回写 + 最终提交 |
+| 验证项 | 结果 |
+|--------|------|
+| `npm run build` | ✅ 通过（1950 modules, 1.95s） |
+| `npx vitest run` | ✅ 12 文件 / 50 测试全通过 |
+| 本地服务启动 | ✅ 前端 5183 + 后端 3010 正常 |
+| API 端点可达性 | ✅ 6 个核心端点全部验证 |
+| 认证网关 | ✅ 未认证请求正确返回 401 |
+| `crucible-thesiswriter.ts` 正则修复 | ✅ `[\r\n]` 替换断行字面量 |
+| Smoke Request 文件 | ✅ TREQ-004/005/006/007 已创建 |
 
 ---
 
-## Unit 2 变更清单（`d3b04ed`）
+## Phase 3 修复清单
 
-- `server/crucible.ts`：`detectThesisConvergence()` 纯函数 + `CrucibleTurnResult.thesisReady`
-- `server/crucible-persistence.ts`：`CrucibleConversationSnapshot.thesisReady` + 快照推导
-- `src/components/crucible/types.ts`：`CrucibleTurnResponse.thesisReady` + `CrucibleSnapshot.thesisReady`
-- `src/components/crucible/CrucibleWorkspaceView.tsx`：`thesisReady` state + SSE 捕获 + 快照持久化
-- `src/SaaSApp.tsx`：`crucibleThesisReady` state + hydrate/reset + 传递给 ChatPanel
-- `src/components/ChatPanel.tsx`：`thesisReady` + `onEnterThesisWriter` props + CTA 卡片（Sparkles 图标）
-- `server/__tests__/crucible-thesis-convergence.test.ts`：6 个收敛检测场景
-- `src/components/__tests__/crucible-thesis-entry.test.tsx`：4 个 CTA 显示/点击场景
-- 额外：Socrates decision 重构、FactChecker 集成、schemas、history 增强
+- `server/crucible-thesiswriter.ts:103`：正则表达式语法错误
+  - 原：`value.replace(/` + 字面量换行 → `Unterminated regular expression`
+  - 修：`value.replace(/[\r\n]/g, '')`
 
-## Unit 3 变更清单（`db75abb`）
+## Smoke Request 目录
 
-- `server/crucible-thesiswriter.ts`（新建）：thesis 生成处理器
-  - 收敛校验 → 辩证地图构建 → ThesisWriter prompt → LLM 调用（支持 BYOK）→ artifact 保存
-- `server/crucible-persistence.ts`：`appendCrucibleThesisArtifact` 函数
-- `server/index.ts`：`POST /api/crucible/thesis/generate` 路由
-- `src/SaaSApp.tsx`：`isGeneratingThesis` / `thesisError` state + `handleEnterThesisWriter` 回调 + Markdown 下载
-
-## Unit 4 变更清单（`f70d001`）
-
-- `server/crucible-trial.ts`：
-  - `CRUCIBLE_THESIS_TRIAL_LIMIT = 2`
-  - `CrucibleThesisTrialStatus` 接口
-  - `getCrucibleThesisTrialStatus`：遍历 conversation artifacts 计数 `thesis_` 前缀
-  - `assertCrucibleThesisTrialAccess`：平台模式阻止超额
-- `server/crucible-thesiswriter.ts`：LLM 调用前增加 trial 校验（BYOK 跳过）
-- `server/index.ts`：`GET /api/crucible/thesis/trial-status` 端点
-- `src/SaaSApp.tsx`：`thesisTrialStatus` state + fetch effect + CTA 额度拦截 + warning 展示
+| TREQ | 文件 | 覆盖 |
+|------|------|------|
+| TREQ-004 | `core-dialogue-smoke` | 对话主链：新建 → 3轮 → 刷新恢复 → 继续对话 |
+| TREQ-005 | `history-and-export-smoke` | 历史列表、active 恢复、bundle-json / markdown 导出 |
+| TREQ-006 | `thesiswriter-smoke` | 收敛触发 → CTA → 生成论文 → artifact → trial 额度 |
+| TREQ-007 | `byok-smoke` | BYOK 配置 → 连通性测试 → 对谈 → 论文 → 清除回退 |
 
 ---
 
@@ -131,8 +121,10 @@ CrucibleTurnResult.thesisReady (server)
 
 ## 下一步
 
-1. **Phase 3 — Unit 7 Staging Acceptance**
-   - 全链路冒烟：启动服务 → 创建对话 → 收敛触发 → CTA 出现 → 生成论文 → 验证 artifact → 导出
-   - `npm run build` + `npx vitest run` 全量验证
-   - HANDOFF 回写 + 父 issue MIN-94 更新
-2. 建议在新 session 中执行，当前上下文已消耗约 45%
+1. **staging 环境全链路冒烟**
+   - 部署最新代码到 Railway staging（`MHSDC-GC-SAAS-staging` 分支）
+   - 用 Google 账号登录执行 TREQ-004/005/006/007
+   - 每条 smoke 写 report + evidence
+2. **production 环境至少一条主链 smoke**
+3. **Linear MIN-94 父 issue 状态更新**（标记 Phase 3 完成）
+4. **最终提交**：正则修复 + smoke request 文件 → `refs MIN-108 add staging acceptance smoke requests and regex fix`
