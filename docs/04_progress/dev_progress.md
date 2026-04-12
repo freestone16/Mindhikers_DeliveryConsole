@@ -1,7 +1,7 @@
 # Development Progress - GoldenCrucible-Roundtable
 
 > **Project**: GoldenCrucible-Roundtable  
-> **Current Phase**: Unit 4 Complete - Spike 提取 + 持久化  
+> **Current Phase**: Unit 5 Complete - Spike → 深聊桥接  
 > **Last Updated**: 2026-04-12
 
 ---
@@ -137,18 +137,11 @@
 
 ## 下一阶段
 
-### Unit 5: Spike → 深聊桥接 🔄
+### Unit 6: 前端侧边栏 + 导演 UI ⏳
 
-**目标**: 将提取的 Spike 桥接到深聊（DeepDive）模式
+**目标**: 前端侧边栏 UI + 导演控制面板
 
-**交付物**:
-- Spike → DeepDive 桥接逻辑
-- DeepDive 端点
-- 相关测试
-
-**参考文档**: 待创建
-
-**Linear Issue**: MIN-116
+**Linear Issue**: MIN-117
 
 ---
 
@@ -157,9 +150,9 @@
 | 指标 | 状态 | 备注 |
 |------|------|------|
 | TypeScript | ✅ 零错误 | `typecheck:full` 通过 |
-| 测试 | ✅ 41 passing, 2 skipped | Unit 1-4 累计 |
+| 测试 | ✅ 49 passing, 2 skipped | Unit 1-5 累计 |
 | 构建 | ✅ 干净 | 无警告 |
-| Git | ✅ `MHSDC-GC-RT` | Unit 4 待提交 |
+| Git | ✅ `MHSDC-GC-RT` | Unit 5 已推送 `7ac605f` |
 
 ---
 

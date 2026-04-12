@@ -1,12 +1,12 @@
-🕐 Last updated: 2026-04-12 21:00
+🕐 Last updated: 2026-04-12 18:44
 🌿 Branch: MHSDC-GC-RT
 📍 Scope: /Users/luzhoua/MHSDC/GoldenCrucible-Roundtable
 
 ## 会话状态
 - 本地分支：`MHSDC-GC-RT`
 - 远端分支：`origin/MHSDC-GC-RT` ✅ 已同步
-- 最新 Commit：`958b077` refs MIN-115 完成 Unit 4 Spike 提取 + 持久化
-- 工作区：干净（Unit 5 方案文档待提交）
+- 最新 Commit：`7ac605f` refs MIN-116 完成 Unit 5 Spike → 深聊桥接（DeepDive）
+- 工作区：干净
 
 ## Linear 项目结构
 **Project**: [MHSDC-GC-RT](https://linear.app/mindhikers/project/mhsdc-gc-rt-5f4e9b847c33)
@@ -19,7 +19,7 @@
 | MIN-113 | [Unit 2] 命题锐化模块 | ✅ Done |
 | MIN-114 | [Unit 3] 圆桌引擎核心 | ✅ Done |
 | MIN-115 | [Unit 4] Spike 提取 + 持久化 | ✅ Done |
-| MIN-116 | [Unit 5] Spike → 深聊桥接 | 📝 方案落盘 |
+| MIN-116 | [Unit 5] Spike → 深聊桥接 | ✅ Done |
 | MIN-117 | [Unit 6] 前端侧边栏 + 导演 UI | ⏳ 待开发 |
 | MIN-118 | [Unit 7] GUI 风格对齐 | ⏳ 待开发 |
 
@@ -28,55 +28,37 @@
 - **Unit 2 完成 ✅** —— 命题锐化模块 + LLM 分层路由（MIN-113）
 - **Unit 3 完成 ✅** —— 圆桌引擎核心 + SSE 流式端点（MIN-114）
 - **Unit 4 完成 ✅** —— Spike 提取 + 持久化 + 导演"止"链路（MIN-115）
-- **Git ✅** —— `958b077` 已推送 origin/MHSDC-GC-RT
-- **测试 ✅** —— `npm run test:run` 通过：41 passed, 2 skipped
+- **Unit 5 完成 ✅** —— Spike → 深聊桥接 + DeepDive 引擎 + API 端点（MIN-116）
+- **Git ✅** —— `7ac605f` 已推送 origin/MHSDC-GC-RT
+- **测试 ✅** —— `npm run test:run` 通过：49 passed, 2 skipped
 - **TypeCheck ✅** —— `npm run typecheck:full` 通过
 
 ## 本会话已完成工作
-### Unit 4 收尾（MIN-115）
-1. **git commit** —— `958b077` refs MIN-115，12 files, +1148/-77 lines
-2. **git push** —— origin/MHSDC-GC-RT 已同步
-3. **Linear 同步** —— MIN-115 标记 Done + 完成评论
-4. **文档更新** —— HANDOFF.md + dev_progress.md 补录 Unit 3/4 里程碑
-### Unit 5 方案落盘（MIN-116）
-1. **方案文档** —— `docs/plans/2026-04-12_unit5-spike-deepdive-bridge.md` 已落盘
-2. **实施索引更新** —— `implementation-index.md` Unit 4/5 状态同步
+### Unit 5 实施（MIN-116）
+1. **deepdive-engine.ts** — 上下文构建 + 追问循环 + 总结生成（253 行）
+2. **roundtable-types.ts** — 新增 10 个 DeepDive 类型 + SSE 事件扩展
+3. **roundtable-engine.ts** — 导演"深"指令 DeepDive 模式分支
+4. **index.ts** — 3 个新端点：POST deepdive / deepdive/question / deepdive/summarize
+5. **crucible-persistence.ts** — deepdive artifact 持久化
+6. **deepdive-engine.test.ts** — 8 个单测（buildDeepDiveContext 2 + askDeepDiveQuestion 3 + summarizeDeepDive 3）
+7. **git commit** —— `7ac605f` refs MIN-116
+8. **git push** —— origin/MHSDC-GC-RT 已同步
+9. **Linear 同步** —— MIN-116 标记 Done + 完成评论
 
 ## 交付清单
-### Unit 1（MIN-112）
-- [x] `src/schemas/persona.ts`
-- [x] `server/persona-loader.ts`
-- [x] `personas/*.json`
-- [x] `server/__tests__/persona-loader.test.ts`
+### Unit 5（MIN-116）
+- [x] `server/deepdive-engine.ts` — 深聊引擎核心（253 行）
+- [x] `server/roundtable-types.ts` — 10 个 DeepDive 类型扩展
+- [x] `server/roundtable-engine.ts` — 导演"深"指令 DeepDive 模式
+- [x] `server/index.ts` — 3 个 DeepDive API 端点
+- [x] `server/crucible-persistence.ts` — DeepDive artifact 持久化
+- [x] `server/__tests__/deepdive-engine.test.ts` — 8 用例
 
-### Unit 2（MIN-113）
-- [x] `server/llm.ts`
-- [x] `server/proposition-sharpener.ts`
-- [x] `server/index.ts` —— sharpen / apply 端点
-- [x] `server/__tests__/proposition-sharpener.test.ts`
-- [x] `docs/plans/2026-04-10_unit2-proposition-sharpener.md`
-
-### Unit 3（MIN-114）
-- [x] `server/roundtable-types.ts`
-- [x] `server/compression-config.ts`
-- [x] `server/roundtable-engine.ts`
-- [x] `server/skill-loader.ts`
-- [x] `server/index.ts` —— turn/stream / director / session 端点
-- [x] `server/__tests__/roundtable-engine.test.ts`
-- [x] `docs/plans/2026-04-11_unit3-roundtable-engine.md`
-
-### Unit 4（MIN-115）
-- [x] `server/spike-extractor.ts` —— Spike 契约与提取逻辑（298 行）
-- [x] `server/crucible-persistence.ts` —— artifact 类型扩展 + appendSpikesToCrucibleConversation()
-- [x] `server/roundtable-engine.ts` —— extractSpikes() async 化 + "止"指令链路
-- [x] `server/roundtable-types.ts` —— Spike 富类型 + DirectorStopResult + spike_extracting 状态
-- [x] `server/index.ts` —— "止"指令 persistence context 注入
-- [x] `server/__tests__/spike-extractor.test.ts` —— 提取器单测（208 行，5 用例）
-- [x] `server/__tests__/crucible-persistence.test.ts` —— 持久化单测
-- [x] `server/__tests__/roundtable-engine.test.ts` —— 新增 3 个导演指令测试
-- [x] `server/auth/index.ts` —— auth stub（测试依赖）
-- [x] `server/auth/workspace-store.ts` —— workspace stub（测试依赖）
-- [x] `docs/plans/2026-04-11_unit4-spike-extractor-persistence.md` —— 方案已落盘
+### 历史交付（Unit 1-4）
+- [x] Unit 1 — `src/schemas/persona.ts` + `server/persona-loader.ts` + `personas/*.json`
+- [x] Unit 2 — `server/llm.ts` + `server/proposition-sharpener.ts` + API 端点
+- [x] Unit 3 — `server/roundtable-engine.ts` + `server/compression-config.ts` + SSE 端点
+- [x] Unit 4 — `server/spike-extractor.ts` + `server/crucible-persistence.ts` 扩展
 
 ### Plan 文档
 - [x] `docs/plans/2026-04-10_implementation-index.md`
@@ -84,47 +66,41 @@
 - [x] `docs/plans/2026-04-10_unit2-proposition-sharpener.md`
 - [x] `docs/plans/2026-04-11_unit3-roundtable-engine.md`
 - [x] `docs/plans/2026-04-11_unit4-spike-extractor-persistence.md`
-- [x] `docs/plans/2026-04-12_unit5-spike-deepdive-bridge.md` —— Unit 5 方案
+- [x] `docs/plans/2026-04-12_unit5-spike-deepdive-bridge.md` — status: confirmed
 
 ## 架构决策速查
 | 维度 | 值 |
 |------|------|
 | 端口 | 前端 5180, 后端 3005 |
 | API 前缀 | `/api/roundtable/*` |
-| SSE 事件前缀 | `roundtable_*` |
+| SSE 事件前缀 | `roundtable_*` / `roundtable_deepdive_*` |
 | LLM 模型 | 统一 `kimi-k2.5` |
 | Temperature | 固定 1（模型限制） |
 | 流式输出 | 两阶段：chunk + meta |
-| Context 压缩 | L0/L1/L2 三档（Kimi/GPT/Opus 分别适配） |
+| Context 压缩 | L0/L1/L2 三档 |
 | Persona 目录 | `personas/` |
-| Spike 持久化 | 并入 `crucible-persistence.ts` artifact 主干 |
+| Spike 持久化 | 并入 artifact 主干（type='spike'） |
+| DeepDive 持久化 | 并入 artifact 主干（type='deepdive'） |
+| DeepDive 追问 tier | premium |
+| DeepDive 总结 tier | standard |
 
-## 下一会话入口（Unit 5 实施）
-**目标**：Spike → 深聊桥接（MIN-116）
+## 下一会话入口（Unit 6 实施）
+**目标**：前端侧边栏 + 导演 UI（MIN-117）
 
-**前置条件**：Unit 4 已提交推送（`958b077`）✅
+**前置条件**：Unit 5 已提交推送（`7ac605f`）✅
 
-**必读文档**（按优先级）：
-1. `docs/plans/2026-04-12_unit5-spike-deepdive-bridge.md` —— Unit 5 实施手册
-2. `docs/plans/2026-04-10_implementation-index.md` —— 项目索引
-3. `server/roundtable-types.ts` —— 现有类型（需扩展 DeepDive 类型）
-4. `server/roundtable-engine.ts` —— 导演"深"指令（需增强）
+**必读文档**：
+1. `docs/plans/2026-04-10_implementation-index.md` — 项目索引
+2. 前端代码结构（待探索）
 
-**实施子单元**（有序列依赖）：
-1. Unit 5.1 — DeepDive 类型 + 引擎核心（deepdive-engine.ts）
-2. Unit 5.2 — 导演"深"指令增强 + API 端点
-3. Unit 5.3 — DeepDive 持久化 + 测试闭合
-
-**当前远程状态**：
-- 分支 `MHSDC-GC-RT` 已推送 ✅
-- Linear Project：https://linear.app/mindhikers/project/mhsdc-gc-rt-5f4e9b847c33
+**依赖**：需要前端开发环境确认
 
 ## 系统状态
 - 后端进程：已停止
 - 端口：3005/5180 空闲
 - 依赖：`node_modules` 完整
 - 构建：干净
-- Git：2 files uncommitted（Unit 5 方案 + 索引更新）
+- Git：干净，已推送
 
 ## 快速验证
 ```bash
@@ -139,11 +115,10 @@ npm run dev
 
 **必读顺序**：
 1. 本 HANDOFF.md（建立上下文）
-2. `docs/plans/2026-04-12_unit5-spike-deepdive-bridge.md`（Unit 5 方案）
-3. `docs/plans/2026-04-10_implementation-index.md`（项目索引）
+2. `docs/plans/2026-04-10_implementation-index.md`（项目索引）
 
 **约束提醒**：
 - 所有输出必须使用中文
 - 禁止在 main 分支直接开发
-- 提交必须关联 MIN-116
+- 提交必须关联 Linear Issue
 - 禁止静默推送
