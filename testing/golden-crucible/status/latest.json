@@ -1,8 +1,8 @@
 {
   "module": "golden-crucible",
-  "latest_request": "TREQ-2026-03-20-GC-003-crucible-contextual-search-request",
-  "latest_status": "passed",
-  "latest_claim": "testing/golden-crucible/claims/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.claim.md",
-  "latest_report": "testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md",
-  "updated_at": "2026-03-20T03:18:58.472Z"
+  "latest_request": "TREQ-2026-04-12-GC-SAAS-006-thesiswriter-smoke",
+  "latest_status": "running",
+  "latest_claim": "testing/golden-crucible/claims/TREQ-2026-04-12-GC-SAAS-006-thesiswriter-smoke.claim.md",
+  "latest_report": null,
+  "updated_at": "2026-04-13T16:20:14.768Z"
 }

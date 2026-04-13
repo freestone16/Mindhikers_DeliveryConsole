@@ -1,5 +1,17 @@
 # GoldenCrucible-SaaS Agent Rules
 
+## 0. Railway 环境架构
+
+当前 `GoldenCrucible-SaaS-Staging` 项目下设有三个环境，对应不同的代码分支与用途：
+
+| 环境 | 对应分支 | 用途 | 域名 | 本地目录 |
+|------|----------|------|------|----------|
+| `production` | `main` | 对外生产环境 | `gc.mindhikers.com` | — |
+| `staging` | `MHSDC-GC-SAAS-staging` | SaaS 集成/预发测试 | `golden-crucible-saas-staging.up.railway.app` | `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS` |
+| `sse` | `MHSDC-GC-SSE` | SSE 新功能开发线 | `golden-crucible-saas-sse.up.railway.app` | `/Users/luzhoua/MHSDC/GoldenCrucible-SSE` |
+
+**发布流**：`MHSDC-GC-SSE`（开发）→ `MHSDC-GC-SAAS-staging`（预发）→ `main`（生产）
+
 ## 1. Scope
 
 当前目录是 `S1` 仓级入口：
