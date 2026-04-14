@@ -45,14 +45,28 @@ export async function generateImageWithGoogleGemini(
     return { error: 'GOOGLE_API_KEY not configured. Please save your Google key in LLM Config.' };
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  // [C5 Security Hotfix] API key 走 header，不再暴露在 URL query string
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent`;
+
+  // 统一脱敏 helper：清除任何残留的 API key 模式
+  const redactSecrets = (text: string): string => {
+    return text
+      .replace(/AIza[\w-]{30,}/g, '[REDACTED_KEY]')
+      .replace(/key=[\w-]{20,}/g, 'key=[REDACTED]')
+      .replace(/Bearer\s+[\w.-]+/g, 'Bearer [REDACTED]');
+  };
 
   try {
     console.log(`[Google Image] Generating image with model=${options.model}, prompt="${prompt.slice(0, 50)}..."`);
+    // [C5] AbortController + 60s 超时，复用 L-013 模式
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
       },
       body: JSON.stringify({
         contents: [
@@ -64,13 +78,16 @@ export async function generateImageWithGoogleGemini(
           responseModalities: ['TEXT', 'IMAGE'],
         },
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     const responseText = await response.text();
-    console.log(`[Google Image] Response status: ${response.status}, body: ${responseText.slice(0, 300)}`);
+    console.log(`[Google Image] Response status: ${response.status}, body: ${redactSecrets(responseText.slice(0, 300))}`);
 
     if (!response.ok) {
-      return { error: `API Error: ${response.status} - ${responseText.slice(0, 300)}` };
+      return { error: `API Error: ${response.status} - ${redactSecrets(responseText.slice(0, 300))}` };
     }
 
     const data = JSON.parse(responseText);
@@ -95,6 +112,7 @@ export async function generateImageWithGoogleGemini(
 
     return { image_url: httpUrl };
   } catch (error: any) {
-    return { error: error.message };
+    // [C5] 错误消息也走脱敏
+    return { error: redactSecrets(error.message || 'Unknown error') };
   }
 }

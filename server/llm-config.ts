@@ -114,14 +114,22 @@ export const getConfigStatus = (_req: Request, res: Response) => {
 };
 
 export const saveApiKey = (req: Request, res: Response) => {
-  const { provider, apiKey } = req.body;
+  const { provider, apiKey: rawApiKey } = req.body;
 
   if (!provider) {
     return res.status(400).json({ error: 'Missing provider' });
   }
 
+  // [C6 Security Hotfix] 输入校验：拒绝空值、过长、含换行/控制字符的 apiKey
+  const apiKey = String(rawApiKey ?? '').trim();
   if (!apiKey) {
     return res.status(400).json({ error: 'Missing apiKey' });
+  }
+  if (apiKey.length > 4096) {
+    return res.status(400).json({ error: 'apiKey too long (max 4096 chars)' });
+  }
+  if (/[\r\n\0]/.test(apiKey)) {
+    return res.status(400).json({ error: 'apiKey contains illegal characters (newline or null byte)' });
   }
 
   const envVars = PROVIDER_INFO[provider]?.envVars;

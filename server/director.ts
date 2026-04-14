@@ -6,7 +6,7 @@ import { loadConfig } from './llm-config';
 import type { LLMProvider } from '../src/schemas/llm-config';
 import { buildDirectorSystemPrompt } from './skill-loader';
 import { generateSvgImage } from './svg-architect';
-import { getProjectRoot } from './project-paths';
+import { getProjectRoot, assertProjectPathSafe } from './project-paths';
 import {
   generateDirectorImage,
   pollDirectorImage,
@@ -250,6 +250,9 @@ export const generatePhase1 = async (req: Request, res: Response) => {
   const projectRoot = getProjectRoot(projectId);
   const scriptFullPath = path.join(projectRoot, scriptPath);
 
+  // [C1] 路径穿越闭合 — 校验路径在项目目录内
+  assertProjectPathSafe(scriptFullPath);
+
   if (!fs.existsSync(scriptFullPath)) {
     return res.status(404).json({ error: 'Script file not found' });
   }
@@ -368,6 +371,8 @@ export const startPhase2 = async (req: Request, res: Response) => {
 
   if (scriptPath) {
     scriptFullPath = path.join(projectRoot, scriptPath);
+    // [C1] 路径穿越闭合
+    assertProjectPathSafe(scriptFullPath);
     if (!fs.existsSync(scriptFullPath)) {
       return res.status(404).json({ error: 'Script file not found' });
     }
@@ -1575,6 +1580,9 @@ export const phase3DownloadXml = async (req: Request, res: Response) => {
     const fileName = format === 'premiere' ? 'sequence_premiere.xml' : 'sequence_jianying.json';
     const filePath = path.join(projectRoot, '04_Visuals', fileName);
 
+    // [C1] 路径穿越闭合
+    assertProjectPathSafe(filePath);
+
     if (fs.existsSync(filePath)) {
       res.download(filePath);
     } else {
@@ -1638,8 +1646,13 @@ const applyVideoJobSource = (
 export const serveVideoFile = async (req: Request, res: Response) => {
   const { projectId, filename } = req.params;
   try {
+    // [C1] filename 白名单 — 只允许安全字符的视频文件名
+    if (!/^[\w\-. ]+\.(mp4|mov|webm)$/.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
     const projectRoot = getProjectRoot(projectId);
     const videoPath = path.join(projectRoot, '04_Visuals', 'videos', filename);
+    assertProjectPathSafe(videoPath);
     if (!fs.existsSync(videoPath)) {
       return res.status(404).json({ error: 'Video file not found' });
     }
@@ -2137,8 +2150,8 @@ Please rewrite the prompt based on the user's feedback. Return only the new prom
       }
     ];
 
-    const config = await loadConfig();
-    const response = await callLLM(messages, config.provider, config.model);
+    const config = loadConfig();
+    const response = await callLLM(messages, config.global.provider as LLMProvider, config.global.model);
     const revisedPrompt = response.content?.trim() || currentPrompt;
 
     // 回写到 delivery_store.json
@@ -2218,6 +2231,11 @@ export const phase4ReadSrt = async (req: Request, res: Response) => {
   const { projectId } = req.query;
   const { filename } = req.params;
   if (!projectId || !filename) return res.status(400).json({ error: 'Missing params' });
+
+  // [C1] filename 白名单 — 只允许安全字符的 SRT/VTT 文件名
+  if (!/^[\w\-. ]+\.(srt|vtt|ass)$/.test(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
 
   try {
     const projectRoot = getProjectRoot(projectId as string);

@@ -187,26 +187,46 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                 if (!opt) return { success: false, error: `选项 ${args.optionId} 不存在` };
                 const updates = args.updates || {};
 
-                // 系统级只读字段，不允许被覆盖（type 变更的级联清理除外）
-                const IMMUTABLE_FIELDS = new Set(['id', 'isChecked']);
+                // [C3 Security Hotfix] 显式白名单 — 只允许这些字段被写入
+                const ALLOWED_FIELDS = new Set([
+                    'type', 'name', 'prompt', 'imagePrompt', 'template',
+                    'props', 'quote', 'rationale', 'svgPrompt', 'previewUrl',
+                    'phase3', 'previewStatus',
+                ]);
 
-                // 当 type 发生变化时，旧的预览图、模板、props 都失去意义，必须级联清理
-                if (updates.type && updates.type !== opt.type) {
+                // [C3] BRollType 合法值枚举
+                const VALID_TYPES = new Set([
+                    'remotion', 'internet-clip', 'user-capture', 'text-to-video',
+                    'infographic', 'ai-generated-image', 'svg-animation',
+                ]);
+
+                // [C3] 原型污染防护 — 用 Object.create(null) 遍历，杜绝 __proto__/constructor
+                const safeUpdates = Object.create(null) as Record<string, unknown>;
+                for (const key of Object.keys(updates)) {
+                    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+                    safeUpdates[key] = (updates as Record<string, unknown>)[key];
+                }
+
+                // type 变更时校验枚举 + 级联清理
+                if (safeUpdates.type !== undefined && safeUpdates.type !== opt.type) {
+                    if (!VALID_TYPES.has(safeUpdates.type as string)) {
+                        return { success: false, error: `非法 type 值: "${safeUpdates.type}"` };
+                    }
                     opt.previewUrl = null;
                     opt.previewStatus = null;
                     opt.template = null;
-                    opt.props = undefined;
-                    console.log(`[Director] Type changed ${opt.type} -> ${updates.type} for ${opt.id}, cleared preview/template/props`);
+                    opt.props = null;
+                    console.log(`[Director] Type changed ${opt.type} -> ${safeUpdates.type} for ${opt.id}, cleared preview/template/props`);
                 }
 
-                for (const [key, value] of Object.entries(updates)) {
-                    if (IMMUTABLE_FIELDS.has(key)) continue;
+                for (const key of Object.keys(safeUpdates)) {
+                    if (!ALLOWED_FIELDS.has(key)) continue;
 
+                    const value = safeUpdates[key];
                     if (key === 'props' && typeof value === 'object' && value !== null) {
-                        // props 做深度合并，而非整体替换
                         opt.props = { ...(opt.props || {}), ...(value as Record<string, unknown>) };
                     } else {
-                        (opt as any)[key] = value;
+                        (opt as Record<string, unknown>)[key] = value;
                     }
                 }
                 break;

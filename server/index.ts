@@ -27,6 +27,7 @@ import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
 import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
 import { getProjectRoot, getProjectsBase, ensureProjectsBaseExists } from './project-paths';
+import { consumePendingConfirm, createPendingConfirm } from './security/pending-confirm-store';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -37,11 +38,30 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env.local'), override: true });
 
 const app = express();
-app.use(cors()); // Enable CORS for all routes
+
+// [C4] CORS Origin 白名单 — 只允许本地前端和显式配置的 origin
+const corsAllowlist = [
+    'http://localhost:5178',
+    'http://localhost:5173',
+    'http://127.0.0.1:5178',
+    'http://127.0.0.1:5173',
+    process.env.FRONTEND_ORIGIN,
+].filter(Boolean) as string[];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || corsAllowlist.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS not allowed'));
+        }
+    },
+}));
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
+        origin: corsAllowlist,
         methods: ["GET", "POST"]
     }
 });
@@ -94,6 +114,15 @@ function emitAndPersistActionConfirm(
         diffLabel?: string;
     }
 ) {
+    // [C2] 将确认动作存入 pending confirm 表，供 chat-action-execute 消费
+    const projectId = socketToProjectMap.get(socket) || '';
+    createPendingConfirm({
+        actionName: payload.actionName,
+        actionArgs: payload.actionArgs,
+        expertId,
+        projectId,
+    });
+
     socket.emit('chat-action-confirm', {
         expertId,
         ...payload,
@@ -158,7 +187,6 @@ function getAppVersion(): string {
     }
 }
 
-app.use(cors());
 app.use(express.json());
 
 // Serve temp_images as static files (Remotion CLI needs HTTP access to generated images)
@@ -939,27 +967,44 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, historyMessages }) => {
+    socket.on('chat-action-execute', async ({ expertId, projectId, actionName, actionArgs, confirmId, historyMessages }) => {
         try {
-            console.log(`[Chat][DEBUG] chat-action-execute => action: ${actionName}, args:`, JSON.stringify(actionArgs));
-            const projectRoot = getProjectRoot(projectId);
-            const adapter = getAdapter(expertId);
-            if (!adapter) throw new Error(`找不到专家 ${expertId} 的处理器`);
+            // [C2] 必须携带有效 confirmId，防止绕过 Bridge 直接执行
+            if (!confirmId) {
+                console.warn(`[Chat][SECURITY] chat-action-execute rejected: no confirmId (socket=${socket.id})`);
+                socket.emit('chat-action-result', { expertId, success: false, message: '❌ 操作未经授权确认，请重新发起。' });
+                return;
+            }
+            const pending = consumePendingConfirm(confirmId);
+            if (!pending) {
+                console.warn(`[Chat][SECURITY] chat-action-execute rejected: invalid/expired confirmId=${confirmId} (socket=${socket.id})`);
+                socket.emit('chat-action-result', { expertId, success: false, message: '❌ 确认已过期或无效，请重新发起。' });
+                return;
+            }
+
+            // [C2] 从 pending 表取 actionName/args/projectId，不信任客户端回传
+            const resolvedActionName = pending.actionName;
+            const resolvedActionArgs = pending.actionArgs;
+            const resolvedProjectId = pending.projectId;
+
+            console.log(`[Chat][DEBUG] chat-action-execute => action: ${resolvedActionName}, args:`, JSON.stringify(resolvedActionArgs));
+            const projectRoot = getProjectRoot(resolvedProjectId);
+            const adapter = getAdapter(pending.expertId);
+            if (!adapter) throw new Error(`找不到专家 ${pending.expertId} 的处理器`);
 
             backupDeliveryStore(projectRoot);
 
-            const result = await adapter.executeAction(actionName, actionArgs, projectRoot);
+            const result = await adapter.executeAction(resolvedActionName, resolvedActionArgs, projectRoot);
 
             if (result.success) {
+                const resolvedExpertId = pending.expertId;
                 // Read fresh data to broadcast
                 const storePath = path.join(projectRoot, 'delivery_store.json');
                 if (fs.existsSync(storePath)) {
                     const data = JSON.parse(fs.readFileSync(storePath, 'utf-8'));
-                    io.to(projectId).emit('delivery-data', data);
+                    io.to(resolvedProjectId).emit('delivery-data', data);
 
-                    // Director: 把 delivery_store 中最新的 items 同步回 director_state，
-                    // 再 push 给前端，确保 ChapterCard 能看到更新（含已清空的 previewUrl）
-                    if (expertId === 'Director') {
+                    if (resolvedExpertId === 'Director') {
                         const updatedItems = data.modules?.director?.items;
                         if (updatedItems) {
                             const directorState = loadExpertState(projectRoot, 'Director');
@@ -968,23 +1013,20 @@ io.on('connection', (socket) => {
                                 items: updatedItems,
                             };
                             saveExpertState(projectRoot, 'Director', mergedState);
-                            // 双重推送：room broadcast + socket direct emit，确保发起者一定收到
                             const rooms = Array.from(socket.rooms || []);
-                            console.log(`[Chat] Socket ${socket.id} rooms: [${rooms.join(', ')}], broadcasting to room "${projectId}"`);
-                            io.to(projectId).emit('expert-data-update:Director', mergedState);
-                            socket.emit('expert-data-update:Director', mergedState);  // 直达保底
+                            console.log(`[Chat] Socket ${socket.id} rooms: [${rooms.join(', ')}], broadcasting to room "${resolvedProjectId}"`);
+                            io.to(resolvedProjectId).emit('expert-data-update:Director', mergedState);
+                            socket.emit('expert-data-update:Director', mergedState);
                             console.log(`[Chat] Director state synced: ${updatedItems.length} chapters pushed to frontend (room + direct)`);
                         }
                     }
                 }
 
-                // For ShortsMaster we also need to broadcast to avoid UI stall if possible, but the reload will handle it
-                if (expertId === 'ShortsMaster') {
-                    io.to(projectId).emit('expert-data-update', { expertId, action: actionName, data: result.data });
+                if (pending.expertId === 'ShortsMaster') {
+                    io.to(resolvedProjectId).emit('expert-data-update', { expertId: pending.expertId, action: resolvedActionName, data: result.data });
                 }
 
-                // 在 result 中直接携带最新 expert state，作为最可靠的更新通道
-                const freshState = expertId === 'Director'
+                const freshState = pending.expertId === 'Director'
                     ? (() => { const s = loadExpertState(projectRoot, 'Director'); return s.data || s; })()
                     : undefined;
                 if (freshState) {
@@ -993,13 +1035,12 @@ io.on('connection', (socket) => {
                     console.log(`[Chat] 📦 expertState attached: ${itemCount} chapters, sample types: [${sampleTypes}]`);
                 }
                 socket.emit('chat-action-result', {
-                    expertId,
+                    expertId: pending.expertId,
                     success: true,
                     message: '✅ 操作执行成功！请在左侧界面查看。',
                     ...(freshState ? { expertState: freshState } : {})
                 });
 
-                // Save confirmation interaction silently to history
                 if (historyMessages) {
                     const confirmationMsg = {
                         id: `msg_${Date.now()}`,
@@ -1009,14 +1050,14 @@ io.on('connection', (socket) => {
                         systemTitle: '系统执行结果',
                         timestamp: new Date().toISOString()
                     };
-                    saveChatHistory(projectRoot, expertId, [...historyMessages, confirmationMsg]);
+                    saveChatHistory(projectRoot, pending.expertId, [...historyMessages, confirmationMsg]);
                 }
             } else {
-                socket.emit('chat-action-result', { expertId, success: false, message: `❌ 操作失败: ${result.error}` });
+                socket.emit('chat-action-result', { expertId: pending.expertId, success: false, message: `❌ 操作失败: ${result.error}` });
             }
         } catch (error: any) {
             console.error('[Chat] Execute action error:', error.message);
-            socket.emit('chat-action-result', { expertId, success: false, message: `❌ 内部错误: ${error.message}` });
+            socket.emit('chat-action-result', { expertId: pending?.expertId || expertId, success: false, message: `❌ 内部错误: ${error.message}` });
         }
     });
 
@@ -1521,11 +1562,11 @@ app.post('/api/experts/run', (req, res) => {
 // Validate PROJECTS_BASE before accepting any requests
 ensureProjectsBaseExists();
 
-// Start Server
-httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔒 Server running on http://0.0.0.0:${PORT} (Docker Friendly)`);
+// [C4] 默认绑定 127.0.0.1（仅本机可访问）；设置 LISTEN_HOST=0.0.0.0 可 opt-in 开放 LAN
+const LISTEN_HOST = process.env.LISTEN_HOST || '127.0.0.1';
+httpServer.listen(PORT, LISTEN_HOST, () => {
+    console.log(`🔒 Server running on http://${LISTEN_HOST}:${PORT}`);
     console.log(`📂 Projects Base: ${getProjectsBase()}`);
-    //    console.log(`🎬 A-roll dir: ${SHORTS_AROLL_DIR}`);
 });
 
 // Initialize Graceful Shutdown
