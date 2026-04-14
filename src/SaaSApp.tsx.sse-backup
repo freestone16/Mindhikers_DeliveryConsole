@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Loader2 } from 'lucide-react';
-import { buildApiUrl } from './config/runtime';
+import { Loader2, Users, Send, Clock } from 'lucide-react';
 import { Header, type HeaderModule } from './components/Header';
+import { AccountsHub } from './components/AccountsHub';
+import { PublishComposer } from './components/PublishComposer';
+import { DistributionQueue } from './components/DistributionQueue';
 import { ChatPanel } from './components/ChatPanel';
 import { StatusFooter } from './components/StatusFooter';
 import { CrucibleWorkspace } from './components/CrucibleWorkspace';
-import { SaaSLLMConfigPage } from './components/SaaSLLMConfigPage';
+import { LLMConfigPage } from './components/LLMConfigPage';
 import { CrucibleHistorySheet } from './components/crucible/CrucibleHistorySheet';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import type { ChatMessage, HostRoutedAsset } from './types';
@@ -20,37 +22,7 @@ import type { CrucibleSnapshot } from './components/crucible/types';
 import { useAppAuth } from './auth/useAppAuth';
 
 type SaaSModule = 'crucible' | 'distribution';
-type CrucibleTrialStatus = {
-    enabled: boolean;
-    mode: 'platform';
-    limits: {
-        conversationLimit: number;
-        turnLimitPerConversation: number;
-    };
-    usage: {
-        conversationsUsed: number;
-        conversationsRemaining: number;
-        currentConversationId?: string;
-        currentConversationTurnsUsed: number;
-        currentConversationTurnsRemaining: number;
-    };
-    status: 'inactive' | 'active' | 'conversation_exhausted' | 'quota_exhausted';
-    requiresByok: boolean;
-    message: string;
-};
-
-interface ThesisTrialStatus {
-    enabled: boolean;
-    mode: 'platform' | 'byok';
-    accountTier?: 'standard' | 'vip';
-    thesisQuota: {
-        limit: number;
-        used: number;
-        remaining: number;
-    };
-    canGenerateThesis: boolean;
-    message: string;
-}
+type DistributionPage = 'accounts' | 'composer' | 'queue';
 
 const CRUCIBLE_EXPERT_ID = 'GoldenMetallurgist';
 const CRUCIBLE_DEFAULT_PROJECT_ID = 'golden-crucible-sandbox';
@@ -147,6 +119,7 @@ function SaaSApp() {
     const [hasBootedCrucible, setHasBootedCrucible] = useState(true);
     const [crucibleHasBoardContent, setCrucibleHasBoardContent] = useState(false);
     const [crucibleManualSidebarWidth, setCrucibleManualSidebarWidth] = useState<number | null>(null);
+    const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
     const [chatResetToken, setChatResetToken] = useState(0);
     const [crucibleRoutedAssets, setCrucibleRoutedAssets] = useState<HostRoutedAsset[]>([]);
     const [crucibleTopicTitle, setCrucibleTopicTitle] = useState(() => initialCrucibleSnapshot?.topicTitle || '标题待定');
@@ -156,16 +129,6 @@ function SaaSApp() {
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const [crucibleWorkspaceKey, setCrucibleWorkspaceKey] = useState(0);
     const [isCrucibleHistoryOpen, setIsCrucibleHistoryOpen] = useState(false);
-    const [crucibleConversationState, setCrucibleConversationState] = useState({
-        conversationId: initialCrucibleSnapshot?.conversationId || '',
-        roundIndex: initialCrucibleSnapshot?.roundIndex || 0,
-    });
-    const [crucibleTrialStatus, setCrucibleTrialStatus] = useState<CrucibleTrialStatus | null>(null);
-    const [crucibleTrialWarning, setCrucibleTrialWarning] = useState<string | null>(null);
-    const [thesisTrialStatus, setThesisTrialStatus] = useState<ThesisTrialStatus | null>(null);
-    const [crucibleThesisReady, setCrucibleThesisReady] = useState(false);
-    const [isGeneratingThesis, setIsGeneratingThesis] = useState(false);
-    const [thesisError, setThesisError] = useState<string | null>(null);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
@@ -201,11 +164,6 @@ function SaaSApp() {
         setCrucibleSeedPrompt('');
         setCrucibleSeedVersion(0);
         setCrucibleTurnSettledToken(0);
-        setCrucibleConversationState({
-            conversationId: snapshot.conversationId || '',
-            roundIndex: snapshot.roundIndex || 0,
-        });
-        setCrucibleThesisReady(snapshot.thesisReady || false);
         setActiveModule('crucible');
         setHasBootedCrucible(true);
         setCrucibleWorkspaceKey((prev) => prev + 1);
@@ -214,7 +172,7 @@ function SaaSApp() {
 
     const resetCrucibleState = useCallback((options?: { remount?: boolean; clearPersisted?: boolean }) => {
         if (options?.clearPersisted) {
-            window.localStorage.removeItem(crucibleAutosaveBootstrapKey);
+            window.localStorage.setItem(crucibleAutosaveBootstrapKey, 'done');
             void clearPersistedCrucibleSnapshot({ workspaceId: crucibleWorkspaceId });
         }
         setCrucibleRoutedAssets([]);
@@ -225,11 +183,6 @@ function SaaSApp() {
         setCrucibleTurnSettledToken(0);
         injectedRoundKeysRef.current.clear();
         setCrucibleTopicTitle('标题待定');
-        setCrucibleConversationState({
-            conversationId: '',
-            roundIndex: 0,
-        });
-        setCrucibleThesisReady(false);
         setChatResetToken((prev) => prev + 1);
         if (options?.remount) {
             setCrucibleWorkspaceKey((prev) => prev + 1);
@@ -276,8 +229,6 @@ function SaaSApp() {
         };
     }, [crucibleAutosaveBootstrapKey, crucibleWorkspaceId, hydrateCrucibleSnapshot]);
 
-    const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
-
     const handleOpenCrucibleHistory = useCallback(() => {
         setActiveModule('crucible');
         setHasBootedCrucible(true);
@@ -290,57 +241,6 @@ function SaaSApp() {
         setHasBootedCrucible(true);
         resetCrucibleState({ remount: true, clearPersisted: true });
     }, [resetCrucibleState]);
-
-    const handleEnterThesisWriter = useCallback(async () => {
-        if (isGeneratingThesis) return;
-        const isThesisQuotaBlocked = thesisTrialStatus
-            && thesisTrialStatus.mode !== 'byok'
-            && thesisTrialStatus.accountTier !== 'vip'
-            && !thesisTrialStatus.canGenerateThesis;
-        if (isThesisQuotaBlocked) {
-            setThesisError(thesisTrialStatus.message);
-            return;
-        }
-        setIsGeneratingThesis(true);
-        setThesisError(null);
-        try {
-            const conversationId = crucibleConversationState.conversationId;
-            if (!conversationId) {
-                throw new Error('没有活跃对话');
-            }
-            const response = await fetch('/api/crucible/thesis/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    conversationId,
-                    projectId: crucibleProjectId,
-                    scriptPath: state.selectedScript?.path || '',
-                }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: '论文生成失败' }));
-                throw new Error(errorData.message || errorData.error || '论文生成失败');
-            }
-            const data = await response.json();
-            setCrucibleThesisReady(false);
-            if (data.content) {
-                const blob = new Blob([data.content], { type: 'text/markdown;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${data.artifact?.title || '论文'}.md`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-            setCrucibleTrialWarning('论文已生成，已开始下载');
-        } catch (error: any) {
-            setThesisError(error.message || '论文生成失败');
-        } finally {
-            setIsGeneratingThesis(false);
-        }
-    }, [crucibleConversationState.conversationId, crucibleProjectId, isGeneratingThesis, state.selectedScript?.path, thesisTrialStatus]);
 
     const handleRestoreCrucibleHistory = useCallback((snapshot: CrucibleSnapshot) => {
         hydrateCrucibleSnapshot(snapshot);
@@ -450,91 +350,14 @@ function SaaSApp() {
     const handleCrucibleTurnSettled = useCallback(() => {
         setCrucibleTurnSettledToken((prev) => prev + 1);
     }, []);
-    const refreshCrucibleTrialStatus = useCallback(async () => {
-        if (!authEnabled || !authSession?.user?.id) {
-            setCrucibleTrialStatus(null);
-            return;
-        }
 
-        try {
-            const search = new URLSearchParams();
-            if (crucibleConversationState.conversationId) {
-                search.set('conversationId', crucibleConversationState.conversationId);
-            }
-            if (state.projectId) {
-                search.set('projectId', state.projectId);
-            }
-            if (state.selectedScript?.path) {
-                search.set('scriptPath', state.selectedScript.path);
-            }
-
-            const response = await fetch(buildApiUrl(`/api/crucible/trial-status?${search.toString()}`), {
-                credentials: 'include',
-            });
-            if (!response.ok) {
-                throw new Error(`trial status failed: ${response.status}`);
-            }
-
-            const payload = await response.json() as CrucibleTrialStatus;
-            setCrucibleTrialStatus(payload);
-        } catch (error) {
-            console.warn('[CrucibleTrial] Failed to refresh status:', error);
-        }
-    }, [authEnabled, authSession?.user?.id, crucibleConversationState.conversationId, state.projectId, state.selectedScript?.path]);
-    const handleCrucibleConversationStateChange = useCallback((payload: { conversationId?: string; roundIndex: number }) => {
-        setCrucibleConversationState({
-            conversationId: payload.conversationId || '',
-            roundIndex: payload.roundIndex,
-        });
-    }, []);
-    const handleCrucibleTurnError = useCallback((payload: { message: string }) => {
-        setCrucibleTrialWarning(payload.message);
-        void refreshCrucibleTrialStatus();
-    }, [refreshCrucibleTrialStatus]);
-
-    useEffect(() => {
-        void refreshCrucibleTrialStatus();
-    }, [refreshCrucibleTrialStatus]);
-
-    useEffect(() => {
-        if (activeModule !== 'crucible' || !crucibleWorkspaceId) return;
-        const params = new URLSearchParams();
-        if (crucibleProjectId) params.set('projectId', crucibleProjectId);
-        if (state.selectedScript?.path) params.set('scriptPath', state.selectedScript.path);
-        fetch(`/api/crucible/thesis/trial-status?${params}`)
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data) => setThesisTrialStatus(data))
-            .catch(() => setThesisTrialStatus(null));
-    }, [activeModule, crucibleWorkspaceId, crucibleProjectId, state.selectedScript?.path]);
-
-    useEffect(() => {
-        if (!crucibleTrialWarning) {
-            return;
-        }
-
-        const timer = window.setTimeout(() => setCrucibleTrialWarning(null), 4200);
-        return () => window.clearTimeout(timer);
-    }, [crucibleTrialWarning]);
-
-    const thesisQuotaWarning = thesisTrialStatus
-        && thesisTrialStatus.mode !== 'byok'
-        && thesisTrialStatus.accountTier !== 'vip'
-        && !thesisTrialStatus.canGenerateThesis
-        ? thesisTrialStatus.message
-        : null;
-
+    const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
     const crucibleSidebarStyle = crucibleManualSidebarWidth
         ? { width: `${crucibleManualSidebarWidth}px` }
         : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
 
     if (hashRoute === '/llm-config') {
-        return (
-            <SaaSLLMConfigPage
-                trialStatus={crucibleTrialStatus}
-                onSaved={refreshCrucibleTrialStatus}
-                onClose={() => { window.location.hash = '/'; }}
-            />
-        );
+        return <LLMConfigPage onClose={() => { window.location.hash = '/'; }} />;
     }
 
     if (!isConnected) {
@@ -557,10 +380,8 @@ function SaaSApp() {
                 onSelectScript={handleSelectScript}
                 activeModule={activeModule}
                 onModuleChange={handleModuleChange}
-                availableModules={['crucible']}
+                availableModules={['crucible', 'distribution']}
                 lockSelectorsWhenCrucible={false}
-                appTitle="黄金坩埚 Golden Crucible"
-                hideWorkspaceControls
                 authSummary={authEnabled && authSession ? {
                     displayName: authSession.user.name?.trim() || authSession.user.email,
                     email: authSession.user.email,
@@ -593,8 +414,6 @@ function SaaSApp() {
                             onRoundGenerated={handleCrucibleRoundGenerated}
                             onBlackboardStateChange={handleCrucibleBoardStateChange}
                             onTurnSettled={handleCrucibleTurnSettled}
-                            onConversationStateChange={handleCrucibleConversationStateChange}
-                            onTurnError={handleCrucibleTurnError}
                         />
                     </div>
                     <div
@@ -625,21 +444,25 @@ function SaaSApp() {
                             externalMessages={crucibleInjectedMessages}
                             onUserMessage={handleCrucibleUserPrompt}
                             onRouteAsset={handleCrucibleRouteAsset}
+                            onOpenTopicCenter={handleOpenCrucibleHistory}
                             onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
                             onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
-                            onOpenHistory={handleOpenCrucibleHistory}
                             blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
                             crucibleTurnSettledToken={crucibleTurnSettledToken}
                             workspaceId={crucibleWorkspaceId}
-                            trialStatus={crucibleTrialStatus}
-                            externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
-                            thesisReady={crucibleThesisReady}
-                            onEnterThesisWriter={handleEnterThesisWriter}
                             socket={socket}
                         />
                     </div>
                 </div>
             )}
+
+            {activeModule === 'distribution' ? (
+                <DistributionLayout
+                    activePage={activeDistributionPage}
+                    onPageChange={setActiveDistributionPage}
+                    projectId={state.projectId}
+                />
+            ) : null}
 
             <StatusFooter
                 isConnected={isConnected}
@@ -655,5 +478,50 @@ function SaaSApp() {
         </div>
     );
 }
+
+const DistributionLayout = ({
+    activePage,
+    onPageChange,
+    projectId,
+}: {
+    activePage: DistributionPage;
+    onPageChange: (page: DistributionPage) => void;
+    projectId: string;
+}) => {
+    const navItems = [
+        { id: 'accounts' as DistributionPage, label: 'Accounts Hub', icon: <Users className="w-4 h-4" /> },
+        { id: 'composer' as DistributionPage, label: 'Publish Composer', icon: <Send className="w-4 h-4" /> },
+        { id: 'queue' as DistributionPage, label: 'Queue', icon: <Clock className="w-4 h-4" /> },
+    ];
+
+    return (
+        <>
+            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,250,242,0.78)] backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-6">
+                    <nav className="flex gap-1 py-2">
+                        {navItems.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => onPageChange(item.id)}
+                                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${activePage === item.id
+                                    ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
+                                    : 'text-[var(--ink-3)] hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]'
+                                    }`}
+                            >
+                                {item.icon}
+                                {item.label}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            </div>
+            <main className="max-w-7xl mx-auto px-6 py-8">
+                {activePage === 'accounts' && <AccountsHub />}
+                {activePage === 'composer' && <PublishComposer projectId={projectId} />}
+                {activePage === 'queue' && <DistributionQueue />}
+            </main>
+        </>
+    );
+};
 
 export default SaaSApp;

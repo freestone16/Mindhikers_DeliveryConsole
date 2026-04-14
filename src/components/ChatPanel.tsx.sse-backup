@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, BookmarkCheck, Check, FolderTree, Loader2, Paperclip, RotateCcw, Send, Settings, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, FolderTree, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -37,33 +37,12 @@ interface ChatPanelProps {
     externalMessages?: ChatMessage[];
     onUserMessage?: (content: string) => void;
     onRouteAsset?: (asset: HostRoutedAsset) => void;
+    onOpenTopicCenter?: () => void;
     onPersistedSnapshotSaved?: (snapshot: CrucibleSnapshot) => void;
     onResetAll?: () => void;
-    onOpenHistory?: () => void;
     blackboardHint?: string | null;
-    thesisReady?: boolean;
-    onEnterThesisWriter?: () => void;
     crucibleTurnSettledToken?: number;
     workspaceId?: string | null;
-    trialStatus?: {
-        enabled: boolean;
-        mode: 'platform';
-        limits: {
-            conversationLimit: number;
-            turnLimitPerConversation: number;
-        };
-        usage: {
-            conversationsUsed: number;
-            conversationsRemaining: number;
-            currentConversationId?: string;
-            currentConversationTurnsUsed: number;
-            currentConversationTurnsRemaining: number;
-        };
-        status: 'inactive' | 'active' | 'conversation_exhausted' | 'quota_exhausted';
-        requiresByok: boolean;
-        message: string;
-    } | null;
-    externalWarning?: string | null;
     socket: any;
 }
 
@@ -146,26 +125,6 @@ const truncateTopicTitle = (value: string, maxLength = 24) => (
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
 );
 
-const getCrucibleDraftBadge = (options: {
-    inputText: string;
-    hasMessages: boolean;
-    snapshot?: CrucibleSnapshot | null;
-}) => {
-    if (options.inputText.trim()) {
-        return '草稿未发送';
-    }
-    if (options.snapshot?.saveMode === 'manual') {
-        return '已手动保存';
-    }
-    if (options.snapshot?.saveMode === 'autosave') {
-        return '自动保存';
-    }
-    if (options.snapshot?.saveMode === 'conversation') {
-        return '对话沉淀';
-    }
-    return options.hasMessages ? '自动保存' : '新话题';
-};
-
 const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCrucibleMode: boolean) => {
     const normalizedNext = next.content.trim();
     if (!normalizedNext) {
@@ -195,7 +154,6 @@ const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCr
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
     isOpen,
-    onToggle,
     expertId,
     projectId,
     scriptPath,
@@ -207,16 +165,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     externalMessages = [],
     onUserMessage,
     onRouteAsset,
+    onOpenTopicCenter,
     onPersistedSnapshotSaved,
-    onResetAll,
-    onOpenHistory,
     blackboardHint,
-    thesisReady,
-    onEnterThesisWriter,
     crucibleTurnSettledToken = 0,
     workspaceId,
-    trialStatus,
-    externalWarning,
     socket,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -247,29 +200,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const expertName = displayName || expert?.name || expertId;
     const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
     const isCrucibleMode = expertId === 'GoldenMetallurgist';
-    const confirmKey = `chatpanel_confirm_send_${expertId}`;
-    const [showSettings, setShowSettings] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const toastTimerRef = useRef<number | null>(null);
-    const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
-        try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
-    });
-    const warningTimerRef = useRef<number | null>(null);
-
-    const saveConfirmSetting = (value: boolean) => {
-        setConfirmBeforeSend(value);
-        try { localStorage.setItem(confirmKey, String(value)); } catch { /* ignore */ }
-    };
 
     const showToast = useCallback((msg: string) => {
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
         setToastMessage(msg);
         toastTimerRef.current = window.setTimeout(() => setToastMessage(null), 2000);
-    }, []);
-    const flashWarning = useCallback((msg: string) => {
-        if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current);
-        setWarning(msg);
-        warningTimerRef.current = window.setTimeout(() => setWarning(null), 4000);
     }, []);
 
     const defaultAssistantMeta = useMemo(
@@ -325,14 +262,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     useEffect(() => {
         streamingContentRef.current = streamingContent;
     }, [streamingContent]);
-
-    useEffect(() => {
-        if (!externalWarning) {
-            return;
-        }
-
-        flashWarning(externalWarning);
-    }, [externalWarning, flashWarning]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -393,6 +322,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (!isCrucibleMode) {
             return;
         }
+        const snapshot = readScopedCrucibleSnapshot(workspaceId);
+        if (!snapshot) {
+            return;
+        }
+
+        if (crucibleDraftPersistTimerRef.current) {
+            window.clearTimeout(crucibleDraftPersistTimerRef.current);
+        }
+
+        const nextSnapshot: CrucibleSnapshot = {
+            ...snapshot,
+            draftInputText: inputText.trim() ? inputText : undefined,
+        };
+
+        crucibleDraftPersistTimerRef.current = window.setTimeout(() => {
+            void persistCrucibleSnapshot(nextSnapshot, { workspaceId });
+        }, 250);
+
+        return () => {
+            if (crucibleDraftPersistTimerRef.current) {
+                window.clearTimeout(crucibleDraftPersistTimerRef.current);
+            }
+        };
+    }, [inputText, isCrucibleMode, workspaceId]);
+
+    useEffect(() => {
+        if (!isCrucibleMode) {
+            return;
+        }
 
         setIsStreaming(false);
         setStreamingContent('');
@@ -414,46 +372,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         const timer = window.setInterval(tick, 1000);
         return () => window.clearInterval(timer);
     }, [crucibleThinkingStartedAt, isCrucibleMode, isStreaming]);
-
-    useEffect(() => () => {
-        if (warningTimerRef.current) {
-            window.clearTimeout(warningTimerRef.current);
-        }
-        if (crucibleDraftPersistTimerRef.current) {
-            window.clearTimeout(crucibleDraftPersistTimerRef.current);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!isCrucibleMode || !workspaceId) {
-            return;
-        }
-
-        if (crucibleDraftPersistTimerRef.current) {
-            window.clearTimeout(crucibleDraftPersistTimerRef.current);
-        }
-
-        const currentSnapshot = readScopedCrucibleSnapshot(workspaceId);
-        if (!currentSnapshot) {
-            return;
-        }
-
-        const nextSnapshot: CrucibleSnapshot = {
-            ...currentSnapshot,
-            draftInputText: inputText.trim() ? inputText : undefined,
-        };
-
-        localStorage.setItem(getCrucibleSnapshotStorageKey(workspaceId), JSON.stringify(nextSnapshot));
-        crucibleDraftPersistTimerRef.current = window.setTimeout(() => {
-            void persistCrucibleSnapshot(nextSnapshot, { workspaceId });
-        }, 600);
-
-        return () => {
-            if (crucibleDraftPersistTimerRef.current) {
-                window.clearTimeout(crucibleDraftPersistTimerRef.current);
-            }
-        };
-    }, [inputText, isCrucibleMode, workspaceId]);
 
     useEffect(() => {
         if (!socket) return;
@@ -610,8 +528,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }, [socket, matchesCurrentScope, defaultAssistantMeta, isCrucibleMode]);
 
     useEffect(() => {
-        // Crucible mode manages its own message history via externalMessages; skip socket-based load/reset
-        if (isCrucibleMode) return;
+        if (isCrucibleMode) {
+            if (prevResetTokenRef.current !== resetToken) {
+                prevResetTokenRef.current = resetToken;
+                queueMicrotask(resetPanelState);
+            }
+            return;
+        }
         if (!socket || !isOpen || !projectId) return;
 
         if (prevScopeKeyRef.current !== scopeKey) {
@@ -637,16 +560,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (!inputText.trim() && attachments.length === 0) return;
         if (!socket || sendGuardRef.current) return;
         if (isStreaming && !isCrucibleMode) return;
-        if (
-            isCrucibleMode
-            && trialStatus?.enabled
-            && (trialStatus.status === 'conversation_exhausted' || trialStatus.status === 'quota_exhausted')
-        ) {
-            flashWarning(trialStatus.message);
-            return;
-        }
-        if (confirmBeforeSend && !window.confirm('确认发送这条消息？')) return;
-
         const normalizedInput = inputText.trim();
         const now = Date.now();
         if (
@@ -706,7 +619,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend, isCrucibleMode, resolvedCurrentUserBadge, trialStatus, flashWarning]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, isCrucibleMode, resolvedCurrentUserBadge]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
@@ -815,11 +728,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         lastSentRef.current = null;
     };
 
-    const handleResetAll = useCallback(() => {
-        if (!window.confirm('确定要重置工作区并清空对话吗？')) return;
-        onResetAll?.();
-    }, [onResetAll]);
-
     const handleExportMarkdown = useCallback(() => {
         const title = (displayName || expertName || '黄金坩埚对话').trim();
         const lines = [
@@ -860,15 +768,75 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
         [workspaceId],
     );
-
-    const handleSaveAutosave = useCallback(() => {
+    const handleSaveTopic = useCallback(async () => {
         try {
+            const saveTimestamp = new Date().toISOString();
+            const snapshot = readScopedCrucibleSnapshot(workspaceId);
             const raw = localStorage.getItem(scopedSnapshotKey);
-            if (!raw) { showToast('当前没有状态可保存'); return; }
-            localStorage.setItem(scopedBackupKey, raw);
-            showToast('快照已保存');
-        } catch { showToast('保存失败'); }
-    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
+            if (raw) {
+                localStorage.setItem(scopedBackupKey, raw);
+            }
+
+            const hasMeaningfulState = messages.some((message) => message.content.trim().length > 0)
+                || Boolean(snapshot?.openingPrompt?.trim())
+                || Boolean(snapshot?.presentables?.length)
+                || Boolean(snapshot?.crystallizedQuotes?.length)
+                || Boolean(snapshot?.roundAnchors?.length);
+
+            if (!hasMeaningfulState) {
+                showToast('当前还没有内容可保存');
+                return;
+            }
+
+            const firstUserMessage = messages.find((message) => message.role === 'user' && message.content.trim().length > 0)?.content.trim();
+            const candidateTitle = isPlaceholderTopicTitle(snapshot?.topicTitle)
+                ? (firstUserMessage || snapshot?.openingPrompt || displayName || expertName || '未命名议题')
+                : (snapshot?.topicTitle || displayName || expertName || '未命名议题');
+            const nextTitle = truncateTopicTitle(candidateTitle.replace(/\s+/g, ' ').trim() || '未命名议题');
+
+            const nextSnapshot: CrucibleSnapshot = {
+                conversationId: snapshot?.conversationId,
+                messages: messages.map((message) => ({
+                    id: message.id,
+                    speaker: message.role === 'user' ? 'user' : (message.meta?.authorId || 'assistant'),
+                    name: message.role === 'user'
+                        ? (resolvedCurrentUserBadge.name || '你')
+                        : (message.meta?.authorName || expertName || '助手'),
+                    content: message.content,
+                    createdAt: message.timestamp,
+                    timestamp: message.timestamp,
+                })),
+                presentables: snapshot?.presentables || [],
+                crystallizedQuotes: snapshot?.crystallizedQuotes || [],
+                activePresentableId: snapshot?.activePresentableId,
+                topicTitle: nextTitle,
+                openingPrompt: snapshot?.openingPrompt || firstUserMessage || undefined,
+                draftInputText: inputText.trim() ? inputText : undefined,
+                roundAnchors: snapshot?.roundAnchors || [],
+                lastDialogue: snapshot?.lastDialogue,
+                submittedAt: snapshot?.submittedAt,
+                roundIndex: snapshot?.roundIndex || 0,
+                isThinking: false,
+                questionSource: snapshot?.questionSource || 'static',
+                engineMode: snapshot?.engineMode || 'roundtable_discovery',
+                updatedAt: saveTimestamp,
+                saveMode: 'manual',
+            };
+
+            const detail = await savePersistedCrucibleConversation({
+                conversationId: snapshot?.conversationId,
+                topicTitle: nextTitle,
+                status: 'active',
+                snapshot: nextSnapshot,
+                projectId,
+                scriptPath,
+            });
+            onPersistedSnapshotSaved?.(detail.snapshot);
+            showToast(snapshot?.conversationId ? '当前话题已保存，可随时从话题中心继续' : '新话题已保存，可随时回来继续');
+        } catch {
+            showToast('保存话题失败');
+        }
+    }, [displayName, expertName, inputText, messages, onPersistedSnapshotSaved, projectId, resolvedCurrentUserBadge.name, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast, workspaceId]);
 
     const handleLoadAutosave = useCallback(() => {
         try {
@@ -885,87 +853,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         } catch { showToast('载入失败'); }
     }, [scopedBackupKey, scopedSnapshotKey, showToast]);
 
-    const crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
-        inputText,
-        hasMessages: messages.length > 0,
-        snapshot: isCrucibleMode ? readScopedCrucibleSnapshot(workspaceId) : null,
-    }), [inputText, isCrucibleMode, messages.length, workspaceId]);
-
-    const handleSaveTopic = useCallback(async () => {
-        if (!isCrucibleMode) {
-            return;
-        }
-
-        try {
-            const raw = localStorage.getItem(scopedSnapshotKey);
-            const localSnapshot = raw ? JSON.parse(raw) as CrucibleSnapshot : null;
-            const fallbackTopicTitle = displayName?.trim() || expertName;
-            const nextSnapshot: CrucibleSnapshot = {
-                ...(localSnapshot || {
-                    presentables: [],
-                    crystallizedQuotes: [],
-                    roundAnchors: [],
-                    messages: [],
-                    roundIndex: 0,
-                    questionSource: 'static',
-                    engineMode: 'socratic_refinement',
-                }),
-                topicTitle: isPlaceholderTopicTitle(localSnapshot?.topicTitle)
-                    ? (isPlaceholderTopicTitle(fallbackTopicTitle) ? '未命名议题' : fallbackTopicTitle)
-                    : localSnapshot?.topicTitle,
-                messages: localSnapshot?.messages?.length ? localSnapshot.messages : messages.map((message) => ({
-                    id: message.id,
-                    speaker: message.role === 'user' ? 'user' : (message.meta?.authorId || 'assistant'),
-                    name: message.role === 'user' ? '你' : (message.meta?.authorName || '助手'),
-                    content: message.content,
-                    createdAt: message.timestamp,
-                    timestamp: message.timestamp,
-                })),
-                draftInputText: inputText.trim() ? inputText : undefined,
-                updatedAt: new Date().toISOString(),
-                saveMode: 'manual',
-            };
-
-            if (!nextSnapshot.messages?.length && !nextSnapshot.presentables.length && !inputText.trim()) {
-                showToast('当前还没有可保存的话题内容');
-                return;
-            }
-
-            localStorage.setItem(scopedSnapshotKey, JSON.stringify(nextSnapshot));
-            localStorage.setItem(scopedBackupKey, JSON.stringify(nextSnapshot));
-
-            const detail = await savePersistedCrucibleConversation({
-                conversationId: nextSnapshot.conversationId,
-                topicTitle: truncateTopicTitle(nextSnapshot.topicTitle || '未命名议题', 48),
-                projectId,
-                scriptPath,
-                snapshot: nextSnapshot,
-            });
-
-            localStorage.setItem(scopedSnapshotKey, JSON.stringify(detail.snapshot));
-            onPersistedSnapshotSaved?.(detail.snapshot);
-            showToast('话题已保存');
-        } catch (error) {
-            console.warn('[ChatPanel] Failed to save topic:', error);
-            showToast('保存失败');
-        }
-    }, [displayName, expertName, inputText, isCrucibleMode, messages, onPersistedSnapshotSaved, projectId, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast]);
-
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
             return '先在这里继续聊，真正需要上黑板的内容会被挂到中区。';
         }
         return `开始和 ${expertName} 对话`;
     }, [isCrucibleMode, expertName]);
-    const isTrialBlocked = Boolean(
-        isCrucibleMode
-        && trialStatus?.enabled
-        && (trialStatus.status === 'conversation_exhausted' || trialStatus.status === 'quota_exhausted')
-    );
-    const showTrialBanner = Boolean(isCrucibleMode && trialStatus?.enabled);
-    const trialBannerTone = isTrialBlocked
-        ? 'border-[rgba(201,118,81,0.3)] bg-[rgba(255,241,233,0.96)] text-[var(--ink-1)]'
-        : 'border-[rgba(184,144,77,0.2)] bg-[rgba(255,248,232,0.96)] text-[var(--ink-2)]';
 
     return (
         <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,250,244,0.98)_0%,rgba(248,239,226,0.96)_100%)]">
@@ -1001,57 +894,40 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <button
                             onClick={handleExportMarkdown}
                             title="下载 Markdown 对话记录"
-                            className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                         >
-                            <span className="text-[11px] font-bold leading-none">D</span>
+                            <span className="text-[15px] font-bold leading-none">D</span>
                         </button>
                         {isCrucibleMode && (
                             <>
                                 <button
-                                    onClick={onOpenHistory}
-                                    title="打开话题中心"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <FolderTree className="h-3.5 w-3.5" />
-                                    <span className="text-[11px] font-medium">话题</span>
-                                </button>
-                                <button
                                     onClick={() => void handleSaveTopic()}
                                     title="保存当前话题到服务端历史中心"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <BookmarkCheck className="h-3.5 w-3.5" />
-                                    <span className="text-[11px] font-medium">保存</span>
-                                </button>
-                                <button
-                                    onClick={handleSaveAutosave}
-                                    title="保存快照到本地（localStorage）"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <span className="text-[11px] font-bold leading-none">S</span>
+                                    <span className="text-[15px] font-bold leading-none">S</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
-                                    title="从本地（localStorage）载入快照"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    title="从本地草稿快照恢复"
+                                    className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <span className="text-[11px] font-bold leading-none">L</span>
+                                    <span className="text-[15px] font-bold leading-none">L</span>
                                 </button>
-                                <span className="rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-2.5 py-1 text-[11px] text-[var(--ink-3)]">
-                                    {crucibleDraftBadge}
-                                </span>
+                                {onOpenTopicCenter ? <div className="mx-1 h-5 w-px bg-[rgba(156,117,76,0.14)]" /> : null}
+                                {onOpenTopicCenter ? (
+                                    <button
+                                        onClick={() => onOpenTopicCenter()}
+                                        title="打开话题中心"
+                                        className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    >
+                                        <FolderTree className="h-5 w-5" />
+                                        <span className="text-[15px] font-semibold leading-none">话题</span>
+                                    </button>
+                                ) : null}
                             </>
                         )}
-                        {isCrucibleMode && onResetAll ? (
-                            <button
-                                onClick={handleResetAll}
-                                title="重置工作区并清空对话"
-                                className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                            >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                <span className="text-[11px] font-medium">重置</span>
-                            </button>
-                        ) : (
+                        {!isCrucibleMode ? (
                             <button
                                 onClick={handleClearHistory}
                                 title="清空对话历史"
@@ -1059,34 +935,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             >
                                 <Trash2 className="h-4 w-4" />
                             </button>
-                        )}
-                        <button
-                            onClick={() => setShowSettings((prev) => !prev)}
-                            title="对话设置"
-                            className={`rounded-xl p-2 transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)] ${showSettings ? 'bg-[var(--surface-1)] text-[var(--ink-1)]' : 'text-[var(--ink-3)]'}`}
-                        >
-                            <Settings className="h-4 w-4" />
-                        </button>
-                        <button
-                            onClick={onToggle}
-                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                        {showSettings && (
-                            <div className="absolute right-0 top-10 z-10 w-52 rounded-[10px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.98)] p-3 shadow-[0_8px_24px_rgba(131,103,70,0.12)]">
-                                <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">对话设置</div>
-                                <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
-                                    <span className="text-[13px] text-[var(--ink-1)]">发送前确认</span>
-                                    <div
-                                        className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${confirmBeforeSend ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)]'}`}
-                                        onClick={() => saveConfirmSetting(!confirmBeforeSend)}
-                                    >
-                                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${confirmBeforeSend ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </div>
-                                </label>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
 
@@ -1114,18 +963,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--ink-2)]">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                     {warning}
-                </div>
-            )}
-
-            {showTrialBanner && trialStatus && (
-                <div className={`mx-4 mt-3 rounded-2xl border px-3 py-2.5 text-[12px] ${trialBannerTone}`}>
-                    <div className="font-medium">
-                        免费试用：剩余 {trialStatus.usage.conversationsRemaining} / {trialStatus.limits.conversationLimit} 个对话
-                        {trialStatus.usage.currentConversationId
-                            ? `，当前对话剩余 ${trialStatus.usage.currentConversationTurnsRemaining} / ${trialStatus.limits.turnLimitPerConversation} 轮`
-                            : ''}
-                    </div>
-                    <div className="mt-1 text-[11px] opacity-80">{trialStatus.message}</div>
                 </div>
             )}
 
@@ -1211,22 +1048,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                                 {blackboardHint}
                                             </div>
                                         )}
-
-                                        {isCrucibleMode && thesisReady && msg.id === lastOldluMessageId && msg.meta?.authorId === 'oldlu' && (
-                                            <button
-                                                type="button"
-                                                onClick={onEnterThesisWriter}
-                                                className="mt-3 flex w-full items-center gap-2.5 rounded-xl border border-[rgba(201,149,107,0.35)] bg-[linear-gradient(135deg,#fdf6ec_0%,#f5e6d0_100%)] px-4 py-3 text-left shadow-[0_4px_14px_rgba(168,132,82,0.10)] transition-all hover:shadow-[0_6px_20px_rgba(168,132,82,0.18)]"
-                                            >
-                                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgba(201,149,107,0.2)]">
-                                                    <Sparkles className="h-4.5 w-4.5 text-[#a07830]" />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[13px] font-semibold text-[var(--ink-1)]">生成论文</span>
-                                                    <span className="text-[11px] text-[var(--ink-3)]">将这段对话提炼为深度论文</span>
-                                                </div>
-                                            </button>
-                                        )}
                                     </div>
                                 </div>
                             );
@@ -1302,11 +1123,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         placeholder={isCrucibleMode ? '继续把你的判断往下说。' : '继续输入。'}
                         className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
                         rows={3}
-                        disabled={isCrucibleMode ? isTrialBlocked : isStreaming}
+                        disabled={isCrucibleMode ? false : isStreaming}
                     />
                     <button
                         onClick={handleSend}
-                        disabled={isTrialBlocked || (isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
+                        disabled={(isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
                         className="flex-shrink-0 grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
                     >
                         {(isStreaming && !isCrucibleMode) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

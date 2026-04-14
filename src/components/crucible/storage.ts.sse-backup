@@ -64,6 +64,7 @@ const normalizeCrucibleSnapshot = (snapshot: string | null): CrucibleSnapshot | 
                 summary: card.helper || '历史中屏同步内容',
                 content: card.answer || '',
             })),
+            engineMode: parsed.engineMode || 'socratic_refinement',
         } as CrucibleSnapshot;
     } catch {
         return null;

@@ -85,6 +85,12 @@ const getConversationStateHint = (item: Pick<CrucibleConversationSummary, 'statu
     return '这条话题已沉淀为常规对话状态，可继续往下聊。';
 };
 
+const TOOL_STATUS_COPY: Record<'success' | 'failed' | 'skipped', string> = {
+    success: '已执行',
+    failed: '执行失败',
+    skipped: '已跳过',
+};
+
 const normalizeConversationList = (items: CrucibleConversationSummary[]) => (
     items
         .slice()
@@ -248,7 +254,6 @@ export const CrucibleHistorySheet = ({
     }, [items, searchQuery, sortMode]);
 
     const hasItems = filteredItems.length > 0;
-
     const handleRefresh = async () => {
         setIsRefreshing(true);
         setError(null);
@@ -364,14 +369,14 @@ export const CrucibleHistorySheet = ({
 
             <aside className="relative flex h-full w-full max-w-[440px] flex-col border-l border-[var(--line-soft)] bg-[linear-gradient(180deg,rgba(255,252,247,0.98)_0%,rgba(246,236,222,0.96)_100%)] shadow-[-24px_0_60px_rgba(92,67,43,0.16)]">
                 <div className="flex items-center justify-between border-b border-[var(--line-soft)] px-5 py-4">
-                        <div>
-                            <div className="flex items-center gap-2 text-[var(--ink-1)]">
-                                <History className="h-4 w-4" />
+                    <div>
+                        <div className="flex items-center gap-2 text-[var(--ink-1)]">
+                            <History className="h-4 w-4" />
                             <h2 className="text-base font-semibold">话题中心</h2>
-                            </div>
+                        </div>
                         <p className="mt-1 text-xs text-[var(--ink-3)]">在这里切换话题、继续旧讨论，或者直接开一个新话题。</p>
                         <p className="mt-1 text-[11px] text-[var(--ink-3)]">口径说明：草稿未发送 = 输入框里还有内容；自动保存 = 系统临时保进度；已手动保存 = 你明确按过保存。</p>
-                        </div>
+                    </div>
                     <button
                         type="button"
                         onClick={onClose}
@@ -434,7 +439,7 @@ export const CrucibleHistorySheet = ({
                             <button
                                 type="button"
                                 onClick={onStartNewTopic}
-                                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.18)] bg-[rgba(246,236,221,0.82)] px-3 py-2 text-sm font-medium text-[var(--ink-1)] transition-colors hover:bg-[rgba(246,236,221,0.96)]"
+                                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[rgba(156,117,76,0.16)] bg-[rgba(255,252,247,0.9)] px-3 py-2 text-sm font-medium text-[var(--ink-1)] transition-colors hover:bg-[rgba(246,236,221,0.96)]"
                             >
                                 <Plus className="h-4 w-4" />
                                 开始新话题
@@ -498,6 +503,37 @@ export const CrucibleHistorySheet = ({
                                             <p className="mt-1 leading-6">{summarizeFocus(selectedDetail.summary.lastFocus)}</p>
                                             <p className="mt-2 text-xs text-[var(--ink-3)]">{getConversationStateHint(selectedDetail.summary)}</p>
                                         </div>
+                                        {selectedDetail.snapshot.decisionSummary ? (
+                                            <div className="rounded-2xl bg-[rgba(255,252,247,0.86)] px-3 py-3">
+                                                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-3)]">决策摘要</div>
+                                                <div className="mt-2 space-y-2 text-[12px] text-[var(--ink-2)]">
+                                                    {selectedDetail.snapshot.decisionSummary.stageLabel ? (
+                                                        <div>阶段：{selectedDetail.snapshot.decisionSummary.stageLabel}</div>
+                                                    ) : null}
+                                                    <div>Research：{selectedDetail.snapshot.decisionSummary.needsResearch ? '需要' : '未请求'}</div>
+                                                    <div>FactCheck：{selectedDetail.snapshot.decisionSummary.needsFactCheck ? '需要' : '未请求'}</div>
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                        {selectedDetail.snapshot.toolTraces?.length ? (
+                                            <div className="rounded-2xl bg-[rgba(255,252,247,0.86)] px-3 py-3">
+                                                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ink-3)]">本轮执行工具</div>
+                                                <div className="mt-2 space-y-2">
+                                                    {selectedDetail.snapshot.toolTraces.map((trace) => (
+                                                        <div key={`${trace.tool}-${trace.startedAt}`} className="rounded-xl border border-[rgba(156,117,76,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-2 text-[12px] text-[var(--ink-2)]">
+                                                            <div className="font-medium text-[var(--ink-1)]">{trace.tool}</div>
+                                                            <div className="mt-1">{TOOL_STATUS_COPY[trace.status]} · {trace.mode === 'primary' ? '主执行位' : '支援位'}</div>
+                                                            {trace.input.query ? (
+                                                                <div className="mt-1 break-words text-[var(--ink-3)]">Query: {trace.input.query}</div>
+                                                            ) : null}
+                                                            {trace.error ? (
+                                                                <div className="mt-1 break-words text-[rgb(127,84,53)]">{trace.error}</div>
+                                                            ) : null}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : null}
                                         <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--ink-3)]">
                                             <div className="rounded-2xl bg-[rgba(255,252,247,0.86)] px-3 py-2">
                                                 <div>Project</div>

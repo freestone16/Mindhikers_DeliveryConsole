@@ -21,9 +21,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
-import { generateCrucibleThesis } from './crucible-thesiswriter';
 import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
-import { getCrucibleThesisTrialStatus } from './crucible-trial';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -44,13 +42,6 @@ import {
     saveCrucibleConversationSnapshot,
     updateCrucibleConversation,
 } from './crucible-persistence';
-import {
-    clearCrucibleByokConfig,
-    getCrucibleByokStatus,
-    saveCrucibleByokConfig,
-    testCrucibleByokConfig,
-} from './crucible-byok';
-import { getCrucibleTrialStatus } from './crucible-trial';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -253,88 +244,6 @@ app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
-app.post('/api/crucible/thesis/generate', generateCrucibleThesis);
-app.get('/api/crucible/thesis/trial-status', async (req, res) => {
-    try {
-        const status = await getCrucibleThesisTrialStatus(req, {
-            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
-            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
-        });
-        res.json(status);
-    } catch (error) {
-        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
-        res.status(statusCode).json({ error: 'Failed to read thesis trial status' });
-    }
-});
-app.get('/api/crucible/trial-status', async (req, res) => {
-    try {
-        const status = await getCrucibleTrialStatus(req, {
-            conversationId: typeof req.query.conversationId === 'string' ? req.query.conversationId : undefined,
-            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
-            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
-        });
-        res.json(status);
-    } catch (error) {
-        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
-        res.status(statusCode).json({
-            error: statusCode === 401 ? 'Authentication required' : 'Failed to read trial status',
-        });
-    }
-});
-app.get('/api/crucible/byok', async (req, res) => {
-    try {
-        const status = await getCrucibleByokStatus(req);
-        res.json(status);
-    } catch (error) {
-        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
-        res.status(statusCode).json({
-            error: statusCode === 401 ? 'Authentication required' : 'Failed to read BYOK status',
-        });
-    }
-});
-app.post('/api/crucible/byok', async (req, res) => {
-    try {
-        await saveCrucibleByokConfig(req, {
-            baseUrl: typeof req.body?.baseUrl === 'string' ? req.body.baseUrl : '',
-            apiKey: typeof req.body?.apiKey === 'string' ? req.body.apiKey : '',
-            model: typeof req.body?.model === 'string' ? req.body.model : '',
-            providerLabel: typeof req.body?.providerLabel === 'string' ? req.body.providerLabel : undefined,
-        });
-        res.json({ success: true });
-    } catch (error) {
-        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
-        res.status(statusCode).json({
-            error: (error as Error).message || 'Failed to save BYOK config',
-        });
-    }
-});
-app.post('/api/crucible/byok/test', async (req, res) => {
-    try {
-        const result = await testCrucibleByokConfig({
-            baseUrl: typeof req.body?.baseUrl === 'string' ? req.body.baseUrl : '',
-            apiKey: typeof req.body?.apiKey === 'string' ? req.body.apiKey : '',
-            model: typeof req.body?.model === 'string' ? req.body.model : '',
-            providerLabel: typeof req.body?.providerLabel === 'string' ? req.body.providerLabel : undefined,
-        });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: (error as Error).message || 'Failed to test BYOK config',
-        });
-    }
-});
-app.delete('/api/crucible/byok', async (req, res) => {
-    try {
-        await clearCrucibleByokConfig(req);
-        res.json({ success: true });
-    } catch (error) {
-        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
-        res.status(statusCode).json({
-            error: (error as Error).message || 'Failed to clear BYOK config',
-        });
-    }
-});
 app.get('/api/crucible/conversations', async (req, res) => {
     try {
         const items = await listCrucibleConversations(req, {

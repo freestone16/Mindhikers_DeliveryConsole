@@ -15,7 +15,7 @@
     "typecheck:full": "tsc -b",
     "lint": "eslint .",
     "preview": "node scripts/preview.js",
-    "start": "tsx server/index.ts",
+    "start": "npm run auth:migrate && tsx server/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:opencode:gc": "node testing/scripts/run-opencode-request.mjs",

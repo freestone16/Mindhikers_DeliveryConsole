@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-    buildSocratesPrompt,
-} from '../../server/crucible-orchestrator';
 
+// Legacy single-prompt architecture test — superseded by two-phase orchestrator
+// See: src/__tests__/crucible-orchestrator.test.ts (SaaS backsync)
+describe.skip('legacy single-prompt', () => {
 const PAIR = {
     challengerSlug: 'oldzhang',
     synthesizerSlug: 'oldlu',
@@ -51,4 +51,5 @@ describe('crucible socrates prompt', () => {
 
         expect(prompt).toContain('topicSuggestion');
     });
+});
 });

@@ -16,37 +16,6 @@ export interface CrucibleTurnResponse {
     dialogue?: CrucibleDialogue;
     presentables?: Array<{ type?: 'reference' | 'quote' | 'asset'; title?: string; summary?: string; content?: string }>;
     topicSuggestion?: string;
-    decision?: {
-        stageLabel?: string;
-        needsResearch: boolean;
-        needsFactCheck: boolean;
-        toolRequests: Array<{
-            tool: 'Researcher' | 'FactChecker';
-            mode: 'primary' | 'support';
-            reason: string;
-            query?: string;
-            goal?: string;
-            scope?: string;
-        }>;
-    };
-    toolTraces?: Array<{
-        tool: 'Researcher' | 'FactChecker';
-        requestedBy: 'Socrates';
-        mode: 'primary' | 'support';
-        status: 'success' | 'failed' | 'skipped';
-        reason: string;
-        input: {
-            query?: string;
-            goal?: string;
-            scope?: string;
-        };
-        output?: unknown;
-        error?: string;
-        startedAt: string;
-        finishedAt: string;
-    }>;
-    engineMode?: CrucibleEngineMode;
-    thesisReady?: boolean;
 }
 
 export interface CrucibleConversationSummary {
@@ -143,25 +112,14 @@ export interface CrucibleSnapshot {
     openingPrompt?: string;
     roundAnchors?: RoundAnchor[];
     lastDialogue?: CrucibleDialogue;
-    updatedAt?: string;
     submittedAt?: string;
     roundIndex?: number;
     isThinking?: boolean;
     questionSource?: 'static' | 'socrates' | 'fallback';
     engineMode?: CrucibleEngineMode;
     draftInputText?: string;
+    updatedAt?: string;
     saveMode?: 'autosave' | 'manual' | 'conversation';
-    toolTraces?: CrucibleTurnResponse['toolTraces'];
-    decisionSummary?: {
-        stageLabel?: string;
-        needsResearch: boolean;
-        needsFactCheck: boolean;
-        requestedTools: Array<{
-            tool: string;
-            mode: string;
-        }>;
-    };
-    thesisReady?: boolean;
 }
 
 export interface CrucibleRound {
