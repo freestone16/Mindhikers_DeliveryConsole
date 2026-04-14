@@ -35,3 +35,4 @@ coverage/
 runtime/crucible/autosave.json
 runtime/crucible/projects/
 runtime/crucible/sessions/
+.gstack/

@@ -1,6 +1,47 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-02 CST
+> **更新日期**: 2026-04-14 CST
+
+---
+
+## 1.19 2026-04-14（V1 Phase 1-2 实施 + Phase 3 staging 冒烟 + 底座同步治理）
+
+### ✅ 本轮已完成
+
+**Phase 1：Core Path Readiness + BYOK Onboarding + Auth Smoke**（MIN-105 / MIN-109）
+- 4 个探索 agent 确认 PRD 就绪
+- 服务端 BYOK 错误归类 + 前端引导增强 + 诊断测试
+- 3 个 smoke request 文件（GC-SAAS-001/002/003）
+
+**Phase 2：Thesis Convergence + ThesisWriter API + Trial Quota**（MIN-119 / MIN-120 / MIN-121）
+- `detectThesisConvergence()` 纯函数 + thesisReady 全链路 + ChatPanel CTA + 10 测试
+- `crucible-thesiswriter.ts` 新建 + `appendCrucibleThesisArtifact` + 前端下载
+- 平台用户限 2 次论文 + BYOK/VIP 无限制 + 前端额度展示
+
+**Phase 3：Staging 冒烟（MIN-108）**
+- TREQ-004 Core Dialogue：✅ 通过（SSE 流正常，4 轮对话 + 刷新恢复）
+- TREQ-005 History/Export：✅ 通过（历史列表、恢复、导出正常）
+- TREQ-006 ThesisWriter：⚠️ 阻塞（后端路由 staging 返回 404）
+- TREQ-007 BYOK：⏸️ 待执行（依赖 TREQ-006 解阻塞）
+
+**Production 主链冒烟**：✅ 通过（`gc.mindhikers.com` 首页、auth、version 正常）
+
+**底座同步治理**（MIN-94）
+- 重写 AGENTS.md（认知校正 + 架构概览 + 底座同步规则 + 精简 Read Order）
+- 更新 rules.md（新增底座同步规则 102-113）
+- 同步底座同步规则到 SSE AGENTS.md 和 SSE rules.md
+
+### 🎯 关键修复
+
+- **Production URL 漂移已修复**：`APP_BASE_URL`、`BETTER_AUTH_URL`、`CORS_ORIGIN` 已修正为 `https://gc.mindhikers.com`
+- **Staging LLM 配置已切换为 Kimi**：通过 `/api/llm-config` 接口生效
+- **ThesisWriter 正则语法修复**：`value.replace(/[\r\n]/g, '')`
+- **Better Auth 空 DB 兼容**：`auth:migrate` 加入启动脚本 + `databaseMigration` 启用
+
+### ⚠️ 当前阻塞
+
+- ThesisWriter 后端路由在 staging 返回 404（代码存在但未部署）
+- 影响范围：TREQ-006 无法继续，TREQ-007 被连带阻塞
 
 ---
 
