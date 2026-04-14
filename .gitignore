@@ -38,3 +38,5 @@ coverage/
 .codepilot-uploads/
 .npm_local_cache/
 node_modules_bad/
+.codex-tmp-*
+*.orig
