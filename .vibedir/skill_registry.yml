@@ -1,0 +1,10 @@
+skills:
+  - name: oldyang
+    display_name: OldYang
+    owner: codex
+    status: active
+    repo_path: skills/oldyang
+    snapshot_file: .vibedir/skill_drafts/codex_oldyang_20260406.md
+    notes: >
+      2026-04-06 在 GoldenCrucible-SaaS 仓内首次落正式 `oldyang` skill 资产，
+      用于承接 MHSDC 全局治理主线。

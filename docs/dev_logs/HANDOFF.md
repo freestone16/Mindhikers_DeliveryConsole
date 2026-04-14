@@ -1,126 +1,99 @@
-🕐 Last updated: 2026-04-14 09:35
+🕐 Last updated: 2026-04-14 22:30
 🌿 Branch: MHSDC-GC-SSE
 
 ## 当前状态
 
-SaaS → SSE 全面回灌治理计划已定稿（v3），待执行。
+SaaS → SSE 全面回灌治理 **Phase 0-2 已完成**，Phase 3A（老杨自验）待执行。
 
 - Linear: [MIN-135](https://linear.app/mindhikers/issue/MIN-135/saas-sse-全面回灌治理底座同步与文档链路修复)
 - 父 issue: MIN-94（黄金坩埚 SAAS 安全上线）
 - 计划文件: `docs/plans/2026-04-14_GC_SSE_SaaS_Full_Backsync_Governance_Plan.md`
 
-## 计划制定阶段已完成的工作
+## 已完成的 Commits
 
-1. **并行审计**（4 个 explore agent）：
-   - SSE 代码库结构、健康度、死代码
-   - SaaS staging 代码库结构
-   - 两边 diff 分析（58 文件，+7827 / -1091 行）
-   - 测试 & CI/CD 就绪度
-2. **诊断报告**：6 大治理问题、8 项治理动作
-3. **计划 v1** → 老卢第一轮批注（4 处）→ **v2** → 老卢第二轮批注（3 处）→ **v3 定稿**
-4. **Linear issue MIN-135 已创建**，所有占位符已替换
+| Commit | Phase | 说明 |
+|--------|-------|------|
+| `d6270b8` | Phase 0 前置 | 暂存 .agent/ 等删除 |
+| `e6e412c` | Phase 0 | 清理 working tree 死代码与 artifacts |
+| `bf0fcb9` | Phase 1 | 核心模块回灌 + 架构升级 + 测试同步 + 路由对齐（34 files, +7910/-357） |
+| 待提交 | Phase 2 | 治理文件同步 + 文档链路修复 |
 
-### 老卢两轮批注的完整处理记录
+## Phase 0：SSE 环境清扫 ✅
 
-**第一轮（v1→v2）：**
-1. §1.3 架构分叉 → 改为"以回灌为大致思路" ✅
-2. §1.4 SSE 独有 → 明确"本次不动 + 后续提交到 SaaS" ✅
-3. §1.5 治理差异 → 增加前提假设，强调文档链路可导航性 ✅
-4. §3 验收收尾 → 新增 §3B 老卢验收清单 ✅
+- 提交 8,450 文件删除（.agent/、旧 worktrees）
+- 物理删除 `node_modules_bad/`（释放 147MB）
+- 删除死代码：`server/llm.ts.orig`、`server/llm_backup.ts`、`.codex-tmp-*`
+- `.gitignore` 补充 `.codex-tmp-*`、`*.orig`
+- Build 验证通过
 
-**第二轮（v2→v3）：**
-1. §0 第 26 行：rules.md 纳入接手链路图 ✅（从 3 条变 4 条）
-2. §2.4：OldYang 不需要复制到项目内 ✅（全局路径共享 SSOT）
-3. §4：MIN-135 已创建并填入 ✅
+## Phase 1：SaaS 核心模块回灌 ✅
 
-## 待执行工作（计划 v3 的 Phase 0→3）
-
-### Phase 0：SSE 环境清扫（前置条件）
-
-| # | 动作 | 说明 |
-|---|---|---|
-| 0.1 | 暂存并提交当前所有删除 | `git add -A` 确认后提交 |
-| 0.2 | 物理删除 `node_modules_bad/` | 释放 147MB |
-| 0.3 | 删除死代码文件 | `server/llm.ts.orig`、`server/llm_backup.ts`、`.codex-tmp-*` |
-| 0.4 | 确认 `.gitignore` 覆盖 | `node_modules_bad/`、`.codex-tmp-*`、`*.orig` |
-| 0.5 | 验证 build 通过 | `npm run build:app` |
-| 0.6 | 提交 | `refs MIN-135 clean SSE working tree dead code and artifacts` |
-
-### Phase 1：SaaS 核心模块回灌
-
-**1A 基础设施层（直接复制，无冲突）：**
+### 1A 基础设施层（4 文件，直接复制）
 - `src/schemas/crucible-runtime.ts`
 - `src/components/crucible/sse.ts`
 - `server/auth/account-tier.ts`
 - `src/auth/AppAuthContext.ts`
 
-**1B 业务功能层（直接复制，低冲突）：**
-- `server/crucible-byok.ts`
-- `server/crucible-factcheck.ts`
-- `server/crucible-trial.ts`
-- `server/crucible-thesiswriter.ts`
+### 1B 业务功能层（5 文件，直接复制）
+- `server/crucible-byok.ts`、`server/crucible-factcheck.ts`、`server/crucible-trial.ts`、`server/crucible-thesiswriter.ts`
 - `src/components/SaaSLLMConfigPage.tsx`
 
-**1C 架构升级层（手动合并，高冲突）— 回灌覆盖前先备份 SSE 原版：**
-- `server/crucible-orchestrator.ts`（单次→两阶段）
-- `src/SaaSApp.tsx`（659 行差异）
-- `src/components/ChatPanel.tsx`（322 行差异）
-- `src/components/crucible/CrucibleWorkspaceView.tsx`（360 行差异）
-- `src/components/crucible/storage.ts`（308 行差异）
-- `src/components/crucible/types.ts`（124 行差异）
-- `server/index.ts`（路由注册对齐）
-- `src/components/Header.tsx`（319 行差异）
+### 1C 架构升级层（8 文件，回灌覆盖，已备份 .sse-backup）
+- `server/crucible-orchestrator.ts`（单次→两阶段架构）
+- `src/SaaSApp.tsx`、`src/components/ChatPanel.tsx`、`src/components/crucible/CrucibleWorkspaceView.tsx`
+- `src/components/crucible/storage.ts`、`src/components/crucible/types.ts`
+- `server/index.ts`（全路由对齐）、`src/components/Header.tsx`
+- 额外同步：`CrucibleHistorySheet.tsx`、`UserAvatarMenu.tsx`、`server/auth/account-router.ts`
 
-**1D 测试同步：**
-- 复制 SaaS 新增测试
-- skip 旧架构测试
-- 更新 vitest.config.ts
+### 1D 测试同步
+- 复制 5 个 SaaS 测试文件（thesis、byok、factcheck、runtime、orchestrator）
+- 旧架构测试 `crucible-prompt.test.ts` 添加 `describe.skip`
+- `vitest.config.ts` 替换为 SaaS 版本
 
-**1E 路由对齐清单（必须逐一核对）：**
-- `/api/crucible/thesis/generate`
-- `/api/crucible/thesis/trial-status`
-- `/api/crucible/byok/diagnostics`
-- FactCheck expert route
-- Account tier route
-- `auth:migrate` 在 start script
+### 1E 路由对齐 ✅
+- `/api/crucible/thesis/generate`、`/api/crucible/thesis/trial-status`
+- `/api/crucible/byok/diagnostics`、FactCheck、account-tier
+- `package.json` start script 已含 `auth:migrate`
 
-### Phase 2：治理文件同步 + 文档链路修复
+- **Build 验证**：`npm run build:app` ✅（JS bundle: 560.95 KB）
 
-| # | 动作 |
-|---|---|
-| 2.1 | 复制 PRD 到 SSE |
-| 2.2 | 复制实施计划到 SSE |
-| 2.3 | 复制冒烟测试请求到 SSE |
-| 2.4 | ~~复制 OldYang~~ → **不需要**（全局路径共享） |
-| 2.5 | 同步 `package.json` start script |
-| 2.6 | **重写 AGENTS.md** |
-| 2.7 | **重写 HANDOFF**（根据回灌后实际状态） |
-| 2.8 | 更新 rules.md |
-| 2.9 | 更新 dev_progress.md |
+## Phase 2：治理文件同步 + 文档链路修复 ✅（待提交）
 
-### Phase 3：验证与收尾
+| # | 动作 | 状态 |
+|---|------|------|
+| 2.1 | 复制 PRD `2026-04-11_GoldenCrucible_SaaS_PRD.md` | ✅ |
+| 2.2 | 复制实施计划 001/002/003 + BYOK_Config_UX | ✅ |
+| 2.3 | 复制冒烟测试 TREQ-2026-04-12-*（7 个） | ✅ |
+| 2.4 | 复制 `.vibedir/` | ✅ |
+| 2.5 | package.json start script（Phase 1 已完成） | ✅ |
+| 2.6 | **重写 AGENTS.md**（架构概览 + 模块索引 + PRD 链接） | ✅ |
+| 2.7 | **重写 HANDOFF.md**（本文件，回灌后实际状态） | ✅ |
+| 2.8 | **更新 rules.md**（补充回灌规则） | ✅ |
+| 2.9 | **更新 dev_progress.md**（记录回灌里程碑） | ✅ |
 
-**3A 老杨自验：** build + test + lint + 本地启动 + 冒烟 + 文档链路检查 + Railway 部署验证 + 提交
+## Phase 3A：老杨自验（待执行）
 
-**3B 老卢验收清单：**
-- V1-V6 本地验收（首页加载、登录、对话、论文 CTA、BYOK 配置、历史面板）
-- V7-V8 云端验收（SSE 域名、health check）
-- V9-V11 文档验收（AGENTS.md、HANDOFF、模块清单）
+| # | 动作 | 验证标准 |
+|---|------|----------|
+| 3A.1 | 完整 build | `npm run build:app` exit 0 |
+| 3A.2 | 单元测试 | `npm run test:run` 通过 |
+| 3A.3 | Lint | `npm run lint` 无新增 error |
+| 3A.4 | 本地启动验证 | `npm run dev` 正常启动 |
+| 3A.5 | 功能冒烟 | 登录 → 对话 → 论文 CTA → BYOK 配置 → 历史面板 |
+| 3A.6 | 文档链路检查 | AGENTS.md → HANDOFF → rules.md → plans/ 全链路可导航 |
+| 3A.7 | Railway 部署验证 | SSE 域名部署成功 |
+| 3A.8 | 提交 | `refs MIN-135 complete SaaS backsync to SSE` |
 
-## 关键数据（供执行窗口参考）
+## Phase 3B：老卢验收清单（待执行）
 
-- **SSE 分支**：`MHSDC-GC-SSE`，目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
-- **SaaS 分支**：`MHSDC-GC-SAAS-staging`，目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`（只读来源）
-- **共同祖先**：`29a0414`
-- **SaaS 独有**：26 个 commit（MIN-105/107/108/109/119/120/121）
-- **SSE 独有**：14 个 commit（多主题保存、artifact 导出、对话恢复等）
-- **源码差异**：58 个文件，+7827 / -1091 行
-- **SSE TS 文件数**：129，**SaaS**：140，**SaaS 多出 14 个核心业务文件**
+**本地**（V1-V6）：首页加载、登录、对话、论文 CTA、BYOK 配置、历史面板
+**云端**（V7-V8）：SSE 域名访问、health check
+**文档**（V9-V11）：AGENTS.md、HANDOFF、模块清单
 
-## SSE 独有代码（回灌后必须验证兼容性）
+## SSE 独有代码（回灌后需验证兼容性）
 
 | Commit | 内容 |
-|---|---|
+|--------|------|
 | `3455d48` | multi-topic save and restore |
 | `9f3ab61` | artifact export hook |
 | `7ad4921` | conversation restore flow |
@@ -128,21 +101,26 @@ SaaS → SSE 全面回灌治理计划已定稿（v3），待执行。
 | `4e4b6b0` | lightweight history center |
 | `b6d14c8` | SaaS shell + legacy type debt isolation |
 
+## 关键数据
+
+- **SSE 分支**：`MHSDC-GC-SSE`，目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+- **SaaS 分支**：`MHSDC-GC-SAAS-staging`，目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`（只读来源）
+- **SSE backup 文件**：`*.sse-backup`（8 个，未提交到 git，仅工作树中保留）
+- **Railway SSE 域名**：`golden-crucible-saas-sse.up.railway.app`
+- **Railway SaaS 域名**：`golden-crucible-saas-staging.up.railway.app`
+
 ## 执行约束
 
 1. 每个 Phase 完成后提交一次：`refs MIN-135 <phase描述>`
-2. Phase 0 完成前不动源码
-3. Phase 1C 回灌覆盖前备份 SSE 原版
-4. **不做任何 SaaS 方向的 push**，只做 SaaS → SSE 单向回灌
-5. Phase 3B 老卢验收通过后才算完成
+2. 不做任何 SaaS 方向的 push，只做 SSE → SaaS 单向推进
+3. Phase 3B 老卢验收通过后才算完成
 
 ## 新窗口直接怎么做
 
 1. **窗口目录**：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`（SSE 分支）
 2. **先读 3 个文件**：
-   - `docs/plans/2026-04-14_GC_SSE_SaaS_Full_Backsync_Governance_Plan.md`（v3 定稿）
-   - `AGENTS.md`（仓级入口）
+   - `AGENTS.md`
    - `docs/dev_logs/HANDOFF.md`（本文件）
-3. **按 Phase 0 → 1A → 1B → 1C → 1D → 1E → 2 → 3A → 3B 顺序执行**
-4. SaaS 目录仅作只读来源，`cp` 文件到 SSE
-5. 最终提交：`refs MIN-135 complete SaaS backsync to SSE`
+   - `docs/04_progress/rules.md`
+3. **当前待执行**：Phase 3A（老杨自验）→ Phase 3B（老卢验收）
+4. SaaS 目录仅作只读来源

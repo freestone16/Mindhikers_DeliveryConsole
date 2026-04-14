@@ -258,8 +258,20 @@
 
 ---
 
+## 回灌治理
+
+95. **回灌以 SaaS 版为基准**：架构分叉、模块升级、路由表以 SaaS staging 版为准，SSE 独有逻辑在 SaaS 基准上验证
+96. **回灌覆盖前必须备份 SSE 原版**：`cp file.ts file.ts.sse-backup`，备份文件不提交到 git
+97. **SSE 独有功能不删除**：多主题保存、artifact 导出、对话恢复等 SSE 独有代码保留，验证兼容性后再提交到 SaaS
+98. **不做 SaaS 方向 push**：只做 SSE → SaaS 单向推进，严禁反向覆盖
+99. **每个回灌 Phase 完成后提交一次**：`refs MIN-135 <phase描述>`，commit 前确认 build 通过
+100. **文档链路可导航性是硬性验收标准**：AGENTS.md → HANDOFF → rules.md → plans/ 必须全链路可访问
+
+---
+
 ## 更新日志
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-14 | 新增回灌治理规则 95-100（MIN-135 Phase 2） |
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |

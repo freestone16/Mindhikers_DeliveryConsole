@@ -1,6 +1,45 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-01 CST
+> **更新日期**: 2026-04-14 CST
+
+---
+
+## 1.24 2026-04-14（SaaS → SSE 全面回灌治理 — MIN-135）
+
+### ✅ 本轮已完成
+
+**Phase 0：SSE 环境清扫**（commit `e6e412c`）
+- 提交 8,450 文件删除（.agent/、旧 worktrees 等）
+- 物理删除 `node_modules_bad/`（释放 147MB）
+- 删除死代码：`server/llm.ts.orig`、`server/llm_backup.ts`、`.codex-tmp-*`
+- `.gitignore` 补充 `.codex-tmp-*`、`*.orig`
+
+**Phase 1：SaaS 核心模块回灌**（commit `bf0fcb9`，34 files, +7910/-357）
+- 1A 基础设施层：4 文件直接复制（schema、sse client、account-tier、auth context）
+- 1B 业务功能层：5 文件直接复制（BYOK、FactCheck、Trial、ThesisWriter、LLM Config UX）
+- 1C 架构升级层：8 文件回灌覆盖（orchestrator 两阶段升级、SaaSApp、ChatPanel、WorkspaceView、storage、types、index.ts、Header）+ 额外 3 文件同步（HistorySheet、UserAvatarMenu、account-router）
+- 1D 测试同步：5 个 SaaS 测试文件 + 旧测试 skip + vitest.config.ts
+- 1E 路由对齐：thesis、trial、byok、factcheck、account-tier 全部路由已挂载
+- Build 验证：`npm run build:app` ✅（JS bundle: 560.95 KB）
+
+**Phase 2：治理文件同步 + 文档链路修复**
+- 复制 PRD + 4 份实施计划 + 7 个冒烟测试请求 + .vibedir/
+- 重写 AGENTS.md（架构概览、模块索引、PRD 链接）
+- 重写 HANDOFF.md（回灌后实际状态）
+- 更新 rules.md（新增回灌治理规则 95-100）
+- 更新本文件（里程碑记录）
+
+### 🎯 核心架构变更
+
+- **对话引擎**：从单次调用 `buildSocratesPrompt` 升级为两阶段 `buildSocratesDecisionPrompt` → 工具执行 → `buildSocratesCompositionPrompt`
+- **新增工具路由**：`CrucibleToolName`、`CrucibleToolRouteMode`、`ToolExecutionTrace`
+- **Socrates 能力**：现在可决策调用 Researcher/FactChecker，结果注入第二轮
+
+### ⚠️ 待验证
+
+- SSE 独有功能（多主题保存、artifact 导出、对话恢复）与新架构兼容性
+- Phase 3A 老杨自验（build + test + lint + 本地冒烟 + 文档链路 + Railway 部署）
+- Phase 3B 老卢验收
 
 ---
 
