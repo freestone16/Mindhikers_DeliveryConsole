@@ -4,11 +4,9 @@
 
 ## 会话状态
 - 本地分支：`MHSDC-GC-RT`
-- 远端分支：`origin/MHSDC-GC-RT` ⚠️ 未同步（本次新增文件未推送）
-- 最新已推送 Commit：`7ac605f` refs MIN-116 完成 Unit 5 Spike → 深聊桥接
-- 工作区：**非干净**
-  - 修改：`src/App.tsx`（重写为主布局）
-  - 未跟踪：全部新增前端组件文件
+- 远端分支：`origin/MHSDC-GC-RT` ✅ 已同步
+- 最新已推送 Commit：`c16a94b` refs MIN-117 完成 Unit 6 前端侧边栏 + 导演 UI
+- 工作区：干净
 
 ## Linear 项目结构
 **Project**: [MHSDC-GC-RT](https://linear.app/mindhikers/project/mhsdc-gc-rt-5f4e9b847c33)
