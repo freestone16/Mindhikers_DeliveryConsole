@@ -269,9 +269,24 @@
 
 ---
 
+## 底座同步（SaaS → SSE）
+
+101. **SaaS 不是 SSE 的子集，是独立的预发阵地**：SaaS 是经过生产级验收的 staging 空间；SSE 是研发前线，最新功能可能尚未进入 SaaS，但 SaaS 验收中产生的底座修复必须回灌 SSE
+102. **底座同步触发时机**：SaaS staging 每次验收收口（准备推 main 之前），会做一次底座回灌到 SSE
+103. **底座同步范围**：服务启动与路由骨架（`server/index.ts`）、认证与账户体系（`server/auth/*`）、构建配置（`package.json` / `vite.config` / `tsconfig`）、前端主壳（`SaaSApp.tsx` / 路由壳 / 主题 CSS token）、共享类型与 Schema、通用工具函数（SSE 客户端 / LLM connector 基座 / `callConfiguredLlm`）
+104. **底座同步不同步功能模块**：`crucible-thesiswriter` / `crucible-trial` / `crucible-byok` / `crucible-factcheck` / `crucible-orchestrator` 的业务逻辑跟随发布流 SSE → SaaS，不走底座回灌
+105. **冲突原则**：底座代码以 SaaS staging 版为准（经过生产验收），业务功能代码以 SSE 版为准（研发前沿），判断不了时暂停问老卢
+106. **底座同步后 SSE 侧健康校验**：`npm run build` 通过 + `npm run dev` 启动无报错 + 至少一条冒烟测试通过
+107. **SaaS 验收中产生的底座修复必须在推生产前回灌**：确保研发前线在健全底座上继续开发；遗漏回灌会导致两边底座分叉
+108. **恢复对话/恢复话题默认优先恢复到 `runtime/crucible` 后端持久化层**：先改 `conversation / index / active pointer / autosave`，不要先去操作浏览器本地状态；浏览器只用于核验，不是恢复主路径
+109. **当用户明确要求"先拉齐 SaaS 再继续 SSE 开发"时，必须先完成 SSE → SaaS 内容同步、发布与线上核验，再回到 SSE 继续迭代**：不能只同步本地代码或只写治理文档后就默认生产已追平
+
+---
+
 ## 更新日志
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-14 | 新增底座同步规则 101-109（MIN-94 治理同步，与 SaaS 侧 102-113 对应） |
 | 2026-04-14 | 新增回灌治理规则 95-100（MIN-135 Phase 2） |
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |
