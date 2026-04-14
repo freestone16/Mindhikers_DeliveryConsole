@@ -1,12 +1,22 @@
-import './App.css';
+import { useState } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { RoundtableView } from './components/roundtable/RoundtableView';
+import type { SidebarTab } from './components/roundtable/types';
 
 function App() {
+  const [activeTab, setActiveTab] = useState<SidebarTab>('proposition');
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--shell-bg)] text-[var(--ink-1)]">
-      <div className="text-center space-y-3">
-        <h1 className="mh-display text-3xl">Roundtable Engine</h1>
-        <p className="text-sm text-[var(--ink-3)]">基础壳已就绪，等待圆桌引擎接入。</p>
-      </div>
+    <div className="flex h-screen bg-[var(--shell-bg)] text-[var(--ink-1)]">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sessionStatus={null}
+        spikeCount={0}
+      />
+      <main className="flex-1 overflow-y-auto">
+        <RoundtableView activeTab={activeTab} />
+      </main>
     </div>
   );
 }
