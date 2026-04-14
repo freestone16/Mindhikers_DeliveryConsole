@@ -16,7 +16,7 @@
 
 ## Preconditions
 
-1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible`
+1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 2. 本地前端页面可访问：`http://127.0.0.1:5176/`
 3. 黄金坩埚后端已运行，页面提交后能产生新的 `runtime/crucible/golden-crucible-sandbox/turn_log.json` 记录
 4. 本次专项验证的真实用户输入固定使用：

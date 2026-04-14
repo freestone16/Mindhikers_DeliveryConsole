@@ -1,7 +1,7 @@
 # GoldenCrucible 迁移收口记录
 
 > 日期：2026-03-14
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 分支：`codex/crucible-main`
 > 状态：迁移层收口完成，存在 unrelated 编译债待后续专项处理
 

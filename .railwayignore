@@ -1,9 +1,15 @@
 node_modules
 node_modules_bad
 dist
-runtime
+runtime/crucible/autosave.json
+runtime/crucible/projects
+runtime/crucible/sessions
 logs
 uploads
+.agent
+.claude
+.codepilot-uploads
+.npm_local_cache
 .git
 .DS_Store
 *.log

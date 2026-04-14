@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpenText, Boxes, BrainCircuit, Quote, Sparkles } from 'lucide-react';
 import type { HostRoutedAsset } from '../../types';
 import { buildApiUrl } from '../../config/runtime';
-import { clearCrucibleSnapshot, readCrucibleSnapshot, writeCrucibleSnapshot } from './storage';
+import { persistCrucibleSnapshot, readScopedCrucibleSnapshot } from './storage';
+import { readSseStream } from './sse';
 import type {
     CanvasAsset,
     CrucibleDialogue,
@@ -26,6 +27,7 @@ const PREVIEW_RENDER_VERSION = 'structure-v2';
 interface CrucibleWorkspaceProps {
     projectId: string;
     scriptPath: string;
+    workspaceId?: string | null;
     incomingAssets?: HostRoutedAsset[];
     topicTitle?: string;
     seedPrompt?: string;
@@ -153,90 +155,23 @@ const normalizeTopic = (topicTitle?: string) => {
     return topicTitle;
 };
 
-const normalizePromptTopic = (topicTitle?: string) => {
-    const normalized = normalizeTopic(topicTitle);
-    return normalized === '标题待定' ? '当前议题' : normalized;
-};
-
-const shortenAnswer = (value: string, fallback: string, maxLength = 28) => {
-    const normalized = value.trim().replace(/\s+/g, ' ');
-    if (!normalized) {
-        return fallback;
-    }
-    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
-};
-
-const pickAnchorText = (anchors: RoundAnchor[], index: number, fallback: string) => {
-    const anchor = anchors[index];
-    if (!anchor) {
-        return fallback;
-    }
-
-    const fromContent = shortenAnswer(anchor.content || '', '', 28);
-    if (fromContent) {
-        return fromContent;
-    }
-
-    const fromTitle = anchor.title.trim().replace(/\s+/g, ' ');
-    if (!fromTitle) {
-        return fallback;
-    }
-    return fromTitle.length > 28 ? `${fromTitle.slice(0, 28)}...` : fromTitle;
-};
-
-const buildFallbackPresentables = (
-    topicTitle: string | undefined,
-    previousAnchors: RoundAnchor[],
-    nextRoundIndex: number
-): CanvasAsset[] => {
-    const promptTopic = normalizePromptTopic(topicTitle);
-    const coreClaim = pickAnchorText(previousAnchors, 0, '你刚才最想保住的那个判断');
-    const counterForce = pickAnchorText(previousAnchors, 1, '那股最难顶住的反力');
-    const takeaway = pickAnchorText(previousAnchors, 2, '读者最终该带走的那个新判断');
-
-    return [
-        {
-            id: `fallback_${nextRoundIndex}_1`,
-            type: 'reference',
-            title: `具体场景：${coreClaim}`,
-            subtitle: '',
-            summary: `继续围绕“${promptTopic}”往下走，但先别上理论。`,
-            content: `如果你要用一个具体场景说明“${coreClaim}”，先拿一个你真正见过、感受过、能说清的例子。`,
-        },
-        {
-            id: `fallback_${nextRoundIndex}_2`,
-            type: 'reference',
-            title: '最强阻力',
-            subtitle: '',
-            summary: '先写那个最让你自己也会犹豫一下的反驳。',
-            content: `如果有人不同意你，他最可能会抓住“${counterForce}”里的哪一点来反驳你？`,
-        },
-        {
-            id: `fallback_${nextRoundIndex}_3`,
-            type: 'reference',
-            title: '读者困惑',
-            subtitle: '',
-            summary: '把目标读者想象成一个真实的人，别写抽象判断升级。',
-            content: `如果你希望读者读完后得到“${takeaway}”，那这篇东西最想帮他解决的具体困惑到底是什么？`,
-        },
-    ];
-};
-
 export const CrucibleWorkspace = ({
     projectId,
     scriptPath,
+    workspaceId,
     incomingAssets = [],
     topicTitle,
     seedPrompt,
     seedPromptVersion = 0,
-    onResetWorkspace,
+    onResetWorkspace: _onResetWorkspace,
     onRoundGenerated,
     onBlackboardStateChange,
     onTurnSettled,
 }: CrucibleWorkspaceProps) => {
-    const snapshot = useMemo(() => readCrucibleSnapshot(), []);
+    const snapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [workspaceId]);
     const [presentables, setPresentables] = useState<CanvasAsset[]>(() => snapshot?.presentables?.length ? snapshot.presentables : []);
     const [crystallizedQuotes, setCrystallizedQuotes] = useState<CanvasAsset[]>(() => snapshot?.crystallizedQuotes?.length ? snapshot.crystallizedQuotes : []);
+    const [conversationId, setConversationId] = useState<string>(() => snapshot?.conversationId || '');
     const [activePresentableId, setActivePresentableId] = useState<string>(() => snapshot?.activePresentableId || '');
     const [openingPrompt, setOpeningPrompt] = useState<string>(() => snapshot?.openingPrompt || '');
     const [roundAnchors, setRoundAnchors] = useState<RoundAnchor[]>(() => (
@@ -254,6 +189,8 @@ export const CrucibleWorkspace = ({
     const previousSeedVersionRef = useRef<number>(seedPromptVersion);
     const mainScrollRef = useRef<HTMLElement | null>(null);
     const thinkingTimerRef = useRef<number | null>(null);
+    const requestAbortRef = useRef<AbortController | null>(null);
+    const persistenceTimerRef = useRef<number | null>(null);
     const requestSeqRef = useRef(0);
     const previewCacheRef = useRef<Map<string, string>>(new Map());
     const [mainScrollIndicator, setMainScrollIndicator] = useState({ visible: false, height: 0, offset: 0 });
@@ -294,7 +231,8 @@ export const CrucibleWorkspace = ({
     }, [presentables.length, onBlackboardStateChange]);
 
     useEffect(() => {
-        writeCrucibleSnapshot({
+        const snapshotPayload = {
+            conversationId: conversationId || undefined,
             messages: snapshotMessagesRef.current,
             presentables,
             crystallizedQuotes,
@@ -307,8 +245,15 @@ export const CrucibleWorkspace = ({
             isThinking,
             questionSource,
             engineMode,
-        });
-    }, [activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, questionSource, engineMode]);
+        };
+
+        if (persistenceTimerRef.current) {
+            window.clearTimeout(persistenceTimerRef.current);
+        }
+        persistenceTimerRef.current = window.setTimeout(() => {
+            void persistCrucibleSnapshot(snapshotPayload, { workspaceId });
+        }, 250);
+    }, [conversationId, activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, questionSource, engineMode, workspaceId]);
 
     useEffect(() => {
         const normalizedTopic = normalizeTopic(topicTitle);
@@ -323,6 +268,7 @@ export const CrucibleWorkspace = ({
         }
 
         previousTopicRef.current = normalizedTopic;
+        setConversationId('');
         setPresentables([]);
         setCrystallizedQuotes([]);
         setActivePresentableId('');
@@ -343,7 +289,52 @@ export const CrucibleWorkspace = ({
         if (thinkingTimerRef.current) {
             window.clearTimeout(thinkingTimerRef.current);
         }
+        if (persistenceTimerRef.current) {
+            window.clearTimeout(persistenceTimerRef.current);
+        }
+        requestAbortRef.current?.abort();
     }, []);
+
+    const applyTurnResponse = useCallback((data: CrucibleTurnResponse, nextRoundIndex: number) => {
+        const generatedPresentables = Array.isArray(data.presentables) && data.presentables.length > 0
+            ? data.presentables.map((item, index) => toGeneratedCanvasAsset(item, nextRoundIndex, index))
+            : [];
+        const generatedAnchors = generatedPresentables.map(toRoundAnchor);
+        const dialogue = {
+            speaker: data.dialogue?.speaker || CRUCIBLE_DEFAULT_PAIR.challenger,
+            utterance: data.dialogue?.utterance || '我先顺着你刚才这句继续追一个更关键的问题。',
+            focus: data.dialogue?.focus || '继续贴着你刚才那句把焦点说清。',
+        };
+
+        const newQuotes = generatedPresentables.filter((asset) => asset.type === 'quote');
+        if (newQuotes.length > 0) {
+            setCrystallizedQuotes((prev) => {
+                const existingIds = new Set(prev.map((q) => q.id));
+                return [...prev, ...newQuotes.filter((q) => !existingIds.has(q.id))];
+            });
+        }
+        if (data.conversationId) {
+            setConversationId(data.conversationId);
+        }
+        setRoundAnchors(generatedAnchors);
+        setPresentables(generatedPresentables);
+        setActivePresentableId(generatedPresentables[0]?.id || '');
+        setRoundIndex(nextRoundIndex);
+        setIsThinking(false);
+        if (data.topicSuggestion) {
+            setSuggestedTitle(data.topicSuggestion);
+        }
+        setQuestionSource(data.source === 'socrates' ? 'socrates' : 'fallback');
+        setLastDialogue(dialogue);
+        onRoundGenerated?.({
+            speaker: dialogue.speaker,
+            reflection: dialogue.utterance,
+            source: data.source === 'socrates' ? 'socrates' : 'fallback',
+            roundIndex: nextRoundIndex,
+        });
+        onTurnSettled?.();
+        mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [onRoundGenerated, onTurnSettled]);
 
     const requestCrucibleTurn = useCallback(async (
         nextRoundIndex: number,
@@ -352,15 +343,21 @@ export const CrucibleWorkspace = ({
         openingSeedPrompt: string
     ) => {
         const requestId = ++requestSeqRef.current;
+        requestAbortRef.current?.abort();
+        const controller = new AbortController();
+        requestAbortRef.current = controller;
+        const timeoutId = window.setTimeout(() => controller.abort(), 45000);
         setEngineMode(nextRoundIndex === 1 && previousAnchors.length === 0 ? 'roundtable_discovery' : 'socratic_refinement');
         setIsThinking(true);
         mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 
         try {
-            const response = await fetch(buildApiUrl('/api/crucible/turn'), {
+            const response = await fetch(buildApiUrl('/api/crucible/turn/stream'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
+                    conversationId,
                     projectId,
                     scriptPath,
                     topicTitle: normalizeTopic(topicTitle),
@@ -379,78 +376,51 @@ export const CrucibleWorkspace = ({
                 throw new Error(text || '苏格拉底问题生成失败');
             }
 
-            const data = await response.json() as CrucibleTurnResponse;
-            if (requestId !== requestSeqRef.current) {
-                return;
+            if (!response.body) {
+                throw new Error('坩埚 SSE 响应体为空');
             }
 
-            const generatedPresentables = Array.isArray(data.presentables) && data.presentables.length > 0
-                ? data.presentables.map((item, index) => toGeneratedCanvasAsset(item, nextRoundIndex, index))
-                : [];
-            const generatedAnchors = generatedPresentables.map(toRoundAnchor);
-            const dialogue = {
-                speaker: data.dialogue?.speaker || CRUCIBLE_DEFAULT_PAIR.challenger,
-                utterance: data.dialogue?.utterance || '我先顺着你刚才这句继续追一个更关键的问题。',
-                focus: data.dialogue?.focus || '继续贴着你刚才那句把焦点说清。',
-            };
+            let receivedTurn = false;
+            await readSseStream(response.body, (event) => {
+                if (requestId !== requestSeqRef.current) {
+                    return;
+                }
 
-            const newQuotes = generatedPresentables.filter((asset) => asset.type === 'quote');
-            if (newQuotes.length > 0) {
-                setCrystallizedQuotes((prev) => {
-                    const existingIds = new Set(prev.map((q) => q.id));
-                    return [...prev, ...newQuotes.filter((q) => !existingIds.has(q.id))];
-                });
-            }
-            setRoundAnchors(generatedAnchors);
-            setPresentables(generatedPresentables);
-            setActivePresentableId(generatedPresentables[0]?.id || '');
-            setRoundIndex(nextRoundIndex);
-            setIsThinking(false);
-            if (data.topicSuggestion) {
-                setSuggestedTitle(data.topicSuggestion);
-            }
-            setQuestionSource(data.source === 'socrates' ? 'socrates' : 'fallback');
-            setEngineMode(data.engineMode === 'roundtable_discovery' ? 'roundtable_discovery' : 'socratic_refinement');
-            setLastDialogue(dialogue);
-            onRoundGenerated?.({
-                speaker: dialogue.speaker,
-                reflection: dialogue.utterance,
-                source: data.source === 'socrates' ? 'socrates' : 'fallback',
-                roundIndex: nextRoundIndex,
+                if (event.event === 'turn') {
+                    receivedTurn = true;
+                    const data = JSON.parse(event.data) as CrucibleTurnResponse;
+                    applyTurnResponse(data, nextRoundIndex);
+                    return;
+                }
+
+                if (event.event === 'error') {
+                    const payload = JSON.parse(event.data) as { message?: string };
+                    throw new Error(payload.message || '坩埚 SSE 流返回错误');
+                }
             });
-            onTurnSettled?.();
-            mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (!receivedTurn && requestId === requestSeqRef.current) {
+                throw new Error('坩埚 SSE 流未返回有效回合结果');
+            }
         } catch (error: any) {
             if (requestId !== requestSeqRef.current) {
                 return;
             }
 
-            const fallbackPresentables = buildFallbackPresentables(topicTitle, previousAnchors, nextRoundIndex);
-            setRoundAnchors(fallbackPresentables.map(toRoundAnchor));
-            setPresentables(fallbackPresentables);
-            setActivePresentableId(fallbackPresentables[0]?.id || '');
-            setRoundIndex(nextRoundIndex);
+            if (error?.name === 'AbortError') {
+                setIsThinking(false);
+                return;
+            }
             setIsThinking(false);
-            setQuestionSource('fallback');
-            setEngineMode('socratic_refinement');
-            setLastDialogue({
-                speaker: nextRoundIndex % 2 === 0 ? CRUCIBLE_DEFAULT_PAIR.synthesizer : CRUCIBLE_DEFAULT_PAIR.challenger,
-                utterance: nextRoundIndex === 1
-                    ? '老张：先别把题说大。我先顺着你刚才那句往下追一个最关键的问题，你就接着在右侧回答我。'
-                    : '我先顺着你刚才这句把下一轮追问接上。主线还在右侧，你继续往下说。',
-                focus: '先把当前最值得继续追的一点钉住。',
-            });
-            onRoundGenerated?.({
-                speaker: nextRoundIndex % 2 === 0 ? CRUCIBLE_DEFAULT_PAIR.synthesizer : CRUCIBLE_DEFAULT_PAIR.challenger,
-                reflection: nextRoundIndex === 1
-                    ? '老张：先别把题说大。我先顺着你刚才那句往下追一个最关键的问题，你就接着在右侧回答我。'
-                    : '我先顺着你刚才这句把下一轮追问接上。主线还在右侧，你继续往下说。',
-                source: 'fallback',
-                roundIndex: nextRoundIndex,
-            });
+            console.error('[Crucible] Turn request failed:', error);
             onTurnSettled?.();
+        } finally {
+            window.clearTimeout(timeoutId);
+            if (requestAbortRef.current === controller) {
+                requestAbortRef.current = null;
+            }
         }
-    }, [projectId, scriptPath, topicTitle, onRoundGenerated, onTurnSettled]);
+    }, [applyTurnResponse, conversationId, projectId, scriptPath, topicTitle, onRoundGenerated, onTurnSettled]);
 
     useEffect(() => {
         if (!seedPrompt?.trim()) {
@@ -614,30 +584,6 @@ export const CrucibleWorkspace = ({
 
         return () => controller.abort();
     }, [activePresentable, previewKey, projectId, shouldRenderPreview, topicTitle]);
-
-    const handleResetWorkspace = () => {
-        if (thinkingTimerRef.current) {
-            window.clearTimeout(thinkingTimerRef.current);
-        }
-        clearCrucibleSnapshot();
-        routedIdsRef.current.clear();
-        requestSeqRef.current += 1;
-        setPresentables([]);
-        setCrystallizedQuotes([]);
-        setActivePresentableId('');
-        setOpeningPrompt('');
-        setRoundAnchors([]);
-        setRoundIndex(1);
-        setIsThinking(false);
-        setQuestionSource('static');
-        setEngineMode('socratic_refinement');
-        setLastDialogue(null);
-        previousSeedVersionRef.current = seedPromptVersion;
-        setPreviewImageUrl(null);
-        setPreviewStatus('idle');
-        setSuggestedTitle('');
-        onResetWorkspace?.();
-    };
 
     return (
         <div className="flex h-full min-h-0 flex-1 overflow-hidden px-3 py-3 md:px-4 md:py-3">

@@ -19,7 +19,7 @@
 
 | Precondition | Status | Notes |
 |--------------|--------|-------|
-| Worktree: `/Users/luzhoua/MHSDC/GoldenCrucible` | ✅ | Confirmed |
+| Worktree: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE` | ✅ | Confirmed |
 | Local frontend: `http://127.0.0.1:5176/` | ✅ | Accessible |
 | Test workflow only (no deep business validation) | ✅ | As specified |
 
@@ -71,4 +71,4 @@ All expected conditions met:
 
 ---
 
-REPORT_PATH:/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/reports/TREQ-2026-03-20-GC-001-opencode-workflow-smoke.report.md
+REPORT_PATH:/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/reports/TREQ-2026-03-20-GC-001-opencode-workflow-smoke.report.md

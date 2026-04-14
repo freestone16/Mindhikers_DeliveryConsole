@@ -6,26 +6,25 @@ import { loadSkillKnowledge } from './skill-loader';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 import { loadCrucibleSoulRegistry, loadRegisteredSoulProfiles } from './crucible-soul-loader';
 import {
-    buildCrucibleResearchPromptAddon,
-    performCrucibleExternalSearch,
-    type CrucibleSearchResult,
-} from './crucible-research';
-import {
-    buildRoundtableDiscoveryPrompt,
-    buildRoundtableFallbackPayload,
-    buildSocraticFallbackPayload,
     buildSocratesPrompt,
-    createCrucibleOrchestratorPlan,
-    type CrucibleEngineMode,
     type CruciblePair,
-    type CrucibleRuntimePhase,
     type DialoguePayload,
     type InputCard,
     type PresentableDraft,
     type PromptContext,
     type SkillOutputPayload,
-    type CrucibleToolRoute,
 } from './crucible-orchestrator';
+import {
+    buildCrucibleResearchPromptAddon,
+    detectCrucibleSearchIntent,
+    performCrucibleExternalSearch,
+    type CrucibleSearchResult,
+} from './crucible-research';
+import {
+    appendTurnToCrucibleConversation,
+    resolveCruciblePersistenceContext,
+    type CruciblePersistenceContext,
+} from './crucible-persistence';
 
 interface MaterializedPresentable extends PresentableDraft {
     type: 'reference' | 'quote' | 'asset';
@@ -261,87 +260,46 @@ const materializePresentables = (drafts: PresentableDraft[], utterance: string):
 const sanitizeFileSegment = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, '_');
 const formatDurationMs = (startedAt: number) => `${Date.now() - startedAt}ms`;
 
-const appendTurnLog = (params: {
-    projectId: string;
-    scriptPath?: string;
+interface CrucibleTurnParams {
+    topicTitle: string;
     roundIndex: number;
-    phase: CrucibleRuntimePhase;
-    engineMode: CrucibleEngineMode;
-    source: 'socrates' | 'fallback';
+    previousCards: InputCard[];
     seedPrompt: string;
     latestUserReply: string;
-    searchRequested: boolean;
-    searchConnected: boolean;
-    toolRoutes: CrucibleToolRoute[];
-    research?: CrucibleSearchResult;
-    speaker: string;
-    utterance: string;
-    focus: string;
+    conversationId: string;
+    projectId: string;
+    scriptPath: string;
+}
+
+export interface CrucibleTurnResult {
+    conversationId: string;
+    source: 'socrates' | 'fallback';
+    warning?: string;
+    dialogue: DialoguePayload;
     presentables: MaterializedPresentable[];
-    skillPresentables: PresentableDraft[];
-}) => {
-    if (!params.projectId) {
-        return;
-    }
+    topicSuggestion?: string;
+}
 
-    const baseDir = path.join(process.cwd(), 'runtime', 'crucible', sanitizeFileSegment(params.projectId));
-    fs.mkdirSync(baseDir, { recursive: true });
-    const logFile = path.join(baseDir, 'turn_log.json');
+type CrucibleTurnEvent =
+    | { event: 'turn'; data: CrucibleTurnResult }
+    | { event: 'error'; data: { message: string } }
+    | { event: 'done'; data: { roundIndex: number; source: 'socrates' | 'fallback' } };
 
-    const existing = fs.existsSync(logFile)
-        ? JSON.parse(fs.readFileSync(logFile, 'utf-8'))
-        : { projectId: params.projectId, scriptPath: params.scriptPath || '', updatedAt: '', turns: [] as any[] };
+const parseCrucibleTurnRequest = (req: Request): CrucibleTurnParams => ({
+    topicTitle: normalizeText(req.body?.topicTitle || '', '标题待定'),
+    roundIndex: Number(req.body?.roundIndex || 1),
+    previousCards: Array.isArray(req.body?.previousCards) ? req.body.previousCards as InputCard[] : [],
+    seedPrompt: normalizeText(req.body?.seedPrompt || '', ''),
+    latestUserReply: normalizeText(req.body?.latestUserReply || '', normalizeText(req.body?.seedPrompt || '', '') || normalizeText(req.body?.topicTitle || '', '标题待定')),
+    conversationId: normalizeText(req.body?.conversationId || '', ''),
+    projectId: normalizeText(req.body?.projectId || '', ''),
+    scriptPath: normalizeText(req.body?.scriptPath || '', ''),
+});
 
-    existing.scriptPath = params.scriptPath || existing.scriptPath || '';
-    existing.updatedAt = new Date().toISOString();
-    existing.turns = Array.isArray(existing.turns) ? existing.turns : [];
-    existing.turns.push({
-        turnId: `turn_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        phase: params.phase,
-        source: params.source,
-        engineMode: params.engineMode,
-        roundIndex: params.roundIndex,
-        userInput: {
-            openingPrompt: params.seedPrompt,
-            latestUserReply: params.latestUserReply,
-        },
-        skillOutput: {
-            speaker: params.speaker,
-            utterance: params.utterance,
-            focus: params.focus,
-            candidatePresentables: params.skillPresentables,
-        },
-        bridgeOutput: {
-            dialogue: {
-                speaker: params.speaker,
-                utterance: params.utterance,
-                focus: params.focus,
-            },
-            presentables: params.presentables,
-        },
-        meta: {
-            searchRequested: params.searchRequested,
-            searchConnected: params.searchConnected,
-        },
-        research: params.research
-            ? {
-                query: params.research.query,
-                connected: params.research.connected,
-                error: params.research.error,
-                sources: params.research.sources,
-            }
-            : undefined,
-        orchestrator: {
-            engineMode: params.engineMode,
-            phase: params.phase,
-            toolRoutes: params.toolRoutes,
-        },
-    });
-
-    fs.writeFileSync(logFile, JSON.stringify(existing, null, 2));
+const writeSseEvent = (res: Response, payload: CrucibleTurnEvent) => {
+    res.write(`event: ${payload.event}\n`);
+    res.write(`data: ${JSON.stringify(payload.data)}\n\n`);
 };
-
 
 const callConfiguredLlm = async (prompt: string) => {
     const config = loadConfig();
@@ -384,15 +342,18 @@ const callConfiguredLlm = async (prompt: string) => {
     return data.choices?.[0]?.message?.content || '';
 };
 
-export const generateCrucibleTurn = async (req: Request, res: Response) => {
+const resolveCrucibleTurn = async (
+    params: CrucibleTurnParams,
+    persistence: CruciblePersistenceContext,
+): Promise<CrucibleTurnResult> => {
     const startedAt = Date.now();
-    const topicTitle = normalizeText(req.body?.topicTitle || '', '标题待定');
-    const roundIndex = Number(req.body?.roundIndex || 1);
-    const previousCards = Array.isArray(req.body?.previousCards) ? req.body.previousCards as InputCard[] : [];
-    const seedPrompt = normalizeText(req.body?.seedPrompt || '', '');
-    const latestUserReply = normalizeText(req.body?.latestUserReply || '', seedPrompt || topicTitle);
-    const projectId = normalizeText(req.body?.projectId || '', '');
-    const scriptPath = normalizeText(req.body?.scriptPath || '', '');
+    const {
+        topicTitle,
+        roundIndex,
+        previousCards,
+        seedPrompt,
+        latestUserReply,
+    } = params;
     const promptContext: PromptContext = {
         topicTitle,
         previousCards,
@@ -400,14 +361,14 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
         seedPrompt,
         latestUserReply,
     };
-    const turnPlan = createCrucibleOrchestratorPlan(promptContext);
     const skillSummary = loadSkillKnowledge('Socrates');
     const speakerSoul = loadSpeakerSoul(roundIndex, DEFAULT_PAIR);
+    const searchRequested = detectCrucibleSearchIntent(promptContext);
     let researchResult: CrucibleSearchResult | undefined;
 
     try {
         const promptStartedAt = Date.now();
-        if (turnPlan.searchRequested) {
+        if (searchRequested) {
             const researchStartedAt = Date.now();
             researchResult = await performCrucibleExternalSearch(promptContext);
             console.log(
@@ -418,11 +379,10 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
             }
         }
 
-        const basePrompt = turnPlan.engineMode === 'roundtable_discovery'
-            ? buildRoundtableDiscoveryPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul)
-            : buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul);
-        const prompt = `${basePrompt}${researchResult ? buildCrucibleResearchPromptAddon(researchResult) : ''}`;
-        console.log(`[CrucibleTiming] prompt round=${roundIndex} mode=${turnPlan.engineMode} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
+        const prompt = `${buildSocratesPrompt(promptContext, DEFAULT_PAIR, skillSummary, speakerSoul)}${
+            researchResult ? buildCrucibleResearchPromptAddon(researchResult) : ''
+        }`;
+        console.log(`[CrucibleTiming] prompt round=${roundIndex} duration=${formatDurationMs(promptStartedAt)} promptChars=${prompt.length}`);
 
         const parseStartedAt = Date.now();
         const raw = await callConfiguredLlm(prompt);
@@ -452,18 +412,14 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
         console.log(`[CrucibleTiming] transform round=${roundIndex} duration=${formatDurationMs(parseStartedAt)} presentables=${presentables.length}`);
 
         const writeStartedAt = Date.now();
-        appendTurnLog({
-            projectId,
-            scriptPath,
+        appendTurnToCrucibleConversation(persistence, {
+            topicTitle,
             roundIndex,
-            phase: turnPlan.phase,
-            engineMode: turnPlan.engineMode,
             source: 'socrates',
             seedPrompt,
             latestUserReply,
-            searchRequested: turnPlan.searchRequested,
+            searchRequested,
             searchConnected: researchResult?.connected || false,
-            toolRoutes: turnPlan.toolRoutes,
             research: researchResult,
             speaker,
             utterance: reflection,
@@ -474,67 +430,66 @@ export const generateCrucibleTurn = async (req: Request, res: Response) => {
         console.log(`[CrucibleTiming] turn-log round=${roundIndex} duration=${formatDurationMs(writeStartedAt)}`);
         console.log(`[CrucibleTiming] total round=${roundIndex} source=socrates duration=${formatDurationMs(startedAt)}`);
 
-        res.json({
-            engineMode: turnPlan.engineMode,
-            phase: turnPlan.phase,
+        return {
+            conversationId: persistence.conversationId,
             source: 'socrates',
-            searchRequested: turnPlan.searchRequested,
-            searchConnected: researchResult?.connected || false,
-            orchestrator: {
-                engineMode: turnPlan.engineMode,
-                phase: turnPlan.phase,
-                toolRoutes: turnPlan.toolRoutes,
-            },
             dialogue,
             presentables,
             ...(topicSuggestion ? { topicSuggestion } : {}),
-        });
+        };
     } catch (error: any) {
         console.error(`[Crucible] Turn generation failed after ${formatDurationMs(startedAt)}:`, error.message);
-        const fallback = turnPlan.engineMode === 'roundtable_discovery'
-            ? buildRoundtableFallbackPayload(promptContext, DEFAULT_PAIR)
-            : buildSocraticFallbackPayload(promptContext, DEFAULT_PAIR);
-        const presentables = materializePresentables(fallback.presentables, fallback.reflection);
-        const dialogue: DialoguePayload = {
-            speaker: fallback.speaker,
-            utterance: fallback.reflection,
-            focus: fallback.focus,
-        };
-        appendTurnLog({
-            projectId,
-            scriptPath,
-            roundIndex,
-            phase: turnPlan.phase,
-            engineMode: turnPlan.engineMode,
-            source: 'fallback',
-            seedPrompt,
-            latestUserReply,
-            searchRequested: turnPlan.searchRequested,
-            searchConnected: researchResult?.connected || false,
-            toolRoutes: turnPlan.toolRoutes,
-            research: researchResult,
-            speaker: fallback.speaker,
-            utterance: fallback.reflection,
-            focus: fallback.focus,
-            presentables,
-            skillPresentables: fallback.presentables,
+        throw error;
+    }
+};
+
+export const generateCrucibleTurn = async (req: Request, res: Response) => {
+    try {
+        const params = parseCrucibleTurnRequest(req);
+        const persistence = await resolveCruciblePersistenceContext(req, {
+            projectId: params.projectId,
+            scriptPath: params.scriptPath,
+            conversationId: params.conversationId,
         });
-        res.json({
-            engineMode: turnPlan.engineMode,
-            phase: turnPlan.phase,
-            source: 'fallback',
-            warning: error.message,
-            searchRequested: turnPlan.searchRequested,
-            searchConnected: researchResult?.connected || false,
-            orchestrator: {
-                engineMode: turnPlan.engineMode,
-                phase: turnPlan.phase,
-                toolRoutes: turnPlan.toolRoutes,
+        const result = await resolveCrucibleTurn(params, persistence);
+        res.json(result);
+    } catch (error: any) {
+        const statusCode = error?.statusCode || 500;
+        res.status(statusCode).json({ error: error.message || '坩埚主链生成失败' });
+    }
+};
+
+export const streamCrucibleTurn = async (req: Request, res: Response) => {
+    const params = parseCrucibleTurnRequest(req);
+
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    try {
+        const persistence = await resolveCruciblePersistenceContext(req, {
+            projectId: params.projectId,
+            scriptPath: params.scriptPath,
+            conversationId: params.conversationId,
+        });
+        const result = await resolveCrucibleTurn(params, persistence);
+        writeSseEvent(res, { event: 'turn', data: result });
+        writeSseEvent(res, {
+            event: 'done',
+            data: {
+                roundIndex: params.roundIndex,
+                source: result.source,
             },
-            dialogue,
-            presentables,
         });
-        console.log(`[CrucibleTiming] total round=${roundIndex} source=fallback duration=${formatDurationMs(startedAt)}`);
+    } catch (error: any) {
+        writeSseEvent(res, {
+            event: 'error',
+            data: { message: error.message || '坩埚 SSE 流生成失败' },
+        });
+    } finally {
+        res.end();
     }
 };
 

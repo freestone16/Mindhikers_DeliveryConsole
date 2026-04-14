@@ -1,7 +1,7 @@
 # 2026-03-19 黄金坩埚 SaaS Demo 周末联合上线计划
 
 > 日期：2026-03-19
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 目标上线窗口：**2026-03-21（周六）至 2026-03-22（周日）**
 > 状态：执行计划 / 供本周冲刺直接使用
 > 作者：Codex（按 OldYang + project-lifecycle-governance 协议落盘）

@@ -1,7 +1,7 @@
 # SD210 黄金坩埚接入 Socrates v0.2.0 一期实施方案
 
 > 日期：2026-03-15
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 分支：`codex/crucible-main`
 > 状态：方案草案，等待人工审核
 > 作者：Codex（按 OldYang 协议落盘）

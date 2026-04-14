@@ -1,10 +1,12 @@
 # 2026-03-19 黄金坩埚 SaaS Demo 实施方案
 
 > 日期：2026-03-19
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 目标上线窗口：**2026-03-21（周六）至 2026-03-22（周日）**
 > 状态：执行方案 / 供新窗口直接进入开发部署
 > 作者：Codex（按 OldYang + project-lifecycle-governance 协议落盘）
+
+> 2026-03-22 补充：当前执行主线已进一步收束为 `SSE / SaaS / Roundtable` 三项，若与本文冲突，请以 [2026-03-22_GoldenCrucible_SSE_SaaS_Roundtable_Execution_Plan.md](/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/plans/2026-03-22_GoldenCrucible_SSE_SaaS_Roundtable_Execution_Plan.md) 为准。
 
 ---
 

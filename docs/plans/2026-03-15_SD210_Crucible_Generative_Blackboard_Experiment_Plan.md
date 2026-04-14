@@ -1,7 +1,7 @@
 # SD210 黄金坩埚生成式黑板实验方案
 
 > 日期：2026-03-15
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 当前稳定分支：`codex/crucible-main`
 > 建议实验分支：`codex/crucible-widget-lab`
 > 文档性质：实施方案 / 交接级别 / 支线实验
@@ -127,7 +127,7 @@
 
 当前稳定工作区已经很好：
 
-- 主工作区：`/Users/luzhoua/MHSDC/GoldenCrucible`
+- 主工作区：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 - 稳定分支：`codex/crucible-main`
 
 建议新增一个兄弟 worktree：
@@ -161,7 +161,7 @@
 
 worktree 路径建议：
 
-1. `/Users/luzhoua/MHSDC/GoldenCrucible`
+1. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 2. `/Users/luzhoua/MHSDC/GoldenCrucibleLab`
 
 如果后面真的进入合并阶段，再增加第三个工作区：
@@ -595,4 +595,3 @@ type CrucibleWidgetPayload =
 2. 先只完成阶段 0：lab 页面 + 3 个 widget + fixture
 3. 跑一轮真实样本回放
 4. 只有在确认“确实明显更好理解”之后，才讨论是否进入 integration 分支
-

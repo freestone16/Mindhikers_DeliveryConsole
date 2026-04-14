@@ -201,4 +201,4 @@
 ---
 
 **Test Completed**: 2026-03-20  
-**Report Path**: `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md`
+**Report Path**: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md`

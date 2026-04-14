@@ -1,8 +1,95 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-03-30 CST
+> **更新日期**: 2026-04-01 CST
 
 ---
+
+## 1.23 2026-04-01（微信/Authing 接入方案 + `SAAS -> SSE` 反向同步治理落盘）
+
+### ✅ 本轮已完成
+
+- 已完成一版正式实施方案，明确本轮微信接入应直接在 `GoldenCrucible-SaaS` 实施，而不是先在 `SSE` 做完再摘樱桃：
+  - `docs/plans/2026-04-01_GoldenCrucible_SaaS_WeChat_Authing_And_Sync_Implementation_Plan.md`
+- 方案已明确本轮认证架构：
+  - `Better Auth` 继续承接 Google / 邮箱
+  - `Authing` 只承接微信扫码的上游认证
+  - SaaS 业务真相层继续保留在我们自己的云端用户体系
+- 方案已明确本轮数据与会话策略：
+  - 短期继续以本地 Postgres 的 `"user"` 作为统一平台用户表
+  - 新增 `user_identity` 承接多认证来源映射
+  - 增加平台级 `session facade`，避免业务 API 长期直接依赖供应商会话
+- 方案已明确 `SAAS -> SSE` 的长期治理口径：
+  - 允许 `SAAS` 在发布线和线上 debug 中产出共享底座修复
+  - 但必须按能力包定期回灌 `SSE`
+  - 禁止把 Railway / Cloudflare / 正式域名 / 生产 smoke 等发布线专属内容整包回灌
+- 已单独写出要求 `SAAS` 端补进 `docs/04_progress/rules.md` 的 4 条精炼规则，供下一窗口直接执行
+
+### 🎯 本轮统一结论
+
+- 本轮微信接入 feature 的正确落点：
+  - `GoldenCrucible-SaaS`
+- 本轮最稳路线：
+  - 在 `SAAS` 新开干净 feature branch
+  - 先补 `rules.md`
+  - 再做 `user_identity + AuthingBridge + session facade + wechat callback`
+  - 最后在 `gc.mindhikers.com` 做真实 smoke
+- 本轮不建议路线：
+  - 先在 `SSE` 完成再 cherry-pick 到 `SAAS`
+  - 把 Authing 直接接成业务真相层
+  - 让 `SAAS` 与 `SSE` 长期无纪律双向漂移
+
+### ⚠️ 下一步动作
+
+- 下一窗口应切到：
+  - `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
+- 下一窗口进入后优先做：
+  - 读取本轮方案文档
+  - 把 4 条反向同步治理规则补进 `GoldenCrucible-SaaS/docs/04_progress/rules.md`
+  - 再按实施阶段进入编码
+- 本轮尚未执行代码实现：
+  - 目前完成的是正式实施方案与治理口径落盘，不是功能代码落地
+
+---
+
+## 1.22 2026-03-31（外部对话后台恢复 + 启动恢复优先级修正）
+
+### ✅ 本轮已完成
+
+- 已按“后台恢复”口径，把外部对话文件恢复进 `runtime/crucible` 持久化层，而不是写进浏览器本地状态：
+  - 来源文件：`/Users/luzhoua/Downloads/AI时代创作的主体性 (2).md`
+  - 恢复标题：`AI时代创作的主体性`
+  - 恢复消息数：`28`
+- 已更新运行时关键文件，确保当前 active conversation 与 autosave 都指向该对话：
+  - `runtime/crucible/golden-crucible-sandbox/conversations/06de004b-2018-4a71-be38-e9ff65ad3836.json`
+  - `runtime/crucible/golden-crucible-sandbox/conversations/index.json`
+  - `runtime/crucible/golden-crucible-sandbox/active_conversation.json`
+  - `runtime/crucible/autosave.json`
+  - `runtime/crucible/golden-crucible-sandbox/turn_log.json`
+- 已修正前端启动时的恢复优先级，避免“后台已恢复，但页面继续吃旧本地缓存”的问题：
+  - 修改文件：`src/SaaSApp.tsx`
+  - 新增基于 `updatedAt` / snapshot 差异的比较逻辑
+  - 现在当后台持久化快照更新得更晚，启动时会优先 hydrate 后台状态，而不是盲信旧 local snapshot
+- 已把这次用户纠正沉淀到规则：
+  - `恢复对话/恢复话题` 默认先恢复 `runtime/crucible` 后台持久化
+  - 浏览器仅用于验证，不作为恢复主路径
+
+### 🎯 本轮验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- 运行时文件已人工核对：
+  - `index.json` 标题已切到 `AI时代创作的主体性`
+  - `active_conversation.json` 已指向该对话
+  - `autosave.json` 已包含恢复后的消息与 snapshot
+
+### ⚠️ 当前说明
+
+- 这轮“后台恢复 + 启动优先级修正”还没有整理成干净 commit
+- 当前 `SSE` 工作树仍有大量无关脏改，不适合直接整包提交
+- 下一窗口建议动作：
+  - 先在新的 `SSE` 窗口整理干净提交
+  - 至少拆成“代码修正 commit”与“runtime 恢复数据 commit”
+  - 然后在新的、干净的 `SAAS` 目标 worktree 上执行 `cherry-pick`
 
 ## 1.21 2026-03-30（草稿态产品语义拆分）
 

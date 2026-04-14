@@ -16,7 +16,7 @@
 
 ## Preconditions
 
-1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible`
+1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 2. 本地服务已启动，前端地址为 `http://127.0.0.1:5176/`
 3. 本次测试只验证测试工作流闭环，不验证业务深链路
 

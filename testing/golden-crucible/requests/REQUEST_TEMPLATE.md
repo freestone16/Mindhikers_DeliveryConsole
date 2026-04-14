@@ -16,7 +16,7 @@
 
 ## Preconditions
 
-1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible`
+1. 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 2. 本地服务已启动
 3. 指定 URL / 页面入口 / 关键数据
 

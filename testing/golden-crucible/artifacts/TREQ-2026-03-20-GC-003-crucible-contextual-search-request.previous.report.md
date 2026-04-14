@@ -16,7 +16,7 @@
 
 ### Preconditions Verification
 
-✅ Current worktree: `/Users/luzhoua/MHSDC/GoldenCrucible`
+✅ Current worktree: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 ✅ Local frontend accessible: `http://127.0.0.1:5176/`
 ✅ Backend running and generating turn logs
 ✅ Browser automation using agent-browser (as required)
@@ -119,24 +119,24 @@
 ### Browser Screenshots
 
 1. **Screenshot 1**: Initial state after entering Golden Crucible
-   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-1-initial-state.png`
+   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-1-initial-state.png`
    - Shows: Clean crucible interface with empty input field
 
 2. **Screenshot 2**: Context formed after Round 1/2
-   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-2-round1-2-context-formed.png`
+   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-2-round1-2-context-formed.png`
    - Shows: Topic "议题锁定的三个核心追问" displayed, indicating active discussion context
 
 3. **Screenshot 3**: Round 3 search request ready
-   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-3-round3-search-request-ready.png`
+   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-3-round3-search-request-ready.png`
    - Shows: Topic evolved to "高质量内容稀缺性三要素初步框架", Round 3 message in input field
 
 4. **Screenshot 4**: Round 3 response complete
-   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-4-round3-response-complete.png`
+   - Path: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-4-round3-response-complete.png`
    - Shows: Topic evolved to "核心质疑点 第3轮", Round 3 response completed
 
 ### Runtime Log Evidence
 
-**File**: `/Users/luzhoua/MHSDC/GoldenCrucible/runtime/crucible/golden-crucible-sandbox/turn_log.json`
+**File**: `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/runtime/crucible/golden-crucible-sandbox/turn_log.json`
 
 **Latest Turn (Round 3) - Key Fields:**
 
@@ -257,11 +257,11 @@ While the system **did** acknowledge the search request in its natural language 
 
 ## Files Generated
 
-- `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-1-initial-state.png`
-- `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-2-round1-2-context-formed.png`
-- `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-3-round3-search-request-ready.png`
-- `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/artifacts/TREQ-003-screenshot-4-round3-response-complete.png`
-- `/Users/luzhoua/MHSDC/GoldenCrucible/testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md` (this file)
+- `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-1-initial-state.png`
+- `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-2-round1-2-context-formed.png`
+- `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-3-round3-search-request-ready.png`
+- `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/artifacts/TREQ-003-screenshot-4-round3-response-complete.png`
+- `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md` (this file)
 
 ## Conclusion
 

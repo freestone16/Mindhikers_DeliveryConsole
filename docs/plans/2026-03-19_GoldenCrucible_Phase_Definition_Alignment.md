@@ -1,7 +1,7 @@
 # 2026-03-19 黄金坩埚阶段口径对齐
 
 > 日期：2026-03-19
-> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible`
+> 工作目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 > 状态：口径对齐 / 作为后续讨论与治理的临时 SSOT
 > 作者：Codex（按 OldYang 协议落盘）
 

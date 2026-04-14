@@ -16,7 +16,7 @@
 
 ### Preconditions Verified
 
-- [x] 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible`
+- [x] 当前 worktree：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
 - [x] 本地服务已启动，前端地址为 `http://127.0.0.1:5176/`
 - [x] 本次测试只验证测试工作流闭环，不验证业务深链路
 
@@ -76,4 +76,3 @@
 ## Wrapper Validation
 
 1. report 未写明 status
-

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, BookmarkCheck, Check, FolderTree, Loader2, Paperclip, RotateCcw, Send, Settings, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, FolderTree, Loader2, Paperclip, Send, Trash2, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -125,26 +125,6 @@ const truncateTopicTitle = (value: string, maxLength = 24) => (
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
 );
 
-const getCrucibleDraftBadge = (options: {
-    inputText: string;
-    hasMessages: boolean;
-    snapshot?: CrucibleSnapshot | null;
-}) => {
-    if (options.inputText.trim()) {
-        return '草稿未发送';
-    }
-    if (options.snapshot?.saveMode === 'manual') {
-        return '已手动保存';
-    }
-    if (options.snapshot?.saveMode === 'autosave') {
-        return '自动保存';
-    }
-    if (options.snapshot?.saveMode === 'conversation') {
-        return '对话沉淀';
-    }
-    return options.hasMessages ? '自动保存' : '新话题';
-};
-
 const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCrucibleMode: boolean) => {
     const normalizedNext = next.content.trim();
     if (!normalizedNext) {
@@ -174,7 +154,6 @@ const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCr
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
     isOpen,
-    onToggle,
     expertId,
     projectId,
     scriptPath,
@@ -188,7 +167,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onRouteAsset,
     onOpenTopicCenter,
     onPersistedSnapshotSaved,
-    onResetAll,
     blackboardHint,
     crucibleTurnSettledToken = 0,
     workspaceId,
@@ -222,18 +200,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const expertName = displayName || expert?.name || expertId;
     const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
     const isCrucibleMode = expertId === 'GoldenMetallurgist';
-    const confirmKey = `chatpanel_confirm_send_${expertId}`;
-    const [showSettings, setShowSettings] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const toastTimerRef = useRef<number | null>(null);
-    const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
-        try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
-    });
-
-    const saveConfirmSetting = (value: boolean) => {
-        setConfirmBeforeSend(value);
-        try { localStorage.setItem(confirmKey, String(value)); } catch { /* ignore */ }
-    };
 
     const showToast = useCallback((msg: string) => {
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -592,8 +560,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (!inputText.trim() && attachments.length === 0) return;
         if (!socket || sendGuardRef.current) return;
         if (isStreaming && !isCrucibleMode) return;
-        if (confirmBeforeSend && !window.confirm('确认发送这条消息？')) return;
-
         const normalizedInput = inputText.trim();
         const now = Date.now();
         if (
@@ -653,7 +619,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             projectId,
             scriptPath,
         });
-    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, confirmBeforeSend, isCrucibleMode, resolvedCurrentUserBadge]);
+    }, [inputText, attachments, isStreaming, socket, messages, contextLoaded, expertId, projectId, scriptPath, onUserMessage, isCrucibleMode, resolvedCurrentUserBadge]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isComposingRef.current || e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) {
@@ -762,17 +728,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         lastSentRef.current = null;
     };
 
-    const handleResetAll = useCallback(() => {
-        if (isCrucibleMode) {
-            if (!window.confirm('确定开启一个新话题吗？当前话题会保留在话题中心，可随时回来继续。')) return;
-            onResetAll?.();
-            return;
-        }
-
-        if (!window.confirm('确定要重置工作区并清空对话吗？')) return;
-        onResetAll?.();
-    }, [isCrucibleMode, onResetAll]);
-
     const handleExportMarkdown = useCallback(() => {
         const title = (displayName || expertName || '黄金坩埚对话').trim();
         const lines = [
@@ -813,13 +768,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
         [workspaceId],
     );
-    const currentSnapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [messages, inputText, workspaceId]);
-    const crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
-        inputText,
-        hasMessages: messages.length > 0,
-        snapshot: currentSnapshot,
-    }), [currentSnapshot, inputText, messages.length]);
-
     const handleSaveTopic = useCallback(async () => {
         try {
             const saveTimestamp = new Date().toISOString();
@@ -946,52 +894,40 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         <button
                             onClick={handleExportMarkdown}
                             title="下载 Markdown 对话记录"
-                            className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                            className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                         >
-                            <span className="text-[11px] font-bold leading-none">D</span>
+                            <span className="text-[15px] font-bold leading-none">D</span>
                         </button>
                         {isCrucibleMode && (
                             <>
-                                {onOpenTopicCenter ? (
-                                    <button
-                                        onClick={() => onOpenTopicCenter()}
-                                        title="打开话题中心"
-                                        className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                    >
-                                        <FolderTree className="h-3.5 w-3.5" />
-                                        <span className="text-[11px] font-medium">话题</span>
-                                    </button>
-                                ) : null}
                                 <button
                                     onClick={() => void handleSaveTopic()}
                                     title="保存当前话题到服务端历史中心"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <BookmarkCheck className="h-3.5 w-3.5" />
-                                    <span className="text-[11px] font-medium">保存</span>
+                                    <span className="text-[15px] font-bold leading-none">S</span>
                                 </button>
                                 <button
                                     onClick={handleLoadAutosave}
                                     title="从本地草稿快照恢复"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    className="rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
                                 >
-                                    <span className="text-[11px] font-medium">草稿</span>
+                                    <span className="text-[15px] font-bold leading-none">L</span>
                                 </button>
-                                <span className="rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-2.5 py-1 text-[11px] text-[var(--ink-3)]">
-                                    {crucibleDraftBadge}
-                                </span>
+                                {onOpenTopicCenter ? <div className="mx-1 h-5 w-px bg-[rgba(156,117,76,0.14)]" /> : null}
+                                {onOpenTopicCenter ? (
+                                    <button
+                                        onClick={() => onOpenTopicCenter()}
+                                        title="打开话题中心"
+                                        className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
+                                    >
+                                        <FolderTree className="h-5 w-5" />
+                                        <span className="text-[15px] font-semibold leading-none">话题</span>
+                                    </button>
+                                ) : null}
                             </>
                         )}
-                        {isCrucibleMode && onResetAll ? (
-                            <button
-                                onClick={handleResetAll}
-                                title="开启一个新话题"
-                                className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                            >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                <span className="text-[11px] font-medium">新话题</span>
-                            </button>
-                        ) : (
+                        {!isCrucibleMode ? (
                             <button
                                 onClick={handleClearHistory}
                                 title="清空对话历史"
@@ -999,34 +935,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             >
                                 <Trash2 className="h-4 w-4" />
                             </button>
-                        )}
-                        <button
-                            onClick={() => setShowSettings((prev) => !prev)}
-                            title="对话设置"
-                            className={`rounded-xl p-2 transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)] ${showSettings ? 'bg-[var(--surface-1)] text-[var(--ink-1)]' : 'text-[var(--ink-3)]'}`}
-                        >
-                            <Settings className="h-4 w-4" />
-                        </button>
-                        <button
-                            onClick={onToggle}
-                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                        {showSettings && (
-                            <div className="absolute right-0 top-10 z-10 w-52 rounded-[10px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.98)] p-3 shadow-[0_8px_24px_rgba(131,103,70,0.12)]">
-                                <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">对话设置</div>
-                                <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
-                                    <span className="text-[13px] text-[var(--ink-1)]">发送前确认</span>
-                                    <div
-                                        className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${confirmBeforeSend ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)]'}`}
-                                        onClick={() => saveConfirmSetting(!confirmBeforeSend)}
-                                    >
-                                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${confirmBeforeSend ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </div>
-                                </label>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
 
