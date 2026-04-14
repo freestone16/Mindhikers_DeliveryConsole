@@ -241,6 +241,15 @@ function buildTargetContext(
   }
 
   const previousTurn = currentRound.turns[currentSpeakerIndex - 1];
+  if (!previousTurn) {
+    const synthesis = currentRoundIndex > 0
+      ? session.rounds[currentRoundIndex - 1]?.synthesis
+      : null;
+    if (synthesis) {
+      return `【上轮综合】\n核心裂缝：${synthesis.focusPoint}\n张力度：${synthesis.tensionLevel}/5`;
+    }
+    return '【你是本轮的先行者，请直接阐述你的观点】';
+  }
   return `【你需要回应的内容】\n${previousTurn.speakerSlug}（${previousTurn.action}）：${previousTurn.utterance}\n\n简要概括：${previousTurn.briefSummary}`;
 }
 
