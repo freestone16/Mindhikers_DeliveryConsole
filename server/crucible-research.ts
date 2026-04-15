@@ -1,5 +1,3 @@
-import type { PromptContext } from './crucible-orchestrator';
-
 export interface CrucibleSearchSource {
     title: string;
     url: string;
@@ -15,21 +13,8 @@ export interface CrucibleSearchResult {
 
 const SEARCH_TIMEOUT_MS = 12000;
 const MAX_SEARCH_RESULTS = 5;
-const SEARCH_FILLER_PATTERN = /(基于我们刚才这个问题|基于刚才这个问题|围绕我们刚才这个问题|我想先|先|联网搜索一下|联网搜索|搜索一下|搜索|再继续(往下)?聊|再继续讨论|之后再继续|最近一两年(关于)?)/g;
-const GENERIC_QUERY_PATTERN = /(我需要你|我需要|我想|请你|请|帮我|到互联网|去互联网|到网上|去网上|互联网|网上|网络|联网|搜索一下|搜索|搜一下|搜|查一下|查|最新进展|最新|进展|补充我们的对话|补充对话|补充一下|继续对话|再继续往下聊|再继续讨论|继续往下聊|继续讨论|这个问题|这个议题|这个话题|一下|先)/g;
 
 const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
-const sanitizeSearchFragment = (value: string) => normalizeText(
-    value
-        .replace(SEARCH_FILLER_PATTERN, ' ')
-        .replace(GENERIC_QUERY_PATTERN, ' ')
-        .replace(/[“”"'`]/g, ' ')
-        .replace(/[，。！？；：、（）()【】\[\]]/g, ' ')
-);
-const isGenericSearchQuery = (value: string) => {
-    const condensed = value.replace(/\s+/g, '');
-    return !condensed || condensed.length < 8;
-};
 
 const decodeHtmlEntities = (value: string) => value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -48,22 +33,6 @@ const extractXmlTag = (xml: string, tag: string) => {
     return match?.[1] || '';
 };
 
-export const buildCrucibleSearchQuery = (context: Pick<PromptContext, 'topicTitle' | 'seedPrompt' | 'latestUserReply'>) => {
-    const cleanedPrimary = sanitizeSearchFragment(context.latestUserReply || '');
-
-    if (!isGenericSearchQuery(cleanedPrimary)) {
-        return cleanedPrimary;
-    }
-
-    const topicQuery = sanitizeSearchFragment(context.topicTitle || '');
-    if (topicQuery) {
-        return `${topicQuery} 最新研究`;
-    }
-
-    const fallback = sanitizeSearchFragment(context.seedPrompt || '最新研究现状');
-    return fallback || '最新研究现状';
-};
-
 export const parseBingSearchRss = (xml: string): CrucibleSearchSource[] => {
     return Array.from(xml.matchAll(/<item>([\s\S]*?)<\/item>/gi))
         .map((match) => {
@@ -79,29 +48,38 @@ export const parseBingSearchRss = (xml: string): CrucibleSearchSource[] => {
 };
 
 export const performCrucibleExternalSearch = async (
-    context: Pick<PromptContext, 'topicTitle' | 'seedPrompt' | 'latestUserReply'>,
-    fetchImpl: typeof fetch = fetch
+    query: string,
+    fetchImpl: typeof fetch = fetch,
 ): Promise<CrucibleSearchResult> => {
-    const query = buildCrucibleSearchQuery(context);
+    const normalizedQuery = normalizeText(query);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
 
+    if (!normalizedQuery) {
+        return {
+            query: '',
+            connected: false,
+            sources: [],
+            error: 'Researcher 缺少 query，宿主未执行外部搜索',
+        };
+    }
+
     try {
         const response = await fetchImpl(
-            `https://www.bing.com/search?format=rss&setlang=zh-Hans&q=${encodeURIComponent(query)}`,
+            `https://www.bing.com/search?format=rss&setlang=zh-Hans&q=${encodeURIComponent(normalizedQuery)}`,
             {
                 method: 'GET',
                 headers: {
                     Accept: 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
                 },
                 signal: controller.signal,
-            }
+            },
         );
 
         if (!response.ok) {
             const errorBody = (await response.text()).slice(0, 240);
             return {
-                query,
+                query: normalizedQuery,
                 connected: false,
                 sources: [],
                 error: `HTTP ${response.status}: ${errorBody}`,
@@ -113,7 +91,7 @@ export const performCrucibleExternalSearch = async (
 
         if (sources.length === 0) {
             return {
-                query,
+                query: normalizedQuery,
                 connected: false,
                 sources: [],
                 error: '外部搜索已返回，但没有解析到有效结果',
@@ -121,7 +99,7 @@ export const performCrucibleExternalSearch = async (
         }
 
         return {
-            query,
+            query: normalizedQuery,
             connected: true,
             sources,
         };
@@ -131,7 +109,7 @@ export const performCrucibleExternalSearch = async (
             : error?.message || '外部搜索失败';
 
         return {
-            query,
+            query: normalizedQuery,
             connected: false,
             sources: [],
             error: message,
@@ -139,20 +117,4 @@ export const performCrucibleExternalSearch = async (
     } finally {
         clearTimeout(timeoutId);
     }
-};
-
-export const buildCrucibleResearchPromptAddon = (result: CrucibleSearchResult) => {
-    if (!result.query) {
-        return '';
-    }
-
-    if (!result.connected) {
-        return `\n\n## Researcher 状态\n用户本轮明确要求联网搜索。\n- 查询意图：${result.query}\n- 当前状态：外部检索未成功接通（${result.error || '未知错误'}）\n请不要伪造“已经查到”的外部材料；如果需要回应，只能诚实说明当前先继续基于现有上下文推进。`;
-    }
-
-    const sourcesBlock = result.sources
-        .map((source, index) => `${index + 1}. 标题：${source.title}\n   链接：${source.url}\n   摘要：${source.snippet || '暂无摘要'}`)
-        .join('\n');
-
-    return `\n\n## Researcher 外部调研补充\n用户本轮明确要求联网搜索，以下是已拉到的外部材料，请把它们作为最新背景信息直接使用。\n- 查询语句：${result.query}\n- 检索状态：已接通真实外部搜索\n- 使用要求：不要再说“我现在去搜索”；你已经拿到了外部材料。请直接结合当前对话继续推进，并在必要时把最有价值的一条压成 presentables 里的 reference。\n\n### 外部来源\n${sourcesBlock}`;
 };
