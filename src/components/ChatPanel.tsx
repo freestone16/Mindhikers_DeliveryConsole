@@ -854,36 +854,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         showToast('对话已下载');
     }, [displayName, expertName, messages, headerBadges, showToast]);
 
-    const SNAPSHOT_BACKUP_KEY = 'golden-crucible-manual-backup-v8';
     const scopedSnapshotKey = useMemo(() => getCrucibleSnapshotStorageKey(workspaceId), [workspaceId]);
-    const scopedBackupKey = useMemo(
-        () => `${SNAPSHOT_BACKUP_KEY}:${workspaceId?.trim() || 'legacy'}`,
-        [workspaceId],
-    );
-
-    const handleSaveAutosave = useCallback(() => {
-        try {
-            const raw = localStorage.getItem(scopedSnapshotKey);
-            if (!raw) { showToast('当前没有状态可保存'); return; }
-            localStorage.setItem(scopedBackupKey, raw);
-            showToast('快照已保存');
-        } catch { showToast('保存失败'); }
-    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
-
-    const handleLoadAutosave = useCallback(() => {
-        try {
-            const raw = localStorage.getItem(scopedBackupKey);
-            if (!raw) { showToast('还没有保存过快照'); return; }
-            const parsed = JSON.parse(raw);
-            if (!parsed || !Array.isArray(parsed.presentables)) {
-                showToast('快照数据损坏');
-                return;
-            }
-            localStorage.setItem(scopedSnapshotKey, raw);
-            showToast('快照已载入，刷新中...');
-            setTimeout(() => window.location.reload(), 600);
-        } catch { showToast('载入失败'); }
-    }, [scopedBackupKey, scopedSnapshotKey, showToast]);
 
     const crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
         inputText,
@@ -932,7 +903,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             }
 
             localStorage.setItem(scopedSnapshotKey, JSON.stringify(nextSnapshot));
-            localStorage.setItem(scopedBackupKey, JSON.stringify(nextSnapshot));
 
             const detail = await savePersistedCrucibleConversation({
                 conversationId: nextSnapshot.conversationId,
@@ -949,7 +919,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             console.warn('[ChatPanel] Failed to save topic:', error);
             showToast('保存失败');
         }
-    }, [displayName, expertName, inputText, isCrucibleMode, messages, onPersistedSnapshotSaved, projectId, scopedBackupKey, scopedSnapshotKey, scriptPath, showToast]);
+    }, [displayName, expertName, inputText, isCrucibleMode, messages, onPersistedSnapshotSaved, projectId, scopedSnapshotKey, scriptPath, showToast]);
 
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
@@ -1022,20 +992,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 >
                                     <BookmarkCheck className="h-3.5 w-3.5" />
                                     <span className="text-[11px] font-medium">保存</span>
-                                </button>
-                                <button
-                                    onClick={handleSaveAutosave}
-                                    title="保存快照到本地（localStorage）"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <span className="text-[11px] font-bold leading-none">S</span>
-                                </button>
-                                <button
-                                    onClick={handleLoadAutosave}
-                                    title="从本地（localStorage）载入快照"
-                                    className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <span className="text-[11px] font-bold leading-none">L</span>
                                 </button>
                                 <span className="rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-2.5 py-1 text-[11px] text-[var(--ink-3)]">
                                     {crucibleDraftBadge}
