@@ -1,6 +1,87 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-14 CST
+> **更新日期**: 2026-04-16 CST
+
+---
+
+## 1.25 2026-04-16（UI Architecture PRD · Phase 0 落盘 + 双轨启动 + 扫雷）
+
+### 背景
+
+老卢提出两个目标并列推进：
+1. **圆桌功能回搬 SSE**（RT sse-export 分支 → SSE 主干）
+2. **UI 大重构，对标 Claude Code 质感**（全前端架构重做）
+
+老杨架构对齐后，拆为**串行 + 并行混合推进**：
+- UI Architecture 先行（作为一等公民）
+- 圆桌迁移暂缓至 Phase 2（Shell 空壳落地后入壳）
+
+### ✅ 本轮已完成
+
+**架构决策对齐（4 轮评审 × 老卢纠正老杨 2 次）**
+- 确立"四段式工作流 + 四模块"：`GoldenRador → Roundtable → GoldenCrucible → Writer → Delivery Console`
+- 确立"三层可插拔 Slot"：Channel Spirit / Persona / Skill
+- 命名定为 Golden 前缀矩阵（GoldenRador 为老卢确认的新模块）
+- 视觉锚点：Claude Code（主）+ Codex（辅）；设计理念：奥卡姆·简单·强壮·底蕴·内涵
+
+**圆桌迁移方案评审**（RT 团队产出，老杨评审）
+- 补齐 6 个硬缺口（persistence diff、workspace 鉴权、独立路由、CSS 变量、回滚、Shell 级代码不搬）
+- 附录 B 落盘：不迁移 Sidebar.tsx/App.tsx（由新 Shell 取代）
+- 业务组件（RoundtableView 等 7 个）需适配新 Shell
+
+**3 份文稿落盘**
+- `docs/plans/2026-04-15_UI_Architecture_North_Star_Brief.md`（视觉轨契约）
+- `docs/plans/2026-04-15_UI_Architecture_PRD_Skeleton.md`（工程轨契约 + 合卷大纲）
+- RT 侧 `2026-04-13_roundtable-to-sse-migration-plan.md` 追加附录 B
+
+**扫雷报告落盘**
+- `docs/dev_logs/2026-04-16_persistence-diff-scan.md`
+- 核心发现：RT 方案 §1.2 事实错误 —— SSE 根本没有 `appendSpikesToCrucibleConversation` / `appendDeepDiveToCrucibleConversation`
+- 两仓 persistence 分叉：SSE 走 SaaS（MIN-135），RT 走圆桌（MIN-117），无交集
+- Backport 难度：🟢 低（纯新增，4 处 type union 宽化，SSE 内部工具齐备）
+- Phase 2 启动日操作清单已写好
+
+**双轨已启动**
+- 视觉轨（frontend-design skill）：产出 4 屏高保真 demo + Design Token + 组件原语 → 🔜 待评审
+- 工程轨（CE 团队 ce-plan skill）：填充 PRD §3/§4/§7/§8/§9/§10 → 🔜 待评审
+
+### 🎯 核心架构决策
+
+1. **三层正交 Slot 是第一公民**
+   - Channel Spirit（频道精神 mindhikers 等，可插拔）
+   - Persona（人格，含未来"人格萃取引擎"接口预留）
+   - Skill（技能，含现有 5 个 skill）
+   - Skill ↔ Module 的 N:M 关系明确
+
+2. **Cross-Module Handoff Contract 是第一公民**
+   - 四段流转每段都有数据契约
+   - 可回溯：下游节点一键跳回源头
+   - 触发方式：用户显式按钮（默认）
+
+3. **Shell 与 Feature Slice 解耦**
+   - Shell（购物中心）：模块切换、session 列表、artifact 抽屉、config
+   - Feature Slice（店铺）：模块业务组件，不管导航布局
+   - 圆桌作为首个入壳的 feature slice
+
+### 📋 下一窗口待执行（合卷评审）
+
+**进入点**：`docs/dev_logs/HANDOFF.md` 的"新窗口直接怎么做"
+
+**关键产物**：
+- 视觉轨产出（位置：`demos/ui-north-star/` 或类似）
+- 工程轨产出（位置：`docs/plans/2026-04-15_UI_Architecture_PRD_v0.2.md`）
+
+**老杨合卷任务**：
+1. 视觉轨一致性评审（是否违反简报 §十二 红线）
+2. 工程轨完整性评审（两大第一公民是否深度填充）
+3. 交叉评审（视觉与工程是否自洽）
+4. 合卷成 PRD v1.0
+5. 提交老卢终审
+
+### ⚠️ 待验证
+
+- 双轨产出的实际质量（视觉轨还原 Claude Code 度、工程轨 schema 深度）
+- 是否需要二轮微调（若发现违反北极星或骨架，启动第二轮）
 
 ---
 

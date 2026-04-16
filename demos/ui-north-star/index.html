@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GoldenCrucible · UI North Star · 4-Screen Demo</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+
+  <link rel="stylesheet" href="styles/tokens.css" />
+  <link rel="stylesheet" href="styles/app.css" />
+</head>
+<body data-screen="1">
+
+  <!-- ============================================================ -->
+  <!-- SVG symbol library (module glyphs + UI icons)                 -->
+  <!-- ============================================================ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- GoldenRador: crosshair ring -->
+      <symbol id="g-rador" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25">
+        <circle cx="8" cy="8" r="6.25"/>
+        <circle cx="8" cy="8" r="3"/>
+        <path d="M8 1.75 V5  M8 11 V14.25  M1.75 8 H5  M11 8 H14.25"/>
+        <circle cx="8" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+      </symbol>
+      <!-- Roundtable: five seats around a ring -->
+      <symbol id="g-roundtable" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25">
+        <circle cx="8" cy="8" r="4"/>
+        <circle cx="8"    cy="1.7"  r="1.1" fill="currentColor" stroke="none"/>
+        <circle cx="13.8" cy="6"    r="1.1" fill="currentColor" stroke="none"/>
+        <circle cx="11.6" cy="13"   r="1.1" fill="currentColor" stroke="none"/>
+        <circle cx="4.4"  cy="13"   r="1.1" fill="currentColor" stroke="none"/>
+        <circle cx="2.2"  cy="6"    r="1.1" fill="currentColor" stroke="none"/>
+      </symbol>
+      <!-- Crucible: chalice / triangle with fire-drop -->
+      <symbol id="g-crucible" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round">
+        <path d="M2.5 4 L13.5 4 L10 13 L6 13 Z"/>
+        <path d="M5.5 4 V2  M10.5 4 V2"/>
+        <path d="M8 6.5 Q9.3 8 8.9 9.6 Q8.6 10.8 8 11 Q7.4 10.8 7.1 9.6 Q6.7 8 8 6.5 Z" fill="currentColor" stroke="none"/>
+      </symbol>
+      <!-- Writer: nib + baseline -->
+      <symbol id="g-writer" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2.5 12.5 L10 5 L12.5 7.5 L5 15 Z" transform="translate(0,-1.5)"/>
+        <path d="M9 4 L11 6"/>
+        <path d="M2 14.25 H14"/>
+      </symbol>
+      <!-- Crucible large (hero watermark) -->
+      <symbol id="g-crucible-hero" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="1">
+        <path d="M30 60 L170 60 L135 165 L65 165 Z" stroke-linejoin="round"/>
+        <path d="M70 60 V35  M130 60 V35"/>
+        <path d="M50 60 L150 60"/>
+        <path d="M100 85 Q118 105 113 128 Q108 148 100 152 Q92 148 87 128 Q82 105 100 85 Z"
+              fill="currentColor" fill-opacity="0.3" stroke="currentColor"/>
+        <path d="M100 85 V70" stroke-dasharray="2 3"/>
+        <circle cx="100" cy="152" r="1" fill="currentColor"/>
+      </symbol>
+
+      <!-- UI icons -->
+      <symbol id="i-plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round">
+        <path d="M8 3.5 V12.5 M3.5 8 H12.5"/>
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 L13.5 13.5"/>
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1">
+        <circle cx="8" cy="8" r="2.3"/>
+        <path d="M8 1.5 V3.2  M8 12.8 V14.5  M1.5 8 H3.2  M12.8 8 H14.5
+                 M3.3 3.3 L4.6 4.6  M11.4 11.4 L12.7 12.7
+                 M3.3 12.7 L4.6 11.4 M11.4 4.6 L12.7 3.3"/>
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3 L11 8 L6 13"/>
+      </symbol>
+      <symbol id="i-chev-left" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 3 L5 8 L10 13"/>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.5 8.5 L6.5 11.5 L12.5 4.5"/>
+      </symbol>
+      <symbol id="i-circle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+        <circle cx="8" cy="8" r="5.25"/>
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 48 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 12 H42"/>
+        <path d="M34 5 L42 12 L34 19"/>
+      </symbol>
+      <symbol id="i-attach" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+        <path d="M10.5 5 L5.2 10.3 A2.4 2.4 0 0 0 8.6 13.7 L13.7 8.6 A4 4 0 1 0 8 2.9 L3 7.9"/>
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+        <path d="M3 2.5 H8 C9.3 2.5 10.5 3.2 10.5 4.5 V13 C10.5 12 9.3 11.5 8 11.5 H3 Z"/>
+        <path d="M13 2.5 H8 C6.7 2.5 5.5 3.2 5.5 4.5 V13 C5.5 12 6.7 11.5 8 11.5 H13 Z"/>
+      </symbol>
+      <symbol id="i-compass" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M10.5 5.5 L7.5 7.5 L5.5 10.5 L8.5 8.5 Z" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-scale" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 2 V14"/>
+        <path d="M3 4 H13"/>
+        <path d="M4 4 L2 9 H6 L4 4 Z"/>
+        <path d="M12 4 L10 9 H14 L12 4 Z"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Demo screen switcher -->
+  <div class="demo-switcher" role="tablist" aria-label="Demo screen switcher">
+    <span class="demo-switcher__label">Screen</span>
+    <button class="demo-switcher__btn" data-screen-btn="1" aria-pressed="true">01</button>
+    <button class="demo-switcher__btn" data-screen-btn="2" aria-pressed="false">02</button>
+    <button class="demo-switcher__btn" data-screen-btn="3" aria-pressed="false">03</button>
+    <button class="demo-switcher__btn" data-screen-btn="4" aria-pressed="false">04</button>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SCREEN 1 · Shell empty state                                  -->
+  <!-- ============================================================ -->
+  <main class="screen screen--1" aria-label="Screen 1 — Shell empty state">
+    <div class="shell">
+      <!-- Left rail -->
+      <aside class="rail" aria-label="Navigation">
+        <div class="rail__brand">
+          <svg class="rail__brand-mark" aria-hidden="true"><use href="#g-crucible"/></svg>
+          <span class="rail__brand-name">GoldenCrucible</span>
+          <span class="rail__brand-suffix">v0.1</span>
+        </div>
+
+        <div class="rail__section">
+          <div class="rail__eyebrow">
+            <span>Modules</span>
+            <button aria-label="Add module"><svg width="12" height="12"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="mod-list">
+            <button class="mod" aria-current="true">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-rador"/></svg>
+              <span class="mod__name">GoldenRador</span>
+              <span class="mod__kbd">⌘1</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-roundtable"/></svg>
+              <span class="mod__name">Roundtable</span>
+              <span class="mod__kbd">⌘2</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-crucible"/></svg>
+              <span class="mod__name">Crucible</span>
+              <span class="mod__kbd">⌘3</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-writer"/></svg>
+              <span class="mod__name">Writer</span>
+              <span class="mod__kbd">⌘4</span>
+            </button>
+            <button class="mod mod--slot">
+              <span>+ 扩展位</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="rail__section" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+          <div class="rail__eyebrow">
+            <span>Topic Pool · mindhikers</span>
+            <button aria-label="Search"><svg width="12" height="12"><use href="#i-search"/></svg></button>
+          </div>
+          <div class="sessions">
+            <div class="sessions__empty">
+              尚未拾取 —— 雷达待扫描
+            </div>
+          </div>
+        </div>
+
+        <div class="rail__spacer"></div>
+
+        <div class="rail__user">
+          <div class="avatar">L</div>
+          <div style="min-width:0;">
+            <div class="rail__user-name">Lu Zhoua</div>
+            <div class="rail__user-sub">mindhikers · founder</div>
+          </div>
+          <button class="rail__user-action" aria-label="Settings"><svg width="14" height="14"><use href="#i-gear"/></svg></button>
+        </div>
+      </aside>
+
+      <!-- Center stage -->
+      <section class="stage" aria-label="Workspace">
+        <div class="topbar">
+          <div class="topbar__crumbs">
+            <strong>GoldenRador</strong>
+            <span class="sep">/</span>
+            <span>Channel · mindhikers</span>
+          </div>
+          <div class="topbar__meta">
+            <span><span class="topbar__dot"></span> SSE ready</span>
+            <span>claude-opus-4-6</span>
+          </div>
+        </div>
+        <div class="empty-stage">
+          <div class="empty-stage__inner">
+            <div class="empty-stage__eyebrow">
+              <span class="bar"></span>
+              雷达 · 选题 · 精神筛选
+              <span class="bar"></span>
+            </div>
+            <h1 class="empty-stage__title">从一个 <em>念头</em> 开始。</h1>
+            <p class="empty-stage__sub">
+              选择模块，让雷达开始扫描 —— 或直接进入圆桌。
+              四段式：雷达 · 圆桌 · 坩埚 · 文案。
+            </p>
+            <div class="empty-stage__actions">
+              <button class="btn btn--primary">
+                <svg width="14" height="14"><use href="#i-plus"/></svg>
+                新建 Topic
+                <span class="btn__kbd">⌘N</span>
+              </button>
+              <button class="btn btn--ghost">
+                打开近期 Session
+                <span class="btn__kbd">⌘O</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right artifact (collapsed) -->
+      <aside class="artifact artifact--collapsed" aria-label="Artifact panel">
+        <button class="artifact__chevron" aria-label="Expand artifact">
+          <svg width="14" height="14"><use href="#i-chev-left"/></svg>
+        </button>
+        <span class="artifact__label-v">Artifact</span>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- SCREEN 2 · Roundtable discussion                              -->
+  <!-- ============================================================ -->
+  <main class="screen screen--2" aria-label="Screen 2 — Roundtable in session">
+    <div class="shell shell--right-expanded">
+      <!-- Left rail -->
+      <aside class="rail" aria-label="Navigation">
+        <div class="rail__brand">
+          <svg class="rail__brand-mark" aria-hidden="true"><use href="#g-crucible"/></svg>
+          <span class="rail__brand-name">GoldenCrucible</span>
+          <span class="rail__brand-suffix">v0.1</span>
+        </div>
+
+        <div class="rail__section">
+          <div class="rail__eyebrow">
+            <span>Modules</span>
+            <button aria-label="Add"><svg width="12" height="12"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="mod-list">
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-rador"/></svg>
+              <span class="mod__name">GoldenRador</span>
+              <span class="mod__kbd">⌘1</span>
+            </button>
+            <button class="mod" aria-current="true">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-roundtable"/></svg>
+              <span class="mod__name">Roundtable</span>
+              <span class="mod__kbd">⌘2</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-crucible"/></svg>
+              <span class="mod__name">Crucible</span>
+              <span class="mod__kbd">⌘3</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-writer"/></svg>
+              <span class="mod__name">Writer</span>
+              <span class="mod__kbd">⌘4</span>
+            </button>
+            <button class="mod mod--slot"><span>+ 扩展位</span></button>
+          </div>
+        </div>
+
+        <div class="rail__section" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+          <div class="rail__eyebrow">
+            <span>Sessions · Roundtable</span>
+            <button aria-label="New"><svg width="12" height="12"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="sessions">
+            <button class="session" aria-current="true">
+              <div class="session__title">注意力碎片化</div>
+              <div class="session__meta"><span>7 msg</span><span>·</span><span>3 spikes</span><span>·</span><span>4 persona</span></div>
+            </button>
+            <button class="session">
+              <div class="session__title">工具主义与意义的失重</div>
+              <div class="session__meta"><span>12 msg</span><span>·</span><span>yesterday</span></div>
+            </button>
+            <button class="session">
+              <div class="session__title">短内容时代的"慢"如何被重塑</div>
+              <div class="session__meta"><span>4 msg</span><span>·</span><span>2d</span></div>
+            </button>
+            <button class="session">
+              <div class="session__title">算法推荐下的自我一致性</div>
+              <div class="session__meta"><span>9 msg</span><span>·</span><span>3d</span></div>
+            </button>
+          </div>
+        </div>
+
+        <div class="rail__user">
+          <div class="avatar">L</div>
+          <div style="min-width:0;">
+            <div class="rail__user-name">Lu Zhoua</div>
+            <div class="rail__user-sub">mindhikers · founder</div>
+          </div>
+          <button class="rail__user-action" aria-label="Settings"><svg width="14" height="14"><use href="#i-gear"/></svg></button>
+        </div>
+      </aside>
+
+      <!-- Center: discussion -->
+      <section class="stage" aria-label="Roundtable discussion">
+        <div class="topbar">
+          <div class="topbar__crumbs">
+            <span>Roundtable</span>
+            <span class="sep">/</span>
+            <strong>注意力碎片化</strong>
+          </div>
+          <div class="topbar__meta">
+            <span>4 persona · 7 msg</span>
+            <span>17:42</span>
+            <span><span class="topbar__dot"></span> streaming</span>
+          </div>
+        </div>
+
+        <div class="thread">
+          <div class="thread__inner">
+            <div class="thread__opener">
+              <div class="thread__opener-label">Topic · mindhikers</div>
+              “注意力的碎片化不是技术问题，是存在方式的问题。
+              我们如何在被切开的时间里，重新长出一个完整的自我？”
+            </div>
+
+            <!-- user -->
+            <div class="msg">
+              <div class="msg__avatar msg__avatar--user">L</div>
+              <div class="msg__body">
+                <div class="msg__head">
+                  <span class="msg__name">Lu Zhoua</span>
+                  <span class="msg__role">— 主持</span>
+                  <span class="msg__time">17:31</span>
+                </div>
+                <div class="msg__content">
+                  <p>我想听四种声音：<em>苏格拉底</em>的诘问、<em>庄子</em>的化解、<em>尼采</em>的锤击、<em>卡尔·纽波特</em>的工程化。先从苏格拉底开始。</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- socrates -->
+            <div class="msg msg--spike">
+              <div class="msg__avatar">苏</div>
+              <div class="msg__body">
+                <div class="msg__head">
+                  <span class="msg__name">Socrates</span>
+                  <span class="msg__role">— 诘问者 · 古希腊</span>
+                  <span class="msg__time">17:33</span>
+                </div>
+                <div class="msg__content">
+                  <p>在抱怨“碎片”之前，请先回答：你所谓的“完整的注意力”，上一次它存在是什么时候？你能描述它的样貌吗？</p>
+                  <p>若一个东西你既未见过、也说不清，那么它究竟是被夺走的，还是从未抵达？</p>
+                </div>
+                <span class="msg__spike-tag">Spike · 诘问</span>
+              </div>
+            </div>
+
+            <!-- zhuangzi -->
+            <div class="msg">
+              <div class="msg__avatar">庄</div>
+              <div class="msg__body">
+                <div class="msg__head">
+                  <span class="msg__name">Zhuangzi</span>
+                  <span class="msg__role">— 逍遥者 · 战国</span>
+                  <span class="msg__time">17:35</span>
+                </div>
+                <div class="msg__content">
+                  <p>碎与整，本无定名。蝴蝶落在万花，谁见其分裂？人以"一整块时间"为尺，故觉所有短皆缺。</p>
+                  <p>放下尺，短亦是短之全。</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- nietzsche spike -->
+            <div class="msg msg--spike">
+              <div class="msg__avatar">尼</div>
+              <div class="msg__body">
+                <div class="msg__head">
+                  <span class="msg__name">Nietzsche</span>
+                  <span class="msg__role">— 锤者 · 19c</span>
+                  <span class="msg__time">17:37</span>
+                </div>
+                <div class="msg__content">
+                  <p>碎片化不是时代的病，是现代人逃避"沉重之思"的共谋。你把注意力交给通知，因为专注意味着面对你自己。</p>
+                  <p><em>重估一切：碎片并不损害你 —— 你损害了自己的在场。</em></p>
+                </div>
+                <span class="msg__spike-tag">Spike · 根因</span>
+              </div>
+            </div>
+
+            <!-- newport spike -->
+            <div class="msg msg--spike">
+              <div class="msg__avatar">N</div>
+              <div class="msg__body">
+                <div class="msg__head">
+                  <span class="msg__name">Cal Newport</span>
+                  <span class="msg__role">— 深度工作论者</span>
+                  <span class="msg__time">17:40</span>
+                </div>
+                <div class="msg__content">
+                  <p>三位都说到了点上。但个体终究要执行 —— 建议把哲学落成两条操作原语：</p>
+                  <p>① <strong>时间围栏</strong>：每天固定 90 分钟"结构性离线"。② <strong>任务蜡封</strong>：一个 context 只封一件事，切换前必须显式打开/关闭。</p>
+                </div>
+                <span class="msg__spike-tag">Spike · 方法</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="composer__inner">
+            <textarea class="composer__input" rows="2" placeholder="追问任意一位，或说"收官"让讨论沉淀成 Spike…"></textarea>
+            <div class="composer__row">
+              <span class="composer__chip composer__chip--active"><span class="dot"></span> 4 persona 在席</span>
+              <span class="composer__chip"><span class="dot"></span> spike auto-extract</span>
+              <span class="composer__spacer"></span>
+              <span class="composer__hint">↵ 发送 · ⇧↵ 换行</span>
+              <button class="btn btn--sm btn--primary">追问</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Spikes -->
+      <aside class="artifact" aria-label="Spikes">
+        <div class="artifact__head">
+          <span class="artifact__title">Spikes</span>
+          <div class="artifact__tabs">
+            <button class="artifact__tab" aria-pressed="true">Spike</button>
+            <button class="artifact__tab" aria-pressed="false">引文</button>
+            <button class="artifact__tab" aria-pressed="false">Persona</button>
+          </div>
+        </div>
+        <div class="artifact__body">
+          <div class="panel-section__head">
+            <span class="panel-section__label">已提取 · 3</span>
+            <span class="panel-section__count">auto</span>
+          </div>
+          <div class="spike-card">
+            <div class="spike-card__head">
+              <span class="spike-card__num">01</span>
+              <span class="spike-card__src">Socrates · 诘问</span>
+            </div>
+            <div class="spike-card__body">"完整的注意力" 是被夺走的，还是从未抵达？问题需要先被证成。</div>
+            <div class="spike-card__meta"><span>17:33</span><span>heat · high</span></div>
+          </div>
+          <div class="spike-card">
+            <div class="spike-card__head">
+              <span class="spike-card__num">02</span>
+              <span class="spike-card__src">Nietzsche · 根因</span>
+            </div>
+            <div class="spike-card__body">碎片化是现代人与通知的共谋 —— 专注意味着必须面对自己。</div>
+            <div class="spike-card__meta"><span>17:37</span><span>heat · peak</span></div>
+          </div>
+          <div class="spike-card">
+            <div class="spike-card__head">
+              <span class="spike-card__num">03</span>
+              <span class="spike-card__src">Newport · 方法</span>
+            </div>
+            <div class="spike-card__body">时间围栏 + 任务蜡封：把哲学落成两条可执行原语。</div>
+            <div class="spike-card__meta"><span>17:40</span><span>heat · mid</span></div>
+          </div>
+        </div>
+        <div class="artifact__foot">
+          <button class="btn btn--ochre">
+            <svg width="14" height="14"><use href="#g-crucible"/></svg>
+            送入坩埚
+            <span class="btn__kbd">⌘↵</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- SCREEN 3 · Handoff ceremony (soul screen)                     -->
+  <!-- ============================================================ -->
+  <main class="screen screen--3" aria-label="Screen 3 — Handoff to Crucible">
+    <section class="handoff">
+      <div class="handoff__backdrop"></div>
+
+      <div class="handoff__topbar">
+        <div class="topbar__crumbs">
+          <span>Roundtable</span>
+          <span class="sep">/</span>
+          <strong>注意力碎片化</strong>
+          <span class="sep">›</span>
+          <span style="color: var(--gc-accent-ink);">送入坩埚</span>
+        </div>
+        <div style="margin-left:auto; font-family: var(--gc-font-mono); font-size: var(--gc-size-xs); color: var(--gc-text-tertiary);">
+          <span class="kbd">esc</span> 取消
+        </div>
+      </div>
+
+      <div class="handoff__stage">
+        <svg class="handoff__watermark" aria-hidden="true"><use href="#g-crucible-hero"/></svg>
+
+        <div class="handoff__panel">
+          <div class="handoff__crumbs">
+            <span>mindhikers</span>
+            <span class="sep">›</span>
+            <span>Roundtable · 注意力碎片化</span>
+            <span class="sep">›</span>
+            <span class="here">Crucible · 新论文</span>
+          </div>
+
+          <h2 class="handoff__title">送入<em>坩埚</em>。</h2>
+          <p class="handoff__subtitle">
+            讨论将被封存为上游记录；坩埚在新上下文中，从 Spike 与引文出发，炼成一篇专业论文。
+          </p>
+
+          <!-- flow -->
+          <div class="handoff__flow">
+            <!-- source -->
+            <div class="handoff-node handoff-node--source">
+              <div class="handoff-node__eyebrow">
+                <svg><use href="#g-roundtable"/></svg>
+                Source · Roundtable
+              </div>
+              <div class="handoff-node__title">注意力碎片化</div>
+              <div class="handoff-node__summary">
+                <div class="handoff-node__summary-row"><span>Persona</span><span class="v">4</span></div>
+                <div class="handoff-node__summary-row"><span>Messages</span><span class="v">7</span></div>
+                <div class="handoff-node__summary-row"><span>Spikes</span><span class="v">3</span></div>
+                <div class="handoff-node__summary-row"><span>引文摘录</span><span class="v">3</span></div>
+                <div class="handoff-node__summary-row"><span>Duration</span><span class="v">09m 18s</span></div>
+              </div>
+            </div>
+
+            <!-- arrow -->
+            <div class="handoff__arrow" aria-hidden="true">
+              <div class="handoff__arrow-line"></div>
+              <svg><use href="#i-arrow-right"/></svg>
+            </div>
+
+            <!-- target -->
+            <div class="handoff-node handoff-node--target">
+              <div class="handoff-node__eyebrow">
+                <svg><use href="#g-crucible"/></svg>
+                Target · Crucible
+              </div>
+              <div class="handoff-node__title">
+                论文 · <em style="font-style:italic; color: var(--gc-accent-ink);">待命名</em>
+              </div>
+              <div class="handoff-node__summary">
+                <div class="handoff-node__summary-row"><span>Skills 预加载</span><span class="v">3</span></div>
+                <div class="handoff-node__summary-row"><span>Channel Spirit</span><span class="v">mindhikers</span></div>
+                <div class="handoff-node__summary-row"><span>结构模板</span><span class="v">论文 · v2</span></div>
+                <div class="handoff-node__summary-row"><span>可回溯源</span><span class="v">已锚定</span></div>
+                <div class="handoff-node__summary-row"><span>Engine</span><span class="v">claude-opus-4-6</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- checklist -->
+          <div class="handoff__checklist">
+            <div class="handoff__check" data-state="done">
+              <svg><use href="#i-check"/></svg>
+              <span>已收集 Spike</span>
+              <span class="handoff__check-meta">3 / 3</span>
+            </div>
+            <div class="handoff__check" data-state="done">
+              <svg><use href="#i-check"/></svg>
+              <span>已摘录引文</span>
+              <span class="handoff__check-meta">3 / 3</span>
+            </div>
+            <div class="handoff__check" data-state="done">
+              <svg><use href="#i-check"/></svg>
+              <span>锚定上游 Session</span>
+              <span class="handoff__check-meta">Roundtable#a81c</span>
+            </div>
+            <div class="handoff__check" data-state="pending">
+              <svg><use href="#i-circle"/></svg>
+              <span>加载专家技能</span>
+              <span class="handoff__check-meta">3 pending</span>
+            </div>
+          </div>
+
+          <div class="handoff__foot">
+            <button class="btn btn--ochre">
+              <svg width="14" height="14"><use href="#g-crucible"/></svg>
+              送入坩埚
+              <span class="btn__kbd">⌘↵</span>
+            </button>
+            <button class="btn btn--ghost">
+              返回圆桌
+              <span class="btn__kbd">esc</span>
+            </button>
+            <span class="hint">此刻将被记入 handoff trail —— 随时可回溯。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- SCREEN 4 · Crucible paper + artifact + Writer handoff         -->
+  <!-- ============================================================ -->
+  <main class="screen screen--4" aria-label="Screen 4 — Crucible paper finalized">
+    <div class="shell shell--right-expanded">
+      <!-- Left rail -->
+      <aside class="rail" aria-label="Navigation">
+        <div class="rail__brand">
+          <svg class="rail__brand-mark" aria-hidden="true"><use href="#g-crucible"/></svg>
+          <span class="rail__brand-name">GoldenCrucible</span>
+          <span class="rail__brand-suffix">v0.1</span>
+        </div>
+
+        <div class="rail__section">
+          <div class="rail__eyebrow"><span>Modules</span>
+            <button aria-label="Add"><svg width="12" height="12"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="mod-list">
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-rador"/></svg>
+              <span class="mod__name">GoldenRador</span>
+              <span class="mod__kbd">⌘1</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-roundtable"/></svg>
+              <span class="mod__name">Roundtable</span>
+              <span class="mod__kbd">⌘2</span>
+            </button>
+            <button class="mod" aria-current="true">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-crucible"/></svg>
+              <span class="mod__name">Crucible</span>
+              <span class="mod__kbd">⌘3</span>
+            </button>
+            <button class="mod">
+              <svg class="mod__glyph" aria-hidden="true"><use href="#g-writer"/></svg>
+              <span class="mod__name">Writer</span>
+              <span class="mod__kbd">⌘4</span>
+            </button>
+            <button class="mod mod--slot"><span>+ 扩展位</span></button>
+          </div>
+        </div>
+
+        <div class="rail__section" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+          <div class="rail__eyebrow">
+            <span>Sessions · Crucible</span>
+            <button aria-label="New"><svg width="12" height="12"><use href="#i-plus"/></svg></button>
+          </div>
+          <div class="sessions">
+            <button class="session" aria-current="true">
+              <div class="session__title">注意力的坩埚炼造</div>
+              <div class="session__meta"><span>论文 v3</span><span>·</span><span>2,184 字</span><span>·</span><span>定稿</span></div>
+            </button>
+            <button class="session">
+              <div class="session__title">工具主义下的意义重建</div>
+              <div class="session__meta"><span>论文 v1</span><span>·</span><span>草稿</span></div>
+            </button>
+            <button class="session">
+              <div class="session__title">"慢"的技术学</div>
+              <div class="session__meta"><span>论文 v2</span><span>·</span><span>3d</span></div>
+            </button>
+          </div>
+        </div>
+
+        <div class="rail__user">
+          <div class="avatar">L</div>
+          <div style="min-width:0;">
+            <div class="rail__user-name">Lu Zhoua</div>
+            <div class="rail__user-sub">mindhikers · founder</div>
+          </div>
+          <button class="rail__user-action" aria-label="Settings"><svg width="14" height="14"><use href="#i-gear"/></svg></button>
+        </div>
+      </aside>
+
+      <!-- Center: paper -->
+      <section class="stage" aria-label="Crucible paper">
+        <div class="topbar">
+          <div class="topbar__crumbs">
+            <span>Crucible</span>
+            <span class="sep">/</span>
+            <strong>注意力的坩埚炼造</strong>
+            <span class="sep">·</span>
+            <span>v3 · 定稿</span>
+          </div>
+          <div class="topbar__meta">
+            <span>2,184 字 · 7 min 读</span>
+            <span>自动存档 17:58</span>
+            <span><span class="topbar__dot"></span> 已定稿</span>
+          </div>
+        </div>
+
+        <article class="paper">
+          <div class="paper__inner">
+            <a class="paper__crumb" href="#" tabindex="0">
+              <svg width="12" height="12"><use href="#i-chev-left"/></svg>
+              返回原圆桌 · 注意力碎片化
+            </a>
+
+            <div class="paper__kicker">
+              <span class="bar"></span> Channel · mindhikers · 哲学工程
+            </div>
+            <h1 class="paper__title">注意力的坩埚炼造：论碎片时代的专注力重建</h1>
+            <p class="paper__subtitle">
+              从苏格拉底之问出发，经尼采之锤，落回纽波特之工程 —— 一份关于"在场"的操作说明书。
+            </p>
+
+            <dl class="paper__byline">
+              <div><dt>作者</dt><dd>Crucible · claude-opus-4-6</dd></div>
+              <div><dt>Skills</dt><dd>哲学 · 认知 · 写作</dd></div>
+              <div><dt>源</dt><dd>Roundtable#a81c</dd></div>
+              <div><dt>版本</dt><dd>v3 · 2026-04-16</dd></div>
+            </dl>
+
+            <div class="paper__abstract">
+              <div class="paper__abstract-label">Abstract</div>
+              所谓"注意力碎片化"常被当作外部事故叙述 —— 通知、算法、节奏。本文反其道而论之：碎片不是被动承受的病，而是现代主体与通知之间的一种<em>结构性共谋</em>。
+              我们以四位异质声音的对话为原料，在坩埚中萃出两条落地原语：<em>时间围栏</em>与<em>任务蜡封</em>，并论证二者何以同时满足哲学的自我返照与工程的可执行性。
+            </div>
+
+            <h2 class="paper__h2"><span class="num">§1</span> 问题的证成</h2>
+            <p class="paper__p">
+              在追问"注意力如何被夺走"之前，我们必须先追问：所谓"完整的注意力"，是否曾经抵达？<span class="paper__cite">[01]</span>
+              若一个东西从未被确证地拥有，那么"失去"便只是一种修辞 —— 它掩盖了一个更难堪的事实：注意力从来需要主体<em>主动生产</em>。
+            </p>
+
+            <blockquote class="paper__pull">
+              "碎片并不损害你 —— 你损害了自己的在场。"
+              <span class="paper__pull-src">— Nietzsche, 圆桌纪要 17:37</span>
+            </blockquote>
+
+            <h2 class="paper__h2"><span class="num">§2</span> 共谋的结构</h2>
+            <p class="paper__p">
+              通知并不强迫你打开它 —— 是你在需要躲开某个"沉重之思"的那一刻，向它伸出了手。<span class="paper__cite">[02]</span>
+              这是一种精密的共谋：一边是每一次震动提供的即时缓解，一边是对自我凝视的系统性延宕。
+            </p>
+
+            <h2 class="paper__h2"><span class="num">§3</span> 两条落地原语</h2>
+            <p class="paper__p">
+              哲学若不能落地成动作，便只是美丽的忧郁。我们从圆桌中萃出两条原语：<strong>时间围栏</strong>——每日 90 分钟的结构性离线；<strong>任务蜡封</strong>——每个 context 仅封一件事，切换前须显式打开/关闭。<span class="paper__cite">[03]</span>
+              二者的共同形式是：<em>以结构换自由</em>。
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <!-- Right: artifact expanded -->
+      <aside class="artifact" aria-label="Crucible artifact">
+        <div class="artifact__head">
+          <span class="artifact__title">Artifact</span>
+          <div class="artifact__tabs">
+            <button class="artifact__tab" aria-pressed="true">技能</button>
+            <button class="artifact__tab" aria-pressed="false">引用</button>
+            <button class="artifact__tab" aria-pressed="false">导出</button>
+          </div>
+        </div>
+        <div class="artifact__body">
+
+          <div class="panel-section">
+            <div class="panel-section__head">
+              <span class="panel-section__label">Loaded Skills</span>
+              <span class="panel-section__count">3 active</span>
+            </div>
+            <div class="skill">
+              <div class="skill__glyph"><svg><use href="#i-book"/></svg></div>
+              <div class="skill__body">
+                <div class="skill__name">哲学写作 · v4</div>
+                <div class="skill__desc">苏格拉底式论证 + 诠释学结构 + 引文纪律</div>
+              </div>
+              <span class="skill__status">loaded</span>
+            </div>
+            <div class="skill">
+              <div class="skill__glyph"><svg><use href="#i-compass"/></svg></div>
+              <div class="skill__body">
+                <div class="skill__name">认知科学 · v2</div>
+                <div class="skill__desc">注意力神经机制 / 执行功能 / context switching cost</div>
+              </div>
+              <span class="skill__status">loaded</span>
+            </div>
+            <div class="skill">
+              <div class="skill__glyph"><svg><use href="#i-scale"/></svg></div>
+              <div class="skill__body">
+                <div class="skill__name">学术引证 · v1</div>
+                <div class="skill__desc">引文追踪 · 证据纪律 · 反例自检</div>
+              </div>
+              <span class="skill__status">loaded</span>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section__head">
+              <span class="panel-section__label">Citations</span>
+              <span class="panel-section__count">3</span>
+            </div>
+            <div class="cite-list">
+              <div class="cite">
+                <span class="cite__num">[01]</span>
+                <div class="cite__body">
+                  <strong>Socrates</strong> — 若一物你既未见过、也说不清，那么它究竟是被夺走的，还是从未抵达？
+                  <span class="cite__src">Roundtable#a81c · 17:33</span>
+                </div>
+              </div>
+              <div class="cite">
+                <span class="cite__num">[02]</span>
+                <div class="cite__body">
+                  <strong>Nietzsche</strong> — 重估一切：碎片并不损害你，是你损害了自己的在场。
+                  <span class="cite__src">Roundtable#a81c · 17:37</span>
+                </div>
+              </div>
+              <div class="cite">
+                <span class="cite__num">[03]</span>
+                <div class="cite__body">
+                  <strong>Newport, C.</strong> — 时间围栏与任务蜡封：哲学的工程化。
+                  <span class="cite__src">Roundtable#a81c · 17:40</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="artifact__foot">
+          <button class="btn btn--ochre">
+            <svg width="14" height="14"><use href="#g-writer"/></svg>
+            送入 Writer
+            <span class="btn__kbd">⌘↵</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="scripts/app.js"></script>
+</body>
+</html>
