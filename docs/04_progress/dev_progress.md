@@ -1,6 +1,58 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-16 CST
+> **更新日期**: 2026-04-17 CST
+
+---
+
+## 1.26 2026-04-17（UI Architecture · Phase 1-6 全量实施计划 v1.1 · 老卢终审通过）
+
+### 本轮主线
+
+CE Team 起草 + 老杨自查 + 老卢终审 → 外部团队可据此启动 Phase 1。
+
+### ✅ 本轮已完成
+
+**Phase 1-6 全量实施计划产出**（`docs/plans/2026-04-17_UI_Architecture_Phase1-6_Implementation_Plan.md`）
+- 45 任务（P1=11 / P2=9 / P3=8 / P4=6 / P5=5 / P6=6），全 S/M/L 档位
+- 两大第一公民索引表（附录 3 表 2）：Slot 三层 + Handoff 四段全部落地到具体任务
+- Mermaid DAG 图 + 并行窗口标注（P4A / P5A 可与上游部分并行）
+- 5 条全局风险 + 回滚策略（R1 路由切换 / R2 persona ID 冲突 / R3 字段兼容性 / R4 workspace middleware / R5 底座回灌）
+- 外部团队冷启动附录（仓库/分支/端口/env/启动/Railway/治理导航）
+- 18 条研发纪律红线（从 rules.md 提炼）
+
+**老卢终审决策 11 条（v1.0 → v1.1 合入）**
+- A1 Writer → **GoldenQuill**（UI 文案；代号 `writer`）
+- A2 拼写 → **GoldenRador** 保留
+- A3 Persona 注册表 → 合并到 JSON + 映射表过渡一个 Phase（老卢 / 老张 / 9 位人格本身 100% 保留）
+- A4 前端数据层 → **React Query v5**
+- A5 Zustand → 壳层 1 + 模块各 1，禁跨模块直访
+- A6 Hash 路由兼容层 → 保留到 Phase 3 结束
+- A7 归档 → 软归档 + 365 天 TTL
+- A8a Handoff 撤销 → 30 秒 Toast 反悔
+- A8b Thesis / TopicCandidate / Copy 存储 → JSON 文件
+- A9 埋点 → **保守档**：Sentry + Pino 结构化日志（schema 对齐 PostHog，v2 升级）
+- A10 SaaS 底座回灌 → **本轮不触发**（SSE 一气呵成，SaaS 全程冻结底座迭代）
+- A11 跨 workspace 共享 → schema 预留 `visibility` 字段
+
+**硬性修正**
+- 🔴 **端口纠正**：CE 草案误把 SaaS 的 3010/5183 写成了 SSE 端口；实际 SSE 是 **backend 3009 / frontend 5182**；已全文修正
+- 总纲第 7 条措辞改为 "老杨为统一指挥"
+- 基本假设新增第 8 条（SaaS 底座冻结）
+- 附录 4 R5 风险降级为 "本轮不触发"
+- Phase 5 章节标题改为 "GoldenQuill（Writer）"
+- P1.T9 / P2.T2 / P6.T5 任务块按决策重写
+
+### 📝 经验沉淀（写入 rules.md）
+
+1. **子代理产出附录信息必须老杨现场核对**：CE 团队这次把 SaaS 和 SSE 的端口写颠倒了，是因为它没去查 `~/.vibedir/global_ports_registry.yml`；老杨自查时标红才被老卢批注坐实。**以后凡涉及端口/环境变量/路径的附录，必须由老杨而非子代理亲自填写或至少现场 diff 核对**。
+2. **待决议题分拆**：CE 把 A8 打包成"Handoff 撤销 + 存储选型"一条，耦合两个独立决策；老卢审阅时不方便拆开拍板。**以后附录 5 议题一条只包一个决策点**。
+3. **通俗讲讲是必备环节**：老卢对 R1-R5 / A3-A11 全部要求"通俗讲讲"。CE 草案默认工程语言，老杨必须在提交老卢前做一次"白话翻译"自查。
+
+### 下一步
+
+1. 老杨提交 Phase 1-6 实施计划 v1.1 git commit（`refs MIN-94 UI Architecture Phase 1-6 Implementation Plan v1.1`）
+2. 开 Linear issue（MIN-94 子任务：P1.T1 ~ P1.T11）
+3. 外部团队接入 SSE 分支，按本 v1.1 启动 Phase 1
 
 ---
 
@@ -63,25 +115,29 @@
    - Feature Slice（店铺）：模块业务组件，不管导航布局
    - 圆桌作为首个入壳的 feature slice
 
-### 📋 下一窗口待执行（合卷评审）
+### ✅ 合卷评审已完成（2026-04-16 第二窗口）
 
-**进入点**：`docs/dev_logs/HANDOFF.md` 的"新窗口直接怎么做"
+**PRD v1.0 落盘**：`docs/plans/2026-04-16_UI_Architecture_PRD_v1.0.md`
 
-**关键产物**：
-- 视觉轨产出（位置：`demos/ui-north-star/` 或类似）
-- 工程轨产出（位置：`docs/plans/2026-04-15_UI_Architecture_PRD_v0.2.md`）
+**合卷评审结论**：
+- 视觉轨红线 8/8 全通过（Fraunces + Instrument Sans + JetBrains Mono，无禁用项）
+- 屏 3 handoff 仪式屏通过：gcDash 赭橙虚线 + 280ms 仪式面板 + handoff watermark
+- 工程轨两大第一公民（§3 §4）深度达标，schema 完整，萃取引擎接口预留
+- 视觉 ↔ 工程交叉自洽（HandoffButton / OriginBreadcrumb / SessionListItem / avatar 均对齐）
+- **修正事实错误**：`appendSpikesToCrucibleConversation` 不在 SSE 侧，仅 RT 侧（PRD v1.0 §4.3.2 + 附录 A 已修正）
 
-**老杨合卷任务**：
-1. 视觉轨一致性评审（是否违反简报 §十二 红线）
-2. 工程轨完整性评审（两大第一公民是否深度填充）
-3. 交叉评审（视觉与工程是否自洽）
-4. 合卷成 PRD v1.0
-5. 提交老卢终审
+**老卢批复决策**：
+1. Phase 1-6 全部拆到执行粒度（非仅 Phase 1）
+2. 外部团队在 SSE 基础上接手（不另起仓库）
+3. 任务粒度：S/M/L 档，不需人周精确估算
 
-### ⚠️ 待验证
+### 📋 下一窗口待执行（Phase 1-6 全量实施计划）
 
-- 双轨产出的实际质量（视觉轨还原 Claude Code 度、工程轨 schema 深度）
-- 是否需要二轮微调（若发现违反北极星或骨架，启动第二轮）
+**任务**：老杨调度 CE 团队，拟定 UI Architecture Phase 1-6 全量实施计划
+
+**进入点**：`docs/dev_logs/HANDOFF.md`（已更新，含 CE brief 全量，新窗口直接喂给 `ce-plan`）
+
+**产出**：`docs/plans/2026-04-17_UI_Architecture_Phase1-6_Implementation_Plan.md`
 
 ---
 
