@@ -1,0 +1,14 @@
+@keyframes gcDash {
+  from { background-position: 0 0; }
+  to   { background-position: 24px 0; }
+}
+
+@keyframes gcRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gcBreath {
+  0%, 100% { opacity: 0.035; transform: scale(1); }
+  50%      { opacity: 0.055; transform: scale(1.02); }
+}
