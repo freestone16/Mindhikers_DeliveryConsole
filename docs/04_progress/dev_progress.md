@@ -4,6 +4,66 @@
 
 ---
 
+## 1.27 2026-04-17（UI Architecture · Phase 1 实施 · T1 ✅ T2 ✅ T8 ✅）
+
+### 本轮主线
+
+Phase 1 进入实施阶段。老杨在 `feature/P1.T2-primitive-components` 分支完成 T2（组件原语库），同时 T1 已合并入 T2 分支，T8 在独立分支已完成。
+
+### ✅ 本轮已完成
+
+**P1.T1 · tokens.css 工程化**（MIN-137）
+- `src/styles/tokens.css` — 102 行 `--gc-*` CSS custom properties
+- `src/styles/fonts.css` — Fraunces / Instrument Sans / JetBrains Mono 加载
+- `src/index.css` — Tailwind v4 `@theme` 映射
+- 已合并入 T2 分支
+
+**P1.T2 · 组件原语库第一批（通用）**（MIN-138）— commit `ea7b526`
+- 15 个通用原语组件（31 文件），全 CSS Modules + `--gc-*` tokens
+- Display：Kbd, Divider, Avatar, Badge, Chip
+- Button：Button（4 variants + sm）, IconButton
+- Form：Input, Textarea
+- Container：Card, Panel（compound component）, Skeleton
+- Overlay：Tooltip, Dialog, Toast
+- `src/components/primitives/index.ts` barrel export
+- `npm run typecheck:saas` ✅ | `npm run build` ✅（1.73s）
+- 已推送到 `origin/feature/P1.T2-primitive-components`
+
+**P1.T8 · requireWorkspace middleware**（MIN-144）
+- 独立分支 `feature/P1.T8-require-workspace` 已完成
+
+### 📝 经验沉淀
+
+1. **`visual-engineering` 和 `deep` 两个 category 的 Sisyphus-Junior agent 都因 `gpt-5.2-codex` 模型不可用而失败**。已测试 6 次（4 次 visual-engineering + 2 次 deep），全部报 `Bad Request: The 'gpt-5.2-codex' model is not supported when using Codex with a ChatGPT account.`。降级方案：直接手动实现，或使用其他 category 待确认。
+2. **CSS Module 头部注释会触发 pre-commit hook**。简单组件不需要文件头注释。
+3. **Badge.tsx 的 `import type { HTMLAttributes<HTMLSpanElement> }` 写法**：大括号内不能带泛型参数，应写 `import type { HTMLAttributes } from 'react'` 再在 interface 里用 `HTMLAttributes<HTMLSpanElement>`。
+
+### Phase 1 进度
+
+```
+T1 ✅ tokens.css — 已合并入 T2
+T2 ✅ 组件原语库 — ea7b526, 已推送
+T8 ✅ requireWorkspace — 独立分支
+T3 ⏳ Shell 原语 — 下一站（MIN-139）
+T4 ⏸ OriginBreadcrumb — 等 T3
+T5 ⏸ React Router v6 — 等 T3
+T6 ⏸ React Query + Zustand — 等 T5
+T7 ⏸ ErrorBoundary — 等 T6
+T9 ⏸ ModuleRegistry — 等 T3
+T10 ⏸ Shell E2E — 等 T3~T9
+T11 ⏳ Handoff 原语 — 可与 T3 并行（MIN-147, 仅依赖 T2）
+```
+
+### 下一步
+
+1. **合并 T2 到 MHSDC-GC-SSE**（需老杨 review T2 PR）
+2. **T3 + T11 并行启动**：
+   - T3（MIN-139）：Shell 级原语（ModuleTab / Rail / Stage / ArtifactDrawer）— 工时 M
+   - T11（MIN-147）：Handoff 原语占位（HandoffButton / HandoffPanel / HandoffArrow / HandoffChecklist）— 工时 S
+3. 建议开新窗口执行（当前上下文因 agent 失败日志已污染）
+
+---
+
 ## 1.26 2026-04-17（UI Architecture · Phase 1-6 全量实施计划 v1.1 · 老卢终审通过）
 
 ### 本轮主线
