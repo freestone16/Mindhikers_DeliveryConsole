@@ -1,0 +1,39 @@
+/* P1.T2 · Badge — small status label */
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gc-s-1);
+  padding: 2px var(--gc-s-2);
+  font-size: 10px;
+  font-weight: var(--gc-weight-medium);
+  letter-spacing: var(--gc-tracking-wide);
+  text-transform: uppercase;
+  border-radius: var(--gc-radius-sm);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.variantDefault {
+  background: var(--gc-bg-sunken);
+  color: var(--gc-text-secondary);
+}
+
+.variantOchre {
+  background: var(--gc-accent-tint);
+  color: var(--gc-accent-ink);
+}
+
+.variantSuccess {
+  background: var(--gc-success-tint);
+  color: var(--gc-success);
+}
+
+.variantWarning {
+  background: var(--gc-bg-sunken);
+  color: var(--gc-warning);
+}
+
+.variantError {
+  background: var(--gc-bg-sunken);
+  color: var(--gc-error);
+}

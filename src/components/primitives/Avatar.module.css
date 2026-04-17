@@ -1,0 +1,31 @@
+/* P1.T2 · Avatar — circular user/persona indicator */
+.root {
+  display: grid;
+  place-items: center;
+  border-radius: var(--gc-radius-pill);
+  background: var(--gc-bg-sunken);
+  color: var(--gc-text-secondary);
+  font-family: var(--gc-font-serif);
+  font-weight: var(--gc-weight-semibold);
+  box-shadow: inset 0 0 0 1px var(--gc-line-subtle);
+  flex: none;
+  user-select: none;
+}
+
+.sizeDefault {
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.sizeLg {
+  width: 32px;
+  height: 32px;
+  font-size: var(--gc-size-md);
+}
+
+.variantUser {
+  background: var(--gc-text-primary);
+  color: var(--gc-text-inverted);
+  box-shadow: none;
+}
