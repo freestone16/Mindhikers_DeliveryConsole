@@ -4,6 +4,68 @@
 
 ---
 
+## 1.31 2026-04-18（UI Architecture · Phase 1 收口 · T6 ✅ T7 ✅ T10 ✅ Phase 1 完成）
+
+### 本轮主线
+
+Phase 1 最后冲刺。老杨完成 T6（React Query + Zustand 骨架）、T7（ErrorBoundary 分层）、T10（Shell E2E + 响应式验证），**Phase 1 全部 11 任务完成**。
+
+### ✅ 本轮已完成
+
+**P1.T6 · React Query v5 + Zustand 骨架**（MIN-142）— commit `7eed19e`
+- 新增 `@tanstack/react-query` + `zustand` 依赖
+- 新增 `src/lib/query-client.ts`（QueryClient 全局配置：staleTime 30s, retry 1）
+- 新增 `src/shell/shellStore.ts`（Zustand：activeModule / activeSessionId / sidebarOpen / artifactDrawerOpen）
+- 新增 `src/modules/crucible/useConversations.ts`（示例 query hook，Phase 2 数据层模式参考）
+- 修改 `src/main.tsx`（注册 QueryClientProvider）
+
+**P1.T7 · ErrorBoundary 分层**（MIN-143）— commit `d4aad6e`
+- 新增 `src/shell/error-boundaries/ShellErrorBoundary.tsx`（全局兜底，全屏错误页 + 刷新按钮）
+- 新增 `src/shell/error-boundaries/ModuleErrorBoundary.tsx`（模块级隔离，inline 错误提示 + 重试按钮）
+- 新增 `src/shell/error-boundaries/index.ts`（barrel export）
+- 修改 `src/main.tsx`（ShellErrorBoundary 包裹在最外层）
+
+**P1.T10 · Shell E2E + 响应式验证**（MIN-146）— 无新 commit（验证任务）
+- `npm run typecheck:saas` ✅
+- `npm run build` ✅（596 KB JS, 2.97s）
+- `rg useHashRoute` 零结果 ✅
+- `requireWorkspace` 已注册在 crucible 路由 ✅
+- 三断点响应式验证（Playwright MCP）✅：
+  - 1280×800 desktop：正常渲染，Header + 聊天面板 + Footer 完整
+  - 768×1024 tablet：正常渲染，布局自适应
+  - 375×812 mobile：正常渲染，无白屏，所有元素可达
+- Console 错误：仅 Google Fonts 404（字体 URL 版本号，非功能性阻塞）
+
+**端口审计修复**（额外）— commit `ba8b777`
+- 7 处硬编码 GC 稳定线端口 `3004`/`5176` 全部修正为 SSE 端口 `3009`/`5182`
+- 范围：`src/config/runtime.ts`、`server/auth/index.ts`、`server/youtube-auth.ts`、`server/index.ts`、`vite.config.ts`
+
+### Phase 1 最终进度
+
+```
+T1  ✅ tokens.css
+T2  ✅ 组件原语库（15组件31文件）
+T3  ✅ Shell级原语
+T4  ✅ OriginBreadcrumb
+T5  ✅ React Router v6
+T6  ✅ React Query v5 + Zustand — NEW
+T7  ✅ ErrorBoundary 分层 — NEW
+T8  ✅ requireWorkspace
+T9  ✅ ModuleRegistry + Slot Registry
+T10 ✅ Shell E2E + 响应式验证 — NEW
+T11 ✅ Handoff原语占位
+```
+
+**Phase 1 完成 ✅（11/11）**
+
+### 下一步
+
+- 通知老卢做最终验收
+- 本地 commits 未 push（等老卢确认）
+- Phase 2（Roundtable 入壳）就绪，等老卢启动指令
+
+---
+
 ## 1.30 2026-04-18（UI Architecture · Phase 1 实施 · T5 ✅ React Router v6）
 
 ### 本轮主线
@@ -19,26 +81,6 @@ Phase 1 独占窗口任务。老杨完成 T5（React Router v6 切换 + URL sche
 - `src/SaaSApp.tsx`：`useHashRoute` hook → `useLocation` + `useNavigate`；`/` → `<Navigate to="/m/crucible" />`
 - `src/App.tsx`（legacy）：同步删除 `useHashRoute`
 - 验收：`grep useHashRoute` 零结果；`typecheck:saas` ✅；`build` ✅（569 KB JS, 1.71s）
-
-### Phase 1 进度
-
-```
-T1 ✅ tokens.css
-T2 ✅ 组件原语库
-T3 ✅ Shell级原语
-T4 ✅ OriginBreadcrumb
-T5 ✅ React Router v6 — NEW
-T8 ✅ requireWorkspace
-T9 ✅ ModuleRegistry + Slot Registry
-T11 ✅ Handoff原语占位
-T6 ⏸ React Query + Zustand — 下一站
-T7 ⏸ ErrorBoundary — 等 T6
-T10 ⏸ Shell E2E — 等 T6~T7
-```
-
-### 下一步
-
-Phase 1 已完成 8/11。剩余：T6（React Query + Zustand）→ T7（ErrorBoundary）→ T10（Shell E2E）收口。
 
 ---
 
