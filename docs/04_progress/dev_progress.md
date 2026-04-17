@@ -1,6 +1,93 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-17 CST
+> **更新日期**: 2026-04-18 CST
+
+---
+
+## 1.30 2026-04-18（UI Architecture · Phase 1 实施 · T5 ✅ React Router v6）
+
+### 本轮主线
+
+Phase 1 独占窗口任务。老杨完成 T5（React Router v6 切换 + URL scheme），从 hash routing 迁移到 BrowserRouter。
+
+### ✅ 本轮已完成
+
+**P1.T5 · React Router v6 切换 + URL scheme**（MIN-141）— commit `3b6a203`
+- 新增 `react-router-dom@6.30.3`
+- 新增 `src/router.tsx`：PRD §7.1 URL scheme 常量 + 路径工具函数（`modulePath` / `sessionPath` / `extractModuleId` / `extractSessionId`）
+- `src/main.tsx`：`BrowserRouter` 包裹 + import 统一为 `SaaSApp`
+- `src/SaaSApp.tsx`：`useHashRoute` hook → `useLocation` + `useNavigate`；`/` → `<Navigate to="/m/crucible" />`
+- `src/App.tsx`（legacy）：同步删除 `useHashRoute`
+- 验收：`grep useHashRoute` 零结果；`typecheck:saas` ✅；`build` ✅（569 KB JS, 1.71s）
+
+### Phase 1 进度
+
+```
+T1 ✅ tokens.css
+T2 ✅ 组件原语库
+T3 ✅ Shell级原语
+T4 ✅ OriginBreadcrumb
+T5 ✅ React Router v6 — NEW
+T8 ✅ requireWorkspace
+T9 ✅ ModuleRegistry + Slot Registry
+T11 ✅ Handoff原语占位
+T6 ⏸ React Query + Zustand — 下一站
+T7 ⏸ ErrorBoundary — 等 T6
+T10 ⏸ Shell E2E — 等 T6~T7
+```
+
+### 下一步
+
+Phase 1 已完成 8/11。剩余：T6（React Query + Zustand）→ T7（ErrorBoundary）→ T10（Shell E2E）收口。
+
+---
+
+## 1.29 2026-04-18（UI Architecture · Phase 1 实施 · T4 ✅ T9 ✅ T8 合并）
+
+### 本轮主线
+
+Phase 1 继续推进。老杨完成 T4（OriginBreadcrumb）+ T9（ModuleRegistry + Slot Registry 骨架），合并 T8（requireWorkspace）到主线。
+
+### ✅ 本轮已完成
+
+**P1.T4 · OriginBreadcrumb Shell 级原语**（MIN-140）— commit `6a3fa3c`
+- `src/shell/primitives/OriginBreadcrumb.tsx` + `OriginBreadcrumb.module.css`
+- 祖先链面包屑：crumbs 数组渲染，每级可点击，归档态灰显 + "(历史只读)"
+- 支持 `.paper__crumb` 外部样式 override
+- 严格遵循已有 Shell primitive pattern：forwardRef + clsx + --gc-* tokens
+
+**P1.T9 · ModuleRegistry + Slot Registry 骨架**（MIN-145）— commit `0213d8c`
+- `src/modules/` — ModuleManifest 类型 + registry（registerModule / getRegisteredModules / subscribe）
+- 预注册 crucible 占位模块
+- `src/slots/` — 三层 Slot 注册表（Channel / Persona / Skill）+ VisibilitySchema（A11 预埋）
+- `docs/02_design/{channels,personas,skills}/.keep`
+- 11 files, 151 insertions
+
+**P1.T8 · requireWorkspace 合并** — merge commit `c42b774`
+
+### 📝 经验沉淀
+
+1. `unspecified-high` / `visual-engineering` category 子代理模型不可用（gpt-5.2-codex），与 1.27 记录一致。`quick` category 正常。复杂任务老杨直接实现。
+
+### Phase 1 进度
+
+```
+T1 ✅ tokens.css
+T2 ✅ 组件原语库
+T3 ✅ Shell级原语
+T4 ✅ OriginBreadcrumb — NEW
+T8 ✅ requireWorkspace — 合并
+T9 ✅ ModuleRegistry + Slot Registry — NEW
+T11 ✅ Handoff原语占位
+T5 ⏸ React Router v6 — 独占窗口
+T6 ⏸ React Query + Zustand — 等 T5
+T7 ⏸ ErrorBoundary — 等 T6
+T10 ⏸ Shell E2E — 等 T5~T9
+```
+
+### 下一步
+
+Phase 1 已完成 7/11。剩余：T5（独占窗口）→ T6 → T7 → T10 收口。
 
 ---
 
