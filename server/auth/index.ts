@@ -22,7 +22,7 @@ export const resolveAuthBaseUrl = () => {
         return trimTrailingSlash(explicitBaseUrl);
     }
 
-    const port = process.env.PORT || '3004';
+    const port = process.env.PORT || '3009';
     return `http://localhost:${port}`;
 };
 

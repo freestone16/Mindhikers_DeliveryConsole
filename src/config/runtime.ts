@@ -1,6 +1,6 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-const backendPort = import.meta.env.VITE_BACKEND_PORT || '3004';
+const backendPort = import.meta.env.VITE_BACKEND_PORT || '3009';
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL?.trim();
 const browserOrigin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -8,7 +8,7 @@ const defaultApiBaseUrl = import.meta.env.DEV ? '' : '';
 const defaultSocketUrl = import.meta.env.DEV ? browserOrigin : browserOrigin;
 
 export const runtimeConfig = {
-    appPort: import.meta.env.VITE_APP_PORT || '5176',
+    appPort: import.meta.env.VITE_APP_PORT || '5182',
     backendPort,
     apiBaseUrl: configuredApiBaseUrl
         ? trimTrailingSlash(configuredApiBaseUrl)

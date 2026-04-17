@@ -852,7 +852,7 @@ setTimeout(() => {
 }, 1000);
 */
 
-const PORT = parseInt(process.env.PORT || '3004', 10);
+const PORT = parseInt(process.env.PORT || '3009', 10);
 
 // ============================================================
 // REST API Endpoints
