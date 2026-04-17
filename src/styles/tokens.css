@@ -1,0 +1,102 @@
+/* =============================================================
+ * GoldenCrucible-SSE · Design Tokens
+ * Single source of truth — copied verbatim from demos/ui-north-star
+ * Anchored to Claude Code aesthetic discipline (warm, restrained).
+ * ============================================================= */
+
+:root {
+  /* ---------- Color · Surface ---------- */
+  --gc-bg-base:     #faf8f3;   /* dominant canvas — warm ivory */
+  --gc-bg-raised:   #f2efe8;   /* sidebar, panels */
+  --gc-bg-sunken:   #ede9e0;   /* input wells, hover fills */
+  --gc-bg-quiet:    #f6f3ec;   /* subtle row stripe */
+  --gc-bg-inverted: #2c2a26;   /* inverted chip / kbd */
+
+  /* ---------- Color · Text ---------- */
+  --gc-text-primary:   #2c2a26;  /* warm near-black */
+  --gc-text-secondary: #6b6860;  /* warm gray */
+  --gc-text-tertiary:  #9a968b;  /* hushed */
+  --gc-text-quiet:     #b7b2a5;  /* placeholder / meta */
+  --gc-text-inverted:  #faf8f3;
+
+  /* ---------- Color · Line ---------- */
+  --gc-line-hairline: #efeae0;   /* barely-there rule */
+  --gc-line-subtle:   #e8e4dc;
+  --gc-line-default:  #d9d4c8;
+  --gc-line-strong:   #bfb8a8;
+
+  /* ---------- Color · Semantic (used sparingly) ---------- */
+  --gc-accent:         #cc7849;  /* ochre — the only warm semantic */
+  --gc-accent-hover:   #b86a3f;
+  --gc-accent-ink:     #8c4a24;  /* ochre for small type */
+  --gc-accent-tint:    #f5e6d8;  /* tinted fill for ochre chips */
+  --gc-accent-hairline:#e7c7a8;
+
+  --gc-success: #6b8759;
+  --gc-success-tint: #e5ebde;
+  --gc-warning: #c89b3c;
+  --gc-error:   #b85c4c;
+
+  /* ---------- Typography ---------- */
+  --gc-font-serif: 'Fraunces', 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;
+  --gc-font-sans:  'Instrument Sans', 'Söhne', 'Helvetica Neue', sans-serif;
+  --gc-font-mono:  'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+
+  --gc-size-xs:   11px;
+  --gc-size-sm:   12px;
+  --gc-size-base: 13px;
+  --gc-size-md:   14px;
+  --gc-size-lg:   16px;
+  --gc-size-xl:   20px;
+  --gc-size-2xl:  28px;
+  --gc-size-3xl:  40px;
+  --gc-size-4xl:  56px;
+
+  --gc-weight-regular:  400;
+  --gc-weight-medium:   500;
+  --gc-weight-semibold: 600;
+
+  --gc-leading-tight: 1.2;
+  --gc-leading-snug:  1.4;
+  --gc-leading-body:  1.6;
+  --gc-leading-prose: 1.75;
+
+  --gc-tracking-wide:  0.08em;   /* eyebrow labels */
+  --gc-tracking-micro: 0.04em;
+
+  /* ---------- Spacing · 4-base rhythm ---------- */
+  --gc-s-1:  4px;
+  --gc-s-2:  8px;
+  --gc-s-3:  12px;
+  --gc-s-4:  16px;
+  --gc-s-6:  24px;
+  --gc-s-8:  32px;
+  --gc-s-12: 48px;
+  --gc-s-16: 64px;
+
+  /* ---------- Radius · temperate corners ---------- */
+  --gc-radius-sm:   4px;
+  --gc-radius-md:   6px;
+  --gc-radius-lg:   8px;
+  --gc-radius-pill: 999px;
+
+  /* ---------- Shadow · line over plane ---------- */
+  --gc-shadow-sm: 0 1px 2px rgba(44, 42, 38, 0.04);
+  --gc-shadow-md: 0 2px 6px rgba(44, 42, 38, 0.05);
+  --gc-shadow-lg: 0 12px 32px -8px rgba(44, 42, 38, 0.12),
+                  0  2px  6px      rgba(44, 42, 38, 0.05);
+
+  /* ---------- Motion · imperceptible but precise ---------- */
+  --gc-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --gc-dur-fast:  150ms;
+  --gc-dur-base:  200ms;
+  --gc-dur-slow:  280ms;   /* handoff ceremony only */
+
+  /* ---------- Layout ---------- */
+  --gc-col-left:            260px;
+  --gc-col-right:           360px;
+  --gc-col-right-collapsed: 44px;
+  --gc-topbar-h:            44px;
+  --gc-composer-h:          76px;
+  --gc-prose-max:           680px;
+}

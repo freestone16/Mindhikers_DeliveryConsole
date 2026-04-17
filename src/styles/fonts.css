@@ -1,0 +1,56 @@
+/* =============================================================
+ * GoldenCrucible-SSE · Font Declarations
+ * Fraunces (serif) · Instrument Sans (sans) · JetBrains Mono (mono)
+ * Loaded via Google Fonts with display=swap for optimal performance.
+ * ============================================================= */
+
+/* --- Fraunces · Variable serif (display + body) --- */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/fraunces/v29/6NUH8F2OLBixRZ8YWyPm.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/fraunces/v29/6NUK8F2OLBixRZ8YWyPm5XjnyLqjA.woff2') format('woff2');
+}
+
+/* --- Instrument Sans · Clean geometric sans --- */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/instrumentsans/v1/pxiypypg3M0Hxaj-_F0HjwRtB2Xq.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/instrumentsans/v1/pxiypypg3M0Hxaj-_F0HjwZtB2Vq7Q.woff2') format('woff2');
+}
+
+/* --- JetBrains Mono · Developer monospace --- */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/jetbrainsmono/v21/tDbY2o-flEEny0FZhsfKu5WALsAm.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/jetbrainsmono/v21/tDbX2o-flEEny0FZhsfKu5WAL Vox7g.woff2') format('woff2');
+}
