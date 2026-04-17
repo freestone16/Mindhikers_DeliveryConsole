@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
@@ -39,19 +40,9 @@ const toCrucibleInjectedMessages = (snapshot?: CrucibleSnapshot | null): ChatMes
     }));
 };
 
-function useHashRoute() {
-    const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
-    useEffect(() => {
-        const handleHashChange = () => {
-            setHash(window.location.hash.slice(1) || '/');
-        };
-        window.addEventListener('hashchange', handleHashChange);
-        return () => window.removeEventListener('hashchange', handleHashChange);
-    }, []);
-    return hash;
-}
-
 function App() {
+    const location = useLocation();
+    const navigate = useNavigate();
     const { authEnabled, session: authSession, workspace, signOut } = useAppAuth();
     const initialCrucibleSnapshot = readScopedCrucibleSnapshot(workspace?.activeWorkspace.id);
     const { state, isConnected, selectScript, socket, setState } = useDeliveryStore();
@@ -277,8 +268,6 @@ function App() {
 
     const expertStatuses = {};
 
-    const hashRoute = useHashRoute();
-
     useEffect(() => {
         const currentContext = {
             projectId: state.projectId,
@@ -384,8 +373,8 @@ function App() {
         ? { width: `${crucibleManualSidebarWidth}px` }
         : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
 
-    if (hashRoute === '/llm-config') {
-        return <LLMConfigPage onClose={() => window.location.hash = '/'} />;
+    if (location.pathname === '/llm-config') {
+        return <LLMConfigPage onClose={() => navigate('/')} />;
     }
 
     if (!isConnected) {

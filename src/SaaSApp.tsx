@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { buildApiUrl } from './config/runtime';
+import { LLM_CONFIG_PATH, modulePath } from './router';
 import { Header, type HeaderModule } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
 import { StatusFooter } from './components/StatusFooter';
@@ -122,22 +124,9 @@ const shouldHydratePersistedSnapshot = (
     return persistedSnapshot.messages.length > (localSnapshot.messages?.length || 0);
 };
 
-function useHashRoute() {
-    const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
-
-    useEffect(() => {
-        const handleHashChange = () => {
-            setHash(window.location.hash.slice(1) || '/');
-        };
-
-        window.addEventListener('hashchange', handleHashChange);
-        return () => window.removeEventListener('hashchange', handleHashChange);
-    }, []);
-
-    return hash;
-}
-
 function SaaSApp() {
+    const location = useLocation();
+    const navigate = useNavigate();
     const { authEnabled, session: authSession, workspace, signOut } = useAppAuth();
     const crucibleWorkspaceId = workspace?.activeWorkspace.id || null;
     const initialCrucibleSnapshot = readScopedCrucibleSnapshot(crucibleWorkspaceId);
@@ -169,7 +158,6 @@ function SaaSApp() {
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
     const crucibleShellRef = useRef<HTMLDivElement | null>(null);
-    const hashRoute = useHashRoute();
 
     const currentUserBadge = useMemo(() => {
         const displayName = authSession?.user.name?.trim()
@@ -527,14 +515,18 @@ function SaaSApp() {
         ? { width: `${crucibleManualSidebarWidth}px` }
         : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
 
-    if (hashRoute === '/llm-config') {
+    if (location.pathname === LLM_CONFIG_PATH) {
         return (
             <SaaSLLMConfigPage
                 trialStatus={crucibleTrialStatus}
                 onSaved={refreshCrucibleTrialStatus}
-                onClose={() => { window.location.hash = '/'; }}
+                onClose={() => { navigate(modulePath()); }}
             />
         );
+    }
+
+    if (location.pathname === '/') {
+        return <Navigate to={modulePath()} replace />;
     }
 
     if (!isConnected) {
