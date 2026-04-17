@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,14 +24,15 @@ import {
     saveCrucibleConversationSnapshot,
     updateCrucibleConversation,
 } from '../crucible-persistence';
-import { ensurePersonalWorkspace } from '../auth/workspace-store';
-import { getAuthPool, getSessionFromRequest, isAuthEnabled } from '../auth';
+import { isAuthEnabled } from '../auth';
 import { requireWorkspace } from '../auth/workspace-middleware';
 
 const router = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+router.use(requireWorkspace);
 
 // --- Core crucible endpoints ---
 
@@ -291,34 +293,15 @@ function sanitizePathSegment(value: string) {
     return value.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-async function resolveCrucibleAutosavePath(req: express.Request) {
-    if (!isAuthEnabled()) {
+async function resolveCrucibleAutosavePath(req: Request) {
+    if (!isAuthEnabled() || !req.workspaceId) {
         return LEGACY_CRUCIBLE_AUTOSAVE_PATH;
-    }
-
-    const session = await getSessionFromRequest(req);
-    if (!session?.user?.id) {
-        const error = new Error('Authentication required');
-        (error as Error & { statusCode?: number }).statusCode = 401;
-        throw error;
-    }
-
-    const workspace = await ensurePersonalWorkspace(getAuthPool(), {
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-    });
-
-    if (!workspace) {
-        const error = new Error('Workspace access denied');
-        (error as Error & { statusCode?: number }).statusCode = 403;
-        throw error;
     }
 
     return path.resolve(
         __dirname,
         '../../runtime/crucible/workspaces',
-        sanitizePathSegment(workspace.activeWorkspace.id),
+        sanitizePathSegment(req.workspaceId),
         'autosave.json',
     );
 }

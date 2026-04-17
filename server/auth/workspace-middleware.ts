@@ -1,18 +1,6 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { RequestHandler } from 'express';
 import { getAuthPool, getSessionFromRequest, isAuthEnabled } from './index';
-import { ensurePersonalWorkspace } from './workspace-store';
-import type { WorkspaceContext } from './workspace-store';
-
-// --- Express type augmentation ---
-declare global {
-    namespace Express {
-        interface Request {
-            userId?: string;
-            workspaceId?: string;
-            workspaceContext?: WorkspaceContext;
-        }
-    }
-}
+import { getWorkspaceContext } from './workspace-store';
 
 /**
  * requireWorkspace middleware
@@ -21,7 +9,7 @@ declare global {
  * Bypasses entirely when auth is disabled (no DATABASE_URL).
  * Supports WORKSPACE_BYPASS=true env for gray-switch testing.
  */
-export const requireWorkspace = async (req: Request, res: Response, next: NextFunction) => {
+export const requireWorkspace: RequestHandler = async (req, res, next) => {
     // Bypass: auth not configured → no workspace enforcement
     if (!isAuthEnabled()) {
         next();
@@ -42,11 +30,7 @@ export const requireWorkspace = async (req: Request, res: Response, next: NextFu
         }
 
         const pool = getAuthPool();
-        const workspace = await ensurePersonalWorkspace(pool, {
-            id: session.user.id,
-            name: session.user.name,
-            email: session.user.email,
-        });
+        const workspace = await getWorkspaceContext(pool, session.user.id);
 
         if (!workspace) {
             res.status(403).json({ error: 'Workspace access denied' });
