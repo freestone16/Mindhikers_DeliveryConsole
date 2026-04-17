@@ -7,17 +7,20 @@ import SaaSApp from './SaaSApp.tsx'
 import { AuthBoundary } from './auth/AuthBoundary'
 import { AuthProvider } from './auth/AuthProvider'
 import { queryClient } from './lib/query-client'
+import { ShellErrorBoundary } from './shell/error-boundaries'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AuthBoundary>
-            <SaaSApp />
-          </AuthBoundary>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ShellErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <AuthBoundary>
+              <SaaSApp />
+            </AuthBoundary>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ShellErrorBoundary>
   </StrictMode>,
 )
