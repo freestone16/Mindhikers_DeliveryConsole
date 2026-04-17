@@ -20,3 +20,5 @@ export { HandoffChecklist } from './HandoffChecklist';
 export type { HandoffChecklistProps, CheckItem } from './HandoffChecklist';
 export { HandoffButton } from './HandoffButton';
 export type { HandoffButtonProps } from './HandoffButton';
+export { OriginBreadcrumb } from './OriginBreadcrumb';
+export type { OriginBreadcrumbProps, OriginCrumb } from './OriginBreadcrumb';
