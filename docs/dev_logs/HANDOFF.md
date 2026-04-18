@@ -1,74 +1,142 @@
-🕐 Last updated: 2026-04-12 18:50
+🕐 Last updated: 2026-04-17 （夜场 · Unit 1 实施 ~80% 完成）
 🌿 Branch: MHSDC-DC-director
+🎯 Session outcome: **Unit 1 Shell+Token 代码已写完、tsc+build 通过，视觉截图已生成但模型无法查看，等待用户确认后提交。子代理模型已全部改为 GLM5.1。**
 
-## 当前状态
+---
 
-- Director 模块全面治理已完成 **ce-brainstorm → ce-plan → ce-review → Linear 治理** 四阶段闭环
-- plan 已升级到 r2，在原 Stage 1-5 之前新增 **Stage 0 — PR0 Security Hotfix（阻断式前置）**
-- Linear 项目 `DeliveryConsole - Director` 已完成治理：合并重复 issue、刷新描述、补全 R1-R17 缺口
-- **下一步头号优先事项：PR0 Security Hotfix（MIN-122）— 6 个 Critical 安全洞必须先修**
+## ⚡ 30 秒读完可继续工作的交接摘要
 
-## 本轮产出（2026-04-12）
+本窗口是"外包团队"执行窗口，老杨启动。
 
-### 文档
-| 文件 | 内容 |
-|---|---|
-| `docs/brainstorms/2026-04-12-director-module-governance-requirements.md` | 17 条需求(R1-R17)，5 组分类，mermaid 架构图 |
-| `docs/plans/2026-04-12_director-module-governance-plan.md` (r2) | 17 个 Unit / 6 个 Stage / 7 个技术决策 / 6 PR |
-| `docs/reviews/2026-04-12_director-code-audit.md` | 安全审计：6 Critical / 7 High / 6 Medium / 5 Low |
-| `docs/governance/2026-04-12_linear-director-actions.md` (r2) | Linear 治理动作清单 + 执行记录 |
-| `docs/dev_logs/2026-04-12.md` | 今日详细日志 |
+1. **Unit 1 (MIN-149)**：Shell + 视觉 Token — **~80% 完成**
+   - 5 个新文件已创建，App.tsx 已修改
+   - `npx tsc --noEmit` 零错误 ✅
+   - `npx vite build` 成功 ✅
+   - 截图已生成：`testing/director/artifacts/unit1-shell-verification.png`
+   - **需要用户确认截图看起来 OK**，然后提交 `refs MIN-149`
+2. **Unit 2 (MIN-150)**：Context Drawer — 未开始
+3. **Unit 3 (MIN-151)**：Workbench + 阶段导航 — 未开始
+4. Unit 4-6 和 Plan 002 都排在后面
 
-### Linear 变更（已执行）
-| 段 | 动作 | 涉及 issue |
-|---|---|---|
-| PR0 | 新建 1 父 + 6 子 issue（Security Hotfix） | MIN-122~128 |
-| A | 合并 4 组重复 issue | MIN-51/63, MIN-52/62, MIN-54/66, MIN-53/73 |
-| B | 描述补丁 3 项 | MIN-66, MIN-72, MIN-89 |
-| C | 新建 6 个缺口 issue | MIN-129~134 |
+---
 
-### Linear 治理后状态
-- 总 issue 数：37（含 2 个 Canceled）
-- In Progress：2（MIN-51, MIN-122）
-- R 编号全部有 issue 承接：17/17
-- Critical 安全洞全部有 issue：6/6
+## 📋 当前状态
 
-## ⛔ PR0 Security Hotfix — 紧急待修
+### Plan 001 进度
 
-**MIN-122** 包含 6 个 Critical（C1-C6），构成完整远程攻击链：
+| Unit | Linear | 内容 | 状态 |
+|------|--------|------|------|
+| Unit 1 | MIN-149 | Shell + 视觉 Token | 🟡 代码完成，tsc+build 通过，等视觉确认 |
+| Unit 2 | MIN-150 | Context Drawer（Chat/Runtime/Artifact/Handoff） | ⬜ |
+| Unit 3 | MIN-151 | Workbench + 阶段导航 | ⬜ |
+| Unit 4 | MIN-152 | P1/P2 重做 | ⬜ |
+| Unit 5 | MIN-153 | P3/P4 重做 | ⬜ |
+| Unit 6 | MIN-154 | 验收 | ⬜ |
 
-| Sub-issue | Critical | 一句话 |
-|---|---|---|
-| MIN-123 | C4 | 0.0.0.0 + 全通 CORS → LAN 暴露 |
-| MIN-124 | C1 | assertProjectPathSafe 从未被调用 → 路径穿越 |
-| MIN-125 | C2 | chat-action-execute 无 confirmId → 绕过 Bridge |
-| MIN-126 | C5 | Gemini API key 在 URL query → 凭证泄漏 |
-| MIN-127 | C3 | update_option_fields 原型污染 + 无白名单 |
-| MIN-128 | C6 | saveApiKey 不校验换行 → .env 注入 |
+### Plan 002 (MIN-155) — Broll 扩充
 
-**攻击链**：C4(入口) → C2(授权) → C1(文件读取) + C5(key泄漏) + C6(env注入) + C3(原型污染)
+排在 Plan 001 全部完成之后，6 个 Unit（MIN-156~161）。
 
-**强制规则**：PR0 必须先于 PR1 merge。Stage 1 视觉路由收口的解锁条件 = PR0 全 Done。
+### 子代理配置已修改
 
-## 未提交改动
+- 文件：`~/.config/opencode/oh-my-openagent.json`
+- 备份：`~/.config/opencode/oh-my-openagent.json.bak.20260417*`
+- 变更：所有 agents 和 categories 的 model 统一改为 `zhipuai-coding-plan/glm-5.1`
+- 之前用 `openai/gpt-5.2-codex`、`openai/gpt-5.4` 等导致子代理超时零产出
 
-本会话只做文档和 Linear 治理，无源代码改动。新增文档：
-- `docs/brainstorms/2026-04-12-director-module-governance-requirements.md`
-- `docs/plans/2026-04-12_director-module-governance-plan.md`（r2）
-- `docs/reviews/2026-04-12_director-code-audit.md`
-- `docs/governance/2026-04-12_linear-director-actions.md`（r2）
-- `docs/dev_logs/2026-04-12.md`
-- 本文件 `docs/dev_logs/HANDOFF.md`
+---
 
-## WIP — 下一会话建议
+## 🗂️ Unit 1 已创建/修改的文件
 
-1. **PR0 Security Hotfix 编码**：按 MIN-123 → 128 顺序（先 0.1 网络收口，立即消除 LAN 暴露入口）
-2. 完成后更新 `rules.md` 新增 4 条安全规则 + 写入 `lessons/L-019-director-security-hotfix.md`
-3. PR0 merge 后解锁 Stage 1（MIN-129 R1-R5 视觉路由收口）
-4. H7 bug（phase2ReviseOption loadConfig 形状错误）可顺手在 PR0 一行修掉
+### 新建文件
 
-## 待解决问题
+| 文件 | 说明 |
+|------|------|
+| `src/styles/delivery-shell.css` | 全套视觉 Token + 布局 CSS（暖纸风色彩、Grid 三栏、Rail、Drawer、响应式） |
+| `src/components/delivery-shell/DeliveryShellLayout.tsx` | 主三栏网格容器，管理 Rail/Drawer 展开/折叠状态 |
+| `src/components/delivery-shell/ProductTopBar.tsx` | 44px 顶栏，项目/剧本下拉选择 + LLM 配置入口 |
+| `src/components/delivery-shell/WorkstationRail.tsx` | 左侧垂直工作站导航（6 个 expert）+ 底部 Context Dock |
+| `src/components/delivery-shell/ContextDrawer.tsx` | 右侧抽屉，4 个 Tab 桩（Chat、Runtime、Artifacts、Handoff） |
 
-- 仓库 `npm run build` 仍被历史 TS 存量错误阻塞
-- Director Phase2 端到端回归测试仍未建立自动化
-- ce-review 报告中 7 条 High（H1-H7）尚未纳入 plan Unit，需在 PR0 之后扩展 Stage 4 覆盖
+### 修改文件
+
+| 文件 | 说明 |
+|------|------|
+| `src/App.tsx` | delivery 模块替换为 DeliveryShellLayout，移除旧 Header+ExpertNav+ChatPanel |
+
+### 验证产物
+
+| 文件 | 说明 |
+|------|------|
+| `testing/director/artifacts/unit1-shell-verification.png` | Playwright 截图，需人工确认 |
+
+---
+
+## 🔧 Unit 1 关键技术细节
+
+- **CSS Grid 布局**：`var(--rail-width) / minmax(0,1fr) / var(--drawer-width)`，Rail 和 Drawer 都支持折叠
+- **暖纸风色彩**：背景 `#F5EFE6`、卡片 `#FFFBF5`、文字 `#2C1810`、强调 `#C17F59`
+- **ProductTopBar** 通过 `/api/projects` 和 `/api/projects/${id}/scripts` 拉数据
+- **WorkstationRail** 映射 6 个 expert：Director、Shorts、Thumbnail、Music、Marketing、VisualAudit
+- **ContextDrawer** 4 个 Tab 目前是空壳，Unit 2 会填充真实内容
+
+---
+
+## 🎯 新窗口应该做什么
+
+1. 读本文件（HANDOFF.md）恢复上下文
+2. 读 `docs/04_progress/rules.md` 恢复规则
+3. 读方案 `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md` 了解 Unit 细节
+4. **确认 Unit 1 截图**（`testing/director/artifacts/unit1-shell-verification.png`）或重新截图验证
+5. 如果截图 OK：
+   - 提交 Unit 1（`refs MIN-149 feat: shared delivery shell layout + visual tokens`）
+   - 继续 Unit 2（Context Drawer）和 Unit 3（Workbench）
+   - 每 Unit 结束评估上下文，觉得超了就停下来写 HANDOFF
+6. 如果截图有问题：修复后再提交
+
+### 批量节奏
+
+- Unit 1-3 一批推进（每个 Unit 结束评估上下文）
+- Unit 4-6 第二批推进
+
+---
+
+## 🚧 踩坑记录
+
+1. **子代理超时**：首次 Unit 1 整包委派给 `visual-engineering` 子 Agent，30 分钟超时零产出。原因是子代理配置的模型（`openai/gpt-5.2-codex` 等）不可用。已改为 GLM5.1。
+2. **LSP 不可用**：本机未安装 `typescript-language-server`，`lsp_symbols` 等工具不可用，用 grep/read 替代。
+3. **ChatPanel.tsx 预存错误**：10+ 个 TS 错误（`kind`、`findLastIndex`、`systemTitle`），计划明确规定不在本轮修复。
+
+---
+
+## 🚧 外部阻塞
+
+- `PR0 Security Hotfix (MIN-122~128)` 仍是正式业务改造的前置
+- UI 方案明确保留 MIN-122 作为前置
+
+---
+
+## 📝 未提交改动
+
+### 本窗口新增/修改
+
+- `src/styles/delivery-shell.css`（新增）
+- `src/components/delivery-shell/` 下 4 个文件（新增）
+- `src/App.tsx`（修改）
+- `testing/director/artifacts/unit1-shell-verification.png`（新增）
+- `docs/dev_logs/HANDOFF.md`（本文件）
+
+### 上半场遗留未提交
+
+- `src/components/DirectorUIDemoPage.tsx`、`src/components/DirectorUIDemoPage.css`
+- `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md`
+- `docs/plans/2026-04-17-002-remotion-broll-enrichment-plan.md`
+- `docs/plans/2026-04-17_director-ui-revamp-plan.md`
+- `testing/director/artifacts/director-ui-demo-*.png`
+- `docs/04_progress/rules.md`
+
+### 提交纪律
+
+- 治理类变更（rules.md、HANDOFF.md、plans）与正式开发代码必须分开独立 commit
+- 每个 commit 必须引用 Linear issue（`refs MIN-xxx`）
+- 禁止静默推送
