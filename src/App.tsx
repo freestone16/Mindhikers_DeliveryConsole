@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
-import { ExpertNav } from './components/ExpertNav';
 import { ExpertPage } from './components/ExpertPage';
 import { DirectorSection } from './components/DirectorSection';
 import { ShortsSection } from './components/ShortsSection';
@@ -9,12 +8,13 @@ import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
 import { DistributionQueue } from './components/DistributionQueue';
-import { ChatPanel } from './components/ChatPanel';
+import { DeliveryShellLayout } from './components/delivery-shell/DeliveryShellLayout';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import { Loader2, Users, Send, Clock } from 'lucide-react';
 import { StatusFooter } from './components/StatusFooter';
 import { CrucibleHome } from './components/CrucibleHome';
 import { LLMConfigPage } from './components/LLMConfigPage';
+import { DirectorUIDemoPage } from './components/DirectorUIDemoPage';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
@@ -36,7 +36,6 @@ function App() {
     const [activeExpertId, setActiveExpertId] = useState('Director');
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
-    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleSelectProject = (projectId: string) => {
         (window as any).__currentProjectId = projectId;
@@ -113,12 +112,14 @@ function App() {
         handleStartWork(expertId);
     };
 
-    const expertStatuses = {};
-
     const hashRoute = useHashRoute();
 
     if (hashRoute === '/llm-config') {
         return <LLMConfigPage onClose={() => window.location.hash = '/'} />;
+    }
+
+    if (hashRoute === '/director-ui-demo') {
+        return <DirectorUIDemoPage />;
     }
 
     if (!isConnected) {
@@ -132,6 +133,54 @@ function App() {
         );
     }
 
+    /* ── Delivery module: own shell manages topbar & theming ── */
+    if (activeModule === 'delivery') {
+        return (
+            <DeliveryShellLayout
+                activeExpertId={activeExpertId}
+                onExpertChange={handleSelectExpert}
+                projectId={state.projectId}
+                selectedScriptPath={state.selectedScript?.path}
+                onSelectProject={handleSelectProject}
+                onSelectScript={selectScript}
+            >
+                <div style={{ padding: '24px 28px', minHeight: '100%', background: '#f7f2ea' }}>
+                    {activeExpertId === 'VisualAudit' ? (
+                        <VisualAuditPage />
+                    ) : activeExpertId === 'Director' ? (
+                        <DirectorSection
+                            projectId={state.projectId}
+                            scriptPath={state.selectedScript?.path || ''}
+                            socket={socket}
+                        />
+                    ) : activeExpertId === 'ShortsMaster' ? (
+                        <ShortsSection
+                            projectId={state.projectId}
+                            scriptPath={state.selectedScript?.path || ''}
+                            socket={socket}
+                        />
+                    ) : activeExpertId === 'MarketingMaster' ? (
+                        <MarketingSection
+                            projectId={state.projectId}
+                            scriptPath={state.selectedScript?.path || ''}
+                            socket={socket}
+                        />
+                    ) : (
+                        <ExpertPage
+                            expertId={activeExpertId}
+                            projectId={state.projectId}
+                            selectedScript={state.selectedScript}
+                            onStartWork={handleStartWork}
+                            onCancel={handleCancel}
+                            onRerun={handleRerun}
+                        />
+                    )}
+                </div>
+            </DeliveryShellLayout>
+        );
+    }
+
+    /* ── Other modules: original dark theme ── */
     return (
         <div className="h-screen flex flex-col bg-[#060b14] font-sans text-slate-200">
             <Header
@@ -147,67 +196,6 @@ function App() {
                 <main className="max-w-7xl mx-auto px-6 py-20">
                     <CrucibleHome />
                 </main>
-            ) : activeModule === 'delivery' ? (
-                <div className="flex-1 flex overflow-hidden">
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <ExpertNav
-                            activeExpertId={activeExpertId}
-                            expertStatuses={expertStatuses}
-                            onSelectExpert={handleSelectExpert}
-                            isChatOpen={isChatOpen}
-                            onToggleChat={() => setIsChatOpen(!isChatOpen)}
-                        />
-
-                        <div className="flex-1 flex overflow-hidden">
-                            <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
-                                <div className="max-w-7xl mx-auto">
-                                    {activeExpertId === 'VisualAudit' ? (
-                                        <VisualAuditPage />
-                                    ) : activeExpertId === 'Director' ? (
-                                        <DirectorSection
-                                            projectId={state.projectId}
-                                            scriptPath={state.selectedScript?.path || ''}
-                                            socket={socket}
-                                        />
-                                    ) : activeExpertId === 'ShortsMaster' ? (
-                                        <ShortsSection
-                                            projectId={state.projectId}
-                                            scriptPath={state.selectedScript?.path || ''}
-                                            socket={socket}
-                                        />
-                                    ) : activeExpertId === 'MarketingMaster' ? (
-                                        <MarketingSection
-                                            projectId={state.projectId}
-                                            scriptPath={state.selectedScript?.path || ''}
-                                            socket={socket}
-                                        />
-                                    ) : (
-                                        <ExpertPage
-                                            expertId={activeExpertId}
-                                            projectId={state.projectId}
-                                            selectedScript={state.selectedScript}
-                                            onStartWork={handleStartWork}
-                                            onCancel={handleCancel}
-                                            onRerun={handleRerun}
-                                        />
-                                    )}
-                                </div>
-                            </main>
-                        </div>
-                    </div>
-
-                    {/* ChatPanel Sidebar (Spans full height of the work area) */}
-                    <div className={`transition-all duration-300 flex-shrink-0 border-l border-slate-700/50 bg-[#0b1529]/80 backdrop-blur-md ${isChatOpen ? 'w-[25vw] min-w-[320px]' : 'w-0 overflow-hidden border-none'
-                        }`}>
-                        <ChatPanel
-                            isOpen={true}
-                            onToggle={() => setIsChatOpen(false)}
-                            expertId={activeExpertId}
-                            projectId={state.projectId}
-                            socket={socket}
-                        />
-                    </div>
-                </div>
             ) : (
                 <DistributionLayout
                     activePage={activeDistributionPage}

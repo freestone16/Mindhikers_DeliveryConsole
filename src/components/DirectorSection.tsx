@@ -466,18 +466,18 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   };
 
   const phaseColors: Record<Phase, string> = {
-    1: 'bg-yellow-500/20 text-yellow-300',
-    2: 'bg-blue-500/20 text-blue-300',
-    3: 'bg-emerald-500/20 text-emerald-300',
-    4: 'bg-purple-500/20 text-purple-300'
+    1: 'bg-[#f4d03f]/20 text-[#9a7d0a]',
+    2: 'bg-[#5dade2]/20 text-[#2874a6]',
+    3: 'bg-[#58d68d]/20 text-[#1e8449]',
+    4: 'bg-[#af7ac5]/20 text-[#6c3483]'
   };
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-      <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+    <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] overflow-hidden">
+      <div className="p-4 border-b border-[#e4dbcc] flex justify-between items-center bg-[#f4efe5]/80">
         <div className="flex items-center gap-2">
-          <MonitorPlay className="w-5 h-5 text-blue-400" />
-          <h2 className="font-semibold text-white">Director (Visual)</h2>
+          <MonitorPlay className="w-5 h-5 text-[#c97545]" />
+          <h2 className="font-semibold text-[#342d24]">Director (Visual)</h2>
           <span className={`px-2 py-0.5 rounded text-xs ml-2 ${phaseColors[phase]}`}>
             Phase {phase}: {phaseLabels[phase]}
           </span>
@@ -496,7 +496,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
                 onClick={() => onUpdate({ ...data, phase: p })}
                 disabled={isDisabled}
                 className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
-                  phase === p ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  phase === p ? 'bg-[#c97545] text-white' : 'bg-[#f4efe5] text-[#8f8372] hover:bg-[#e4dbcc]'
                 }`}
               >
                 P{p}

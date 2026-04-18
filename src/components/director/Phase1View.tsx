@@ -13,23 +13,23 @@ const SimpleMarkdown = ({ text }: { text: string }) => {
       {lines.map((line, i) => {
         const trimmed = line.trim();
         // Headers
-        if (trimmed.startsWith('#### ')) return <h5 key={i} className="text-md font-bold text-white mt-4 mb-2">{parseInline(trimmed.replace('#### ', ''))}</h5>;
-        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-lg font-bold text-white mt-4 mb-2">{parseInline(trimmed.replace('### ', ''))}</h4>;
-        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-xl font-bold text-white mt-6 mb-3">{parseInline(trimmed.replace('## ', ''))}</h3>;
-        if (trimmed.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold text-blue-400 mt-6 mb-4">{parseInline(trimmed.replace('# ', ''))}</h2>;
+        if (trimmed.startsWith('#### ')) return <h5 key={i} className="text-md font-bold text-[#342d24] mt-4 mb-2">{parseInline(trimmed.replace('#### ', ''))}</h5>;
+        if (trimmed.startsWith('### ')) return <h4 key={i} className="text-lg font-bold text-[#342d24] mt-4 mb-2">{parseInline(trimmed.replace('### ', ''))}</h4>;
+        if (trimmed.startsWith('## ')) return <h3 key={i} className="text-xl font-bold text-[#342d24] mt-6 mb-3">{parseInline(trimmed.replace('## ', ''))}</h3>;
+        if (trimmed.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold text-[#c97545] mt-6 mb-4">{parseInline(trimmed.replace('# ', ''))}</h2>;
 
         // Blockquotes
-        if (trimmed.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-1 my-4 text-slate-300 italic bg-blue-500/10 rounded-r">{parseInline(trimmed.replace('> ', ''))}</blockquote>;
+        if (trimmed.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-1 my-4 text-[#6b5e4f] italic bg-blue-500/10 rounded-r">{parseInline(trimmed.replace('> ', ''))}</blockquote>;
 
         // Lists
-        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) return <li key={i} className="ml-6 list-disc text-slate-300 my-1 pb-1">{parseInline(trimmed.replace(/^(\*|-)\s+/, ''))}</li>;
-        if (trimmed.match(/^\d+\.\s/)) return <li key={i} className="ml-6 list-decimal text-slate-300 my-1 pb-1">{parseInline(trimmed.replace(/^\d+\.\s+/, ''))}</li>;
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) return <li key={i} className="ml-6 list-disc text-[#6b5e4f] my-1 pb-1">{parseInline(trimmed.replace(/^(\*|-)\s+/, ''))}</li>;
+        if (trimmed.match(/^\d+\.\s/)) return <li key={i} className="ml-6 list-decimal text-[#6b5e4f] my-1 pb-1">{parseInline(trimmed.replace(/^\d+\.\s+/, ''))}</li>;
 
         // Empty lines
         if (trimmed === '') return <div key={i} className="h-2"></div>;
 
         // Normal text
-        return <p key={i} className="text-slate-300 mb-1 leading-relaxed">{parseInline(trimmed)}</p>;
+        return <p key={i} className="text-[#6b5e4f] mb-1 leading-relaxed">{parseInline(trimmed)}</p>;
       })}
     </div>
   );
@@ -44,7 +44,7 @@ const parseInline = (text: string) => {
       return <strong key={i} className="font-bold text-blue-100">{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} className="bg-slate-800 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono">{part.slice(1, -1)}</code>;
+      return <code key={i} className="bg-slate-800 text-[#c97545] px-1.5 py-0.5 rounded text-sm font-mono">{part.slice(1, -1)}</code>;
     }
     return <span key={i}>{part}</span>;
   })}</>;
@@ -128,8 +128,8 @@ export const Phase1View = ({
   if (isConceptEmpty && !isGenerating) {
     if (!projectId || projectId === '' || !scriptPath || scriptPath === '') {
       return (
-        <div className="bg-slate-900 rounded-xl border border-slate-700 p-12 text-center h-[200px] flex flex-col items-center justify-center">
-          <h3 className="text-xl font-bold text-slate-400">欢迎使用影视导演，请先在顶部面板选择项目和视频剧本。</h3>
+        <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] p-12 text-center h-[200px] flex flex-col items-center justify-center">
+          <h3 className="text-xl font-bold text-[#8f8372]">欢迎使用影视导演，请先在顶部面板选择项目和视频剧本。</h3>
         </div>
       );
     }
@@ -138,16 +138,16 @@ export const Phase1View = ({
     const displayPath = scriptPath.length > 100 ? "当前剧本" : scriptPath.split('/').pop();
 
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700 p-8 text-center">
-        <Sparkles className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-white mb-2">Visual Concept Architect</h3>
-        <p className="text-slate-400 text-sm mb-6">
-          准备为当前剧本<strong className="text-blue-300">「{displayPath}」</strong>进行概念提案...
+      <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] p-8 text-center">
+        <Sparkles className="w-12 h-12 text-[#c97545] mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-[#342d24] mb-2">Visual Concept Architect</h3>
+        <p className="text-[#8f8372] text-sm mb-6">
+          准备为当前剧本<strong className="text-[#c97545]">「{displayPath}」</strong>进行概念提案...
         </p>
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={onGenerate}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+            className="px-6 py-3 bg-[#c97545] hover:bg-[#b26135] text-[#342d24] font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
           >
             开始头脑风暴并生成概念提案
           </button>
@@ -155,7 +155,7 @@ export const Phase1View = ({
           <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 rounded-lg font-medium flex items-center gap-2 transition-colors"
+            className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[#6b5e4f] rounded-lg font-medium flex items-center gap-2 transition-colors"
           >
             <Upload className="w-4 h-4" />
             导入离线分镜 JSON
@@ -163,12 +163,12 @@ export const Phase1View = ({
         </div>
         <div className="mt-4 flex items-center justify-center">
           <div
-            className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded border border-slate-700 cursor-pointer hover:border-slate-500 transition-colors"
+            className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded border border-[#e4dbcc] cursor-pointer hover:border-slate-500 transition-colors"
             onClick={handleCopyPath}
             title="点击复制路径，在 Antigravity 中向导演大师提交时可用"
           >
             <span className="text-[10px] text-slate-500">模板:</span>
-            <code className="text-[10px] text-blue-300 font-mono">{templatePath}</code>
+            <code className="text-[10px] text-[#c97545] font-mono">{templatePath}</code>
             {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3 text-slate-500" />}
           </div>
         </div>
@@ -178,10 +178,10 @@ export const Phase1View = ({
 
   if (isGenerating) {
     return (
-      <div className="bg-slate-900 rounded-xl border border-slate-700 p-8 text-center">
+      <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] p-8 text-center">
         <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
-        <h3 className="text-lg font-bold text-white mb-2">Generating Visual Concept...</h3>
-        <p className="text-slate-400 text-sm">
+        <h3 className="text-lg font-bold text-[#342d24] mb-2">Generating Visual Concept...</h3>
+        <p className="text-[#8f8372] text-sm">
           Analyzing script structure and style...
         </p>
       </div>
@@ -189,10 +189,10 @@ export const Phase1View = ({
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
-      <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+    <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] overflow-hidden">
+      <div className="p-4 border-b border-[#e4dbcc] bg-slate-800/50">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white">Visual Concept Proposal</h3>
+          <h3 className="text-lg font-bold text-[#342d24]">Visual Concept Proposal</h3>
           {isApproved && (
             <span className="text-sm text-green-400 flex items-center gap-1">
               <CheckCircle className="w-4 h-4" /> Approved
@@ -202,16 +202,16 @@ export const Phase1View = ({
       </div>
 
       <div className="p-6">
-        <div className="prose prose-invert max-w-none text-slate-300">
+        <div className="prose prose-invert max-w-none text-[#6b5e4f]">
           <SimpleMarkdown text={concept || ''} />
         </div>
       </div>
 
       {!isApproved && (
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-4 border-t border-[#e4dbcc]">
           <label className="text-xs text-slate-500 block mb-2">Feedback / Adjustments</label>
           <textarea
-            className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-slate-800 border border-[#e4dbcc] rounded p-3 text-[#342d24] placeholder-slate-500 focus:outline-none focus:border-blue-500"
             rows={3}
             placeholder="Describe changes you'd like to see..."
             value={feedback}
@@ -220,14 +220,14 @@ export const Phase1View = ({
           <div className="flex justify-end gap-2 mt-3">
             <button
               onClick={() => onRevise(feedback)}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded flex items-center gap-2"
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-[#342d24] rounded flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
               Revise
             </button>
             <button
               onClick={onApprove}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded flex items-center gap-2"
+              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-[#342d24] rounded flex items-center gap-2"
             >
               <CheckCircle className="w-4 h-4" />
               Approve & Continue
