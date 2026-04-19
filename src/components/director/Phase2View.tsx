@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import type { DirectorChapter, BRollType } from '../../types';
@@ -16,49 +15,29 @@ interface Phase2ViewProps {
   projectId: string;
   chapters: DirectorChapter[];
   isLoading: boolean;
-  startTime: number | null;
   onConfirmBRoll: (types: BRollType[]) => void;
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
   onBatchSetCheck: (filterFn: (opt: any) => boolean, checked: boolean) => void;
   onProceed: () => void;
-  currentModel?: { provider: string; model: string };
-  logs?: LogEntry[];
   pendingTaskKeys?: Set<string>;
 }
 export const Phase2View = ({
   projectId,
   chapters,
   isLoading,
-  startTime,
   onConfirmBRoll,
   onSelect,
   onToggleCheck,
   onBatchSetCheck,
   onProceed,
-  currentModel,
-  logs = [],
   pendingTaskKeys,
 }: Phase2ViewProps) => {
   const [brollConfirmed, setBrollConfirmed] = useState(chapters.length > 0);
   const [brollSelections, setBrollSelections] = useState<BRollType[]>(
     chapters.length > 0 ? [] : ['remotion', 'seedance', 'artlist', 'infographic']
   );
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isLogsCollapsed, setIsLogsCollapsed] = useState(true);
   const [wasLoading, setWasLoading] = useState(false);
-
-  useEffect(() => {
-    let interval: number;
-    if (isLoading && startTime) {
-      interval = window.setInterval(() => {
-        setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-    } else {
-      setElapsedSeconds(0);
-    }
-    return () => window.clearInterval(interval);
-  }, [isLoading, startTime]);
 
   // Sync state if chapters are loaded externally (e.g., initial fetch)
   useEffect(() => {
@@ -77,13 +56,6 @@ export const Phase2View = ({
       setWasLoading(false);
     }
   }, [isLoading, wasLoading]);
-
-  const formatElapsed = (seconds: number) => {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
 
   const isShowAll = brollConfirmed && brollSelections.length === 0;
   const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
@@ -105,66 +77,8 @@ export const Phase2View = ({
     onConfirmBRoll(brollSelections);
   };
 
-  const getLogColor = (type: string) => {
-    switch (type) {
-      case 'error': return 'text-red-400';
-      case 'warning': return 'text-yellow-400';
-      case 'info': return 'text-blue-400';
-      default: return 'text-slate-300';
-    }
-  };
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Debug Panel - 模型信息 + 日志 */}
-      {currentModel && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm text-slate-400 uppercase font-bold flex items-center gap-2">
-              <Info className="w-4 h-4" />
-              调试面板
-            </h3>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-slate-400">模型:</span>
-              <span className="text-white font-medium">
-                {currentModel.provider === 'siliconflow' ? 'SiliconFlow' :
-                  currentModel.provider === 'deepseek' ? 'DeepSeek' :
-                    currentModel.provider === 'yinli' ? 'Yinli' :
-                      currentModel.provider || 'Unknown'}
-              </span>
-              <span className="text-slate-500 text-xs">({currentModel.model})</span>
-            </div>
-          </div>
-
-          {/* 日志面板 */}
-          <div>
-            <button
-              onClick={() => setIsLogsCollapsed(!isLogsCollapsed)}
-              className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 mb-2"
-            >
-              <span>{isLogsCollapsed ? '展开' : '收起'}日志 ({logs.length})</span>
-              {isLogsCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-            </button>
-
-            {!isLogsCollapsed && logs.length > 0 && (
-              <div className="bg-slate-950 rounded p-3 max-h-64 overflow-y-auto space-y-1">
-                {logs.map((log, i) => (
-                  <div
-                    key={i}
-                    className={`text-xs font-mono ${getLogColor(log.type)}`}
-                  >
-                    <span className="text-slate-500 mr-2">
-                      [{new Date(log.timestamp).toLocaleTimeString()}]
-                    </span>
-                    {log.message}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* B-Roll 类型选择与过滤 */}
       <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -228,16 +142,6 @@ export const Phase2View = ({
           </div>
         )}
       </div>
-
-      {isLoading && (
-        <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-            <span className="text-white">正在为你的剧本生成视觉方案...</span>
-            <span className="text-slate-400 font-mono text-sm">⏱ 已用时 {formatElapsed(elapsedSeconds)}</span>
-          </div>
-        </div>
-      )}
 
       {chapters.length > 0 && (
         <>

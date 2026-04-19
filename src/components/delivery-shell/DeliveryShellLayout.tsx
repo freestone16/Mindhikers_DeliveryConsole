@@ -20,6 +20,12 @@ interface DeliveryShellLayoutProps {
   onSelectProject: (id: string) => void;
   onSelectScript: (projectId: string, path: string) => Promise<boolean>;
   socket: any;
+  runtimeData?: {
+    currentModel: { provider: string; model: string } | null;
+    logs: { timestamp: number; type: string; message: string }[];
+    isLoading: boolean;
+    startTime: number | null;
+  };
   children: React.ReactNode;
 }
 
@@ -31,6 +37,7 @@ export function DeliveryShellLayout({
   onSelectProject,
   onSelectScript,
   socket,
+  runtimeData,
   children,
 }: DeliveryShellLayoutProps) {
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
@@ -111,6 +118,7 @@ export function DeliveryShellLayout({
           socket={socket}
           projectId={projectId}
           activeExpertId={activeExpertId}
+          runtimeData={runtimeData}
         />
       </div>
     </div>

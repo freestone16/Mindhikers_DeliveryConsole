@@ -1,6 +1,6 @@
-🕐 Last updated: 2026-04-19 14:36
+🕐 Last updated: 2026-04-19 14:52
 🌿 Branch: MHSDC-DC-director
-🎯 Session outcome: **Step 2A 已完成（ChatPanel 接入 drawer + 暖纸面色系适配），tsc 零报错；下一步 Step 2B（Runtime tab + Phase2 日志搬迁）。**
+🎯 Session outcome: **Step 2A + Step 2B 已完成（ChatPanel 接入 + Runtime tab 日志搬迁），tsc 零报错；下一步 Step 2C（Artifacts tab）。**
 
 ---
 
@@ -37,9 +37,20 @@
 | `src/components/ChatPanel.tsx` | 全元素加 `ChatPanel-*` className（~20 处） |
 | `src/styles/delivery-shell.css` | 新增 `~170 行` 暖纸面色系覆盖规则 |
 
+### Step 2B 完成摘要
+
+| 文件 | 改动 |
+|------|------|
+| `src/components/delivery-shell/drawer/RuntimePanel.tsx` | 新建轻量版运行态面板（模型信息 + 可折叠日志 + 计时器） |
+| `src/App.tsx` | 新增 `runtimeData` state，bridge 给 DeliveryShellLayout 和 DirectorSection |
+| `src/components/delivery-shell/DeliveryShellLayout.tsx` | 透传 `runtimeData` 给 ContextDrawer |
+| `src/components/delivery-shell/ContextDrawer.tsx` | Runtime tab 渲染 `RuntimePanel` |
+| `src/components/DirectorSection.tsx` | 新增 `onRuntimeDataChange` prop，useEffect 上报 runtime 数据 |
+| `src/components/director/Phase2View.tsx` | 移除调试面板（~50 行）+ 生成加载条 + 相关 props/state |
+
 **验证：** `tsc --noEmit` 零报错 ✅ | Dev 服务正常 ✅
 
-### Step 2B 待做
+### Step 2C 待做
 
 **目标：** Phase2View 内联调试面板搬迁到 drawer Runtime tab
 

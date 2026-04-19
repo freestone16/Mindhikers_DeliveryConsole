@@ -11,13 +11,19 @@ interface DirectorSectionProps {
   projectId: string;
   scriptPath: string;
   socket: any;
+  onRuntimeDataChange?: (data: {
+    currentModel: { provider: string; model: string } | null;
+    logs: { timestamp: number; type: string; message: string }[];
+    isLoading: boolean;
+    startTime: number | null;
+  }) => void;
 }
 
 type Phase = 1 | 2 | 3 | 4;
 
 import { useExpertState } from '../hooks/useExpertState';
 
-export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSectionProps) => {
+export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataChange }: DirectorSectionProps) => {
   const { state: data, updateState } = useExpertState<DirectorModule>('Director', { phase: 1, conceptProposal: '', conceptFeedback: '', isConceptApproved: false, items: [], renderJobs: [] }, projectId);
 
   const onUpdate = (newData: DirectorModule) => {
@@ -97,6 +103,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
   const currentModel = status?.global?.provider
     ? { provider: status.global.provider, model: status.global.model || 'default' }
     : undefined;
+
+  useEffect(() => {
+    onRuntimeDataChange?.({
+      currentModel: currentModel || null,
+      logs: phase2Logs,
+      isLoading,
+      startTime,
+    });
+  }, [currentModel, phase2Logs, isLoading, startTime, onRuntimeDataChange]);
 
   const getGlobalLLMConfigError = () => {
     if (!status?.global?.provider) return null;
@@ -526,14 +541,11 @@ export const DirectorSection = ({ projectId, scriptPath, socket }: DirectorSecti
             projectId={projectId}
             chapters={displayedChapters}
             isLoading={isLoading}
-            startTime={startTime}
             onConfirmBRoll={handleConfirmBRoll}
             onSelect={handleSelectOption}
             onToggleCheck={handleToggleCheck}
             onBatchSetCheck={handleBatchSetCheck}
             onProceed={handleProceed}
-            currentModel={currentModel}
-            logs={phase2Logs}
             pendingTaskKeys={pendingBatchTaskKeys}
           />
         )}

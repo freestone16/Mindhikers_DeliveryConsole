@@ -37,6 +37,13 @@ function App() {
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
 
+    const [runtimeData, setRuntimeData] = useState<{
+        currentModel: { provider: string; model: string } | null;
+        logs: { timestamp: number; type: string; message: string }[];
+        isLoading: boolean;
+        startTime: number | null;
+    }>({ currentModel: null, logs: [], isLoading: false, startTime: null });
+
     const handleSelectProject = (projectId: string) => {
         (window as any).__currentProjectId = projectId;
         try { localStorage.setItem('dc:lastProjectId', projectId); } catch {}
@@ -144,6 +151,7 @@ function App() {
                 onSelectProject={handleSelectProject}
                 onSelectScript={selectScript}
                 socket={socket}
+                runtimeData={runtimeData}
             >
                 <div style={{ padding: '24px 28px', minHeight: '100%', background: '#f7f2ea' }}>
                     {activeExpertId === 'VisualAudit' ? (
@@ -153,6 +161,7 @@ function App() {
                             projectId={state.projectId}
                             scriptPath={state.selectedScript?.path || ''}
                             socket={socket}
+                            onRuntimeDataChange={setRuntimeData}
                         />
                     ) : activeExpertId === 'ShortsMaster' ? (
                         <ShortsSection

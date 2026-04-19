@@ -1,5 +1,6 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ChatPanel } from '../ChatPanel';
+import { RuntimePanel } from './drawer/RuntimePanel';
 
 const DRAWER_TABS = [
   { id: 'chat', label: 'Chat' },
@@ -16,6 +17,12 @@ interface ContextDrawerProps {
   socket: any;
   projectId: string;
   activeExpertId: string;
+  runtimeData?: {
+    currentModel: { provider: string; model: string } | null;
+    logs: { timestamp: number; type: string; message: string }[];
+    isLoading: boolean;
+    startTime: number | null;
+  };
 }
 
 export function ContextDrawer({
@@ -26,6 +33,7 @@ export function ContextDrawer({
   socket,
   projectId,
   activeExpertId,
+  runtimeData,
 }: ContextDrawerProps) {
   if (collapsed) {
     return (
@@ -80,7 +88,18 @@ export function ContextDrawer({
         </div>
 
 
-        {activeTab !== 'chat' && (
+        {activeTab === 'runtime' && runtimeData && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <RuntimePanel
+              currentModel={runtimeData.currentModel}
+              logs={runtimeData.logs}
+              isLoading={runtimeData.isLoading}
+              startTime={runtimeData.startTime}
+            />
+          </div>
+        )}
+
+        {(activeTab === 'artifacts' || activeTab === 'handoff') && (
           <div className="shell-drawer__empty">
             <span>{DRAWER_TABS.find(t => t.id === activeTab)?.label} panel placeholder</span>
           </div>
