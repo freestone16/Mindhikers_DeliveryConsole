@@ -1,20 +1,14 @@
-🕐 Last updated: 2026-04-19 09:55
+🕐 Last updated: 2026-04-19 14:36
 🌿 Branch: MHSDC-DC-director
-🎯 Session outcome: **Unit 1.5（SessionListPanel + ProjectContextDock）已实施完成并完成两轮 UI 修正，主线下一步进入 Unit 2（MIN-150）Context Drawer。**
+🎯 Session outcome: **Step 2A 已完成（ChatPanel 接入 drawer + 暖纸面色系适配），tsc 零报错；下一步 Step 2B（Runtime tab + Phase2 日志搬迁）。**
 
 ---
 
 ## ⚡ 30 秒读完可继续工作的交接摘要
 
-1. **Unit 1 (MIN-149)**：Shell + 视觉 Token — ✅ 已完成已提交
-2. **Unit 1.5**：SessionListPanel + ProjectContextDock — ✅ **已实施完成，含后续修正**
-   - 已落地 SessionList、ProjectContextDock、scripts 数据提升、Rail 三段式布局
-   - 已修正 scripts API 调用错误（真实接口为 `/api/scripts?projectId=...`）
-   - 已修正顶栏 script dropdown 空列表问题
-   - 已修正 Dock 窄栏信息布局，改为纵向 stacked
-   - 已完成 Phase1 主操作区视觉提升（次按钮/模板提示条可读性）
-   - 已轻度压缩左侧 Workstations 列表节奏
-3. **Unit 2 (MIN-150)**：Context Drawer — ⬜ 未开始
+1. **Unit 1 (MIN-149)**：Shell + 视觉 Token — ✅ 已提交已 push（`90eade9` + `2f20547`）
+2. **Unit 1.5**：SessionListPanel + ProjectContextDock — ✅ 已提交已 push（`8329d9d` + `95445fc`）
+3. **Unit 2 (MIN-150)**：Context Drawer — 🔄 **Step 2A 已完成（未提交），Step 2B 进行中**
 4. **Unit 3-6** 仍排队
 
 ---
@@ -26,63 +20,65 @@
 | Unit | Linear | 内容 | 状态 |
 |------|--------|------|------|
 | Unit 1 | MIN-149 | Shell + 视觉 Token | ✅ 已提交 (90eade9 + 2f20547) |
-| **Unit 1.5** | — | **SessionListPanel + ProjectContextDock 补齐** | ✅ **代码完成，待老卢确认是否提交** |
-| Unit 2 | MIN-150 | Context Drawer | ⬜ 未开始 |
+| Unit 1.5 | — | SessionListPanel + ProjectContextDock | ✅ 已提交 (8329d9d + 95445fc) |
+| Unit 2 | MIN-150 | Context Drawer | 🔄 Step 2A 完成，Step 2B 进行中 |
 | Unit 3 | MIN-151 | Workbench + 阶段导航 | ⬜ |
 | Unit 4 | MIN-152 | P1/P2 重做 | ⬜ |
 | Unit 5 | MIN-153 | P3/P4 重做 | ⬜ |
 | Unit 6 | MIN-154 | 验收 | ⬜ |
 
-### 本窗口核心产出
+### Step 2A 完成摘要
 
-| 文件 | 说明 |
+| 文件 | 改动 |
 |------|------|
-| `src/components/delivery-shell/SessionListPanel.tsx` | 左侧 SessionList 组件 |
-| `src/components/delivery-shell/ProjectContextDock.tsx` | 左下上下文坞组件 |
-| `src/components/delivery-shell/DeliveryShellLayout.tsx` | scripts 数据提升 + 项目名解析 |
-| `src/components/delivery-shell/ProductTopBar.tsx` | scripts 改为 props 传入 |
-| `src/components/delivery-shell/WorkstationRail.tsx` | Rail 三段式集成 |
-| `src/components/director/Phase1View.tsx` | 主操作区次按钮/模板提示条视觉修正 |
-| `src/styles/delivery-shell.css` | Rail / Dock / Workstation 节奏样式修正 |
-| `docs/plans/2026-04-18-002-feat-session-list-context-dock-plan.md` | Unit 1.5 方案，现已对应完成 |
+| `src/App.tsx` | 传 `socket` 给 `DeliveryShellLayout` |
+| `src/components/delivery-shell/DeliveryShellLayout.tsx` | 接收并透传 `socket`/`projectId`/`activeExpertId` |
+| `src/components/delivery-shell/ContextDrawer.tsx` | ChatPanel 接入，始终挂载 + `display:none` 防 blob 泄漏 |
+| `src/components/ChatPanel.tsx` | 全元素加 `ChatPanel-*` className（~20 处） |
+| `src/styles/delivery-shell.css` | 新增 `~170 行` 暖纸面色系覆盖规则 |
 
-### 关键实现与修正摘要
+**验证：** `tsc --noEmit` 零报错 ✅ | Dev 服务正常 ✅
 
-- **数据层**：scripts fetch 从 `ProductTopBar` 提升到 `DeliveryShellLayout`
-- **真实 API 口径**：原方案写成 `/api/projects/${projectId}/scripts`，实施中查明后端真实接口是 `/api/scripts?projectId=...`，已按真实口径修复
-- **Rail 布局**：Workstations 固顶 + SessionList 弹性滚动 + Dock 固底
-- **Dock 布局修正**：2×2 grid 在 260px rail 内过挤，已改为纵向 stacked，value 支持换行
-- **可读性修正**：`导入离线分镜 JSON` 次按钮与模板提示条重新设计，提升暖纸面背景下的文字对比度
-- **节奏修正**：左侧 Workstations 区略微压缩，减少松散感
+### Step 2B 待做
 
----
+**目标：** Phase2View 内联调试面板搬迁到 drawer Runtime tab
 
-## 🚧 踩坑记录（新增）
+**需要搬迁的内容：**
+- Phase2View 行 108-166：内联调试面板（模型信息 + 可折叠日志）
+- Phase2View 行 232-240：生成加载条（spinner + 计时器）
 
-8. **不要假设 scripts 接口路径**：Director 当前真实接口不是 `/api/projects/:projectId/scripts`，而是 `GET /api/scripts?projectId=...`；一旦写错，顶栏 script dropdown 会变成“空容器像是被遮挡”
-9. **260px rail 不适合 2×2 高密度 Dock**：项目信息一旦包含较长中文/文件名，grid 会显得拥挤且截断；窄栏优先 stacked 布局
-10. **Vite 首次 `socket.io` ECONNREFUSED` 多为启动竞态**：若后端随后正常启动且 client connected，优先判定为前后端启动时序问题，不是持续故障
+**新建文件：**
+- `src/components/delivery-shell/drawer/RuntimePanel.tsx`（轻量版，不复用 DebugPanel）
+
+**修改文件：**
+- `src/components/delivery-shell/ContextDrawer.tsx` — Runtime tab 渲染 `RuntimePanel`
+- `src/components/director/Phase2View.tsx` — 移除内联调试面板 + 生成加载条
+- `src/components/DirectorSection.tsx` — 将 `logs`/`currentModel`/`startTime` 提升到可传给 drawer 的层级
 
 ---
 
-## 🎯 新窗口应该做什么
+## 📋 Unit 2 方案摘要
 
-1. 读此文件（HANDOFF.md）
-2. 若要继续主线，直接进入 **Unit 2 (MIN-150) Context Drawer**
-3. 开工前先确认这轮 Unit 1.5 是否需要：
-   - 提交 commit
-   - 更新 Linear / PR 说明
-   - 清理 `.playwright-mcp/`、`tmp/` 等本地验证产物
-4. 若继续 Unit 2：先读原主线计划与现有 `ContextDrawer` 代码，避免和已完成的 Rail 改造冲突
+**方案文件**：`docs/plans/2026-04-19-003-feat-context-drawer-plan.md`
+
+### 四个 Tab 内容
+
+| Tab | 内容 | 关键决策 |
+|-----|------|----------|
+| **Chat** | ChatPanel 接入 drawer + 暖纸面色系适配 | 始终挂载（display:none 隐藏），避免 blob URL 泄漏 |
+| **Runtime** | Phase2 日志 + 模型信息 + 计时器（临时组件） | Phase2View 内联调试面板搬迁到此处；Phase3/4 界面不动 |
+| **Artifacts** | 各阶段产出物文件清单（按阶段分组） | 需新后端 API：`GET /api/director/artifacts?projectId=...` |
+| **Handoff** | 阶段状态摘要 + 跨模块只读交接卡片 | 只读展示，不做跨模块 push 动作 |
 
 ---
 
-## 📝 当前未提交改动
+## 🚧 踩坑记录
 
-- **本轮代码改动**：`DeliveryShellLayout.tsx` / `ProductTopBar.tsx` / `WorkstationRail.tsx` / `Phase1View.tsx` / `delivery-shell.css` / 新增 `SessionListPanel.tsx` / `ProjectContextDock.tsx`
-- **文档改动**：`docs/plans/2026-04-18-002-feat-session-list-context-dock-plan.md`（建议同步标记为 completed）
-- **历史/杂项改动**：`skills/Director/prompts/broll.md`、若干 `testing/director/artifacts/`、`.claude/skills`、`.playwright-mcp/`、`tmp/`
-- **注意**：`.playwright-mcp/` 与 `tmp/` 是本地浏览器验证产物，提交前需确认是否排除
+8. **不要假设 scripts 接口路径**：真实接口是 `GET /api/scripts?projectId=...`，不是 `/api/projects/:projectId/scripts`
+9. **260px rail 不适合 2×2 高密度 Dock**：窄栏优先 stacked 布局
+10. **Vite 首次 socket.io ECONNREFUSED 多为启动竞态**：后端起来后自动恢复
+11. **broll.md 不属于 shell 层**：它是 Director 业务提示词（视觉策略/模板矩阵/imagePrompt 规则），不应并入 MIN-149 的 shell commit
+12. **ChatPanel blob URL 在 tab 切换时不能泄漏**：始终挂载 + display:none，只在 drawer 折叠时卸载
 
 ---
 
@@ -90,5 +86,14 @@
 
 | 服务 | 端口 | 状态 |
 |------|------|------|
-| Director 前端 | 5178 | 🟡 本窗口验证时可启动，结束后未持续保活，按需重启 |
-| Director 后端 | 3005 | 🟡 同上 |
+| Director 前端 | 5178 | 🟢 运行中 |
+| Director 后端 | 3005 | 🟢 运行中 |
+
+---
+
+## 🎯 新窗口应该做什么
+
+1. 读此文件（HANDOFF.md）
+2. 读 `docs/plans/2026-04-19-003-feat-context-drawer-plan.md` 中 Step 2B 部分
+3. 启动 Step 2B：Runtime tab + Phase2 日志搬迁
+4. `npm run dev` 启动服务验证（前端 5178 / 后端 3005）

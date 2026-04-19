@@ -459,3 +459,164 @@
     border-bottom: 1px solid var(--shell-border);
   }
 }
+
+/* ── ChatPanel warm-tone overrides inside drawer ── */
+
+.shell-drawer__content .ChatPanel-root {
+  background: transparent;
+}
+
+.shell-drawer__content .ChatPanel-header {
+  background: rgba(249, 244, 236, 0.6);
+  border-bottom-color: var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-header-title {
+  color: var(--shell-text);
+}
+
+.shell-drawer__content .ChatPanel-messages {
+  background: transparent;
+}
+
+.shell-drawer__content .ChatPanel-empty {
+  color: var(--shell-muted);
+}
+
+.shell-drawer__content .ChatPanel-bubble-user {
+  background: var(--shell-accent);
+  color: #fff;
+}
+
+.shell-drawer__content .ChatPanel-bubble-assistant {
+  background: var(--shell-panel);
+  color: var(--shell-text);
+  border: 1px solid var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-bubble-streaming {
+  background: var(--shell-panel);
+  color: var(--shell-text);
+  border: 1px solid var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-system-card {
+  background: rgba(222, 201, 170, 0.15);
+  border-color: var(--shell-border-strong);
+  color: var(--shell-text);
+}
+
+.shell-drawer__content .ChatPanel-system-card-title {
+  color: var(--shell-accent-deep);
+}
+
+.shell-drawer__content .ChatPanel-action-card {
+  background: rgba(201, 117, 69, 0.08);
+  border-color: rgba(201, 117, 69, 0.25);
+}
+
+.shell-drawer__content .ChatPanel-action-title {
+  color: var(--shell-accent-deep);
+}
+
+.shell-drawer__content .ChatPanel-confirm-btn {
+  background: var(--shell-success);
+  color: var(--shell-success-text);
+  border-color: var(--shell-success-text);
+}
+
+.shell-drawer__content .ChatPanel-confirm-btn:hover {
+  background: var(--shell-success-text);
+  color: #fff;
+}
+
+.shell-drawer__content .ChatPanel-cancel-btn {
+  background: var(--shell-panel);
+  color: var(--shell-muted);
+  border-color: var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-cancel-btn:hover {
+  background: var(--shell-border);
+  color: var(--shell-text);
+}
+
+.shell-drawer__content .ChatPanel-input-area {
+  background: transparent;
+  border-top-color: var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-input-textarea {
+  background: var(--shell-panel);
+  border-color: var(--shell-border);
+  color: var(--shell-text);
+}
+
+.shell-drawer__content .ChatPanel-input-textarea::placeholder {
+  color: var(--shell-muted);
+}
+
+.shell-drawer__content .ChatPanel-input-textarea:focus {
+  border-color: var(--shell-accent);
+}
+
+.shell-drawer__content .ChatPanel-send-btn {
+  background: var(--shell-accent);
+}
+
+.shell-drawer__content .ChatPanel-send-btn:hover {
+  background: var(--shell-accent-deep);
+}
+
+.shell-drawer__content .ChatPanel-send-btn:disabled {
+  background: var(--shell-border);
+}
+
+.shell-drawer__content .ChatPanel-attach-btn {
+  color: var(--shell-muted);
+}
+
+.shell-drawer__content .ChatPanel-attach-btn:hover {
+  background: var(--shell-panel);
+}
+
+.shell-drawer__content .ChatPanel-clear-btn {
+  color: var(--shell-muted);
+}
+
+.shell-drawer__content .ChatPanel-clear-btn:hover {
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.shell-drawer__content .ChatPanel-warning-toast {
+  background: rgba(201, 117, 69, 0.1);
+  border-color: rgba(201, 117, 69, 0.2);
+  color: var(--shell-accent-deep);
+}
+
+.shell-drawer__content .ChatPanel-close-btn {
+  color: var(--shell-muted);
+}
+
+.shell-drawer__content .ChatPanel-close-btn:hover {
+  background: var(--shell-panel);
+}
+
+.shell-drawer__content .ChatPanel-attachment-remove {
+  background: #c0392b;
+}
+
+.shell-drawer__content .ChatPanel-cursor {
+  background: var(--shell-accent);
+}
+
+.shell-drawer__content .ChatPanel-status-confirmed {
+  background: var(--shell-success);
+  color: var(--shell-success-text);
+}
+
+.shell-drawer__content .ChatPanel-status-cancelled {
+  background: var(--shell-panel);
+  color: var(--shell-muted);
+}

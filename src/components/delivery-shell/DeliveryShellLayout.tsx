@@ -19,6 +19,7 @@ interface DeliveryShellLayoutProps {
   selectedScriptPath?: string;
   onSelectProject: (id: string) => void;
   onSelectScript: (projectId: string, path: string) => Promise<boolean>;
+  socket: any;
   children: React.ReactNode;
 }
 
@@ -29,6 +30,7 @@ export function DeliveryShellLayout({
   selectedScriptPath,
   onSelectProject,
   onSelectScript,
+  socket,
   children,
 }: DeliveryShellLayoutProps) {
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
@@ -106,6 +108,9 @@ export function DeliveryShellLayout({
           onToggleCollapse={() => setDrawerCollapsed(!drawerCollapsed)}
           activeTab={activeDrawerTab}
           onTabChange={setActiveDrawerTab}
+          socket={socket}
+          projectId={projectId}
+          activeExpertId={activeExpertId}
         />
       </div>
     </div>

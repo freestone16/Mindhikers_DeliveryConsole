@@ -432,12 +432,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#0b1529]/80 backdrop-blur-md">
-            {/* Header */}
-            <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0">
+        <div className="flex flex-col h-full ChatPanel-root">
+            <div className="h-12 px-4 flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 flex-shrink-0 ChatPanel-header">
                 <div className="flex items-center gap-2">
                     <span className="text-lg">💬</span>
-                    <span className="font-medium text-white text-sm">{expertName}</span>
+                    <span className="font-medium text-white text-sm ChatPanel-header-title">{expertName}</span>
                     {contextLoaded && (
                         <span className="text-xs text-green-400" title="上下文已加载">●</span>
                     )}
@@ -446,13 +445,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     <button
                         onClick={handleClearHistory}
                         title="清空对话历史"
-                        className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-all"
+                        className="p-1.5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-all ChatPanel-clear-btn"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
                     <button
                         onClick={onToggle}
-                        className="p-1 hover:bg-slate-700 rounded transition-colors"
+                        className="p-1 hover:bg-slate-700 rounded transition-colors ChatPanel-close-btn"
                     >
                         <X className="w-4 h-4 text-slate-400" />
                     </button>
@@ -460,16 +459,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
             {/* Warning Toast */}
             {warning && (
-                <div className="mx-4 mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2">
+                <div className="mx-4 mt-2 px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-300 text-xs flex items-center gap-2 ChatPanel-warning-toast">
                     <AlertCircle className="w-3 h-3 flex-shrink-0" />
                     {warning}
                 </div>
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 ChatPanel-messages" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
                 {messages.length === 0 && !streamingContent ? (
-                    <div className="text-center text-slate-500 text-sm mt-8">
+                    <div className="text-center text-slate-500 text-sm mt-8 ChatPanel-empty">
                         <p>开始和 {expertName} 对话</p>
                     </div>
                 ) : (
@@ -482,8 +481,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             >
                                 <div
                                     className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${msg.role === 'user'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-slate-800 text-slate-200'
+                                        ? 'bg-blue-600 text-white ChatPanel-bubble-user'
+                                        : 'bg-slate-800 text-slate-200 ChatPanel-bubble-assistant'
                                         }`}
                                 >
                                     {msg.attachments && msg.attachments.length > 0 && (
@@ -500,7 +499,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                                     ) : (
                                                         <div
                                                             key={i}
-                                                            className="min-w-16 max-w-24 rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-300"
+                                                            className="min-w-16 max-w-24 rounded bg-slate-900/80 px-2 py-1 text-[10px] text-slate-300 ChatPanel-attachment-name"
                                                         >
                                                             {att.name}
                                                         </div>
@@ -515,10 +514,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             <div key={msg.id} className="flex justify-center">
                                 <div className={`w-full max-w-[92%] rounded-xl border px-4 py-3 text-sm ${
                                     getMessageKind(msg) === 'system_action'
-                                        ? 'bg-amber-900/20 border-amber-600/50 text-amber-100'
-                                        : 'bg-slate-900/80 border-slate-700 text-slate-200'
+                                        ? 'bg-amber-900/20 border-amber-600/50 text-amber-100 ChatPanel-action-card'
+                                        : 'bg-slate-900/80 border-slate-700 text-slate-200 ChatPanel-system-card'
                                 }`}>
-                                    <p className={`mb-2 font-medium ${getMessageKind(msg) === 'system_action' ? 'text-amber-200' : 'text-slate-300'}`}>
+                                    <p className={`mb-2 font-medium ${getMessageKind(msg) === 'system_action' ? 'text-amber-200' : 'text-slate-300 ChatPanel-system-card-title'}`}>
                                         {msg.systemTitle || msg.actionConfirm?.title || '系统消息'}
                                     </p>
                                     {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
@@ -536,21 +535,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleConfirmAction(msg.actionConfirm!)}
-                                                        className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-green-500"
+                                                        className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-green-500 ChatPanel-confirm-btn"
                                                     >
                                                         <Check className="w-3 h-3" /> 确认执行
                                                     </button>
                                                     <button
                                                         onClick={() => handleCancelAction(msg.actionConfirm!)}
-                                                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-slate-600"
+                                                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded flex-1 flex items-center justify-center gap-1 transition-colors border border-slate-600 ChatPanel-cancel-btn"
                                                     >
                                                         <X className="w-3 h-3" /> 取消
                                                     </button>
                                                 </div>
                                             ) : (
                                                 <span className={`text-xs font-medium px-2 py-1 rounded inline-block ${msg.actionConfirm.status === 'confirmed'
-                                                    ? 'bg-green-900/50 text-green-400 border border-green-800'
-                                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                                    ? 'bg-green-900/50 text-green-400 border border-green-800 ChatPanel-status-confirmed'
+                                                    : 'bg-slate-800 text-slate-400 border border-slate-700 ChatPanel-status-cancelled'
                                                     }`}>
                                                     {msg.actionConfirm.status === 'confirmed' ? '✓ 已确认' : '✕ 已取消'}
                                                 </span>
@@ -563,8 +562,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         ))}
                         {streamingContent && (
                             <div className="flex justify-start">
-                                <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-slate-800 text-slate-200">
-                                    <p className="whitespace-pre-wrap">{streamingContent}<span className="inline-block w-2 h-4 bg-slate-400 animate-pulse ml-1">▋</span></p>
+                                <div className="max-w-[85%] px-3 py-2 rounded-lg text-sm bg-slate-800 text-slate-200 ChatPanel-bubble-streaming">
+                                    <p className="whitespace-pre-wrap">{streamingContent}<span className="inline-block w-2 h-4 bg-slate-400 animate-pulse ml-1 ChatPanel-cursor">▋</span></p>
                                 </div>
                             </div>
                         )}
@@ -585,7 +584,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             />
                             <button
                                 onClick={() => removeAttachment(i)}
-                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center ChatPanel-attachment-remove"
                             >
                                 <X className="w-3 h-3 text-white" />
                             </button>
@@ -595,9 +594,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
 
             {/* Input */}
-            <div className="p-3 border-t border-slate-700/50 flex-shrink-0">
+            <div className="p-3 border-t border-slate-700/50 flex-shrink-0 ChatPanel-input-area">
                 <div className="flex items-end gap-2">
-                    <label className="p-2 hover:bg-slate-700 rounded transition-colors text-slate-400 cursor-pointer">
+                    <label className="p-2 hover:bg-slate-700 rounded transition-colors text-slate-400 cursor-pointer ChatPanel-attach-btn">
                         <Paperclip className="w-4 h-4" />
                         <input
                             type="file"
@@ -616,14 +615,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         placeholder="输入消息或指令（Shift+Enter 换行）..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 overflow-y-auto"
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500 overflow-y-auto ChatPanel-input-textarea"
                         rows={3}
                         style={{ height: '88px' }}
                     />
                     <button
                         onClick={handleSend}
                         disabled={isStreaming || (!inputText.trim() && attachments.length === 0)}
-                        className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg transition-colors"
+                        className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg transition-colors ChatPanel-send-btn"
                     >
                         {isStreaming ? (
                             <Loader2 className="w-4 h-4 animate-spin" />

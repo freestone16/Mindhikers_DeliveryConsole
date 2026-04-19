@@ -1,4 +1,5 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ChatPanel } from '../ChatPanel';
 
 const DRAWER_TABS = [
   { id: 'chat', label: 'Chat' },
@@ -12,9 +13,20 @@ interface ContextDrawerProps {
   onToggleCollapse: () => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  socket: any;
+  projectId: string;
+  activeExpertId: string;
 }
 
-export function ContextDrawer({ collapsed, onToggleCollapse, activeTab, onTabChange }: ContextDrawerProps) {
+export function ContextDrawer({
+  collapsed,
+  onToggleCollapse,
+  activeTab,
+  onTabChange,
+  socket,
+  projectId,
+  activeExpertId,
+}: ContextDrawerProps) {
   if (collapsed) {
     return (
       <div className="shell-drawer shell-drawer--collapsed">
@@ -56,9 +68,23 @@ export function ContextDrawer({ collapsed, onToggleCollapse, activeTab, onTabCha
         </button>
       </div>
       <div className="shell-drawer__content">
-        <div className="shell-drawer__empty">
-          <span>{activeTab === 'chat' ? 'Chat will be migrated here in Unit 2' : `${DRAWER_TABS.find(t => t.id === activeTab)?.label} panel placeholder`}</span>
+        {/* Chat tab: always mounted, display:none when hidden to preserve blob URLs */}
+        <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
+          <ChatPanel
+            isOpen={activeTab === 'chat'}
+            onToggle={onToggleCollapse}
+            expertId={activeExpertId}
+            projectId={projectId}
+            socket={socket}
+          />
         </div>
+
+
+        {activeTab !== 'chat' && (
+          <div className="shell-drawer__empty">
+            <span>{DRAWER_TABS.find(t => t.id === activeTab)?.label} panel placeholder</span>
+          </div>
+        )}
       </div>
     </div>
   );
