@@ -2,6 +2,7 @@ import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ChatPanel } from '../ChatPanel';
 import { RuntimePanel } from './drawer/RuntimePanel';
 import { ArtifactsPanel } from './drawer/ArtifactsPanel';
+import { HandoffPanel } from './drawer/HandoffPanel';
 
 const DRAWER_TABS = [
   { id: 'chat', label: 'Chat' },
@@ -107,8 +108,8 @@ export function ContextDrawer({
         )}
 
         {activeTab === 'handoff' && (
-          <div className="shell-drawer__empty">
-            <span>Handoff panel placeholder</span>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <HandoffPanel projectId={projectId} />
           </div>
         )}
       </div>

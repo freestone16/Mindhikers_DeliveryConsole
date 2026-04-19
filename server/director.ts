@@ -2425,3 +2425,99 @@ export const listArtifacts = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// ============================================================
+// Director Handoff — phase status + cross-module readiness
+// ============================================================
+
+export const getHandoffStatus = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+  if (!projectId) return res.status(400).json({ error: 'Missing projectId' });
+
+  try {
+    const projectRoot = getProjectRoot(projectId as string);
+    const deliveryFile = path.join(projectRoot, 'delivery_store.json');
+
+    let directorModule: any = {};
+    if (fs.existsSync(deliveryFile)) {
+      const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
+      directorModule = deliveryData.modules?.director || {};
+    }
+
+    const phase = directorModule.phase || 1;
+    const items = directorModule.items || [];
+    const conceptProposal = directorModule.conceptProposal;
+    const isConceptApproved = directorModule.isConceptApproved;
+
+    const selectedCount = items.filter((item: any) => item.selectedOption !== undefined && item.selectedOption !== null).length;
+    const totalChapters = items.length;
+    const videoCount = items.filter((item: any) => item.videoUrl || item.videoApproved).length;
+    const xmlExported = fs.existsSync(path.join(projectRoot, '04_Visuals', 'sequence_premiere.xml'));
+
+    const phaseStatus = {
+      currentPhase: phase,
+      P1: {
+        ready: Boolean(conceptProposal),
+        approved: Boolean(isConceptApproved),
+        summary: conceptProposal
+          ? (isConceptApproved ? '概念已确认' : '概念待审阅')
+          : '尚未生成',
+      },
+      P2: {
+        ready: totalChapters > 0,
+        summary: totalChapters > 0
+          ? `${totalChapters} 章，已选 ${selectedCount} 选项`
+          : '尚未生成',
+      },
+      P3: {
+        ready: videoCount > 0,
+        summary: videoCount > 0
+          ? `${videoCount} 视频已审`
+          : '尚未渲染',
+      },
+      P4: {
+        ready: xmlExported,
+        summary: xmlExported ? 'XML 已导出' : '尚未导出',
+      },
+    };
+
+    const crossModuleReadiness = [
+      {
+        target: 'ThumbnailMaster',
+        label: '缩略图大师',
+        needs: '视觉概念 + 关键帧',
+        ready: Boolean(conceptProposal) && totalChapters > 0,
+        outputDir: '03_Thumbnail_Plan',
+      },
+      {
+        target: 'ShortsMaster',
+        label: '短视频大师',
+        needs: '已审章节 + 场景数据',
+        ready: selectedCount > 0,
+        outputDir: '05_Shorts_Output',
+      },
+      {
+        target: 'MarketingMaster',
+        label: '营销大师',
+        needs: '标题 + 主题 + 概念',
+        ready: Boolean(conceptProposal),
+        outputDir: '05_Marketing',
+      },
+      {
+        target: 'MusicDirector',
+        label: '音乐总监',
+        needs: '情绪/视觉上下文',
+        ready: totalChapters > 0,
+        outputDir: '04_Music_Plan',
+      },
+    ];
+
+    res.json({
+      success: true,
+      phaseStatus,
+      crossModuleReadiness,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

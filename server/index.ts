@@ -259,6 +259,7 @@ app.get('/api/director/material-exists', checkMaterialExists);
 
 // Director Artifacts Route
 app.get('/api/director/artifacts', director.listArtifacts);
+app.get('/api/director/handoff', director.getHandoffStatus);
 
 
 // Shorts Master Routes (SD-206)
