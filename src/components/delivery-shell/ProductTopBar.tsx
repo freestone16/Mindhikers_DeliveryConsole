@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, FolderOpen, FileText, Settings } from 'lucide-react';
+import type { ScriptFile } from './DeliveryShellLayout';
 
 interface Project {
   name: string;
@@ -7,18 +8,12 @@ interface Project {
   hasDeliveryStore: boolean;
 }
 
-interface ScriptFile {
-  name: string;
-  path: string;
-  size: number;
-  modifiedAt: string;
-}
-
 interface ProductTopBarProps {
   projectId: string;
   selectedScriptPath?: string;
   onSelectProject: (id: string) => void;
   onSelectScript: (projectId: string, path: string) => Promise<boolean>;
+  scripts: ScriptFile[];
 }
 
 export function ProductTopBar({
@@ -26,9 +21,9 @@ export function ProductTopBar({
   selectedScriptPath,
   onSelectProject,
   onSelectScript,
+  scripts,
 }: ProductTopBarProps) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [scripts, setScripts] = useState<ScriptFile[]>([]);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [scriptDropdownOpen, setScriptDropdownOpen] = useState(false);
   const projectRef = useRef<HTMLDivElement>(null);
@@ -40,14 +35,6 @@ export function ProductTopBar({
       .then(data => setProjects(data.projects || []))
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!projectId) return;
-    fetch(`/api/projects/${projectId}/scripts`)
-      .then(r => r.json())
-      .then(data => setScripts(data.scripts || []))
-      .catch(() => {});
-  }, [projectId]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {

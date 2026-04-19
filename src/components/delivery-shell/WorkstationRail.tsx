@@ -1,4 +1,7 @@
 import { PenTool, Eye, Music, Image, Video, Megaphone } from 'lucide-react';
+import { SessionListPanel } from './SessionListPanel';
+import { ProjectContextDock } from './ProjectContextDock';
+import type { ScriptFile } from './DeliveryShellLayout';
 
 const WORKSTATIONS = [
   { id: 'Director', label: 'Director', icon: PenTool },
@@ -14,16 +17,35 @@ interface WorkstationRailProps {
   onExpertChange: (id: string) => void;
   projectId: string;
   selectedScriptPath?: string;
+  onSelectScript: (projectId: string, path: string) => Promise<boolean>;
+  scripts: ScriptFile[];
+  projectName?: string;
+  modelName?: string;
+  outputDir?: string;
 }
 
-export function WorkstationRail({ activeExpertId, onExpertChange }: WorkstationRailProps) {
+export function WorkstationRail({
+  activeExpertId,
+  onExpertChange,
+  projectId,
+  selectedScriptPath,
+  onSelectScript,
+  scripts,
+  projectName,
+  modelName,
+  outputDir,
+}: WorkstationRailProps) {
+  const activeLabel = WORKSTATIONS.find(ws => ws.id === activeExpertId)?.label || activeExpertId;
+
+  const activeScript = scripts.find(s => s.path === selectedScriptPath);
+
   return (
     <div className="shell-rail">
       <div className="shell-rail__section">
         <div className="shell-rail__label">
           <span>Workstations</span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {WORKSTATIONS.map(ws => {
             const Icon = ws.icon;
             const isActive = ws.id === activeExpertId;
@@ -41,18 +63,20 @@ export function WorkstationRail({ activeExpertId, onExpertChange }: WorkstationR
         </div>
       </div>
 
-      <div className="shell-dock">
-        <div className="shell-dock__row">
-          <span className="shell-dock__label">Project</span>
-          <span className="shell-dock__value" style={{ fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            —
-          </span>
-        </div>
-        <div className="shell-dock__row">
-          <span className="shell-dock__label">Model</span>
-          <span className="shell-dock__value" style={{ fontSize: '0.82rem' }}>—</span>
-        </div>
-      </div>
+      <SessionListPanel
+        scripts={scripts}
+        selectedScriptPath={selectedScriptPath}
+        onSelectScript={onSelectScript}
+        expertLabel={activeLabel}
+        projectId={projectId}
+      />
+
+      <ProjectContextDock
+        projectName={projectName}
+        scriptName={activeScript?.name}
+        modelName={modelName}
+        outputDir={outputDir}
+      />
     </div>
   );
 }

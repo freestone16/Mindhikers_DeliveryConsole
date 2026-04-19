@@ -151,11 +151,11 @@ export const Phase1View = ({
           >
             开始头脑风暴并生成概念提案
           </button>
-          <div className="h-8 w-px bg-slate-700"></div>
+          <div className="h-8 w-px bg-[#c9baa3]"></div>
           <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[#6b5e4f] rounded-lg font-medium flex items-center gap-2 transition-colors"
+            className="px-5 py-3 bg-[#24324a] hover:bg-[#1f2b40] border border-[#4c5d7a] text-[#f6ead6] rounded-lg font-medium flex items-center gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(36,50,74,0.16)] transition-all"
           >
             <Upload className="w-4 h-4" />
             导入离线分镜 JSON
@@ -163,13 +163,13 @@ export const Phase1View = ({
         </div>
         <div className="mt-4 flex items-center justify-center">
           <div
-            className="flex items-center gap-1.5 bg-slate-800/50 px-3 py-1.5 rounded border border-[#e4dbcc] cursor-pointer hover:border-slate-500 transition-colors"
+            className="flex items-center gap-2 bg-[#f2e7d4] px-3.5 py-2 rounded-lg border border-[#dbc9af] shadow-[0_6px_18px_rgba(88,67,42,0.06)] cursor-pointer hover:border-[#c9a574] hover:bg-[#f7eddd] transition-colors"
             onClick={handleCopyPath}
             title="点击复制路径，在 Antigravity 中向导演大师提交时可用"
           >
-            <span className="text-[10px] text-slate-500">模板:</span>
-            <code className="text-[10px] text-[#c97545] font-mono">{templatePath}</code>
-            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3 text-slate-500" />}
+            <span className="text-[11px] font-medium tracking-[0.08em] text-[#8f6f4f] uppercase">模板</span>
+            <code className="text-[11px] text-[#8d5730] font-mono">{templatePath}</code>
+            {copied ? <Check className="w-3.5 h-3.5 text-[#5f8a58]" /> : <Copy className="w-3.5 h-3.5 text-[#9d7d5a]" />}
           </div>
         </div>
       </div>
