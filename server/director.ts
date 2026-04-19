@@ -2258,3 +2258,170 @@ export const phase4ReadSrt = async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// ============================================================
+// Director Artifacts — phase-grouped artifact listing
+// ============================================================
+
+interface ArtifactFile {
+  name: string;
+  format: string;
+  size: number;
+  mtime: string;
+  path: string;
+  phase: string;
+}
+
+interface PhaseGroup {
+  phase: string;
+  label: string;
+  files: ArtifactFile[];
+}
+
+export const listArtifacts = async (req: Request, res: Response) => {
+  const { projectId } = req.query;
+  if (!projectId) return res.status(400).json({ error: 'Missing projectId' });
+
+  try {
+    const projectRoot = getProjectRoot(projectId as string);
+    const phases: PhaseGroup[] = [
+      { phase: 'P1', label: 'Visual Concept', files: [] },
+      { phase: 'P2', label: 'Execution Plan + Thumbnails', files: [] },
+      { phase: 'P3', label: 'Videos + Materials', files: [] },
+      { phase: 'P4', label: 'Export', files: [] },
+    ];
+
+    const scanDir = (dir: string, ext: string, phaseIdx: number) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith(`.${ext}`));
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        phases[phaseIdx].files.push({
+          name: file,
+          format: ext,
+          size: stat.size,
+          mtime: stat.mtime.toISOString(),
+          path: path.relative(projectRoot, fullPath),
+          phase: phases[phaseIdx].phase,
+        });
+      }
+    };
+
+    const scanDirPattern = (dir: string, pattern: RegExp, phaseIdx: number) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir).filter(f => pattern.test(f));
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        const ext = path.extname(file).slice(1).toLowerCase();
+        phases[phaseIdx].files.push({
+          name: file,
+          format: ext,
+          size: stat.size,
+          mtime: stat.mtime.toISOString(),
+          path: path.relative(projectRoot, fullPath),
+          phase: phases[phaseIdx].phase,
+        });
+      }
+    };
+
+    const visuals = path.join(projectRoot, '04_Visuals');
+
+    // P1 — Visual Concept
+    scanDirPattern(visuals, /^phase1_视觉概念提案_.*\.md$/, 0);
+
+    // P2 — Execution Plan + Thumbnails
+    scanDirPattern(visuals, /^phase2_分段视觉执行方案_.*\.md$/, 1);
+    // selection_state.json
+    const selectionState = path.join(visuals, 'selection_state.json');
+    if (fs.existsSync(selectionState)) {
+      const stat = fs.statSync(selectionState);
+      phases[1].files.push({
+        name: 'selection_state.json',
+        format: 'json',
+        size: stat.size,
+        mtime: stat.mtime.toISOString(),
+        path: path.relative(projectRoot, selectionState),
+        phase: 'P2',
+      });
+    }
+    // thumbnails/*.png
+    scanDir(path.join(visuals, 'thumbnails'), 'png', 1);
+
+    // P3 — Videos + Materials
+    scanDir(path.join(visuals, 'videos'), 'mp4', 2);
+    // phase3_render_state.json
+    const renderState = path.join(visuals, 'phase3_render_state.json');
+    if (fs.existsSync(renderState)) {
+      const stat = fs.statSync(renderState);
+      phases[2].files.push({
+        name: 'phase3_render_state.json',
+        format: 'json',
+        size: stat.size,
+        mtime: stat.mtime.toISOString(),
+        path: path.relative(projectRoot, renderState),
+        phase: 'P3',
+      });
+    }
+    // 06_Video_Broll — mp4 and mov
+    const brollDir = path.join(projectRoot, '06_Video_Broll');
+    if (fs.existsSync(brollDir)) {
+      const brollFiles = fs.readdirSync(brollDir).filter(f =>
+        f.toLowerCase().endsWith('.mp4') || f.toLowerCase().endsWith('.mov')
+      );
+      for (const file of brollFiles) {
+        const fullPath = path.join(brollDir, file);
+        const stat = fs.statSync(fullPath);
+        const ext = path.extname(file).slice(1).toLowerCase();
+        phases[2].files.push({
+          name: file,
+          format: ext,
+          size: stat.size,
+          mtime: stat.mtime.toISOString(),
+          path: path.relative(projectRoot, fullPath),
+          phase: 'P3',
+        });
+      }
+    }
+
+    // P4 — Export
+    const premiereXml = path.join(visuals, 'sequence_premiere.xml');
+    if (fs.existsSync(premiereXml)) {
+      const stat = fs.statSync(premiereXml);
+      phases[3].files.push({
+        name: 'sequence_premiere.xml',
+        format: 'xml',
+        size: stat.size,
+        mtime: stat.mtime.toISOString(),
+        path: path.relative(projectRoot, premiereXml),
+        phase: 'P4',
+      });
+    }
+    const jianyingJson = path.join(visuals, 'sequence_jianying.json');
+    if (fs.existsSync(jianyingJson)) {
+      const stat = fs.statSync(jianyingJson);
+      phases[3].files.push({
+        name: 'sequence_jianying.json',
+        format: 'json',
+        size: stat.size,
+        mtime: stat.mtime.toISOString(),
+        path: path.relative(projectRoot, jianyingJson),
+        phase: 'P4',
+      });
+    }
+    // SRT files (reuse same scanDirs pattern as phase4ScanSrt)
+    const srtDirs = [
+      path.join(projectRoot, '05_Audio'),
+      path.join(projectRoot, 'srt'),
+      path.join(projectRoot, '03_Script'),
+    ];
+    for (const dir of srtDirs) {
+      scanDir(dir, 'srt', 3);
+    }
+
+    res.json({ success: true, artifacts: phases });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};

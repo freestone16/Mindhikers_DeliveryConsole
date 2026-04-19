@@ -1,6 +1,7 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ChatPanel } from '../ChatPanel';
 import { RuntimePanel } from './drawer/RuntimePanel';
+import { ArtifactsPanel } from './drawer/ArtifactsPanel';
 
 const DRAWER_TABS = [
   { id: 'chat', label: 'Chat' },
@@ -99,9 +100,15 @@ export function ContextDrawer({
           </div>
         )}
 
-        {(activeTab === 'artifacts' || activeTab === 'handoff') && (
+        {activeTab === 'artifacts' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <ArtifactsPanel projectId={projectId} />
+          </div>
+        )}
+
+        {activeTab === 'handoff' && (
           <div className="shell-drawer__empty">
-            <span>{DRAWER_TABS.find(t => t.id === activeTab)?.label} panel placeholder</span>
+            <span>Handoff panel placeholder</span>
           </div>
         )}
       </div>

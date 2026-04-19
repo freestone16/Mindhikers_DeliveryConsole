@@ -257,6 +257,9 @@ app.get('/api/director/phase3/download-xml/:projectId/:format', director.phase3D
 app.post('/api/director/upload-material', materialUpload.single('videoFile'), handleMaterialUpload);
 app.get('/api/director/material-exists', checkMaterialExists);
 
+// Director Artifacts Route
+app.get('/api/director/artifacts', director.listArtifacts);
+
 
 // Shorts Master Routes (SD-206)
 app.post('/api/shorts/phase1/recommend', shorts.recommend);
