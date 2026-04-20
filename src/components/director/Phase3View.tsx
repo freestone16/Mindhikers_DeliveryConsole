@@ -2,9 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Play, Maximize2, X, Loader2, CheckCircle, AlertCircle, Check,
-  RefreshCw, MessageSquare, Sparkles, Video, ChevronDown, ChevronUp
+  RefreshCw, Video, ChevronDown, ChevronUp, BarChart3, Layers,
+  Film, Code
 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
+import {
+  PhasePanel, PhasePanelHeader, PhasePanelBody, PhasePanelFooter,
+  PhaseEmptyState, PhaseLoadingState
+} from './phase-layouts/PhasePanel';
 import type { DirectorChapter, SceneOption, BRollType } from '../../types';
 
 // Re-export for DirectorSection to use
@@ -13,17 +18,24 @@ export const RENDERABLE_TYPES: BRollType[] = ['remotion', 'seedance', 'generativ
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
-  remotion: 'bg-blue-500/20 text-blue-300',
-  seedance: 'bg-purple-500/20 text-purple-300',
-  generative: 'bg-purple-500/20 text-purple-300',
-  infographic: 'bg-amber-500/20 text-amber-300',
+  remotion: 'bg-[#c97545]/15 text-[#c97545]',
+  seedance: 'bg-[#9b6b9e]/15 text-[#9b6b9e]',
+  generative: 'bg-[#9b6b9e]/15 text-[#9b6b9e]',
+  infographic: 'bg-[#a68b4b]/15 text-[#a68b4b]',
 };
 
 const TYPE_LABELS: Record<string, string> = {
   remotion: 'Remotion动画',
   seedance: '文生视频',
   generative: 'AI生成',
-  infographic: '📊 信息图',
+  infographic: '信息图',
+};
+
+const TYPE_ICONS: Record<string, typeof Code> = {
+  remotion: Code,
+  seedance: Film,
+  generative: Film,
+  infographic: BarChart3,
 };
 
 function getScriptPreview(text: string): string {
@@ -48,8 +60,39 @@ interface VideoTaskStatus {
   retryCount?: number;
 }
 
+// ─── Status helpers ──────────────────────────────────────────────────────────
+
+type ItemStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'approved';
+
+function getItemStatus(option: SceneOption, taskStatus: VideoTaskStatus | null, isPolling: boolean): ItemStatus {
+  if (option.phase3Approved) return 'approved';
+  if (isPolling || taskStatus?.status === 'processing' || taskStatus?.status === 'pending') return 'processing';
+  if (taskStatus?.status === 'failed') return 'failed';
+  if (option.videoUrl || taskStatus?.status === 'completed') return 'completed';
+  return 'pending';
+}
+
+function statusLabel(status: ItemStatus): string {
+  switch (status) {
+    case 'approved': return '已通过';
+    case 'completed': return '已渲染';
+    case 'processing': return '渲染中';
+    case 'failed': return '失败';
+    case 'pending': return '待渲染';
+  }
+}
+
+function statusDotClass(status: ItemStatus): string {
+  switch (status) {
+    case 'approved': return 'bg-[#62835c]';
+    case 'completed': return 'bg-[#5b8a9b]';
+    case 'processing': return 'bg-[#c97545] animate-pulse';
+    case 'failed': return 'bg-red-500';
+    case 'pending': return 'bg-[#e4dbcc]';
+  }
+}
+
 // ─── Phase3OptionRow ─────────────────────────────────────────────────────────
-// Mirrors Phase2's OptionRow layout (12-col grid), but col-4 = video player
 
 interface Phase3OptionRowProps {
   chapter: DirectorChapter;
@@ -127,9 +170,8 @@ const Phase3OptionRow = ({
   }, [showFullscreen]);
 
   const videoUrl = option.videoUrl || taskStatus?.videoUrl;
-  const isProcessing = isPolling || taskStatus?.status === 'processing' || taskStatus?.status === 'pending';
-  const isFailed = taskStatus?.status === 'failed';
-  const isCompleted = !!videoUrl || taskStatus?.status === 'completed';
+  const itemStatus = getItemStatus(option, taskStatus, isPolling);
+  const isCompleted = itemStatus === 'completed' || itemStatus === 'approved';
 
   // ── Feedback / Revise ──
   const handleRevise = async () => {
@@ -159,136 +201,191 @@ const Phase3OptionRow = ({
       phase3Approved: false,
       revisedPrompt,
       ...(revisedPrompt && { imagePrompt: revisedPrompt })
-    } as any);
+    } as Partial<SceneOption>);
     setShowFeedback(false);
     setFeedbackText('');
     onRetry(chapter.chapterId, option);
   };
 
+  const TypeIcon = TYPE_ICONS[option.type] || Film;
+
   // ── Render ──
   return (
-    <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${
-      option.phase3Approved
-        ? 'border-emerald-500/50 bg-emerald-500/5'
-        : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
-    }`}>
-      {/* 序号 (col 1) */}
-      <div className="col-span-1 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
-          {rowId}
+    <>
+      <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${
+        option.phase3Approved
+          ? 'border-[#62835c]/40 bg-[#dce9d8]/30'
+          : itemStatus === 'processing'
+            ? 'border-[#c97545]/40 bg-[#c97545]/5'
+            : itemStatus === 'failed'
+              ? 'border-red-300/40 bg-red-50/30'
+              : 'border-[#e4dbcc] bg-[#faf6ef]/60 hover:border-[#d8c8ae]'
+      }`}>
+        {/* 状态点 + 序号 (col 1) */}
+        <div className="col-span-1 flex flex-col items-center justify-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${statusDotClass(itemStatus)}`} />
+          <span className="text-[10px] text-[#8f8372] font-mono">{rowId}</span>
         </div>
-      </div>
 
-      {/* 原文一句话 (col 2) */}
-      <div className="col-span-2 flex items-center">
-        <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
-          {quoteText}
-        </p>
-      </div>
-
-      {/* 设计方案/提示词 (col 3) */}
-      <div className="col-span-3 flex flex-col justify-center gap-1 px-2 -mx-2">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${TYPE_COLORS[option.type] || 'bg-slate-600 text-slate-300'}`}>
-            {TYPE_LABELS[option.type] || option.type}
-          </span>
-        </div>
-        <p className="text-white text-xs leading-relaxed line-clamp-3">
-          {option.prompt || option.imagePrompt || '暂无方案描述'}
-        </p>
-        {(option as any).rationale && (
-          <p className="text-slate-500 text-[10px] italic mt-1 line-clamp-2">
-            💡 {(option as any).rationale}
+        {/* 类型标签 + 方案名 (col 2) */}
+        <div className="col-span-2 flex flex-col justify-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${TYPE_COLORS[option.type] || 'bg-[#e4dbcc] text-[#8f8372]'}`}>
+              <TypeIcon className="w-3 h-3" />
+              {TYPE_LABELS[option.type] || option.type}
+            </span>
+          </div>
+          <p className="text-[#342d24] text-xs font-medium leading-relaxed line-clamp-2">
+            {option.name || option.prompt || '暂无方案描述'}
           </p>
-        )}
-      </div>
+          <p className="text-[10px] text-[#8f8372]">{statusLabel(itemStatus)}</p>
+        </div>
 
-      {/* 视频播放区 (col 5) — Phase3 核心：替代 Phase2 的预览图 */}
-      <div className="col-span-5 flex flex-col gap-2">
-        <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
-          {videoUrl ? (
-            <>
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                controls
-                className="w-full h-full object-contain bg-black"
-                preload="metadata"
-              />
-              <button
-                onClick={() => setShowFullscreen(true)}
-                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Maximize2 className="w-4 h-4 text-white" />
-              </button>
-            </>
-          ) : isProcessing ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              <span className="text-[10px] text-blue-400 mt-2">渲染中...</span>
-              {taskStatus?.progress != null && (
-                <div className="mt-2 w-24 bg-slate-700 rounded-full h-1">
-                  <div
-                    className="bg-blue-500 h-1 rounded-full transition-all"
-                    style={{ width: `${taskStatus.progress}%` }}
-                  />
-                </div>
-              )}
-              {taskStatus?.retryCount != null && taskStatus.retryCount > 0 && (
-                <span className="text-[9px] text-yellow-400 mt-1">第 {taskStatus.retryCount} 次重试</span>
-              )}
-            </div>
-          ) : isFailed ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
-              <AlertCircle className="w-5 h-5 text-red-400 mb-1" />
-              <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">
-                {taskStatus?.error || '渲染失败'}
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
-                className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2"
-              >
-                重试渲染
-              </button>
-            </div>
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              <button
-                onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
-                className="flex flex-col items-center gap-1 group cursor-pointer hover:scale-105 transition-transform"
-              >
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 group-hover:bg-blue-500/30 flex items-center justify-center transition-colors">
-                  <Play className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
-                </div>
-                <span className="text-[10px] text-slate-400 group-hover:text-blue-300 font-medium">单条渲染</span>
-              </button>
-            </div>
+        {/* 原文 (col 2) */}
+        <div className="col-span-2 flex items-center">
+          <p className="text-[#6b5e4f] text-xs leading-relaxed line-clamp-3 whitespace-pre-wrap">
+            {quoteText}
+          </p>
+        </div>
+
+        {/* 提示词 (col 3) */}
+        <div className="col-span-3 flex flex-col justify-center gap-1 px-2 -mx-2">
+          <p className="text-[#342d24] text-xs leading-relaxed line-clamp-3">
+            {option.prompt || option.imagePrompt || '暂无方案描述'}
+          </p>
+          {(option as Record<string, unknown>).rationale && (
+            <p className="text-[#8f8372] text-[10px] italic mt-0.5 line-clamp-2">
+              {(option as Record<string, unknown>).rationale as string}
+            </p>
           )}
         </div>
 
-        {/* Feedback section removed — retry via single render button */}
+        {/* 视频播放区 (col 3) */}
+        <div className="col-span-3 flex flex-col gap-1.5">
+          <div className="w-full aspect-video bg-[#f4efe5] rounded overflow-hidden relative group border border-[#e4dbcc]">
+            {videoUrl ? (
+              <>
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  controls
+                  className="w-full h-full object-contain bg-black"
+                  preload="metadata"
+                />
+                <button
+                  onClick={() => setShowFullscreen(true)}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Maximize2 className="w-4 h-4 text-white" />
+                </button>
+              </>
+            ) : itemStatus === 'processing' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
+                <Loader2 className="w-5 h-5 text-[#c97545] animate-spin" />
+                <span className="text-[10px] text-[#c97545] mt-2">渲染中...</span>
+                {taskStatus?.progress != null && (
+                  <div className="mt-2 w-24 bg-[#e4dbcc] rounded-full h-1">
+                    <div
+                      className="bg-[#c97545] h-1 rounded-full transition-all"
+                      style={{ width: `${taskStatus.progress}%` }}
+                    />
+                  </div>
+                )}
+                {taskStatus?.retryCount != null && taskStatus.retryCount > 0 && (
+                  <span className="text-[9px] text-[#b5653a] mt-1">第 {taskStatus.retryCount} 次重试</span>
+                )}
+              </div>
+            ) : itemStatus === 'failed' ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
+                <AlertCircle className="w-5 h-5 text-red-500 mb-1" />
+                <span className="text-red-600 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">
+                  {taskStatus?.error || '渲染失败'}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
+                  className="text-[10px] text-[#6b5e4f] mt-2 hover:text-[#342d24] underline decoration-[#d8c8ae] underline-offset-2"
+                >
+                  重试渲染
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(chapter.chapterId, option); }}
+                className="w-full h-full flex flex-col items-center justify-center hover:bg-[#e4dbcc]/50 transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#c97545]/15 group-hover:bg-[#c97545]/25 flex items-center justify-center transition-colors">
+                  <Play className="w-5 h-5 text-[#c97545] group-hover:text-[#b26135]" />
+                </div>
+                <span className="text-[10px] text-[#8f8372] group-hover:text-[#c97545] font-medium mt-1">单条渲染</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 审阅通过 (col 1) */}
+        <div className="col-span-1 flex flex-col items-center justify-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onApprove(chapter.chapterId, option.id);
+            }}
+            disabled={!isCompleted}
+            title={isCompleted ? (option.phase3Approved ? '取消通过' : '标记通过') : '请先完成渲染'}
+            className={`w-8 h-8 rounded border-2 flex items-center justify-center transition-all ${
+              option.phase3Approved
+                ? 'bg-[#62835c] border-[#62835c] text-white hover:bg-[#4d6b5f]'
+                : isCompleted
+                  ? 'border-[#d8c8ae] hover:border-[#62835c] opacity-60 hover:opacity-100 hover:bg-[#dce9d8]/50'
+                  : 'border-[#e4dbcc] opacity-30 cursor-not-allowed'
+            }`}
+          >
+            {option.phase3Approved && <Check className="w-4 h-4" />}
+          </button>
+          {!option.phase3Approved && isCompleted && (
+            <span className="text-[9px] text-[#8f8372]">通过</span>
+          )}
+        </div>
       </div>
 
-      {/* 审阅通过 (col 1) */}
-      <div className="col-span-1 flex items-center justify-center">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onApprove(chapter.chapterId, option.id);
-          }}
-          disabled={!isCompleted}
-          title={isCompleted ? (option.phase3Approved ? '取消通过' : '标记通过') : '请先完成渲染'}
-          className={`w-7 h-7 rounded border-2 flex items-center justify-center transition-all ${
-            option.phase3Approved
-              ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
-              : isCompleted
-                ? 'border-slate-500 hover:border-slate-300 opacity-60 hover:opacity-100 hover:bg-slate-700'
-                : 'border-slate-700 opacity-30 cursor-not-allowed'
-          }`}
-        >
-          {option.phase3Approved && <Check className="w-4 h-4" />}
-        </button>
-      </div>
+      {/* Feedback drawer */}
+      {showFeedback && (
+        <div className="mx-3 mb-2 p-3 rounded-lg border border-[#e4dbcc] bg-[#f4efe5]/60">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-[#342d24]">修订反馈</span>
+            <button onClick={() => setShowFeedback(false)} className="text-[10px] text-[#8f8372] hover:text-[#342d24]">关闭</button>
+          </div>
+          <textarea
+            className="w-full bg-[#faf6ef] border border-[#e4dbcc] rounded-lg p-2.5 text-[#342d24] text-xs placeholder-[#c9baa3] focus:outline-none focus:border-[#c97545]"
+            rows={2}
+            placeholder="输入修改意见..."
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={handleRevise}
+              disabled={isRevising || !feedbackText.trim()}
+              className="px-3 py-1.5 bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] rounded text-xs border border-[#e4dbcc] disabled:opacity-50"
+            >
+              {isRevising ? '生成中...' : '生成修订'}
+            </button>
+            {revisedPrompt && (
+              <button
+                onClick={handleApplyAndRender}
+                className="px-3 py-1.5 bg-[#c97545] hover:bg-[#b26135] text-white rounded text-xs"
+              >
+                应用并重新渲染
+              </button>
+            )}
+          </div>
+          {revisedPrompt && (
+            <div className="mt-2 p-2 bg-[#faf6ef] rounded border border-[#e4dbcc]">
+              <span className="text-[10px] text-[#8f8372] uppercase tracking-wider">修订后提示词</span>
+              <p className="text-xs text-[#342d24] mt-1">{revisedPrompt}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fullscreen video portal */}
       {showFullscreen && videoUrl && createPortal(
@@ -313,12 +410,11 @@ const Phase3OptionRow = ({
         </div>,
         document.body
       )}
-    </div>
+    </>
   );
 };
 
 // ─── Phase3ChapterCard ───────────────────────────────────────────────────────
-// Mirrors Phase2's ChapterCard layout
 
 interface Phase3ChapterCardProps {
   chapter: DirectorChapter;
@@ -336,27 +432,35 @@ const Phase3ChapterCard = ({
 }: Phase3ChapterCardProps) => {
   const approvedAll = chapter.options.length > 0 && chapter.options.every(o => o.phase3Approved);
   const displayName = cleanChapterName(chapter.chapterName);
+  const approvedCount = chapter.options.filter(o => o.phase3Approved).length;
 
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-      {/* Chapter header — same as Phase2's ChapterCard */}
-      <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
-        <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
-        <span className="text-white font-medium">{displayName}</span>
-        {approvedAll && <Check className="w-4 h-4 text-green-400" />}
-        <span className="ml-auto text-xs text-slate-500">
-          {chapter.options.filter(o => o.phase3Approved).length}/{chapter.options.length} 通过
-        </span>
-      </div>
+    <PhasePanel className="overflow-hidden">
+      {/* Chapter header */}
+      <PhasePanelHeader
+        title={
+          <>
+            <span className="text-[#c97545] font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
+            <span className="text-[#342d24] font-medium text-sm ml-2">{displayName}</span>
+            {approvedAll && <Check className="w-4 h-4 text-[#62835c] ml-2" />}
+          </>
+        }
+        actions={
+          <span className="text-xs text-[#8f8372]">
+            {approvedCount}/{chapter.options.length} 通过
+          </span>
+        }
+      />
 
-      <div className="p-3">
-        {/* Column headers — same grid as Phase2 but col-4→col-3 方案, col-4→col-5 视频 */}
+      <PhasePanelBody className="p-3">
+        {/* Column headers */}
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
-          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
-          <div className="col-span-2 text-xs text-slate-500 font-bold">原文一句话</div>
-          <div className="col-span-3 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
-          <div className="col-span-5 text-xs text-slate-500 font-bold text-center">视频</div>
-          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">审阅</div>
+          <div className="col-span-1 text-[10px] text-[#8f8372] font-bold text-center uppercase tracking-wider">状态</div>
+          <div className="col-span-2 text-[10px] text-[#8f8372] font-bold uppercase tracking-wider">类型</div>
+          <div className="col-span-2 text-[10px] text-[#8f8372] font-bold uppercase tracking-wider">原文</div>
+          <div className="col-span-3 text-[10px] text-[#8f8372] font-bold uppercase tracking-wider">设计方案</div>
+          <div className="col-span-3 text-[10px] text-[#8f8372] font-bold text-center uppercase tracking-wider">视频</div>
+          <div className="col-span-1 text-[10px] text-[#8f8372] font-bold text-center uppercase tracking-wider">审阅</div>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -375,13 +479,93 @@ const Phase3ChapterCard = ({
             />
           ))}
         </div>
-      </div>
-    </div>
+      </PhasePanelBody>
+    </PhasePanel>
   );
 };
 
+// ─── RenderPipelineBoard (编排概览) ──────────────────────────────────────────
+
+interface PipelineStats {
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  approved: number;
+}
+
+function computePipelineStats(chapters: DirectorChapter[]): PipelineStats {
+  const all = chapters.flatMap(c => c.options.filter(o => RENDERABLE_TYPES.includes(o.type as BRollType)));
+  return {
+    total: all.length,
+    pending: all.filter(o => !o.videoUrl && !o.phase3Approved).length,
+    processing: 0, // Will be tracked via pendingTaskKeys in parent
+    completed: all.filter(o => !!o.videoUrl && !o.phase3Approved).length,
+    failed: 0, // Will be tracked via taskStatus in children
+    approved: all.filter(o => o.phase3Approved).length,
+  };
+}
+
+interface RenderPipelineBoardProps {
+  chapters: DirectorChapter[];
+  pendingTaskKeys: Set<string>;
+  visibleCount: number;
+  visibleApprovedCount: number;
+  totalCount: number;
+  totalApproved: number;
+}
+
+function RenderPipelineBoard({
+  chapters, pendingTaskKeys, visibleCount, visibleApprovedCount, totalCount, totalApproved
+}: RenderPipelineBoardProps) {
+  const stats = computePipelineStats(chapters);
+  const processingCount = pendingTaskKeys.size;
+  const completedCount = stats.completed + stats.approved;
+  const progressPercent = totalCount > 0 ? Math.round((totalApproved / totalCount) * 100) : 0;
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-b border-[#e4dbcc]" style={{ background: 'rgba(250, 246, 239, 0.9)' }}>
+      <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2">
+          <Layers className="w-4 h-4 text-[#8f8372]" />
+          <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">待渲染</span>
+          <span className="text-sm font-bold text-[#c97545]">{stats.pending}</span>
+        </div>
+        {processingCount > 0 && (
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-[#c97545] animate-spin" />
+            <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">渲染中</span>
+            <span className="text-sm font-bold text-[#c97545]">{processingCount}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-[#8f8372]" />
+          <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">已完成</span>
+          <span className="text-sm font-bold text-[#5b8a9b]">{completedCount}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Check className="w-4 h-4 text-[#8f8372]" />
+          <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">已通过</span>
+          <span className="text-sm font-bold text-[#62835c]">{stats.approved}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-[#8f8372]">{totalApproved}/{totalCount} 已通过</span>
+        <div className="w-24 h-1.5 bg-[#e4dbcc] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#62835c] rounded-full transition-all"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <span className="text-[10px] text-[#8f8372] w-8 text-right">{progressPercent}%</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Phase3View ──────────────────────────────────────────────────────────────
-// Mirrors Phase2View structure: BRollSelector filter → sticky toolbar → ChapterCards
 
 interface Phase3ViewProps {
   projectId: string;
@@ -397,11 +581,10 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [brollSelections, setBrollSelections] = useState<BRollType[]>([]);
 
-  // ── Filter logic (same as Phase2) ──
+  // ── Filter logic ──
   const isShowAll = brollSelections.length === 0;
   const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
 
-  // Only count renderable types
   const allRenderableOptions = chapters.flatMap(c =>
     c.options.filter(o => RENDERABLE_TYPES.includes(o.type as BRollType))
   );
@@ -416,7 +599,7 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
 
   const visibleUnrenderedCount = visibleOptions.filter(o => !o.videoUrl).length;
 
-  // ── Batch render (respects current filter) ──
+  // ── Batch render ──
   const handleBatchRender = async () => {
     const items = chapters.flatMap(c =>
       c.options
@@ -426,14 +609,14 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
           option: {
             id: o.id,
             type: o.type,
-            template: (o as any).template,
-            props: (o as any).props,
+            template: (o as Record<string, unknown>).template,
+            props: (o as Record<string, unknown>).props,
             name: o.name,
-            prompt: (o as any).prompt,
-            imagePrompt: (o as any).imagePrompt || (o as any).revisedPrompt,
-            infographicLayout: (o as any).infographicLayout,
-            infographicStyle: (o as any).infographicStyle,
-            infographicUseMode: (o as any).infographicUseMode,
+            prompt: (o as Record<string, unknown>).prompt,
+            imagePrompt: (o as Record<string, unknown>).imagePrompt || o.revisedPrompt,
+            infographicLayout: (o as Record<string, unknown>).infographicLayout,
+            infographicStyle: (o as Record<string, unknown>).infographicStyle,
+            infographicUseMode: (o as Record<string, unknown>).infographicUseMode,
           }
         }))
     );
@@ -471,14 +654,14 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
       option: {
         id: option.id,
         type: option.type,
-        template: (option as any).template,
-        props: (option as any).props,
+        template: (option as Record<string, unknown>).template,
+        props: (option as Record<string, unknown>).props,
         name: option.name,
-        prompt: (option as any).prompt,
-        imagePrompt: option.revisedPrompt || (option as any).imagePrompt,
-        infographicLayout: (option as any).infographicLayout,
-        infographicStyle: (option as any).infographicStyle,
-        infographicUseMode: (option as any).infographicUseMode,
+        prompt: (option as Record<string, unknown>).prompt,
+        imagePrompt: option.revisedPrompt || (option as Record<string, unknown>).imagePrompt,
+        infographicLayout: (option as Record<string, unknown>).infographicLayout,
+        infographicStyle: (option as Record<string, unknown>).infographicStyle,
+        infographicUseMode: (option as Record<string, unknown>).infographicUseMode,
       }
     };
 
@@ -497,7 +680,6 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
     }
   };
 
-  // Delegate mutations to parent (DirectorSection) via callbacks — no local shadow state
   const handleApproveOption = onApproveOption;
   const handleUpdateOption = onUpdateOption;
 
@@ -510,9 +692,8 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
     });
   }, []);
 
-  // ── Batch approve (all visible filtered options) ──
+  // ── Batch approve ──
   const handleBatchApprove = (approved: boolean) => {
-    // Pass filter function to parent so it can apply the same filter logic
     const currentFilter = (o: SceneOption) => {
       if (!RENDERABLE_TYPES.includes(o.type as BRollType)) return false;
       if (!matchesFilter(o.type)) return false;
@@ -522,156 +703,149 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
     onBatchApprove(approved, currentFilter);
   };
 
+  if (chapters.length === 0) {
+    return (
+      <PhasePanel>
+        <PhaseEmptyState
+          icon={<Video className="w-12 h-12" />}
+          title="暂无可渲染的视觉方案"
+          description="请先在 Phase 2 生成并选择 B-roll 方案"
+        />
+      </PhasePanel>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* B-Roll 类型筛选 — same as Phase2 */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm text-slate-400 uppercase font-bold">
-            过滤视觉方案 (Excel 式筛选)
-          </h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setBrollSelections([...RENDERABLE_TYPES])}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
-            >
-              显示全部
-            </button>
-            <button
-              onClick={() => setBrollSelections([])}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
-            >
-              清空过滤 (显示全部)
-            </button>
+    <div className="flex flex-col gap-4 h-full">
+      {/* Pipeline Board — 编排概览 */}
+      <RenderPipelineBoard
+        chapters={chapters}
+        pendingTaskKeys={pendingTaskKeys}
+        visibleCount={visibleCount}
+        visibleApprovedCount={visibleApprovedCount}
+        totalCount={totalCount}
+        totalApproved={totalApproved}
+      />
+
+      {/* Filter + Batch ops */}
+      <PhasePanel>
+        <PhasePanelHeader
+          title={<span className="text-sm font-bold text-[#342d24]">过滤视觉方案</span>}
+          actions={
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBrollSelections([...RENDERABLE_TYPES])}
+                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+              >
+                显示全部
+              </button>
+              <button
+                onClick={() => setBrollSelections([])}
+                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+              >
+                清空过滤
+              </button>
+            </div>
+          }
+        />
+        <PhasePanelBody>
+          <BRollSelector
+            selected={brollSelections}
+            onChange={setBrollSelections}
+            types={RENDERABLE_TYPES}
+          />
+
+          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
+            <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
+              <input
+                type="checkbox"
+                className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                style={{ backgroundColor: '#faf6ef' }}
+                ref={el => {
+                  if (el) el.indeterminate = visibleApprovedCount > 0 && visibleApprovedCount < visibleCount;
+                }}
+                checked={visibleApprovedCount === visibleCount && visibleCount > 0}
+                disabled={visibleCount === 0}
+                onChange={(e) => handleBatchApprove(e.target.checked)}
+              />
+              <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
+                全选通过当前视图 <span className="text-[#8f8372]">({visibleApprovedCount}/{visibleCount})</span>
+              </span>
+            </label>
+          </div>
+        </PhasePanelBody>
+      </PhasePanel>
+
+      {/* Sticky progress toolbar */}
+      <div className="flex items-center justify-between px-5 py-3 rounded-xl border border-[#e4dbcc]" style={{ background: 'rgba(255, 252, 247, 0.78)' }}>
+        <div className="flex items-center gap-4">
+          <span className="text-[#8f8372] font-medium whitespace-nowrap text-sm">筛选结果:</span>
+          <div className="flex gap-4">
+            <div className="flex items-baseline gap-1">
+              <span className={`text-2xl font-bold ${visibleApprovedCount > 0 ? 'text-[#62835c]' : 'text-[#8f8372]'}`}>
+                {visibleApprovedCount}
+              </span>
+              <span className="text-[#8f8372] font-medium text-sm">/ {visibleCount} (当前显示)</span>
+            </div>
+            {brollSelections.length > 0 && (
+              <div className="flex items-baseline gap-1 opacity-60">
+                <span className="text-lg font-bold text-[#342d24]">{totalApproved}</span>
+                <span className="text-[#8f8372] text-sm">/ {totalCount} (全局总计)</span>
+              </div>
+            )}
           </div>
         </div>
-        <BRollSelector
-          selected={brollSelections}
-          onChange={setBrollSelections}
-          types={RENDERABLE_TYPES}
-        />
 
-        {/* Batch operations */}
-        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-800">
-          <span className="text-xs text-slate-500 font-medium">批量操作:</span>
-          <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/80 p-1.5 -ml-1.5 rounded transition-colors group">
-            <input
-              type="checkbox"
-              className="w-4 h-4 cursor-pointer accent-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
-              ref={el => {
-                if (el) el.indeterminate = visibleApprovedCount > 0 && visibleApprovedCount < visibleCount;
-              }}
-              checked={visibleApprovedCount === visibleCount && visibleCount > 0}
-              disabled={visibleCount === 0}
-              onChange={(e) => handleBatchApprove(e.target.checked)}
-            />
-            <span className="text-xs text-slate-400 group-hover:text-slate-300 select-none flex items-center gap-1">
-              全选通过当前视图 <span className="text-slate-500">({visibleApprovedCount}/{visibleCount})</span>
-            </span>
-          </label>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBatchRender}
+            disabled={isSubmitting || pendingTaskKeys.size > 0 || visibleUnrenderedCount === 0}
+            className="px-4 py-2 bg-[#c97545] hover:bg-[#b26135] disabled:opacity-50 text-white text-sm rounded-lg flex items-center gap-2 transition-colors"
+          >
+            {isSubmitting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> 触发中...</>
+            ) : pendingTaskKeys.size > 0 ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中...</>
+            ) : (
+              <><Play className="w-4 h-4" /> 渲染当前筛选 ({visibleUnrenderedCount}条)</>
+            )}
+          </button>
+
+          <button
+            onClick={onProceed}
+            className={`px-4 py-2 ${allApproved ? 'bg-[#62835c] hover:bg-[#4d6b5f]' : 'bg-[#c97545] hover:bg-[#b26135]'} text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            {allApproved ? '提交 → Phase 4' : `进入 Phase 4 (${totalApproved}/${totalCount})`}
+          </button>
         </div>
       </div>
 
-      {/* Sticky progress toolbar — same style as Phase2 */}
-      {chapters.length > 0 && (
-        <>
-          <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg">
-            <div className="flex items-center gap-4">
-              <span className="text-slate-400 font-medium whitespace-nowrap">筛选结果:</span>
-              <div className="flex gap-4">
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-bold ${visibleApprovedCount > 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                    {visibleApprovedCount}
-                  </span>
-                  <span className="text-slate-500 font-medium">/ {visibleCount} (当前显示)</span>
-                </div>
-                <div className="w-px h-6 bg-slate-700 mx-2"></div>
-                {brollSelections.length > 0 && (
-                  <div className="flex items-baseline gap-1 opacity-60">
-                    <span className="text-lg font-bold text-slate-400">{totalApproved}</span>
-                    <span className="text-slate-500 text-sm">/ {totalCount} (全局总计)</span>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Chapter cards */}
+      <div className="flex flex-col gap-4">
+        {chapters.map(chapter => {
+          const filteredOptions = chapter.options.filter(o =>
+            RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type)
+          );
+          if (filteredOptions.length === 0) return null;
 
-            <div className="flex items-center gap-3">
-              {/* Render button */}
-              <button
-                onClick={handleBatchRender}
-                disabled={isSubmitting || pendingTaskKeys.size > 0 || visibleUnrenderedCount === 0}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded-lg flex items-center gap-2"
-              >
-                {isSubmitting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> 触发中...</>
-                ) : pendingTaskKeys.size > 0 ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中...</>
-                ) : (
-                  <><Play className="w-4 h-4" /> 渲染当前筛选 ({visibleUnrenderedCount}条)</>
-                )}
-              </button>
+          const filteredChapter = { ...chapter, options: filteredOptions };
 
-              {/* Proceed button — 始终可见，即使未全部渲染完也可进入 Phase4 生成 XML */}
-              <button
-                onClick={onProceed}
-                className={`px-4 py-2 ${allApproved ? 'bg-green-600 hover:bg-green-500' : 'bg-amber-600 hover:bg-amber-500'} text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm`}
-              >
-                <CheckCircle className="w-4 h-4" />
-                {allApproved ? '提交 → Phase 4' : `进入 Phase 4 (${totalApproved}/${totalCount})`}
-              </button>
-            </div>
-          </div>
-
-          {/* Overall progress bar */}
-          {totalCount > 0 && (
-            <div className="bg-slate-900 rounded-lg border border-slate-700 p-3 -mt-4">
-              <div className="flex justify-between text-xs text-slate-500 mb-1">
-                <span>审阅进度</span>
-                <span>{totalApproved}/{totalCount} 已通过</span>
-              </div>
-              <div className="h-1.5 bg-slate-700 rounded-full">
-                <div
-                  className="h-1.5 bg-emerald-500 rounded-full transition-all"
-                  style={{ width: `${(totalApproved / totalCount) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Chapter cards */}
-          <div className="flex flex-col gap-4">
-            {chapters.map(chapter => {
-              const filteredOptions = chapter.options.filter(o =>
-                RENDERABLE_TYPES.includes(o.type as BRollType) && matchesFilter(o.type)
-              );
-              if (filteredOptions.length === 0) return null;
-
-              const filteredChapter = { ...chapter, options: filteredOptions };
-
-              return (
-                <Phase3ChapterCard
-                  key={chapter.chapterId}
-                  chapter={filteredChapter}
-                  projectId={projectId}
-                  pendingTaskKeys={pendingTaskKeys}
-                  onApprove={handleApproveOption}
-                  onUpdateOption={handleUpdateOption}
-                  onRetry={handleRetryOption}
-                  onTaskComplete={handleTaskComplete}
-                />
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {chapters.length === 0 && (
-        <div className="text-center py-12 text-slate-500">
-          <Video className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>暂无可渲染的视觉方案</p>
-          <p className="text-xs mt-1">请先在 Phase 2 生成并选择 B-roll 方案</p>
-        </div>
-      )}
+          return (
+            <Phase3ChapterCard
+              key={chapter.chapterId}
+              chapter={filteredChapter}
+              projectId={projectId}
+              pendingTaskKeys={pendingTaskKeys}
+              onApprove={handleApproveOption}
+              onUpdateOption={handleUpdateOption}
+              onRetry={handleRetryOption}
+              onTaskComplete={handleTaskComplete}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 };
