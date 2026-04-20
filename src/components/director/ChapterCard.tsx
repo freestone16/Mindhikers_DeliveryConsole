@@ -12,13 +12,13 @@ interface ChapterCardProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  remotion: 'bg-blue-500/20 text-blue-300',
-  seedance: 'bg-purple-500/20 text-purple-300',
-  generative: 'bg-purple-500/20 text-purple-300',
-  artlist: 'bg-green-500/20 text-green-300',
-  'internet-clip': 'bg-orange-500/20 text-orange-300',
-  'user-capture': 'bg-cyan-500/20 text-cyan-300',
-  infographic: 'bg-amber-500/20 text-amber-300',
+  remotion: 'bg-[#c97545]/15 text-[#c97545]',
+  seedance: 'bg-[#9b6b9e]/15 text-[#9b6b9e]',
+  generative: 'bg-[#9b6b9e]/15 text-[#9b6b9e]',
+  artlist: 'bg-[#5b7c6f]/15 text-[#5b7c6f]',
+  'internet-clip': 'bg-[#c97545]/15 text-[#b5653a]',
+  'user-capture': 'bg-[#5b8a9b]/15 text-[#5b8a9b]',
+  infographic: 'bg-[#a68b4b]/15 text-[#a68b4b]',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -238,31 +238,31 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
   return (
     <div className={`grid grid-cols-12 gap-3 p-3 rounded-lg border transition-all ${isSelected
-      ? 'border-blue-500 bg-blue-500/5'
-      : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'
+      ? 'border-[#c97545] bg-[#c97545]/5'
+      : 'border-[#e4dbcc] bg-[#f4efe5]/60 hover:border-[#d8c8ae]'
       }`}>
       {/* 序号 (col 1) */}
       <div className="col-span-1 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-bold">
+        <div className="w-8 h-8 rounded-full bg-[#e4dbcc] flex items-center justify-center text-[#342d24] text-sm font-bold">
           {rowId}
         </div>
       </div>
 
       {/* 原文一句话 (col 2 instead of 3 - ~70% width) */}
       <div className="col-span-2 flex items-center">
-        <p className="text-slate-300 text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
+        <p className="text-[#342d24] text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
           {quoteText}
         </p>
       </div>
 
       {/* 设计方案/提示词 (col 4 instead of 3 - more space) */}
       <div
-        className="col-span-4 flex flex-col justify-center gap-1 hover:bg-slate-700/20 rounded px-2 -mx-2 transition-colors"
+        className="col-span-4 flex flex-col justify-center gap-1 hover:bg-[#e4dbcc]/30 rounded px-2 -mx-2 transition-colors"
         title="点击选中此方案"
       >
         <div className="flex items-center gap-2 mb-1">
           <span
-            className={`inline-block px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${TYPE_COLORS[option.type]} ${isSelected ? 'ring-1 ring-blue-400' : ''}`}
+            className={`inline-block px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${TYPE_COLORS[option.type]} ${isSelected ? 'ring-1 ring-[#c97545]' : ''}`}
             onClick={() => onSelect(chapter.chapterId, option.id)}
             title={isSelected ? '已选中' : '点击选中此方案'}
           >
@@ -270,11 +270,11 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
             {isSelected && ' ✓'}
           </span>
         </div>
-        <p className="text-white text-xs leading-relaxed">
+        <p className="text-[#342d24] text-xs leading-relaxed">
           {option.prompt || '暂无方案描述'}
         </p>
         {(option as any).rationale && (
-          <p className="text-slate-500 text-[10px] italic mt-1">
+          <p className="text-[#8f8372] text-[10px] italic mt-1">
             💡 {(option as any).rationale}
           </p>
         )}
@@ -282,7 +282,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
       {/* 预览图 (col 4) */}
       <div className="col-span-4 flex flex-col gap-2">
-        <div className="w-full aspect-video bg-slate-700/50 rounded overflow-hidden relative group border border-slate-700">
+        <div className="w-full aspect-video bg-[#f4efe5] rounded overflow-hidden relative group border border-[#e4dbcc]">
           {thumbStatus === 'completed' && previewUrl ? (
             <>
               <img
@@ -300,18 +300,18 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               </div>
             </>
           ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
-              <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-              <span className="text-[10px] text-blue-400 mt-2">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
+              <Loader2 className="w-5 h-5 text-[#c97545] animate-spin" />
+              <span className="text-[10px] text-[#c97545] mt-2">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
             </div>
           ) : thumbStatus === 'failed' ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800">
-              <span className="text-red-400 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">失败</span>
-              <button onClick={(e) => { e.stopPropagation(); handleGenerateThumbnail(); }} className="text-[10px] text-slate-400 mt-2 hover:text-white underline decoration-slate-500 underline-offset-2">重试生成</button>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
+              <span className="text-red-600 text-xs font-medium bg-red-500/10 px-2 py-1 rounded">失败</span>
+              <button onClick={(e) => { e.stopPropagation(); handleGenerateThumbnail(); }} className="text-[10px] text-[#6b5e4f] mt-2 hover:text-[#342d24] underline decoration-[#d8c8ae] underline-offset-2">重试生成</button>
             </div>
           ) : requiresUpload ? (
             // Non-AI sources (internet-clip, user-capture, artlist) — always show upload entry
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800/80 relative">
+            <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]/80 relative">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -321,23 +321,23 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               />
               {uploadStatus === 'completed' ? (
                 <div className="flex flex-col items-center">
-                  <FileVideo className="w-8 h-8 text-green-400 mb-1" />
-                  <span className="text-green-400 text-xs font-medium">已上传</span>
-                  <span className="text-[9px] text-slate-500 mt-0.5">{uploadedFile || `${chapter.chapterId}_${option.id}_rendered.mp4`}</span>
+                  <FileVideo className="w-8 h-8 text-[#5b7c6f] mb-1" />
+                  <span className="text-[#5b7c6f] text-xs font-medium">已上传</span>
+                  <span className="text-[9px] text-[#8f8372] mt-0.5">{uploadedFile || `${chapter.chapterId}_${option.id}_rendered.mp4`}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       triggerFileInput();
                     }}
-                    className="text-[10px] text-slate-400 mt-1 hover:text-white underline"
+                    className="text-[10px] text-[#6b5e4f] mt-1 hover:text-[#342d24] underline"
                   >
                     重新上传
                   </button>
                 </div>
               ) : uploadStatus === 'uploading' ? (
                 <div className="flex flex-col items-center">
-                  <Loader2 className="w-6 h-6 text-blue-400 animate-spin mb-1" />
-                  <span className="text-blue-400 text-[10px]">上传中...</span>
+                  <Loader2 className="w-6 h-6 text-[#c97545] animate-spin mb-1" />
+                  <span className="text-[#c97545] text-[10px]">上传中...</span>
                 </div>
               ) : (
                 <button
@@ -345,13 +345,13 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                     e.stopPropagation();
                     triggerFileInput();
                   }}
-                  className="flex flex-col items-center hover:bg-slate-700/50 p-3 rounded-lg transition-colors"
+                  className="flex flex-col items-center hover:bg-[#e4dbcc]/50 p-3 rounded-lg transition-colors"
                 >
-                  <Upload className={`w-6 h-6 mb-1 ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'artlist' ? 'text-green-400' : 'text-cyan-400'}`} />
-                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-orange-400' : option.type === 'artlist' ? 'text-green-400' : 'text-cyan-400'}`}>
+                  <Upload className={`w-6 h-6 mb-1 ${option.type === 'internet-clip' ? 'text-[#b5653a]' : option.type === 'artlist' ? 'text-[#5b7c6f]' : 'text-[#5b8a9b]'}`} />
+                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-[#b5653a]' : option.type === 'artlist' ? 'text-[#5b7c6f]' : 'text-[#5b8a9b]'}`}>
                     {option.type === 'internet-clip' ? '🌐 上传网络素材' : option.type === 'artlist' ? '🎬 上传实拍素材' : '📸 上传录屏/截图'}
                   </span>
-                  <span className="text-[9px] text-slate-500 mt-1">点击选择视频文件</span>
+                  <span className="text-[9px] text-[#8f8372] mt-1">点击选择视频文件</span>
                 </button>
               )}
             </div>
@@ -363,11 +363,11 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                 handleGenerateThumbnail();
               }}
               disabled={!option.imagePrompt && !option.prompt}
-              className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
+              className="w-full h-full flex flex-col items-center justify-center hover:bg-[#e4dbcc]/50 transition-colors disabled:opacity-50"
             >
-              <span className="text-amber-400 text-lg mb-1">📊</span>
-              <span className="text-[10px] text-amber-400 font-medium">静态信息图</span>
-              <span className="text-[9px] text-slate-500 mt-0.5">点击生成预览</span>
+              <span className="text-[#a68b4b] text-lg mb-1">📊</span>
+              <span className="text-[10px] text-[#a68b4b] font-medium">静态信息图</span>
+              <span className="text-[9px] text-[#8f8372] mt-0.5">点击生成预览</span>
             </button>
           ) : (
             <button
@@ -376,10 +376,10 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                 handleGenerateThumbnail();
               }}
               disabled={!option.imagePrompt && !option.prompt}
-              className="w-full h-full flex flex-col items-center justify-center hover:bg-slate-600 transition-colors disabled:opacity-50"
+              className="w-full h-full flex flex-col items-center justify-center hover:bg-[#e4dbcc]/50 transition-colors disabled:opacity-50"
             >
-              <Image className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors mb-2" />
-              <span className="text-[10px] text-slate-400 group-hover:text-slate-200 font-medium">生成预览</span>
+              <Image className="w-6 h-6 text-[#8f8372] group-hover:text-[#342d24] transition-colors mb-2" />
+              <span className="text-[10px] text-[#8f8372] group-hover:text-[#342d24] font-medium">生成预览</span>
             </button>
           )}
         </div>
@@ -419,8 +419,8 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
           }}
           title={option.isChecked ? '取消确认' : '确认该方案，加入渲染队列'}
           className={`w-7 h-7 rounded border-2 flex items-center justify-center transition-all ${option.isChecked
-            ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
-            : 'border-slate-500 hover:border-slate-300 opacity-60 hover:opacity-100 hover:bg-slate-700'
+            ? 'bg-[#5b7c6f] border-[#5b7c6f] text-white hover:bg-[#4d6b5f]'
+            : 'border-[#d8c8ae] hover:border-[#c97545] opacity-60 hover:opacity-100 hover:bg-[#f4efe5]'
             }`}
         >
           {option.isChecked && <Check className="w-4 h-4" />}
@@ -439,20 +439,20 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendi
   const displayName = cleanChapterName(chapter.chapterName);
 
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-      <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3">
-        <span className="text-blue-400 font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
-        <span className="text-white font-medium">{displayName}</span>
-        {isAnyOptionChecked && <Check className="w-4 h-4 text-green-400" />}
+    <div className="rounded-lg border border-[#e4dbcc] overflow-hidden" style={{ background: 'rgba(255,252,247,0.78)' }}>
+      <div className="bg-[#f4efe5] px-4 py-2 border-b border-[#e4dbcc] flex items-center gap-3">
+        <span className="text-[#c97545] font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
+        <span className="text-[#342d24] font-medium">{displayName}</span>
+        {isAnyOptionChecked && <Check className="w-4 h-4 text-[#5b7c6f]" />}
       </div>
 
       <div className="p-3">
         <div className="grid grid-cols-12 gap-3 mb-2 px-1">
-          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">序号</div>
-          <div className="col-span-2 text-xs text-slate-500 font-bold">原文一句话</div>
-          <div className="col-span-4 text-xs text-slate-500 font-bold">设计方案 / 提示词</div>
-          <div className="col-span-4 text-xs text-slate-500 font-bold text-center">预览图</div>
-          <div className="col-span-1 text-xs text-slate-500 font-bold text-center">确认</div>
+          <div className="col-span-1 text-xs text-[#8f8372] font-bold text-center">序号</div>
+          <div className="col-span-2 text-xs text-[#8f8372] font-bold">原文一句话</div>
+          <div className="col-span-4 text-xs text-[#8f8372] font-bold">设计方案 / 提示词</div>
+          <div className="col-span-4 text-xs text-[#8f8372] font-bold text-center">预览图</div>
+          <div className="col-span-1 text-xs text-[#8f8372] font-bold text-center">确认</div>
         </div>
 
         <div className="flex flex-col gap-2">

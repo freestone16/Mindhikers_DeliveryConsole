@@ -21,7 +21,7 @@
               "prompt": "具体的视觉描述（如果使用artlist，必须符合上面的官方词库协议）",
               "imagePrompt": "如果当前画面需要照片级/艺术风格底图素材（自然风光、城市、人物、宇宙星空、水墨油画等），用此字段出图（仅限名词/形容词英文堆叠）。请发挥导演想象力特调背景：根据当前文字主题，量身定制绝不重样的视觉概念（例如：cosmic nebula with floating data particles, old vintage paper texture with coffee stains, underwater bioluminescent deep sea 等）。**严禁擅自生成 imageUrl 字典！**",
               "svgPrompt": "（预留字段，当前版本暂不使用。未来用于 SVG-Architect 精准数据图。当前请用 imagePrompt 提供所有底图需求。）",
-              "phase3": "如果 type 是 infographic 时必填：指定将这帧信息图渲染为最终动态视频的推镜配置。结构示例：{\"template\": \"CinematicZoom\", \"props\": {\"bgStyle\": \"black\", \"startScale\": 0.9, \"endScale\": 1.05, \"rotation\": 0, \"imageFit\": \"contain\"}}。你的决策：如果 useMode 为 'cinematic-zoom'，采用大幅度运镜 (0.9→1.05)；如果为 'static'，采用微推 (0.95→1.02)。⚠️ **rotation 必须为 0**，信息图严禁旋转特效，会导致文字倾斜影响可读性。⚠️强烈建议：如果涉及信息图和数据，必须指定 \"imageFit\": \"contain\" 以防文字被裁切！如果纯粹是氛围厚涂漫画，才考虑使用 \"cover\"。这些参数由你掌控，DC不会干预。",
+              "phase3": "如果 type 是 infographic 时必填：指定将这帧信息图渲染为最终动态视频的推镜配置。结构示例：{\"template\": \"CinematicZoom\", \"props\": {\"bgStyle\": \"black\", \"startScale\": 0.9, \"endScale\": 1.05, \"rotation\": 1.5, \"imageFit\": \"contain\"}}。你的决策：如果 useMode 为 'cinematic-zoom'，采用大幅度运镜 (0.9→1.05, rotation 1-2度)；如果为 'static'，采用微推 (0.95→1.02, rotation 0.5度)。⚠️强烈建议：如果涉及信息图和数据，必须指定 \"imageFit\": \"contain\" 以防文字被裁切！如果纯粹是氛围厚涂漫画，才考虑使用 \"cover\"。这些参数由你掌控，DC不会干预。",
               "rationale": "用一句话解释为什么选择这类镜头、符合怎样的人设意图"
            }
         ]
@@ -108,7 +108,7 @@
   > 🚨 **注意**：针对 type="infographic"，你必须同时在同级输出 `phase3` 字段配置最终推镜参数（见上方 JSON Schema），这部分参数必须根据你的导演意志和当前的 `useMode` 设定。
   > 📊 **信息图数据纪律**：
   > - `prompt` 字段**必须包含完整的数据内容描述**（如"金字塔三层：底层=基础能力，中层=专业技能，顶层=战略思维"），而非仅描述 layout/style。这些文字内容会被渲染到最终图片中。
-  > - `imagePrompt` **必须将 prompt 中的文字内容融入图片生成指令**，确保文生图引擎能渲染出带有文字标注的信息图。例如：`infographic bridge diagram with Chinese text labels, left side "我和老搭档老张" connected by bridge to right side "苏格拉底式对话的结晶", aged academia style, warm golden tones`。**严禁只写氛围描述而不包含任何文字内容**，否则生成的图片将是一张没有文字的风景图。
+  > - `imagePrompt` 仅用于氛围底图（如 `dark abstract background with subtle grid pattern`），不要用 imagePrompt 描述数据本身。
   > - ⚠️ **优先考虑 remotion 模板**：如果数据可以用 DataChartQuadrant、BarChartRace、MetricRings、MindmapFlow 等模板精确展示，**优先使用 remotion 而非 infographic**。infographic 适合 remotion 模板无法覆盖的复杂布局（如鱼骨图、冰山图、维恩图等）。
 - **seedance**：适合情绪叙事、人物特写、意境画面、比喻场景等需要 AI 生成实景视频的内容。
 - **artlist**：适合需要自然环境空镜、城市场景、通用氛围画面的内容，从实拍素材库检索。prompt 字段中的搜索关键词**必须**从下方 Artlist 官方词库中选取组合，严禁臆造标签。
@@ -132,16 +132,9 @@
 
 {{ARTLIST_DICTIONARY}}
 
-【🚨 硬约束 — 数据真实性红线】
-以下规则不可违反，任何违反将导致观众信任崩塌：
-1. **数据类模板（BarChartRace, MetricRings, GaugeChart, PieChart, StatDashboard, RadarChart, NumberCounter, SegmentCounter）的数值必须来自原文明确引用或有据可查的事实**。如果原文没有提供具体数字，**严禁使用数据类模板**，改用 ConceptChain、TextReveal、KineticTypography 等非数据模板表达概念。
-2. **禁止凭空编造百分比、排名数值、统计指标**。观众会追问"25%是谁除以谁？数据来源是什么？"，如果你回答不了，就不要用数据模板。
-3. **数据模板的每个数值必须有明确单位和语义**。不能只写 `value: 95` 而不告诉观众 95 是什么量纲。如果量纲不同的指标（如"内容量"和"注意力时长"）不能放在同一张图里比较。
-4. **定性对比请用定性模板**：想表达"A 远大于 B"但没有具体数字时，用 ComparisonSplit/BeforeAfter/TwoColumnText，不要硬凑数字塞进 BarChartRace。
-
 【🚨 硬约束 — imagePrompt 底图规则】
 以下规则不可违反：
-1. **A 级模板（TextReveal, KineticTypography, ComparisonSplit, TimelineFlow, QuoteCard, BeforeAfter, TwoColumnText, Callout）必须 100% 提供 imagePrompt**。底图是这些模板的视觉灵魂。
+1. **A 级模板（TextReveal, KineticTypography, ComparisonSplit, TimelineFlow, QuoteCard）必须 100% 提供 imagePrompt**。底图是这些模板的视觉灵魂。
 2. **B 级模板（DataChartQuadrant, BarChartRace, MetricRings 等数据模板）必须提供装饰性底纹 imagePrompt**，严禁写实底图。根据主题类别选择底纹（技术类/哲学类/自然类/商业类/通用），搭配 `overlayOpacity: 0.75~0.85`。
 3. **C 级模板（TerminalTyping, SceneComposer, CinematicZoom）不要提供 imagePrompt**。
 4. **imagePrompt 不要千篇一律**。根据当前文字主题量身定制，每个都要独特。

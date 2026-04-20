@@ -90,13 +90,13 @@ export function ContextDrawer({
         </div>
 
 
-        {activeTab === 'runtime' && runtimeData && (
+        {activeTab === 'runtime' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <RuntimePanel
-              currentModel={runtimeData.currentModel}
-              logs={runtimeData.logs}
-              isLoading={runtimeData.isLoading}
-              startTime={runtimeData.startTime}
+              currentModel={runtimeData?.currentModel}
+              logs={runtimeData?.logs}
+              isLoading={runtimeData?.isLoading}
+              startTime={runtimeData?.startTime}
             />
           </div>
         )}

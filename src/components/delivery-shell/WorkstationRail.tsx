@@ -1,6 +1,5 @@
 import { PenTool, Eye, Music, Image, Video, Megaphone } from 'lucide-react';
 import { SessionListPanel } from './SessionListPanel';
-import { ProjectContextDock } from './ProjectContextDock';
 import type { ScriptFile } from './DeliveryShellLayout';
 
 const WORKSTATIONS = [
@@ -31,13 +30,8 @@ export function WorkstationRail({
   selectedScriptPath,
   onSelectScript,
   scripts,
-  projectName,
-  modelName,
-  outputDir,
 }: WorkstationRailProps) {
   const activeLabel = WORKSTATIONS.find(ws => ws.id === activeExpertId)?.label || activeExpertId;
-
-  const activeScript = scripts.find(s => s.path === selectedScriptPath);
 
   return (
     <div className="shell-rail">
@@ -69,13 +63,6 @@ export function WorkstationRail({
         onSelectScript={onSelectScript}
         expertLabel={activeLabel}
         projectId={projectId}
-      />
-
-      <ProjectContextDock
-        projectName={projectName}
-        scriptName={activeScript?.name}
-        modelName={modelName}
-        outputDir={outputDir}
       />
     </div>
   );

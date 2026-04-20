@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Image, Video } from 'lucide-react';
 
 interface LogEntry {
   timestamp: number;
@@ -14,7 +14,33 @@ interface RuntimePanelProps {
   startTime?: number | null;
 }
 
+function SkillInfoCard() {
+  return (
+    <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
+      <h3 className="text-xs text-[#8f8372] uppercase font-bold mb-2">Skill 信息</h3>
+      <div className="space-y-1.5 text-xs">
+        <div className="flex items-center gap-2">
+          <Cpu className="w-3.5 h-3.5 text-[#c97545]" />
+          <span className="text-[#342d24]">Director Skill</span>
+          <span className="text-[#8f8372] ml-auto">v2.1</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Image className="w-3.5 h-3.5 text-[#5b7c6f]" />
+          <span className="text-[#342d24]">文生图</span>
+          <span className="text-[#8f8372] ml-auto">doubao-seedream</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Video className="w-3.5 h-3.5 text-[#7c6f5b]" />
+          <span className="text-[#342d24]">文生视频</span>
+          <span className="text-[#8f8372] ml-auto">seedance-v4</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RuntimePanel({ currentModel, logs = [], isLoading = false, startTime }: RuntimePanelProps) {
+  console.log('[RuntimePanel] render:', { currentModel, logsCount: logs.length, isLoading, startTime });
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -65,20 +91,26 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      {currentModel && (
-        <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs text-[#8f8372] uppercase font-bold flex items-center gap-2">
-              <Info className="w-3.5 h-3.5" />
-              当前模型
-            </h3>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#8f8372]">{providerLabel(currentModel.provider)}</span>
-              <span className="text-[#8f8372] opacity-60">({currentModel.model})</span>
-            </div>
+      <SkillInfoCard />
+
+      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs text-[#8f8372] uppercase font-bold flex items-center gap-2">
+            <Info className="w-3.5 h-3.5" />
+            LLM 模型
+          </h3>
+          <div className="flex items-center gap-2 text-xs">
+            {currentModel ? (
+              <>
+                <span className="text-[#8f8372]">{providerLabel(currentModel.provider)}</span>
+                <span className="text-[#8f8372] opacity-60">({currentModel.model})</span>
+              </>
+            ) : (
+              <span className="text-[#8f8372] opacity-60">未配置</span>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {isLoading && (
         <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">

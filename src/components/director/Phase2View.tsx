@@ -80,22 +80,22 @@ export const Phase2View = ({
   return (
     <div className="flex flex-col gap-6">
       {/* B-Roll 类型选择与过滤 */}
-      <div className="bg-slate-900 rounded-lg border border-slate-700 p-4">
+      <div className="rounded-lg border border-[#e4dbcc] p-4" style={{ background: 'rgba(255,252,247,0.78)' }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm text-slate-400 uppercase font-bold">
+          <h3 className="text-sm text-[#6b5e4f] uppercase font-bold">
             {brollConfirmed ? '过滤视觉方案 (Excel 式筛选)' : 'Select B-Roll Types'}
           </h3>
           {brollConfirmed && (
             <div className="flex gap-2">
               <button
                 onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
-                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
+                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
               >
                 显示全部
               </button>
               <button
                 onClick={() => setBrollSelections([])}
-                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors"
+                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
               >
                 清空过滤 (显示全部)
               </button>
@@ -111,17 +111,18 @@ export const Phase2View = ({
           <button
             onClick={handleConfirmBRoll}
             disabled={brollSelections.length === 0}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium"
+            className="mt-4 px-4 py-2 bg-[#c97545] hover:bg-[#b5653a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium"
           >
             Confirm & Generate Previews
           </button>
         ) : (
-          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-800">
-            <span className="text-xs text-slate-500 font-medium">批量操作:</span>
-            <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-800/80 p-1.5 -ml-1.5 rounded transition-colors group">
+          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
+            <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
               <input
                 type="checkbox"
-                className="w-4 h-4 cursor-pointer accent-blue-500 rounded border-slate-600 bg-slate-800 focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                style={{ backgroundColor: '#faf6ef' }}
                 ref={el => {
                   if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
                 }}
@@ -135,8 +136,8 @@ export const Phase2View = ({
                   );
                 }}
               />
-              <span className="text-xs text-slate-400 group-hover:text-slate-300 select-none flex items-center gap-1">
-                全选当前视图方案 <span className="text-slate-500">({visibleCheckedCount}/{visibleOptionsCount})</span>
+              <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
+                全选当前视图方案 <span className="text-[#8f8372]">({visibleCheckedCount}/{visibleOptionsCount})</span>
               </span>
             </label>
           </div>
@@ -146,19 +147,19 @@ export const Phase2View = ({
       {chapters.length > 0 && (
         <>
           {/* 进度头工具栏 */}
-          <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg">
+          <div className="rounded-lg border border-[#e4dbcc] p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg" style={{ background: 'rgba(255,252,247,0.78)' }}>
             <div className="flex items-center gap-4">
-              <span className="text-slate-400 font-medium whitespace-nowrap">筛选结果:</span>
+              <span className="text-[#6b5e4f] font-medium whitespace-nowrap">筛选结果:</span>
               <div className="flex gap-4">
                 <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-bold ${visibleCheckedCount > 0 ? 'text-green-400' : 'text-slate-500'}`}>{visibleCheckedCount}</span>
-                  <span className="text-slate-500 font-medium">/ {visibleOptionsCount} (当前显示)</span>
+                  <span className={`text-2xl font-bold ${visibleCheckedCount > 0 ? 'text-[#62835c]' : 'text-[#8f8372]'}`}>{visibleCheckedCount}</span>
+                  <span className="text-[#8f8372] font-medium">/ {visibleOptionsCount} (当前显示)</span>
                 </div>
-                <div className="w-px h-6 bg-slate-700 mx-2"></div>
+                <div className="w-px h-6 bg-[#e4dbcc] mx-2"></div>
                 {brollSelections.length > 0 && (
                   <div className="flex items-baseline gap-1 opacity-60">
-                    <span className="text-lg font-bold text-slate-400">{checkedCount}</span>
-                    <span className="text-slate-500 text-sm">/ {totalOptions} (全局总计)</span>
+                    <span className="text-lg font-bold text-[#6b5e4f]">{checkedCount}</span>
+                    <span className="text-[#8f8372] text-sm">/ {totalOptions} (全局总计)</span>
                   </div>
                 )}
               </div>
@@ -168,7 +169,7 @@ export const Phase2View = ({
               {allChecked && (
                 <button
                   onClick={onProceed}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
+                  className="px-4 py-2 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
                 >
                   提交 → Phase 3
                 </button>

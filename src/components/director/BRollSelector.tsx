@@ -43,17 +43,17 @@ export const BRollSelector = ({ selected, onChange, disabled, types }: BRollSele
             disabled={disabled}
             className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all
               ${isSelected
-                ? 'border-blue-500 bg-blue-500/10'
-                : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'}
+                ? 'border-[#c97545] bg-[#c97545]/10'
+                : 'border-[#e4dbcc] bg-[#f4efe5]/60 hover:border-[#d8c8ae]'}
               ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center
-              ${isSelected ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}`}>
+              ${isSelected ? 'bg-[#c97545]/20 text-[#c97545]' : 'bg-[#e4dbcc] text-[#8f8372]'}`}>
               <Icon className="w-4 h-4" />
             </div>
-            <span className="text-sm font-medium text-white">{label}</span>
-            <span className="text-xs text-slate-500">{description}</span>
-            {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+            <span className="text-sm font-medium text-[#342d24]">{label}</span>
+            <span className="text-xs text-[#8f8372]">{description}</span>
+            {isSelected && <Check className="w-4 h-4 text-[#c97545]" />}
           </button>
         );
       })}

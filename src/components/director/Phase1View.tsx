@@ -19,7 +19,7 @@ const SimpleMarkdown = ({ text }: { text: string }) => {
         if (trimmed.startsWith('# ')) return <h2 key={i} className="text-2xl font-bold text-[#c97545] mt-6 mb-4">{parseInline(trimmed.replace('# ', ''))}</h2>;
 
         // Blockquotes
-        if (trimmed.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-blue-500 pl-4 py-1 my-4 text-[#6b5e4f] italic bg-blue-500/10 rounded-r">{parseInline(trimmed.replace('> ', ''))}</blockquote>;
+        if (trimmed.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-[#c97545] pl-4 py-1 my-4 text-[#6b5e4f] italic bg-[#c97545]/10 rounded-r">{parseInline(trimmed.replace('> ', ''))}</blockquote>;
 
         // Lists
         if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) return <li key={i} className="ml-6 list-disc text-[#6b5e4f] my-1 pb-1">{parseInline(trimmed.replace(/^(\*|-)\s+/, ''))}</li>;
@@ -41,7 +41,7 @@ const parseInline = (text: string) => {
   const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
   return <>{parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold text-blue-100">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-bold text-[#c97545]">{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return <code key={i} className="bg-slate-800 text-[#c97545] px-1.5 py-0.5 rounded text-sm font-mono">{part.slice(1, -1)}</code>;
@@ -179,7 +179,7 @@ export const Phase1View = ({
   if (isGenerating) {
     return (
       <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] p-8 text-center">
-        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+        <div className="w-12 h-12 border-4 border-[#c97545]/30 border-t-[#c97545] rounded-full animate-spin mx-auto mb-4" />
         <h3 className="text-lg font-bold text-[#342d24] mb-2">Generating Visual Concept...</h3>
         <p className="text-[#8f8372] text-sm">
           Analyzing script structure and style...
@@ -190,11 +190,11 @@ export const Phase1View = ({
 
   return (
     <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] overflow-hidden">
-      <div className="p-4 border-b border-[#e4dbcc] bg-slate-800/50">
+      <div className="p-4 border-b border-[#e4dbcc] bg-[#f4efe5]">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-[#342d24]">Visual Concept Proposal</h3>
           {isApproved && (
-            <span className="text-sm text-green-400 flex items-center gap-1">
+            <span className="text-sm text-[#5b7c6f] flex items-center gap-1">
               <CheckCircle className="w-4 h-4" /> Approved
             </span>
           )}
@@ -209,9 +209,9 @@ export const Phase1View = ({
 
       {!isApproved && (
         <div className="p-4 border-t border-[#e4dbcc]">
-          <label className="text-xs text-slate-500 block mb-2">Feedback / Adjustments</label>
+          <label className="text-xs text-[#8f8372] block mb-2">Feedback / Adjustments</label>
           <textarea
-            className="w-full bg-slate-800 border border-[#e4dbcc] rounded p-3 text-[#342d24] placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-[#faf6ef] border border-[#e4dbcc] rounded p-3 text-[#342d24] placeholder-[#c9baa3] focus:outline-none focus:border-[#c97545]"
             rows={3}
             placeholder="Describe changes you'd like to see..."
             value={feedback}
@@ -220,14 +220,14 @@ export const Phase1View = ({
           <div className="flex justify-end gap-2 mt-3">
             <button
               onClick={() => onRevise(feedback)}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-[#342d24] rounded flex items-center gap-2"
+              className="px-4 py-2 bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] rounded flex items-center gap-2 border border-[#e4dbcc]"
             >
               <RefreshCw className="w-4 h-4" />
               Revise
             </button>
             <button
               onClick={onApprove}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-[#342d24] rounded flex items-center gap-2"
+              className="px-4 py-2 bg-[#c97545] hover:bg-[#b26135] text-white rounded flex items-center gap-2 font-medium"
             >
               <CheckCircle className="w-4 h-4" />
               Approve & Continue

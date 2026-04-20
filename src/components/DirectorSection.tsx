@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { MonitorPlay } from 'lucide-react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
-import { Phase3View, RENDERABLE_TYPES as PHASE3_RENDERABLE_TYPES } from './director/Phase3View';
+import { Phase3View } from './director/Phase3View';
 import { Phase4View } from './director/Phase4View';
+import { DirectorWorkbenchShell } from './director/DirectorWorkbenchShell';
 import type { DirectorModule, DirectorChapter, SceneOption, BRollType } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
@@ -473,101 +473,63 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
     onUpdate({ ...data, items: normalized, phase: 2 });
   };
 
-  const phaseLabels: Record<Phase, string> = {
-    1: 'Concept',
-    2: '初审',
-    3: '二审',
-    4: 'XML 导出'
-  };
-
-  const phaseColors: Record<Phase, string> = {
-    1: 'bg-[#f4d03f]/20 text-[#9a7d0a]',
-    2: 'bg-[#5dade2]/20 text-[#2874a6]',
-    3: 'bg-[#58d68d]/20 text-[#1e8449]',
-    4: 'bg-[#af7ac5]/20 text-[#6c3483]'
+  const handlePhaseChange = (newPhase: Phase) => {
+    onUpdate({ ...data, phase: newPhase });
   };
 
   return (
-    <div className="bg-[#faf6ef] rounded-xl border border-[#e4dbcc] overflow-hidden">
-      <div className="p-4 border-b border-[#e4dbcc] flex justify-between items-center bg-[#f4efe5]/80">
-        <div className="flex items-center gap-2">
-          <MonitorPlay className="w-5 h-5 text-[#c97545]" />
-          <h2 className="font-semibold text-[#342d24]">Director (Visual)</h2>
-          <span className={`px-2 py-0.5 rounded text-xs ml-2 ${phaseColors[phase]}`}>
-            Phase {phase}: {phaseLabels[phase]}
-          </span>
-        </div>
-        <div className="flex gap-1">
-          {([1, 2, 3, 4] as Phase[]).map(p => {
-            // Phase 解锁规则：只能前进到已达到过的最高阶段，不能跳级
-            const maxReachedPhase = !conceptApproved ? 1
-              : chapters.length === 0 ? 2
-              : phase >= 3 ? 4  // 到过 Phase 3 则 P3/P4 都解锁
-              : 2;
-            const isDisabled = p > maxReachedPhase;
-            return (
-              <button
-                key={p}
-                onClick={() => onUpdate({ ...data, phase: p })}
-                disabled={isDisabled}
-                className={`px-3 py-1 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
-                  phase === p ? 'bg-[#c97545] text-white' : 'bg-[#f4efe5] text-[#8f8372] hover:bg-[#e4dbcc]'
-                }`}
-              >
-                P{p}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <DirectorWorkbenchShell
+      projectId={projectId}
+      phase={phase}
+      conceptApproved={conceptApproved}
+      hasChapters={chapters.length > 0}
+      onPhaseChange={handlePhaseChange}
+    >
+      {phase === 1 && (
+        <Phase1View
+          projectId={projectId}
+          scriptPath={scriptPath}
+          concept={concept}
+          isGenerating={isGeneratingConcept}
+          isApproved={conceptApproved}
+          onGenerate={handleGenerateConcept}
+          onRevise={handleReviseConcept}
+          onApprove={handleApproveConcept}
+          onImportChapters={handleImportChapters}
+        />
+      )}
 
-      <div className="p-6">
-        {phase === 1 && (
-          <Phase1View
-            projectId={projectId}
-            scriptPath={scriptPath}
-            concept={concept}
-            isGenerating={isGeneratingConcept}
-            isApproved={conceptApproved}
-            onGenerate={handleGenerateConcept}
-            onRevise={handleReviseConcept}
-            onApprove={handleApproveConcept}
-            onImportChapters={handleImportChapters}
-          />
-        )}
+      {phase === 2 && (
+        <Phase2View
+          projectId={projectId}
+          chapters={displayedChapters}
+          isLoading={isLoading}
+          onConfirmBRoll={handleConfirmBRoll}
+          onSelect={handleSelectOption}
+          onToggleCheck={handleToggleCheck}
+          onBatchSetCheck={handleBatchSetCheck}
+          onProceed={handleProceed}
+          pendingTaskKeys={pendingBatchTaskKeys}
+        />
+      )}
 
-        {phase === 2 && (
-          <Phase2View
-            projectId={projectId}
-            chapters={displayedChapters}
-            isLoading={isLoading}
-            onConfirmBRoll={handleConfirmBRoll}
-            onSelect={handleSelectOption}
-            onToggleCheck={handleToggleCheck}
-            onBatchSetCheck={handleBatchSetCheck}
-            onProceed={handleProceed}
-            pendingTaskKeys={pendingBatchTaskKeys}
-          />
-        )}
+      {phase === 3 && (
+        <Phase3View
+          projectId={projectId}
+          chapters={displayedChapters}
+          onApproveOption={handlePhase3ApproveOption}
+          onUpdateOption={handlePhase3UpdateOption}
+          onBatchApprove={handlePhase3BatchApprove}
+          onProceed={handleProceedToPhase4}
+        />
+      )}
 
-        {phase === 3 && (
-          <Phase3View
-            projectId={projectId}
-            chapters={displayedChapters}
-            onApproveOption={handlePhase3ApproveOption}
-            onUpdateOption={handlePhase3UpdateOption}
-            onBatchApprove={handlePhase3BatchApprove}
-            onProceed={handleProceedToPhase4}
-          />
-        )}
-
-        {phase === 4 && (
-          <Phase4View
-            projectId={projectId}
-            chapters={chapters}
-          />
-        )}
-      </div>
-    </div>
+      {phase === 4 && (
+        <Phase4View
+          projectId={projectId}
+          chapters={chapters}
+        />
+      )}
+    </DirectorWorkbenchShell>
   );
 };

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProductTopBar } from './ProductTopBar';
 import { WorkstationRail } from './WorkstationRail';
 import { ContextDrawer } from './ContextDrawer';
-import { useLLMConfig } from '../../hooks/useLLMConfig';
 import '../../styles/delivery-shell.css';
 
 export interface ScriptFile {
@@ -44,9 +43,6 @@ export function DeliveryShellLayout({
   const [activeDrawerTab, setActiveDrawerTab] = useState('chat');
 
   const [scripts, setScripts] = useState<ScriptFile[]>([]);
-  const [projectName, setProjectName] = useState<string | undefined>(undefined);
-
-  const { status: llmStatus } = useLLMConfig();
 
   useEffect(() => {
     if (!projectId) { setScripts([]); return; }
@@ -59,21 +55,6 @@ export function DeliveryShellLayout({
     return () => { stale = true; controller.abort(); };
   }, [projectId]);
 
-  useEffect(() => {
-    if (!projectId) { setProjectName(undefined); return; }
-    let stale = false;
-    fetch('/api/projects')
-      .then(r => r.json())
-      .then(data => {
-        if (stale) return;
-        const projects = data.projects || [];
-        const active = projects.find((p: { name: string; isActive: boolean }) => p.name === projectId || p.isActive);
-        setProjectName(active?.name || projectId);
-      })
-      .catch(() => { if (!stale) setProjectName(projectId); });
-    return () => { stale = true; };
-  }, [projectId]);
-
   const handleSelectScript = useCallback(async (pid: string, path: string) => {
     return onSelectScript(pid, path);
   }, [onSelectScript]);
@@ -82,9 +63,6 @@ export function DeliveryShellLayout({
     'shell-body',
     drawerCollapsed ? 'shell-body--drawer-collapsed' : '',
   ].filter(Boolean).join(' ');
-
-  const modelName = llmStatus?.global?.model || undefined;
-  const outputDir = '04_Visuals';
 
   return (
     <div className="delivery-shell">
@@ -103,9 +81,6 @@ export function DeliveryShellLayout({
           selectedScriptPath={selectedScriptPath}
           onSelectScript={handleSelectScript}
           scripts={scripts}
-          projectName={projectName}
-          modelName={modelName}
-          outputDir={outputDir}
         />
         <div className="shell-center">
           {children}
