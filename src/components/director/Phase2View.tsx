@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
+import { CheckCircle, Play, Loader2 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
-import type { DirectorChapter, BRollType } from '../../types';
-
-interface LogEntry {
-  timestamp: number;
-  type: string;
-  message: string;
-  provider?: string;
-  model?: string;
-}
+import { StoryboardSummaryStrip } from './phase-layouts/StoryboardSummaryStrip';
+import { ChapterRail } from './phase-layouts/ChapterRail';
+import { PhasePanel, PhasePanelHeader, PhasePanelBody } from './phase-layouts/PhasePanel';
+import type { DirectorChapter, BRollType, SceneOption } from '../../types';
 
 interface Phase2ViewProps {
   projectId: string;
@@ -18,10 +14,11 @@ interface Phase2ViewProps {
   onConfirmBRoll: (types: BRollType[]) => void;
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
-  onBatchSetCheck: (filterFn: (opt: any) => boolean, checked: boolean) => void;
+  onBatchSetCheck: (filterFn: (opt: SceneOption) => boolean, checked: boolean) => void;
   onProceed: () => void;
   pendingTaskKeys?: Set<string>;
 }
+
 export const Phase2View = ({
   projectId,
   chapters,
@@ -38,8 +35,8 @@ export const Phase2View = ({
     chapters.length > 0 ? [] : ['remotion', 'seedance', 'artlist', 'infographic']
   );
   const [wasLoading, setWasLoading] = useState(false);
+  const [activeChapterId, setActiveChapterId] = useState<string | undefined>(undefined);
 
-  // Sync state if chapters are loaded externally (e.g., initial fetch)
   useEffect(() => {
     if (chapters.length > 0 && !brollConfirmed && !isLoading && !wasLoading) {
       setBrollConfirmed(true);
@@ -47,7 +44,6 @@ export const Phase2View = ({
     }
   }, [chapters.length, brollConfirmed, isLoading, wasLoading]);
 
-  // Clear selections when generation finishes so the user starts with an empty filter
   useEffect(() => {
     if (isLoading) {
       setWasLoading(true);
@@ -57,18 +53,29 @@ export const Phase2View = ({
     }
   }, [isLoading, wasLoading]);
 
+  useEffect(() => {
+    if (chapters.length > 0 && !activeChapterId) {
+      setActiveChapterId(chapters[0].chapterId);
+    }
+  }, [chapters, activeChapterId]);
+
   const isShowAll = brollConfirmed && brollSelections.length === 0;
   const matchesFilter = (type: string) => isShowAll || brollSelections.includes(type as BRollType);
 
-  // Counts based on currently visible filters
-  const visibleOptionsCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => matchesFilter(o.type)).length, 0);
-  const visibleCheckedCount = chapters.reduce((sum, ch) =>
-    sum + ch.options.filter(o => matchesFilter(o.type) && o.isChecked).length, 0
+  const visibleOptionsCount = chapters.reduce(
+    (sum, ch) => sum + ch.options.filter(o => matchesFilter(o.type)).length,
+    0
+  );
+  const visibleCheckedCount = chapters.reduce(
+    (sum, ch) => sum + ch.options.filter(o => matchesFilter(o.type) && o.isChecked).length,
+    0
   );
 
-  // Total counts for overall progress
   const totalOptions = chapters.reduce((sum, ch) => sum + ch.options.length, 0);
-  const checkedCount = chapters.reduce((sum, ch) => sum + ch.options.filter(o => o.isChecked).length, 0);
+  const checkedCount = chapters.reduce(
+    (sum, ch) => sum + ch.options.filter(o => o.isChecked).length,
+    0
+  );
   const allChecked = chapters.length > 0 && chapters.every(c => c.options.some(o => o.isChecked));
 
   const handleConfirmBRoll = () => {
@@ -77,128 +84,169 @@ export const Phase2View = ({
     onConfirmBRoll(brollSelections);
   };
 
-  return (
-    <div className="flex flex-col gap-6">
-      {/* B-Roll 类型选择与过滤 */}
-      <div className="rounded-lg border border-[#e4dbcc] p-4" style={{ background: 'rgba(255,252,247,0.78)' }}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm text-[#6b5e4f] uppercase font-bold">
-            {brollConfirmed ? '过滤视觉方案 (Excel 式筛选)' : 'Select B-Roll Types'}
-          </h3>
-          {brollConfirmed && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
-                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
-              >
-                显示全部
-              </button>
-              <button
-                onClick={() => setBrollSelections([])}
-                className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
-              >
-                清空过滤 (显示全部)
-              </button>
-            </div>
-          )}
-        </div>
-        <BRollSelector
-          selected={brollSelections}
-          onChange={setBrollSelections}
-          disabled={!brollConfirmed && isLoading}
+  const getFilterLabel = () => {
+    if (!brollConfirmed) return undefined;
+    if (brollSelections.length === 0) return '全部类型';
+    return `已筛选 ${brollSelections.length} 类`;
+  };
+
+  const getChapterStatus = (ch: DirectorChapter) => {
+    const checked = ch.options.filter(o => o.isChecked).length;
+    if (checked === 0) return 'pending' as const;
+    if (checked < ch.options.length) return 'partial' as const;
+    return 'complete' as const;
+  };
+
+  const filteredChapters = chapters.map(ch => {
+    const filteredOptions = ch.options.filter(o => matchesFilter(o.type));
+    return { ...ch, options: filteredOptions };
+  }).filter(ch => ch.options.length > 0);
+
+  const activeChapter = filteredChapters.find(c => c.chapterId === activeChapterId) || filteredChapters[0];
+
+  if (!brollConfirmed) {
+    return (
+      <PhasePanel>
+        <PhasePanelHeader
+          title={<span className="text-sm font-bold text-[#342d24]">Select B-Roll Types</span>}
         />
-        {!brollConfirmed ? (
+        <PhasePanelBody className="space-y-5">
+          <BRollSelector
+            selected={brollSelections}
+            onChange={setBrollSelections}
+            disabled={isLoading}
+          />
           <button
             onClick={handleConfirmBRoll}
             disabled={brollSelections.length === 0}
-            className="mt-4 px-4 py-2 bg-[#c97545] hover:bg-[#b5653a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-medium"
+            className="px-5 py-2.5 bg-[#c97545] hover:bg-[#b5653a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
-            Confirm & Generate Previews
-          </button>
-        ) : (
-          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
-            <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
-            <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
-              <input
-                type="checkbox"
-                className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
-                style={{ backgroundColor: '#faf6ef' }}
-                ref={el => {
-                  if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
-                }}
-                checked={visibleCheckedCount === visibleOptionsCount && visibleOptionsCount > 0}
-                disabled={visibleOptionsCount === 0}
-                onChange={(e) => {
-                  const isChecked = e.target.checked;
-                  onBatchSetCheck(
-                    (opt) => matchesFilter(opt.type),
-                    isChecked
-                  );
-                }}
-              />
-              <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
-                全选当前视图方案 <span className="text-[#8f8372]">({visibleCheckedCount}/{visibleOptionsCount})</span>
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> 生成中...
               </span>
-            </label>
-          </div>
-        )}
-      </div>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Play className="w-4 h-4" /> Confirm & Generate Previews
+              </span>
+            )}
+          </button>
+        </PhasePanelBody>
+      </PhasePanel>
+    );
+  }
 
-      {chapters.length > 0 && (
-        <>
-          {/* 进度头工具栏 */}
-          <div className="rounded-lg border border-[#e4dbcc] p-4 flex items-center justify-between sticky top-4 z-10 shadow-lg" style={{ background: 'rgba(255,252,247,0.78)' }}>
-            <div className="flex items-center gap-4">
-              <span className="text-[#6b5e4f] font-medium whitespace-nowrap">筛选结果:</span>
-              <div className="flex gap-4">
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-bold ${visibleCheckedCount > 0 ? 'text-[#62835c]' : 'text-[#8f8372]'}`}>{visibleCheckedCount}</span>
-                  <span className="text-[#8f8372] font-medium">/ {visibleOptionsCount} (当前显示)</span>
-                </div>
-                <div className="w-px h-6 bg-[#e4dbcc] mx-2"></div>
-                {brollSelections.length > 0 && (
-                  <div className="flex items-baseline gap-1 opacity-60">
-                    <span className="text-lg font-bold text-[#6b5e4f]">{checkedCount}</span>
-                    <span className="text-[#8f8372] text-sm">/ {totalOptions} (全局总计)</span>
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      <StoryboardSummaryStrip
+        chapters={chapters}
+        visibleCheckedCount={visibleCheckedCount}
+        visibleOptionsCount={visibleOptionsCount}
+        totalCheckedCount={checkedCount}
+        totalOptionsCount={totalOptions}
+        filterLabel={getFilterLabel()}
+      />
+
+      <div className="flex gap-4 flex-1 min-h-0">
+        <ChapterRail
+          chapters={chapters}
+          activeChapterId={activeChapter?.chapterId}
+          onChapterClick={(id) => setActiveChapterId(id)}
+          getChapterStatus={getChapterStatus}
+        />
+
+        <div className="flex-1 min-w-0 overflow-auto">
+          <div className="flex flex-col gap-4">
+            <PhasePanel>
+              <PhasePanelHeader
+                title={<span className="text-sm font-bold text-[#342d24]">过滤视觉方案</span>}
+                actions={
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
+                      className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+                    >
+                      显示全部
+                    </button>
+                    <button
+                      onClick={() => setBrollSelections([])}
+                      className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+                    >
+                      清空过滤
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>
+                }
+              />
+              <PhasePanelBody>
+                <BRollSelector
+                  selected={brollSelections}
+                  onChange={setBrollSelections}
+                  disabled={isLoading}
+                />
+                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
+                  <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
+                  <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                      style={{ backgroundColor: '#faf6ef' }}
+                      ref={el => {
+                        if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
+                      }}
+                      checked={visibleCheckedCount === visibleOptionsCount && visibleOptionsCount > 0}
+                      disabled={visibleOptionsCount === 0}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        onBatchSetCheck((opt) => matchesFilter(opt.type), isChecked);
+                      }}
+                    />
+                    <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
+                      全选当前视图方案 <span className="text-[#8f8372]">({visibleCheckedCount}/{visibleOptionsCount})</span>
+                    </span>
+                  </label>
+                </div>
+              </PhasePanelBody>
+            </PhasePanel>
 
-            <div className="flex items-center gap-3">
-              {allChecked && (
+            {allChecked && (
+              <div className="flex justify-end">
                 <button
                   onClick={onProceed}
-                  className="px-4 py-2 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
+                  className="px-5 py-2.5 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
                 >
+                  <CheckCircle className="w-4 h-4" />
                   提交 → Phase 3
                 </button>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
 
-          <div className="flex flex-col gap-4">
-            {chapters.map(chapter => {
-              const filteredOptions = chapter.options.filter(o => matchesFilter(o.type));
-              if (filteredOptions.length === 0) return null;
+            {activeChapter && (
+              <ChapterCard
+                key={activeChapter.chapterId}
+                chapter={activeChapter}
+                projectId={projectId}
+                onSelect={onSelect}
+                onToggleCheck={onToggleCheck}
+                pendingTaskKeys={pendingTaskKeys}
+              />
+            )}
 
-              // Only pass filtered options to the chapter card
-              const filteredChapter = { ...chapter, options: filteredOptions };
-
-              return (
+            {/* 其他章节（折叠展示） */}
+            {filteredChapters
+              .filter(ch => ch.chapterId !== activeChapter?.chapterId)
+              .map(chapter => (
                 <ChapterCard
                   key={chapter.chapterId}
-                  chapter={filteredChapter}
+                  chapter={chapter}
                   projectId={projectId}
                   onSelect={onSelect}
                   onToggleCheck={onToggleCheck}
                   pendingTaskKeys={pendingTaskKeys}
                 />
-              );
-            })}
+              ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 };

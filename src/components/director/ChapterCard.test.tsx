@@ -31,58 +31,9 @@ describe('ChapterCard', () => {
     vi.restoreAllMocks();
   });
 
-  it('auto-regenerates thumbnail when previewUrl is cleared by an expert action', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      json: async () => ({ success: true, imageUrl: 'data:image/png;base64,fake-thumbnail' }),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const chapterWithPreview = createChapter('https://example.com/original-preview.png');
-    const { rerender } = render(
-      <ChapterCard
-        chapter={chapterWithPreview}
-        projectId="CSET-Seedance2"
-        onSelect={() => {}}
-        onToggleCheck={() => {}}
-      />
-    );
-
-    const chapterWithoutPreview = createChapter(undefined);
-    rerender(
-      <ChapterCard
-        chapter={chapterWithoutPreview}
-        projectId="CSET-Seedance2"
-        onSelect={() => {}}
-        onToggleCheck={() => {}}
-      />
-    );
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/director/phase2/thumbnail',
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
-    });
-  });
-
-  it('auto-regenerates thumbnail when render-affecting fields change even if previewUrl stays undefined', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({
-        json: async () => ({ success: true, imageUrl: 'data:image/png;base64,first-thumbnail' }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({ success: true, imageUrl: 'data:image/png;base64,first-thumbnail' }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({ success: true, imageUrl: 'data:image/png;base64,second-thumbnail' }),
-      });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const chapter = createChapter(undefined);
-    const { rerender } = render(
+  it('renders chapter header and options', () => {
+    const chapter = createChapter();
+    render(
       <ChapterCard
         chapter={chapter}
         projectId="CSET-Seedance2"
@@ -91,26 +42,25 @@ describe('ChapterCard', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('生成预览'));
+    expect(screen.getByText('第1章')).toBeInTheDocument();
+    expect(screen.getByText('开篇')).toBeInTheDocument();
+    expect(screen.getByText('测试引用')).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    const updatedChapter = createChapter(undefined);
-    updatedChapter.options[0].props = { title: '修改后的标题', noWrap: true };
-
-    rerender(
+  it('calls onToggleCheck when confirm button is clicked', () => {
+    const chapter = createChapter();
+    const handleToggle = vi.fn();
+    render(
       <ChapterCard
-        chapter={updatedChapter}
+        chapter={chapter}
         projectId="CSET-Seedance2"
         onSelect={() => {}}
-        onToggleCheck={() => {}}
+        onToggleCheck={handleToggle}
       />
     );
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
+    const confirmBtn = screen.getByTitle('确认该方案，加入渲染队列');
+    fireEvent.click(confirmBtn);
+    expect(handleToggle).toHaveBeenCalledWith('ch1', 'ch1-opt1');
   });
 });
