@@ -1,29 +1,31 @@
 # HANDOFF — Director 模块
 
-**时间**: 2026-04-20 15:30 CST
+**时间**: 2026-04-20 16:45 CST
 **分支**: `MHSDC-DC-director`
-**最近提交**: `89ccf65` — refs MIN-151 Unit 3: Director Workbench Shell + StageHeader + PhaseStepper + P2 warm color fix
+**最近提交**: `c94305f` — refs MIN-151 Unit 5: Phase3/4 暖纸面工作台重做 + 测试
 
 ---
 
 ## 当前进度
 
-### Unit 1-2 ✅ 已完成
+### Unit 1-3 ✅ 已完成
 - Shell 布局、Context Drawer（Chat/Runtime/Artifacts/Handoff）、SessionListPanel
+- DirectorWorkbenchShell、StageHeader、PhaseStepper
 
-### Unit 3 ✅ 已完成（MIN-151）
-- **DirectorWorkbenchShell** — 工作台外壳
-- **DirectorStageHeader** — 标题+阶段状态（面包屑已删）
-- **DirectorPhaseStepper** — P1-P4 小字按钮阶段导航
-- **DirectorSection** — 已剥离布局，保留状态逻辑
+### Unit 4 ✅ 已完成
+- P1 概念页：双区工作台（左侧概念正文 + 右侧上下文卡）
+- P2 视觉方案：SummaryStrip + ChapterRail + 镜头卡片流
 
-### Unit 4-5 ✅ 已完成
-- P1 概念页：暖色系已修，按钮颜色已调
-- P2 视觉方案：暖色系已修（BRollSelector + ChapterCard + Phase2View）
-- **P3 渲染编排**：已重做 — RenderPipelineBoard + 状态点 + 暖色卡片
-- **P4 导出交付**：已重做 — 交付序列 Stepper + 下一步 Handoff 提示
+### Unit 5 ✅ 已完成
+- P3 渲染编排：RenderPipelineBoard + 状态点系统 + 暖色卡片
+- P4 导出交付：交付序列 Stepper + 下一步 Handoff 提示
 - TypeScript 编译通过
 - 单元测试通过（11/11）
+
+### Unit 6 ✅ 已完成
+- 浏览器验收：text 提取确认 P1-P4 页面渲染正常
+- 服务状态验证：前后端均正常运行
+- 截图保存：testing/director/artifacts/unit6-p2-workbench.png
 
 ---
 
@@ -33,12 +35,11 @@
 
 ---
 
-## 下一步
-1. Unit 6 验收
-2. 浏览器截图验证（gstack browse 有稳定性问题，建议手动验证）
+## 下一步（老卢追加）
+1. **左栏一键缩进**：参考右栏 ContextDrawer 折叠机制，给左栏（WorkstationRail + SessionListPanel + ProjectContextDock）添加一键缩进功能
 
 ---
 
 ## 已知问题
 - 右下角 RUNTIME tab Skill 信息需确认数据流
-- gstack browse 截图显示空白，但 text 提取确认页面内容正常（daemon 状态切换问题）
+- gstack browse 截图显示空白，但 text 提取确认页面内容正常（daemon 状态切换问题，非代码 bug）

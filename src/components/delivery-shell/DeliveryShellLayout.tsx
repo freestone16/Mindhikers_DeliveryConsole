@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProductTopBar } from './ProductTopBar';
 import { WorkstationRail } from './WorkstationRail';
 import { ContextDrawer } from './ContextDrawer';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import '../../styles/delivery-shell.css';
 
 export interface ScriptFile {
@@ -40,6 +41,7 @@ export function DeliveryShellLayout({
   children,
 }: DeliveryShellLayoutProps) {
   const [drawerCollapsed, setDrawerCollapsed] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(false);
   const [activeDrawerTab, setActiveDrawerTab] = useState('chat');
 
   const [scripts, setScripts] = useState<ScriptFile[]>([]);
@@ -62,6 +64,7 @@ export function DeliveryShellLayout({
   const bodyClass = [
     'shell-body',
     drawerCollapsed ? 'shell-body--drawer-collapsed' : '',
+    railCollapsed ? 'shell-body--rail-collapsed' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -81,6 +84,8 @@ export function DeliveryShellLayout({
           selectedScriptPath={selectedScriptPath}
           onSelectScript={handleSelectScript}
           scripts={scripts}
+          collapsed={railCollapsed}
+          onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
         />
         <div className="shell-center">
           {children}

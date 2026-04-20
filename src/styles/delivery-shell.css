@@ -163,6 +163,10 @@
   transition: width var(--transition-normal);
 }
 
+.shell-rail--collapsed {
+  width: var(--rail-collapsed-width);
+}
+
 .shell-rail__section {
   padding: 14px 14px;
 }
