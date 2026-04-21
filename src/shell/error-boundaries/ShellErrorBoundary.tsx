@@ -47,8 +47,8 @@ export class ShellErrorBoundary extends Component<ShellErrorBoundaryProps, Shell
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          background: 'var(--shell-bg, #faf7f0)',
-          color: 'var(--ink-1, #1a1a1a)',
+          background: 'var(--gc-bg-base, #faf7f0)',
+          color: 'var(--gc-text-primary, #1a1a1a)',
           fontFamily: 'Instrument Sans, system-ui, sans-serif',
         }}
       >
@@ -56,10 +56,10 @@ export class ShellErrorBoundary extends Component<ShellErrorBoundaryProps, Shell
           <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
             Golden Crucible 遇到了意外错误
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--ink-3, #6b6b6b)', marginBottom: 8 }}>
+          <p style={{ fontSize: 14, color: 'var(--gc-text-tertiary, #6b6b6b)', marginBottom: 8 }}>
             {this.state.error?.message || '未知错误'}
           </p>
-          <p style={{ fontSize: 12, color: 'var(--ink-3, #6b6b6b)', marginBottom: 24 }}>
+          <p style={{ fontSize: 12, color: 'var(--gc-text-tertiary, #6b6b6b)', marginBottom: 24 }}>
             错误已被记录。请尝试刷新页面，如果问题持续出现请联系管理员。
           </p>
           <Button variant="primary" onClick={this.handleReload}>

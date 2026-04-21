@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, BookmarkCheck, Check, FolderTree, Loader2, Paperclip, RotateCcw, Send, Settings, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Paperclip, Send, Sparkles, X } from 'lucide-react';
 import type { Attachment, ChatMessage, ChatMessageMeta, HostRoutedAsset, ToolCallConfirmation } from '../types';
 import { EXPERTS } from '../config/experts';
 import { enrichMessageMeta, toHostRoutedAsset } from './crucible/hostRouting';
@@ -91,22 +91,22 @@ const buildDefaultAssistantMeta = (
 
 const getBubbleTone = (msg: ChatMessage) => {
     if (msg.role === 'user') {
-        return 'border-[rgba(166,117,64,0.18)] bg-[linear-gradient(180deg,#f3dcc2_0%,#eed0ae_100%)] text-[var(--ink-1)]';
+        return 'border-[rgba(166,117,64,0.18)] bg-[linear-gradient(180deg,#f3dcc2_0%,#eed0ae_100%)] text-[var(--gc-text-primary)]';
     }
 
     if (msg.meta?.classification === 'quote') {
-        return 'border-[rgba(177,139,80,0.18)] bg-[linear-gradient(180deg,#fff8ef_0%,#f8ebd9_100%)] text-[var(--ink-1)]';
+        return 'border-[rgba(177,139,80,0.18)] bg-[linear-gradient(180deg,#fff8ef_0%,#f8ebd9_100%)] text-[var(--gc-text-primary)]';
     }
 
     if (msg.meta?.classification === 'reference') {
-        return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffdf8_0%,#f6eee2_100%)] text-[var(--ink-1)]';
+        return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffdf8_0%,#f6eee2_100%)] text-[var(--gc-text-primary)]';
     }
 
     if (msg.meta?.classification === 'asset') {
-        return 'border-[rgba(191,147,95,0.2)] bg-[linear-gradient(180deg,#fef7ee_0%,#f3e4cf_100%)] text-[var(--ink-1)]';
+        return 'border-[rgba(191,147,95,0.2)] bg-[linear-gradient(180deg,#fef7ee_0%,#f3e4cf_100%)] text-[var(--gc-text-primary)]';
     }
 
-    return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] text-[var(--ink-1)]';
+    return 'border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] text-[var(--gc-text-primary)]';
 };
 
 const getMessageAuthor = (
@@ -195,13 +195,13 @@ const shouldSkipAssistantMessage = (prev: ChatMessage[], next: ChatMessage, isCr
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
     isOpen,
-    onToggle,
+    onToggle: _onToggle,
     expertId,
     projectId,
     scriptPath,
     resetToken,
     displayName,
-    panelTitle,
+    panelTitle: _panelTitle,
     currentUserBadge,
     headerBadges,
     externalMessages = [],
@@ -209,7 +209,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onRouteAsset,
     onPersistedSnapshotSaved,
     onResetAll,
-    onOpenHistory,
+    onOpenHistory: _onOpenHistory,
     blackboardHint,
     thesisReady,
     onEnterThesisWriter,
@@ -248,18 +248,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const scopeKey = `${expertId}::${projectId}::${scriptPath || '__no_script__'}`;
     const isCrucibleMode = expertId === 'GoldenMetallurgist';
     const confirmKey = `chatpanel_confirm_send_${expertId}`;
-    const [showSettings, setShowSettings] = useState(false);
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [_toastMessage, setToastMessage] = useState<string | null>(null);
+    void _toastMessage;
     const toastTimerRef = useRef<number | null>(null);
     const [confirmBeforeSend, setConfirmBeforeSend] = useState(() => {
         try { return localStorage.getItem(confirmKey) === 'true'; } catch { return false; }
     });
     const warningTimerRef = useRef<number | null>(null);
 
-    const saveConfirmSetting = (value: boolean) => {
+    const _saveConfirmSetting = (value: boolean) => {
         setConfirmBeforeSend(value);
         try { localStorage.setItem(confirmKey, String(value)); } catch { /* ignore */ }
     };
+    void _saveConfirmSetting;
 
     const showToast = useCallback((msg: string) => {
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -805,7 +806,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         });
     };
 
-    const handleClearHistory = () => {
+    const _handleClearHistory = () => {
         if (!window.confirm('确定要清空对话历史吗？')) return;
         socket?.emit('chat-clear-history', { expertId, projectId, scriptPath });
         setMessages([]);
@@ -814,13 +815,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         sendGuardRef.current = false;
         lastSentRef.current = null;
     };
+    void _handleClearHistory;
 
-    const handleResetAll = useCallback(() => {
+    const _handleResetAll = useCallback(() => {
         if (!window.confirm('确定要重置工作区并清空对话吗？')) return;
         onResetAll?.();
     }, [onResetAll]);
+    void _handleResetAll;
 
-    const handleExportMarkdown = useCallback(() => {
+    const _handleExportMarkdown = useCallback(() => {
         const title = (displayName || expertName || '黄金坩埚对话').trim();
         const lines = [
             `# ${title}`,
@@ -853,16 +856,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         URL.revokeObjectURL(url);
         showToast('对话已下载');
     }, [displayName, expertName, messages, headerBadges, showToast]);
+    void _handleExportMarkdown;
 
     const scopedSnapshotKey = useMemo(() => getCrucibleSnapshotStorageKey(workspaceId), [workspaceId]);
 
-    const crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
+    const _crucibleDraftBadge = useMemo(() => getCrucibleDraftBadge({
         inputText,
         hasMessages: messages.length > 0,
         snapshot: isCrucibleMode ? readScopedCrucibleSnapshot(workspaceId) : null,
     }), [inputText, isCrucibleMode, messages.length, workspaceId]);
+    void _crucibleDraftBadge;
 
-    const handleSaveTopic = useCallback(async () => {
+    const _handleSaveTopic = useCallback(async () => {
         if (!isCrucibleMode) {
             return;
         }
@@ -920,6 +925,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             showToast('保存失败');
         }
     }, [displayName, expertName, inputText, isCrucibleMode, messages, onPersistedSnapshotSaved, projectId, scopedSnapshotKey, scriptPath, showToast]);
+    void _handleSaveTopic;
 
     const emptyStateText = useMemo(() => {
         if (isCrucibleMode) {
@@ -934,140 +940,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     );
     const showTrialBanner = Boolean(isCrucibleMode && trialStatus?.enabled);
     const trialBannerTone = isTrialBlocked
-        ? 'border-[rgba(201,118,81,0.3)] bg-[rgba(255,241,233,0.96)] text-[var(--ink-1)]'
-        : 'border-[rgba(184,144,77,0.2)] bg-[rgba(255,248,232,0.96)] text-[var(--ink-2)]';
+        ? 'border-[rgba(201,118,81,0.3)] bg-[rgba(255,241,233,0.96)] text-[var(--gc-text-primary)]'
+        : 'border-[rgba(184,144,77,0.2)] bg-[rgba(255,248,232,0.96)] text-[var(--gc-text-secondary)]';
 
     return (
-        <div className="flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,250,244,0.98)_0%,rgba(248,239,226,0.96)_100%)]">
-            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-2">
-                <div className="flex items-center justify-between gap-3">
-                    {isCrucibleMode && headerBadges && headerBadges.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            {headerBadges.map((badge) => (
-                                <div key={badge.id} className="flex items-center gap-1.5 rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[rgba(255,255,255,0.52)] px-2 py-1">
-                                    {badge.avatarImage ? (
-                                        <div className="h-6 w-6 overflow-hidden rounded-lg bg-[var(--surface-2)]">
-                                            <img src={badge.avatarImage} alt={badge.name} className="h-full w-full object-cover" />
-                                        </div>
-                                    ) : (
-                                        <div className="grid h-6 w-6 place-items-center rounded-lg bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-1)]">
-                                            {badge.avatarText || badge.name.slice(0, 1)}
-                                        </div>
-                                    )}
-                                    <div className="text-[12px] font-medium text-[var(--ink-1)]">{badge.name}</div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : !isCrucibleMode ? (
-                        <div className="flex items-center gap-2">
-                            <div className="grid h-9 w-9 place-items-center rounded-2xl border border-[rgba(166,117,64,0.15)] bg-[var(--surface-1)] text-[13px] font-semibold text-[var(--ink-1)]">聊</div>
-                            <div className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{panelTitle || displayName || expertName}</div>
-                        </div>
-                    ) : null}
-                    <div className="relative flex flex-shrink-0 items-center gap-1">
-                        {toastMessage && (
-                            <span className="mr-1 animate-pulse rounded-full bg-[rgba(166,117,64,0.12)] px-2.5 py-1 text-[11px] text-[var(--ink-2)]">{toastMessage}</span>
-                        )}
-                        <button
-                            onClick={handleExportMarkdown}
-                            title="下载 Markdown 对话记录"
-                            className="rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                        >
-                            <span className="text-[11px] font-bold leading-none">D</span>
-                        </button>
-                        {isCrucibleMode && (
-                            <>
-                                <button
-                                    onClick={onOpenHistory}
-                                    title="打开话题中心"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <FolderTree className="h-3.5 w-3.5" />
-                                    <span className="text-[11px] font-medium">话题</span>
-                                </button>
-                                <button
-                                    onClick={() => void handleSaveTopic()}
-                                    title="保存当前话题到服务端历史中心"
-                                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                                >
-                                    <BookmarkCheck className="h-3.5 w-3.5" />
-                                    <span className="text-[11px] font-medium">保存</span>
-                                </button>
-                                <span className="rounded-full border border-[rgba(156,117,76,0.14)] bg-[rgba(255,252,247,0.9)] px-2.5 py-1 text-[11px] text-[var(--ink-3)]">
-                                    {crucibleDraftBadge}
-                                </span>
-                            </>
-                        )}
-                        {isCrucibleMode && onResetAll ? (
-                            <button
-                                onClick={handleResetAll}
-                                title="重置工作区并清空对话"
-                                className="inline-flex items-center gap-1 rounded-xl px-2 py-1.5 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                            >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                <span className="text-[11px] font-medium">重置</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleClearHistory}
-                                title="清空对话历史"
-                                className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setShowSettings((prev) => !prev)}
-                            title="对话设置"
-                            className={`rounded-xl p-2 transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)] ${showSettings ? 'bg-[var(--surface-1)] text-[var(--ink-1)]' : 'text-[var(--ink-3)]'}`}
-                        >
-                            <Settings className="h-4 w-4" />
-                        </button>
-                        <button
-                            onClick={onToggle}
-                            className="rounded-xl p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                        {showSettings && (
-                            <div className="absolute right-0 top-10 z-10 w-52 rounded-[10px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.98)] p-3 shadow-[0_8px_24px_rgba(131,103,70,0.12)]">
-                                <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">对话设置</div>
-                                <label className="flex cursor-pointer items-center justify-between gap-2 py-1.5">
-                                    <span className="text-[13px] text-[var(--ink-1)]">发送前确认</span>
-                                    <div
-                                        className={`relative h-5 w-9 flex-shrink-0 rounded-full transition-colors ${confirmBeforeSend ? 'bg-[var(--accent)]' : 'bg-[var(--surface-2)]'}`}
-                                        onClick={() => saveConfirmSetting(!confirmBeforeSend)}
-                                    >
-                                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${confirmBeforeSend ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                    </div>
-                                </label>
-                            </div>
-                        )}
-                    </div>
-                </div>
+        <div className="flex h-full flex-col">
 
-                {!isCrucibleMode && headerBadges && headerBadges.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {headerBadges.map((badge) => (
-                            <div key={badge.id} className="flex items-center gap-2 rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[rgba(255,255,255,0.52)] px-2.5 py-2">
-                                {badge.avatarImage ? (
-                                    <div className="h-8 w-8 overflow-hidden rounded-xl bg-[var(--surface-2)]">
-                                        <img src={badge.avatarImage} alt={badge.name} className="h-full w-full object-cover" />
-                                    </div>
-                                ) : (
-                                    <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--surface-2)] text-sm font-semibold text-[var(--ink-1)]">
-                                        {badge.avatarText || badge.name.slice(0, 1)}
-                                    </div>
-                                )}
-                                <div className="text-[13px] font-medium text-[var(--ink-1)]">{badge.name}</div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
 
             {warning && (
-                <div className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--ink-2)]">
+                <div className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--gc-text-secondary)]">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                     {warning}
                 </div>
@@ -1087,7 +968,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="flex-1 overflow-y-auto px-4 py-4" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
                 {messages.length === 0 && !streamingContent ? (
-                    <div className="mt-8 rounded-[24px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.38)] px-4 py-6 text-center text-sm text-[var(--ink-3)]">
+                    <div className="mt-8 rounded-[24px] border border-dashed border-[var(--gc-line-subtle)] bg-[rgba(255,255,255,0.38)] px-4 py-6 text-center text-sm text-[var(--gc-text-tertiary)]">
                         {emptyStateText}
                     </div>
                 ) : (
@@ -1099,21 +980,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             return (
                                 <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                                     {author.avatarImage ? (
-                                        <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)]">
+                                        <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--gc-col-left)]">
                                             <img src={author.avatarImage} alt={author.name} className="h-full w-full object-cover" />
                                         </div>
                                     ) : (
-                                        <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                                        <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--gc-col-left)] text-sm font-semibold text-[var(--gc-text-primary)]">
                                             {author.avatarText || author.name.slice(0, 1)}
                                         </div>
                                     )}
 
                                     <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
-                                        <div className={`mb-1 flex items-center gap-2 text-[11px] ${isUser ? 'flex-row-reverse text-right' : 'text-left'} text-[var(--ink-3)]`}>
-                                            <span className="font-medium text-[var(--ink-2)]">{author.name}</span>
+                                        <div className={`mb-1 flex items-center gap-2 text-[11px] ${isUser ? 'flex-row-reverse text-right' : 'text-left'} text-[var(--gc-text-tertiary)]`}>
+                                            <span className="font-medium text-[var(--gc-text-secondary)]">{author.name}</span>
                                         </div>
 
-                                        <div className={`w-full rounded-[22px] border px-3.5 py-3 shadow-[0_8px_20px_rgba(131,103,70,0.04)] ${getBubbleTone(msg)}`}>
+                                        <div className={`w-full rounded-[22px] border px-3.5 py-3 ${getBubbleTone(msg)}`}>
                                             {msg.attachments && msg.attachments.length > 0 && (
                                                 <div className="mb-3 flex flex-wrap gap-2">
                                                     {msg.attachments.map((att, index) => (
@@ -1135,26 +1016,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                                             {msg.actionConfirm && (
                                                 <div className="mt-3 rounded-[18px] border border-[rgba(184,144,77,0.24)] bg-[rgba(255,249,236,0.95)] p-3">
-                                                    <p className="mb-3 text-sm font-medium text-[var(--ink-1)]">{msg.actionConfirm.description}</p>
+                                                    <p className="mb-3 text-sm font-medium text-[var(--gc-text-primary)]">{msg.actionConfirm.description}</p>
                                                     {msg.actionConfirm.status === 'pending' ? (
                                                         <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleConfirmAction(msg.actionConfirm!)}
-                                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
-                                                            >
+                                                    <button
+                                                        onClick={() => handleConfirmAction(msg.actionConfirm!)}
+                                                        className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--gc-accent)] px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                                    >
                                                                 <Check className="h-3.5 w-3.5" />
                                                                 确认执行
                                                             </button>
                                                             <button
                                                                 onClick={() => handleCancelAction(msg.actionConfirm!)}
-                                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-[var(--line-soft)] bg-[var(--surface-0)] px-3 py-2 text-xs font-medium text-[var(--ink-2)]"
+                                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] px-3 py-2 text-xs font-medium text-[var(--gc-text-secondary)]"
                                                             >
                                                                 <X className="h-3.5 w-3.5" />
                                                                 取消
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <span className="inline-flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] px-2.5 py-1 text-[11px] text-[var(--ink-2)]">
+                                                        <span className="inline-flex rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] px-2.5 py-1 text-[11px] text-[var(--gc-text-secondary)]">
                                                             {msg.actionConfirm.status === 'confirmed' ? '已确认' : '已取消'}
                                                         </span>
                                                     )}
@@ -1163,23 +1044,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                         </div>
 
                                         {isCrucibleMode && blackboardHint && msg.id === lastOldluMessageId && msg.meta?.authorId === 'oldlu' && (
-                                            <div className="mt-2 px-1 text-[12px] leading-6 text-[var(--ink-3)]">
-                                                {blackboardHint}
-                                            </div>
+                                        <div className="mt-2 px-1 text-[12px] leading-6 text-[var(--gc-text-tertiary)]">
+                                            {blackboardHint}
+                                        </div>
                                         )}
 
                                         {isCrucibleMode && thesisReady && msg.id === lastOldluMessageId && msg.meta?.authorId === 'oldlu' && (
                                             <button
                                                 type="button"
                                                 onClick={onEnterThesisWriter}
-                                                className="mt-3 flex w-full items-center gap-2.5 rounded-xl border border-[rgba(201,149,107,0.35)] bg-[linear-gradient(135deg,#fdf6ec_0%,#f5e6d0_100%)] px-4 py-3 text-left shadow-[0_4px_14px_rgba(168,132,82,0.10)] transition-all hover:shadow-[0_6px_20px_rgba(168,132,82,0.18)]"
+                                                className="mt-3 flex w-full items-center gap-2.5 rounded-xl border border-[rgba(201,149,107,0.35)] bg-[linear-gradient(135deg,#fdf6ec_0%,#f5e6d0_100%)] px-4 py-3 text-left transition-all"
                                             >
                                                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[rgba(201,149,107,0.2)]">
                                                     <Sparkles className="h-4.5 w-4.5 text-[#a07830]" />
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-[13px] font-semibold text-[var(--ink-1)]">生成论文</span>
-                                                    <span className="text-[11px] text-[var(--ink-3)]">将这段对话提炼为深度论文</span>
+                                                    <span className="text-[13px] font-semibold text-[var(--gc-text-primary)]">生成论文</span>
+                                                    <span className="text-[11px] text-[var(--gc-text-tertiary)]">将这段对话提炼为深度论文</span>
                                                 </div>
                                             </button>
                                         )}
@@ -1190,8 +1071,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                         {(streamingContent || (isCrucibleMode && isStreaming)) && (
                             <div className="pl-1">
-                                <div className="mb-1 text-[11px] text-[var(--ink-3)]">{isCrucibleMode ? '老卢、老张在思索' : '推理中'}</div>
-                                <div className="inline-block rounded-[10px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--ink-1)] shadow-[0_8px_20px_rgba(131,103,70,0.04)]">
+                                <div className="mb-1 text-[11px] text-[var(--gc-text-tertiary)]">{isCrucibleMode ? '老卢、老张在思索' : '推理中'}</div>
+                                <div className="inline-block rounded-[10px] border border-[rgba(146,118,82,0.16)] bg-[linear-gradient(180deg,#fffaf3_0%,#f7eddf_100%)] px-3.5 py-3 text-[13px] leading-7 text-[var(--gc-text-primary)]">
                                     {isCrucibleMode
                                         ? crucibleThinkingLabel
                                         : streamingContent}
@@ -1205,14 +1086,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
 
             {attachments.length > 0 && (
-                <div className="border-t border-[var(--line-soft)] px-4 py-2">
+                <div className="border-t border-[var(--gc-line-subtle)] px-4 py-2">
                     <div className="flex flex-wrap gap-2">
                         {attachments.map((att, index) => (
                             <div key={`${att.name}_${index}`} className="relative">
                                 <img src={att.previewUrl} alt={att.name} className="h-12 w-12 rounded-xl object-cover" />
                                 <button
                                     onClick={() => removeAttachment(index)}
-                                    className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--accent)] text-white"
+                                    className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--gc-accent)] text-white"
                                 >
                                     <X className="h-3 w-3" />
                                 </button>
@@ -1222,9 +1103,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
             )}
 
-            <div className="border-t border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
+            <div className="border-t border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
                 <div className="flex items-center gap-2">
-                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--surface-1)] text-sm font-semibold text-[var(--ink-1)]">
+                    <div className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--gc-col-left)] text-sm font-semibold text-[var(--gc-text-primary)]">
                         {resolvedCurrentUserBadge.avatarImage ? (
                             <img
                                 src={resolvedCurrentUserBadge.avatarImage}
@@ -1235,7 +1116,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             resolvedCurrentUserBadge.avatarText || resolvedCurrentUserBadge.name.slice(0, 1)
                         )}
                     </div>
-                    <label className="flex-shrink-0 cursor-pointer rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]">
+                    <label className="flex-shrink-0 cursor-pointer rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-2 text-[var(--gc-text-tertiary)] transition-colors hover:text-[var(--gc-text-primary)]">
                         <Paperclip className="h-4 w-4" />
                         <input type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
                     </label>
@@ -1256,14 +1137,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         placeholder={isCrucibleMode ? '继续把你的判断往下说。' : '继续输入。'}
-                        className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink-1)] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--line-strong)]"
+                        className="min-h-[96px] flex-1 resize-none rounded-[22px] border border-[var(--gc-line-subtle)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--gc-text-primary)] outline-none transition-colors placeholder:text-[var(--gc-text-tertiary)] focus:border-[var(--gc-line-default)]"
                         rows={3}
                         disabled={isCrucibleMode ? isTrialBlocked : isStreaming}
                     />
                     <button
                         onClick={handleSend}
                         disabled={isTrialBlocked || (isStreaming && !isCrucibleMode) || (!inputText.trim() && attachments.length === 0)}
-                        className="flex-shrink-0 grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--surface-2)] disabled:text-[var(--ink-3)]"
+                        className="flex-shrink-0 grid h-11 w-11 place-items-center rounded-2xl bg-[var(--gc-accent)] text-white transition-opacity hover:opacity-90 disabled:bg-[var(--gc-col-content)] disabled:text-[var(--gc-text-tertiary)]"
                     >
                         {(isStreaming && !isCrucibleMode) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </button>

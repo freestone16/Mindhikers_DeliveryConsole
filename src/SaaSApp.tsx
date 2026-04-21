@@ -1,14 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { buildApiUrl } from './config/runtime';
-import { LLM_CONFIG_PATH, modulePath } from './router';
-import { Header, type HeaderModule } from './components/Header';
+import { DEFAULT_MODULE, extractModuleId, LLM_CONFIG_PATH, modulePath } from './router';
+import { type HeaderModule } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
-import { StatusFooter } from './components/StatusFooter';
-import { CrucibleWorkspace } from './components/CrucibleWorkspace';
 import { SaaSLLMConfigPage } from './components/SaaSLLMConfigPage';
-import { CrucibleHistorySheet } from './components/crucible/CrucibleHistorySheet';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import type { ChatMessage, HostRoutedAsset } from './types';
 import { buildCrucibleHeaderBadges, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
@@ -20,8 +17,9 @@ import {
 } from './components/crucible/storage';
 import type { CrucibleSnapshot } from './components/crucible/types';
 import { useAppAuth } from './auth/useAppAuth';
-
-type SaaSModule = 'crucible' | 'distribution';
+import { CrucibleStage, getRegisteredModules, RoundtableStage, subscribe } from './modules';
+import { ShellLayout } from './shell/ShellLayout';
+import { useShellStore } from './shell/shellStore';
 type CrucibleTrialStatus = {
     enabled: boolean;
     mode: 'platform';
@@ -127,15 +125,12 @@ const shouldHydratePersistedSnapshot = (
 function SaaSApp() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { authEnabled, session: authSession, workspace, signOut } = useAppAuth();
+    const { authEnabled, session: authSession, workspace } = useAppAuth();
     const crucibleWorkspaceId = workspace?.activeWorkspace.id || null;
     const initialCrucibleSnapshot = readScopedCrucibleSnapshot(crucibleWorkspaceId);
     const crucibleAutosaveBootstrapKey = getCrucibleAutosaveBootstrapKey(crucibleWorkspaceId);
     const { state, isConnected, selectScript, socket, setState } = useDeliveryStore();
-    const [activeModule, setActiveModule] = useState<SaaSModule>('crucible');
-    const [hasBootedCrucible, setHasBootedCrucible] = useState(true);
     const [crucibleHasBoardContent, setCrucibleHasBoardContent] = useState(false);
-    const [crucibleManualSidebarWidth, setCrucibleManualSidebarWidth] = useState<number | null>(null);
     const [chatResetToken, setChatResetToken] = useState(0);
     const [crucibleRoutedAssets, setCrucibleRoutedAssets] = useState<HostRoutedAsset[]>([]);
     const [crucibleTopicTitle, setCrucibleTopicTitle] = useState(() => initialCrucibleSnapshot?.topicTitle || '标题待定');
@@ -144,7 +139,7 @@ function SaaSApp() {
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => toCrucibleInjectedMessages(initialCrucibleSnapshot));
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const [crucibleWorkspaceKey, setCrucibleWorkspaceKey] = useState(0);
-    const [isCrucibleHistoryOpen, setIsCrucibleHistoryOpen] = useState(false);
+
     const [crucibleConversationState, setCrucibleConversationState] = useState({
         conversationId: initialCrucibleSnapshot?.conversationId || '',
         roundIndex: initialCrucibleSnapshot?.roundIndex || 0,
@@ -157,7 +152,11 @@ function SaaSApp() {
     const [thesisError, setThesisError] = useState<string | null>(null);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
-    const crucibleShellRef = useRef<HTMLDivElement | null>(null);
+    const activeModule = useShellStore((shell) => shell.activeModule);
+    const setActiveModule = useShellStore((shell) => shell.setActiveModule);
+    const artifactDrawerOpen = useShellStore((shell) => shell.artifactDrawerOpen);
+    const toggleArtifactDrawer = useShellStore((shell) => shell.toggleArtifactDrawer);
+    const registeredModules = useSyncExternalStore(subscribe, getRegisteredModules, getRegisteredModules);
 
     const currentUserBadge = useMemo(() => {
         const displayName = authSession?.user.name?.trim()
@@ -195,10 +194,9 @@ function SaaSApp() {
         });
         setCrucibleThesisReady(snapshot.thesisReady || false);
         setActiveModule('crucible');
-        setHasBootedCrucible(true);
         setCrucibleWorkspaceKey((prev) => prev + 1);
         setChatResetToken((prev) => prev + 1);
-    }, [crucibleAutosaveBootstrapKey, crucibleWorkspaceId]);
+    }, [crucibleAutosaveBootstrapKey, crucibleWorkspaceId, setActiveModule]);
 
     const resetCrucibleState = useCallback((options?: { remount?: boolean; clearPersisted?: boolean }) => {
         if (options?.clearPersisted) {
@@ -266,18 +264,7 @@ function SaaSApp() {
 
     const crucibleProjectId = state.projectId || CRUCIBLE_DEFAULT_PROJECT_ID;
 
-    const handleOpenCrucibleHistory = useCallback(() => {
-        setActiveModule('crucible');
-        setHasBootedCrucible(true);
-        setIsCrucibleHistoryOpen(true);
-    }, []);
 
-    const handleStartNewCrucibleTopic = useCallback(() => {
-        setIsCrucibleHistoryOpen(false);
-        setActiveModule('crucible');
-        setHasBootedCrucible(true);
-        resetCrucibleState({ remount: true, clearPersisted: true });
-    }, [resetCrucibleState]);
 
     const handleEnterThesisWriter = useCallback(async () => {
         if (isGeneratingThesis) return;
@@ -334,7 +321,7 @@ function SaaSApp() {
         hydrateCrucibleSnapshot(snapshot);
     }, [hydrateCrucibleSnapshot]);
 
-    const handleSelectProject = (projectId: string) => {
+    const _handleSelectProject = (projectId: string) => {
         setState({
             ...INITIAL_STATE,
             projectId,
@@ -345,18 +332,18 @@ function SaaSApp() {
             socket.emit('select-project', projectId);
         }
     };
+    void _handleSelectProject;
 
-    const handleSelectScript = async (projectId: string, scriptPath: string) => selectScript(projectId, scriptPath);
+    const _handleSelectScript = async (projectId: string, scriptPath: string) => selectScript(projectId, scriptPath);
+    void _handleSelectScript;
 
     const handleModuleChange = (module: HeaderModule) => {
-        if (module === 'delivery') {
+        if (!registeredModules.some((registeredModule) => registeredModule.id === module)) {
             return;
         }
 
-        setActiveModule(module);
-        if (module === 'crucible') {
-            setHasBootedCrucible(true);
-        }
+        const nextModule = module as typeof DEFAULT_MODULE | 'roundtable' | 'rador' | 'writer';
+        navigate(modulePath(nextModule));
     };
 
     const handleCrucibleRouteAsset = useCallback((asset: HostRoutedAsset) => {
@@ -404,31 +391,6 @@ function SaaSApp() {
                 meta,
             },
         ]);
-    }, []);
-
-    const handleCrucibleDividerMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-        const container = crucibleShellRef.current;
-        if (!container) {
-            return;
-        }
-
-        event.preventDefault();
-        const rect = container.getBoundingClientRect();
-        const minWidth = 280;
-        const maxWidth = Math.max(minWidth, rect.width - 80);
-
-        const handleMouseMove = (moveEvent: MouseEvent) => {
-            const nextWidth = Math.min(maxWidth, Math.max(minWidth, rect.right - moveEvent.clientX));
-            setCrucibleManualSidebarWidth(nextWidth);
-        };
-
-        const handleMouseUp = () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
     }, []);
 
     const handleCrucibleBoardStateChange = useCallback((payload: { hasContent: boolean }) => {
@@ -511,9 +473,21 @@ function SaaSApp() {
         ? thesisTrialStatus.message
         : null;
 
-    const crucibleSidebarStyle = crucibleManualSidebarWidth
-        ? { width: `${crucibleManualSidebarWidth}px` }
-        : { width: crucibleHasBoardContent ? 'clamp(440px, 35vw, 620px)' : 'clamp(520px, 46vw, 760px)' };
+    useEffect(() => {
+        const moduleFromPath = extractModuleId(location.pathname);
+        if (!moduleFromPath) {
+            return;
+        }
+
+        if (activeModule !== moduleFromPath) {
+            setActiveModule(moduleFromPath);
+        }
+    }, [activeModule, location.pathname, setActiveModule]);
+
+    const handleSendRoundtableToCrucible = useCallback(() => {
+        setActiveModule('crucible');
+        navigate(modulePath('crucible'));
+    }, [navigate, setActiveModule]);
 
     if (location.pathname === LLM_CONFIG_PATH) {
         return (
@@ -529,122 +503,86 @@ function SaaSApp() {
         return <Navigate to={modulePath()} replace />;
     }
 
+    const resolvedModule = extractModuleId(location.pathname) ?? DEFAULT_MODULE;
+    const activeModuleLabel = registeredModules.find((module) => module.id === activeModule)?.label;
+    const shellViews = {
+        crucible: {
+            keepMounted: true,
+            content: (
+                <CrucibleStage
+                    workspaceKey={crucibleWorkspaceKey}
+                    projectId={crucibleProjectId}
+                    scriptPath={state.selectedScript?.path || ''}
+                    workspaceId={crucibleWorkspaceId}
+                    incomingAssets={crucibleRoutedAssets}
+                    topicTitle={crucibleTopicTitle}
+                    seedPrompt={crucibleSeedPrompt}
+                    seedPromptVersion={crucibleSeedVersion}
+                    onResetWorkspace={() => resetCrucibleState({ clearPersisted: true })}
+                    onRoundGenerated={handleCrucibleRoundGenerated}
+                    onBlackboardStateChange={handleCrucibleBoardStateChange}
+                    onTurnSettled={handleCrucibleTurnSettled}
+                    onConversationStateChange={handleCrucibleConversationStateChange}
+                    onTurnError={handleCrucibleTurnError}
+                />
+            ),
+            drawer: (
+                <ChatPanel
+                    key={`crucible-chat-${chatResetToken}`}
+                    isOpen={resolvedModule === 'crucible'}
+                    onToggle={toggleArtifactDrawer}
+                    expertId={CRUCIBLE_EXPERT_ID}
+                    projectId={crucibleProjectId}
+                    scriptPath={state.selectedScript?.path || ''}
+                    resetToken={chatResetToken}
+                    displayName={crucibleTopicTitle}
+                    panelTitle="对话"
+                    currentUserBadge={currentUserBadge}
+                    headerBadges={crucibleHeaderBadges}
+                    externalMessages={crucibleInjectedMessages}
+                    onUserMessage={handleCrucibleUserPrompt}
+                    onRouteAsset={handleCrucibleRouteAsset}
+                    onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
+                    onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
+                    blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
+                    crucibleTurnSettledToken={crucibleTurnSettledToken}
+                    workspaceId={crucibleWorkspaceId}
+                    trialStatus={crucibleTrialStatus}
+                    externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
+                    thesisReady={crucibleThesisReady}
+                    onEnterThesisWriter={handleEnterThesisWriter}
+                    socket={socket}
+                />
+            ),
+            drawerTitle: '对话',
+            drawerExpanded: artifactDrawerOpen,
+            onDrawerToggle: toggleArtifactDrawer,
+        },
+        roundtable: {
+            content: <RoundtableStage onSendToCrucible={handleSendRoundtableToCrucible} />,
+        },
+    };
+
     if (!isConnected) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--shell-bg)] text-[var(--ink-1)]">
+            <div className="min-h-screen flex items-center justify-center bg-[var(--gc-bg-base)] text-[var(--gc-text-primary)]">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-                    <p className="text-sm text-[var(--ink-3)]">Connecting to SaaS console...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-[var(--gc-accent)]" />
+                    <p className="text-sm text-[var(--gc-text-tertiary)]">Connecting to SaaS console...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="h-screen flex flex-col bg-[var(--shell-bg)] text-[var(--ink-1)]">
-            <Header
-                projectId={state.projectId}
-                selectedScriptPath={state.selectedScript?.path}
-                onSelectProject={handleSelectProject}
-                onSelectScript={handleSelectScript}
-                activeModule={activeModule}
-                onModuleChange={handleModuleChange}
-                availableModules={['crucible']}
-                lockSelectorsWhenCrucible={false}
-                appTitle="黄金坩埚 Golden Crucible"
-                hideWorkspaceControls
-                authSummary={authEnabled && authSession ? {
-                    displayName: authSession.user.name?.trim() || authSession.user.email,
-                    email: authSession.user.email,
-                    avatarImage: authSession.user.image,
-                    workspaceName: workspace?.activeWorkspace.name,
-                    onOpenHistory: handleOpenCrucibleHistory,
-                    onSignOut: () => {
-                        void signOut();
-                    },
-                } : undefined}
-            />
-
-            {(activeModule === 'crucible' || hasBootedCrucible) && (
-                <div
-                    ref={crucibleShellRef}
-                    className={`min-h-0 flex-1 overflow-hidden ${activeModule === 'crucible' ? 'flex' : 'hidden'}`}
-                    aria-hidden={activeModule !== 'crucible'}
-                >
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                        <CrucibleWorkspace
-                            key={crucibleWorkspaceKey}
-                            projectId={crucibleProjectId}
-                            scriptPath={state.selectedScript?.path || ''}
-                            workspaceId={crucibleWorkspaceId}
-                            incomingAssets={crucibleRoutedAssets}
-                            topicTitle={crucibleTopicTitle}
-                            seedPrompt={crucibleSeedPrompt}
-                            seedPromptVersion={crucibleSeedVersion}
-                            onResetWorkspace={() => resetCrucibleState({ clearPersisted: true })}
-                            onRoundGenerated={handleCrucibleRoundGenerated}
-                            onBlackboardStateChange={handleCrucibleBoardStateChange}
-                            onTurnSettled={handleCrucibleTurnSettled}
-                            onConversationStateChange={handleCrucibleConversationStateChange}
-                            onTurnError={handleCrucibleTurnError}
-                        />
-                    </div>
-                    <div
-                        role="separator"
-                        aria-orientation="vertical"
-                        onMouseDown={handleCrucibleDividerMouseDown}
-                        onDoubleClick={() => setCrucibleManualSidebarWidth(null)}
-                        className="group relative hidden w-3 cursor-col-resize xl:block"
-                    >
-                        <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[rgba(142,99,55,0.12)] transition-colors group-hover:bg-[rgba(142,99,55,0.32)]" />
-                    </div>
-                    <div
-                        style={crucibleSidebarStyle}
-                        className="min-w-[280px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
-                    >
-                        <ChatPanel
-                            key={`crucible-chat-${chatResetToken}`}
-                            isOpen={activeModule === 'crucible'}
-                            onToggle={() => undefined}
-                            expertId={CRUCIBLE_EXPERT_ID}
-                            projectId={crucibleProjectId}
-                            scriptPath={state.selectedScript?.path || ''}
-                            resetToken={chatResetToken}
-                            displayName={crucibleTopicTitle}
-                            panelTitle="对话"
-                            currentUserBadge={currentUserBadge}
-                            headerBadges={crucibleHeaderBadges}
-                            externalMessages={crucibleInjectedMessages}
-                            onUserMessage={handleCrucibleUserPrompt}
-                            onRouteAsset={handleCrucibleRouteAsset}
-                            onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
-                            onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
-                            onOpenHistory={handleOpenCrucibleHistory}
-                            blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
-                            crucibleTurnSettledToken={crucibleTurnSettledToken}
-                            workspaceId={crucibleWorkspaceId}
-                            trialStatus={crucibleTrialStatus}
-                            externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
-                            thesisReady={crucibleThesisReady}
-                            onEnterThesisWriter={handleEnterThesisWriter}
-                            socket={socket}
-                        />
-                    </div>
-                </div>
-            )}
-
-            <StatusFooter
-                isConnected={isConnected}
-                activeChatExpertId={activeModule === 'crucible' ? CRUCIBLE_EXPERT_ID : undefined}
-            />
-            <CrucibleHistorySheet
-                isOpen={isCrucibleHistoryOpen}
-                workspaceId={crucibleWorkspaceId}
-                onClose={() => setIsCrucibleHistoryOpen(false)}
-                onStartNewTopic={handleStartNewCrucibleTopic}
-                onRestoreSnapshot={handleRestoreCrucibleHistory}
-            />
-        </div>
+        <ShellLayout
+            modules={registeredModules}
+            activeModuleId={resolvedModule}
+            onModuleChange={(moduleId) => handleModuleChange(moduleId as HeaderModule)}
+            views={shellViews}
+            workspaceName={workspace?.activeWorkspace.name}
+            displayName={authSession?.user.name?.trim() || authSession?.user.email || activeModuleLabel}
+        />
     );
 }
 

@@ -62,8 +62,8 @@ export class ModuleErrorBoundary extends Component<ModuleErrorBoundaryProps, Mod
           height: '100%',
           minHeight: 200,
           padding: 24,
-          background: 'var(--shell-bg, #faf7f0)',
-          color: 'var(--ink-1, #1a1a1a)',
+          background: 'var(--gc-bg-base, #faf7f0)',
+          color: 'var(--gc-text-primary, #1a1a1a)',
           fontFamily: 'Instrument Sans, system-ui, sans-serif',
         }}
       >
@@ -71,10 +71,10 @@ export class ModuleErrorBoundary extends Component<ModuleErrorBoundaryProps, Mod
           <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
             {this.props.moduleName} 模块出错
           </h2>
-          <p style={{ fontSize: 13, color: 'var(--ink-3, #6b6b6b)', marginBottom: 6 }}>
+          <p style={{ fontSize: 13, color: 'var(--gc-text-tertiary, #6b6b6b)', marginBottom: 6 }}>
             {this.state.error?.message || '未知错误'}
           </p>
-          <p style={{ fontSize: 12, color: 'var(--ink-3, #6b6b6b)', marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: 'var(--gc-text-tertiary, #6b6b6b)', marginBottom: 20 }}>
             其他模块不受影响。请尝试重试。
           </p>
           <Button variant="ochre" size="sm" onClick={this.handleRetry}>
