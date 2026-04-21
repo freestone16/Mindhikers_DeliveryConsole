@@ -45,10 +45,10 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
 };
 
 const PHASE_LABELS: Record<string, string> = {
-  P1: 'Phase 1 — 视觉概念',
-  P2: 'Phase 2 — 视觉执行',
-  P3: 'Phase 3 — 视频渲染',
-  P4: 'Phase 4 — 序列导出',
+  P1: 'P1 — 视觉概念',
+  P2: 'P2 — 视觉执行',
+  P3: 'P3 — 视频渲染',
+  P4: 'P4 — 序列导出',
 };
 
 export function HandoffPanel({ projectId }: HandoffPanelProps) {

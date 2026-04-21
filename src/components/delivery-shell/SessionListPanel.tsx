@@ -13,10 +13,10 @@ function relativeTime(dateStr: string): string {
   const then = new Date(dateStr).getTime();
   const diff = now - then;
   if (diff < 60_000) return '刚刚';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}分钟前`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}小时前`;
   if (diff < 172_800_000) return '昨日';
-  return `${Math.floor(diff / 86_400_000)}d`;
+  return `${Math.floor(diff / 86_400_000)}天前`;
 }
 
 export function SessionListPanel({
@@ -33,7 +33,7 @@ export function SessionListPanel({
   return (
     <div className="shell-rail__section shell-sessionlist">
       <div className="shell-rail__label">
-        <span>SESSIONS · {expertLabel.toUpperCase()}</span>
+        <span>文稿 · {expertLabel}</span>
       </div>
 
       {sorted.length === 0 ? (

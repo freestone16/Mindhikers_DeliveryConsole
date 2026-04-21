@@ -174,8 +174,8 @@ export const Phase1View = ({
     return (
       <PhasePanel>
         <PhaseLoadingState
-          title="Generating Visual Concept..."
-          subtitle="Analyzing script structure and style..."
+          title="正在生成视觉概念..."
+          subtitle="分析剧本结构与风格..."
         />
       </PhasePanel>
     );
@@ -189,13 +189,13 @@ export const Phase1View = ({
             title={
               <>
                 <FileText className="w-4 h-4 text-[#c97545]" />
-                <span className="text-sm font-bold text-[#342d24]">Visual Concept Proposal</span>
+                <span className="text-sm font-bold text-[#342d24]">视觉概念提案</span>
               </>
             }
             actions={
               isApproved && (
                 <span className="text-xs text-[#5b7c6f] flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> Approved
+                  <CheckCircle className="w-3.5 h-3.5" /> 已批准
                 </span>
               )
             }
@@ -208,11 +208,11 @@ export const Phase1View = ({
 
           {!isApproved && (
             <PhasePanelFooter>
-              <label className="text-xs text-[#8f8372] block mb-2">Feedback / Adjustments</label>
+              <label className="text-xs text-[#8f8372] block mb-2">反馈 / 调整</label>
               <textarea
                 className="w-full bg-[#faf6ef] border border-[#e4dbcc] rounded-lg p-3 text-[#342d24] placeholder-[#c9baa3] focus:outline-none focus:border-[#c97545] text-sm"
                 rows={3}
-                placeholder="Describe changes you'd like to see..."
+                placeholder="描述你希望看到的调整..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
               />
@@ -222,14 +222,14 @@ export const Phase1View = ({
                   className="px-4 py-2 bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] rounded-lg flex items-center gap-2 border border-[#e4dbcc] text-sm font-medium transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Revise
+                  修订
                 </button>
                 <button
                   onClick={onApprove}
                   className="px-4 py-2 bg-[#c97545] hover:bg-[#b26135] text-white rounded-lg flex items-center gap-2 font-medium text-sm transition-colors"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Approve & Continue
+                  批准并继续
                 </button>
               </div>
             </PhasePanelFooter>

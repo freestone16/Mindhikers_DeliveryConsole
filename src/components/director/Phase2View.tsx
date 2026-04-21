@@ -108,7 +108,7 @@ export const Phase2View = ({
     return (
       <PhasePanel>
         <PhasePanelHeader
-          title={<span className="text-sm font-bold text-[#342d24]">Select B-Roll Types</span>}
+          title={<span className="text-sm font-bold text-[#342d24]">选择 B-Roll 类型</span>}
         />
         <PhasePanelBody className="space-y-5">
           <BRollSelector
@@ -127,7 +127,7 @@ export const Phase2View = ({
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <Play className="w-4 h-4" /> Confirm & Generate Previews
+                <Play className="w-4 h-4" /> 确认并生成预览
               </span>
             )}
           </button>

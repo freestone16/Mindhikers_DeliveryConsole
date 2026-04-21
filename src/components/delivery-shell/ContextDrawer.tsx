@@ -5,10 +5,10 @@ import { ArtifactsPanel } from './drawer/ArtifactsPanel';
 import { HandoffPanel } from './drawer/HandoffPanel';
 
 const DRAWER_TABS = [
-  { id: 'chat', label: 'Chat' },
-  { id: 'runtime', label: 'Runtime' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'handoff', label: 'Handoff' },
+  { id: 'chat', label: '对话' },
+  { id: 'runtime', label: '运行态' },
+  { id: 'artifacts', label: '产物' },
+  { id: 'handoff', label: '交接' },
 ];
 
 interface ContextDrawerProps {

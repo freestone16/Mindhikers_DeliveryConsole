@@ -40,10 +40,10 @@ interface ArtifactsPanelProps {
 }
 
 const PHASE_META: Record<string, { label: string; icon: LucideIcon; color: string }> = {
-  P1: { label: 'Phase 1 — 视觉概念', icon: Lightbulb, color: '#c97545' },
-  P2: { label: 'Phase 2 — 视觉执行', icon: Palette, color: '#7c6f5b' },
-  P3: { label: 'Phase 3 — 视频渲染', icon: Film, color: '#5b7c6f' },
-  P4: { label: 'Phase 4 — 序列导出', icon: Download, color: '#5b6f7c' },
+  P1: { label: 'P1 — 视觉概念', icon: Lightbulb, color: '#c97545' },
+  P2: { label: 'P2 — 视觉执行', icon: Palette, color: '#7c6f5b' },
+  P3: { label: 'P3 — 视频渲染', icon: Film, color: '#5b7c6f' },
+  P4: { label: 'P4 — 序列导出', icon: Download, color: '#5b6f7c' },
 };
 
 function formatSize(bytes: number): string {

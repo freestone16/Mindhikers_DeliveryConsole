@@ -66,7 +66,7 @@ export function ProductTopBar({
             }}
           >
             <FolderOpen style={{ width: 14, height: 14 }} />
-            <strong>{activeProject?.name || 'Select project'}</strong>
+            <strong>{activeProject?.name || '选择项目'}</strong>
             <ChevronDown style={{ width: 12, height: 12 }} />
           </button>
           {projectDropdownOpen && (
@@ -100,7 +100,7 @@ export function ProductTopBar({
               }}
             >
               <FileText style={{ width: 14, height: 14 }} />
-              <strong>{activeScript?.name || 'Select script'}</strong>
+              <strong>{activeScript?.name || '选择文稿'}</strong>
               <ChevronDown style={{ width: 12, height: 12 }} />
             </button>
             {scriptDropdownOpen && (
@@ -136,7 +136,7 @@ export function ProductTopBar({
           }}
         >
           <Settings style={{ width: 14, height: 14 }} />
-          LLM Config
+          模型配置
         </button>
       </div>
     </div>

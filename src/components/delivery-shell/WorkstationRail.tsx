@@ -3,12 +3,12 @@ import { SessionListPanel } from './SessionListPanel';
 import type { ScriptFile } from './DeliveryShellLayout';
 
 const WORKSTATIONS = [
-  { id: 'Director', label: 'Director', icon: PenTool },
-  { id: 'ShortsMaster', label: 'Shorts', icon: Video },
-  { id: 'ThumbnailMaster', label: 'Thumbnail', icon: Image },
-  { id: 'MusicMaster', label: 'Music', icon: Music },
-  { id: 'MarketingMaster', label: 'Marketing', icon: Megaphone },
-  { id: 'VisualAudit', label: 'Visual Audit', icon: Eye },
+  { id: 'Director', label: '影视导演', icon: PenTool },
+  { id: 'ShortsMaster', label: '短视频', icon: Video },
+  { id: 'ThumbnailMaster', label: '缩略图', icon: Image },
+  { id: 'MusicMaster', label: '音乐', icon: Music },
+  { id: 'MarketingMaster', label: '营销', icon: Megaphone },
+  { id: 'VisualAudit', label: '视觉审计', icon: Eye },
 ];
 
 interface WorkstationRailProps {
@@ -75,7 +75,7 @@ export function WorkstationRail({
     <div className="shell-rail">
       <div className="shell-rail__section">
         <div className="shell-rail__label">
-          <span>Workstations</span>
+          <span>工作站</span>
           <button
             onClick={onToggleCollapse}
             style={{
