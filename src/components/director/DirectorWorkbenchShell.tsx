@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Phase } from '../types';
 import { DirectorStageHeader } from './DirectorStageHeader';
-import { DirectorPhaseStepper } from './DirectorPhaseStepper';
 
 interface DirectorWorkbenchShellProps {
   projectId: string;
@@ -28,14 +27,9 @@ export function DirectorWorkbenchShell({
         projectId={projectId}
         phase={phase}
         conceptApproved={conceptApproved}
-        onBackToSessions={onBackToSessions}
-      />
-
-      <DirectorPhaseStepper
-        phase={phase}
-        conceptApproved={conceptApproved}
         hasChapters={hasChapters}
         onPhaseChange={onPhaseChange}
+        onBackToSessions={onBackToSessions}
       />
 
       <div className="director-workbench__content">
