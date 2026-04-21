@@ -1,42 +1,42 @@
 # HANDOFF — Director 模块
 
-**时间**: 2026-04-21 12:55 CST
+**时间**: 2026-04-21 14:05 CST
 **分支**: `MHSDC-DC-director`
-**最近提交**: `cb61b3b` — docs(director): session dump for context recovery
+**最近提交**: `45ed1f5` — feat(director): Chinese localization
 **远程状态**: 已推送 ✅
-**工作树状态**: 干净（仅测试修复未提交）
+**工作树状态**: 干净 ✅
 
 ---
 
 ## 当前进度
 
-### Unit 1-3 ✅ 已完成
-- Shell 布局、Context Drawer（Chat/Runtime/Artifacts/Handoff）、SessionListPanel
-- DirectorWorkbenchShell、StageHeader、PhaseStepper
+### Unit 1-6 ✅ 已完成（UI 改造全部完成）
+- Shell 布局、Context Drawer（对话/运行态/产物/交接）、SessionListPanel
+- DirectorWorkbenchShell、StageHeader（单行布局）、PhaseStepper
+- P1-P4 全部重做完成
 
-### Unit 4 ✅ 已完成
-- P1 概念页：双区工作台（左侧概念正文 + 右侧上下文卡）
-- P2 视觉方案：SummaryStrip + ChapterRail + 镜头卡片流
+### 本次会话新增完成 ✅
 
-### Unit 5 ✅ 已完成
-- P3 渲染编排：RenderPipelineBoard + 状态点系统 + 暖色卡片
-- P4 导出交付：交付序列 Stepper + 下一步 Handoff 提示
-- TypeScript 编译通过
-- 单元测试通过（11/11）
+#### 1. StageHeader 重新设计
+- 删除原有大标题区域（居中 + badge + 多行状态）
+- 左侧：一行显示 `视觉导演工作台 | 分镜筛选中`（标题 + 分隔线 + 状态）
+- 右侧：P1 P2 P3 P4 阶段按钮
+- 单行 flex 布局，justify-content: space-between
+- 提交：`501b6f7`
 
-### Unit 6 ✅ 已完成
-- 浏览器验收：text 提取确认 P1-P4 页面渲染正常
-- 服务状态验证：前后端均正常运行
-- 截图保存：testing/director/artifacts/
+#### 2. 全局中文化
+- **左侧栏工作站**：影视导演、短视频、缩略图、音乐、营销、视觉审计
+- **左侧栏文稿**：`文稿 · 影视导演`，时间格式改为中文（分钟前/小时前/天前）
+- **右侧 Drawer Tab**：对话、运行态、产物、交接
+- **Phase 标签**：P1-P4 中文标签
+- **P1/P2 按钮文案**：全部中文化
+- **顶栏**：选择项目、选择文稿、模型配置
+- 提交：`45ed1f5`
 
-### 左栏缩进 ✅ 已完成（老卢追加）
-- 一键折叠/展开，与右栏交互一致
-- Commit: `6c47c62`
-
-### Bridge Fast Path 测试修复 ✅ 已完成（本次会话）
-- 修复 `src/__tests__/director-bridge.test.ts` 第 20 行 `chapterIndex: 1` → `chapterIndex: 0`
+#### 3. Bridge Fast Path 测试修复
+- 修复 `chapterIndex: 1` → `chapterIndex: 0`
 - 12/12 测试全部通过
-- 根因：测试数据错误，非 Bridge 逻辑缺陷
+- 提交：`d38cc7a`
 
 ---
 
@@ -46,76 +46,51 @@
 
 ---
 
-## 未完成任务（已清理）
+## 待办事项（全部完成）
 
-### 1. Bridge Fast Path 语义解析修复 ✅ 已完成
-- 状态：测试数据修复后 12/12 全部通过
-- 提交：待提交（当前工作树有 1 个文件修改）
-
-### 2. 测试状态板更新 ✅ 已完成
-- 文件：`testing/director/status/BOARD.md`
-- 状态：已更新为 `ready_for_acceptance`
-- 说明：Unit 1-6 全部完成，进入验收阶段
-
-### 3. 组件抽离（计划内遗留）🟢 低优先级 — 暂不处理
-- RenderPipelineBoard、ExportChecklistPanel 内联代码可优化
-- DirectorSessionSummary 计划中但未实现
-- **决策**：验收前不处理，避免引入新变更
-
-### 4. 测试补全 🟢 低优先级 — 暂不处理
-- ChatPanel.test.tsx、DirectorSection.test.tsx 等缺失
-- **决策**：验收前不处理，避免引入新变更
-
-### 5. 测试请求文档创建 🟢 低优先级 — 暂不处理
-- TREQ-2026-04-17-DIRECTOR-UI-shell-workbench.md 未创建
-- **决策**：验收前不处理，避免引入新变更
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| Bridge Fast Path 测试修复 | ✅ | 12/12 通过 |
+| StageHeader 重新设计 | ✅ | 单行布局，左侧标题+状态，右侧 P1-P4 |
+| 全局中文化 | ✅ | 工作站、Drawer Tab、按钮、文案 |
+| 章节导航移到左栏 | ⏸️ | 老卢决定先不动，保持 P2 内部 |
 
 ---
 
-## 分支状态评估
+## 分支状态
 
 ### Commit 情况
-- 当前分支 `MHSDC-DC-director` 领先 `main` **52 个 commit**
-- 最近 30 个 commit 覆盖：UI 改造 Unit 1-6、Bridge 层、Chatbox 修复、状态同步、视觉模型配置
-- 最早 commit 追溯到 2026-03-16（Phase3 MP4 二审 + Phase4 XML 导出）
+- 当前分支 `MHSDC-DC-director` 领先 `main` **54 个 commit**
+- 最近 3 个 commit：
+  - `45ed1f5` — 中文化
+  - `501b6f7` — StageHeader 重新设计
+  - `d38cc7a` — Bridge 测试修复
 
 ### 合并准备度
-| 检查项 | 状态 | 说明 |
-|--------|------|------|
-| 主链路功能 | ✅ | P1-P4 生成、筛选、渲染、导出均可用 |
-| TypeScript 编译 | ✅ | 通过 |
-| 单元测试 | ✅ | director-bridge 12/12 通过 |
-| 浏览器验收 | ✅ | Unit 6 已完成 |
-| 服务验证 | ✅ | 前后端正常运行 |
-| 工作树 | ⚠️ | 有 1 个未提交修改（测试修复） |
-
-### 建议
-1. **提交当前测试修复**（1 行代码）
-2. **老卢验收** P1-P4 主链路
-3. **验收通过后合并**到 `main`
+| 检查项 | 状态 |
+|--------|------|
+| 主链路功能 | ✅ P1-P4 可用 |
+| TypeScript 编译 | ✅ 通过 |
+| 单元测试 | ✅ 12/12 通过 |
+| 浏览器验收 | ✅ 已完成 |
+| 服务验证 | ✅ 正常运行 |
+| 工作树 | ✅ 干净 |
 
 ---
 
-## 下一步建议
+## 下一步
 
-1. **提交测试修复** → `refs MIN-151 fix(director): correct chapterIndex in bridge test data`
-2. **老卢验收** → 验证 P1-P4 核心功能
-3. **合并到 main** → 验收通过后执行
-4. **其他模块接入** → 验收后评估 Shorts/Music/Thumbnail/Marketing 接入优先级
+**等待老卢验收和挑刺**
 
----
-
-## 已知问题
-- 右下角 RUNTIME tab Skill 信息需确认数据流
-- gstack browse 截图显示空白，但 text 提取确认页面内容正常（daemon 状态切换问题，非代码 bug）
-- `.agent/config/llm_config.json` 变更已回退，不纳入版本控制
+已知可优化点（老卢下一窗口验收）：
+- 细节对齐、间距、字体大小
+- 交互流畅度
+- 文案微调
+- 其他视觉/体验问题
 
 ---
 
-## 验收前不再新增变更
-
-为避免验收前引入回归风险，以下事项明确推迟到验收后：
+## 已知限制（验收后处理）
 - 组件抽离（RenderPipelineBoard、ExportChecklistPanel）
 - 测试补全（ChatPanel、DirectorSection 等）
-- 测试请求文档创建
 - 其他模块业务页面重做
