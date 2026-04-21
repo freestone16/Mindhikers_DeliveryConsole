@@ -1,3 +1,4 @@
+export type Phase = 1 | 2 | 3 | 4;
 export type PhaseState = 'concept' | 'execution';
 
 export interface BaseItem {
@@ -145,6 +146,7 @@ export interface DeliveryState {
     selectedScript?: SelectedScript;
     activeExpertId?: string;
     activeModule?: 'crucible' | 'delivery' | 'distribution';
+    modules?: Record<string, any>;
 }
 
 // --- Visual Audit Module (v3.1) ---
@@ -212,14 +214,26 @@ export interface SceneOption {
     prompt?: string;
     quote?: string;
     imagePrompt?: string;
+    svgPrompt?: string;       // SVG-Architect: Director LLM 内联的完整 SVG 代码
     rationale?: string;
     mode?: 'T2V' | 'I2V' | 'V2V';
     search_keywords?: string[];
     // Infographic specific (BaoyuInfographic)
-    infographicLayout?: string;   // 'pyramid' | 'funnel' | 'iceberg' | 'fishbone' | 'venn' | ...
-    infographicStyle?: string;    // 'cyberpunk-neon' | 'aged-academia' | 'dore-engraving' | ...
-    infographicUseMode?: 'cinematic-zoom' | 'static'; // cinematic-zoom: Ken Burns slow zoom; static: PNG only
+    infographicLayout?: string;
+    infographicStyle?: string;
+    infographicUseMode?: 'cinematic-zoom' | 'static';
+    // Phase3 渲染指令（Director 导演指定，DC 纯透传给 Remotion）
+    phase3?: {
+        template?: string;            // 渲染模板，默认 CinematicZoom
+        props?: Record<string, any>;  // 渲染参数（bgStyle, startScale, endScale, rotation, imageFit 等）
+    };
     isChecked?: boolean;
+    // Phase 2 (初审) fields
+    phase2Approved?: boolean;
+    // Phase 3 (二审) fields
+    videoUrl?: string;            // MP4 video URL/path after Phase 3 render
+    phase3Approved?: boolean;
+    revisedPrompt?: string;       // AI-rewritten prompt awaiting user confirmation
 }
 
 export interface DirectorChapter {
@@ -464,6 +478,18 @@ export interface TubeBuddyScore {
     competition: number;    // 竞争度 0-100
     optimization: number;   // 优化度 0-100
     relevance: number;      // 相关度 0-100
+    overallScore?: number;
+    weightedScore?: number;
+    metrics?: {
+        searchVolume: number;
+        competition: number;
+        optimization: number;
+        relevance: number;
+    };
+    rawMetrics?: {
+        monthlySearches: number;
+        competitionLevel: 'low' | 'medium' | 'high';
+    };
 }
 
 export interface MarketModule_V2 {
@@ -629,6 +655,9 @@ export interface ToolCallConfirmation {
     actionName: string;
     actionArgs: any;
     description: string;
+    title?: string;
+    targetLabel?: string;
+    diffLabel?: string;
     status: 'pending' | 'confirmed' | 'cancelled';
 }
 

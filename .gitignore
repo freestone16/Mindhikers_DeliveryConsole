@@ -31,7 +31,17 @@ coverage/
 *.tmp
 .cache/
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Runtime artifacts
 runtime/crucible/autosave.json
 runtime/crucible/projects/
 runtime/crucible/sessions/
+
+# Browser/test artifacts
+testing/**/artifacts/*.png
+testing/**/artifacts/*.txt
+testing/**/artifacts/*.json
+testing/**/artifacts/*.html

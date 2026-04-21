@@ -6,6 +6,12 @@ import { ChatPanel } from './components/ChatPanel';
 import { StatusFooter } from './components/StatusFooter';
 import { CrucibleWorkspace } from './components/CrucibleWorkspace';
 import { SaaSLLMConfigPage } from './components/SaaSLLMConfigPage';
+import { ExpertPage } from './components/ExpertPage';
+import { DirectorSection } from './components/DirectorSection';
+import { ShortsSection } from './components/ShortsSection';
+import { MarketingSection } from './components/MarketingSection';
+import { VisualAuditPage } from './components/VisualAuditPage';
+import { DeliveryShellLayout } from './components/delivery-shell/DeliveryShellLayout';
 import { CrucibleHistorySheet } from './components/crucible/CrucibleHistorySheet';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import type { ChatMessage, HostRoutedAsset } from './types';
@@ -19,7 +25,7 @@ import {
 import type { CrucibleSnapshot } from './components/crucible/types';
 import { useAppAuth } from './auth/useAppAuth';
 
-type SaaSModule = 'crucible' | 'distribution';
+type SaaSModule = 'crucible' | 'delivery';
 type CrucibleTrialStatus = {
     enabled: boolean;
     mode: 'platform';
@@ -131,6 +137,7 @@ function SaaSApp() {
     const crucibleAutosaveBootstrapKey = getCrucibleAutosaveBootstrapKey(crucibleWorkspaceId);
     const { state, isConnected, selectScript, socket, setState } = useDeliveryStore();
     const [activeModule, setActiveModule] = useState<SaaSModule>('crucible');
+    const [activeExpertId, setActiveExpertId] = useState('Director');
     const [hasBootedCrucible, setHasBootedCrucible] = useState(true);
     const [crucibleHasBoardContent, setCrucibleHasBoardContent] = useState(false);
     const [crucibleManualSidebarWidth, setCrucibleManualSidebarWidth] = useState<number | null>(null);
@@ -143,6 +150,12 @@ function SaaSApp() {
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const [crucibleWorkspaceKey, setCrucibleWorkspaceKey] = useState(0);
     const [isCrucibleHistoryOpen, setIsCrucibleHistoryOpen] = useState(false);
+    const [runtimeData, setRuntimeData] = useState<{
+        currentModel: { provider: string; model: string } | null;
+        logs: { timestamp: number; type: string; message: string }[];
+        isLoading: boolean;
+        startTime: number | null;
+    }>({ currentModel: null, logs: [], isLoading: false, startTime: null });
     const [crucibleConversationState, setCrucibleConversationState] = useState({
         conversationId: initialCrucibleSnapshot?.conversationId || '',
         roundIndex: initialCrucibleSnapshot?.roundIndex || 0,
@@ -281,8 +294,12 @@ function SaaSApp() {
 
     const handleSelectScript = async (projectId: string, scriptPath: string) => selectScript(projectId, scriptPath);
 
+    const handleSelectExpert = (expertId: string) => {
+        setActiveExpertId(expertId);
+    };
+
     const handleModuleChange = (module: HeaderModule) => {
-        if (module === 'delivery') {
+        if (module === 'distribution') {
             return;
         }
 
@@ -290,6 +307,49 @@ function SaaSApp() {
         if (module === 'crucible') {
             setHasBootedCrucible(true);
         }
+    };
+
+    const handleStartWork = async (expertId: string) => {
+        if (!state.selectedScript) {
+            alert('请先选择文稿');
+            return;
+        }
+
+        try {
+            const res = await fetch(buildApiUrl('/api/experts/run'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    expertId,
+                    scriptPath: state.selectedScript.path,
+                    projectId: state.projectId,
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || '启动失败');
+            }
+            alert('专家任务已启动');
+        } catch (e) {
+            const message = e instanceof Error ? e.message : '启动失败';
+            console.error('Start work error:', e);
+            alert(`启动失败: ${message}`);
+        }
+    };
+
+    const handleCancel = async (expertId: string) => {
+        if (socket) {
+            socket.emit('update-expert-data', {
+                projectId: state.projectId,
+                expertId,
+                data: { status: 'idle', logs: [] },
+            });
+        }
+    };
+
+    const handleRerun = (expertId: string) => {
+        void handleStartWork(expertId);
     };
 
     const handleCrucibleRouteAsset = useCallback((asset: HostRoutedAsset) => {
@@ -461,10 +521,9 @@ function SaaSApp() {
                 onSelectScript={handleSelectScript}
                 activeModule={activeModule}
                 onModuleChange={handleModuleChange}
-                availableModules={['crucible']}
-                lockSelectorsWhenCrucible={false}
+                availableModules={['crucible', 'delivery']}
+                lockSelectorsWhenCrucible
                 appTitle="黄金坩埚 Golden Crucible"
-                hideWorkspaceControls
                 authSummary={authEnabled && authSession ? {
                     displayName: authSession.user.name?.trim() || authSession.user.email,
                     email: authSession.user.email,
@@ -476,6 +535,55 @@ function SaaSApp() {
                     },
                 } : undefined}
             />
+
+            {activeModule === 'delivery' ? (
+                <div className="min-h-0 flex-1 overflow-hidden">
+                    <DeliveryShellLayout
+                        activeExpertId={activeExpertId}
+                        onExpertChange={handleSelectExpert}
+                        projectId={state.projectId}
+                        selectedScriptPath={state.selectedScript?.path}
+                        onSelectProject={handleSelectProject}
+                        onSelectScript={handleSelectScript}
+                        socket={socket}
+                        runtimeData={runtimeData}
+                    >
+                        <div style={{ padding: '24px 28px', minHeight: '100%', background: '#f7f2ea' }}>
+                            {activeExpertId === 'VisualAudit' ? (
+                                <VisualAuditPage />
+                            ) : activeExpertId === 'Director' ? (
+                                <DirectorSection
+                                    projectId={state.projectId}
+                                    scriptPath={state.selectedScript?.path || ''}
+                                    socket={socket}
+                                    onRuntimeDataChange={setRuntimeData}
+                                />
+                            ) : activeExpertId === 'ShortsMaster' ? (
+                                <ShortsSection
+                                    projectId={state.projectId}
+                                    scriptPath={state.selectedScript?.path || ''}
+                                    socket={socket}
+                                />
+                            ) : activeExpertId === 'MarketingMaster' ? (
+                                <MarketingSection
+                                    projectId={state.projectId}
+                                    scriptPath={state.selectedScript?.path || ''}
+                                    socket={socket}
+                                />
+                            ) : (
+                                <ExpertPage
+                                    expertId={activeExpertId}
+                                    projectId={state.projectId}
+                                    selectedScript={state.selectedScript}
+                                    onStartWork={handleStartWork}
+                                    onCancel={handleCancel}
+                                    onRerun={handleRerun}
+                                />
+                            )}
+                        </div>
+                    </DeliveryShellLayout>
+                </div>
+            ) : null}
 
             {(activeModule === 'crucible' || hasBootedCrucible) && (
                 <div

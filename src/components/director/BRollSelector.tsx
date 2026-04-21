@@ -5,6 +5,8 @@ interface BRollSelectorProps {
   selected: BRollType[];
   onChange: (selected: BRollType[]) => void;
   disabled?: boolean;
+  /** Restrict which types to show (default: all 6) */
+  types?: BRollType[];
 }
 
 const BROLL_OPTIONS: { type: BRollType; label: string; icon: typeof Code; description: string }[] = [
@@ -16,7 +18,11 @@ const BROLL_OPTIONS: { type: BRollType; label: string; icon: typeof Code; descri
   { type: 'infographic', label: 'F. 信息图', icon: BarChart3, description: '结构化逻辑图示' },
 ];
 
-export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorProps) => {
+export const BRollSelector = ({ selected, onChange, disabled, types }: BRollSelectorProps) => {
+  const visibleOptions = types
+    ? BROLL_OPTIONS.filter(o => types.includes(o.type))
+    : BROLL_OPTIONS;
+
   const toggleOption = (type: BRollType) => {
     if (disabled) return;
     if (selected.includes(type)) {
@@ -28,7 +34,7 @@ export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorPro
 
   return (
     <div className="flex gap-3">
-      {BROLL_OPTIONS.map(({ type, label, icon: Icon, description }) => {
+      {visibleOptions.map(({ type, label, icon: Icon, description }) => {
         const isSelected = selected.includes(type);
         return (
           <button
@@ -37,17 +43,17 @@ export const BRollSelector = ({ selected, onChange, disabled }: BRollSelectorPro
             disabled={disabled}
             className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all
               ${isSelected
-                ? 'border-blue-500 bg-blue-500/10'
-                : 'border-slate-700 bg-slate-800/30 hover:border-slate-500'}
+                ? 'border-[#c97545] bg-[#c97545]/10'
+                : 'border-[#e4dbcc] bg-[#f4efe5]/60 hover:border-[#d8c8ae]'}
               ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center
-              ${isSelected ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}`}>
+              ${isSelected ? 'bg-[#c97545]/20 text-[#c97545]' : 'bg-[#e4dbcc] text-[#8f8372]'}`}>
               <Icon className="w-4 h-4" />
             </div>
-            <span className="text-sm font-medium text-white">{label}</span>
-            <span className="text-xs text-slate-500">{description}</span>
-            {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+            <span className="text-sm font-medium text-[#342d24]">{label}</span>
+            <span className="text-xs text-[#8f8372]">{description}</span>
+            {isSelected && <Check className="w-4 h-4 text-[#c97545]" />}
           </button>
         );
       })}
