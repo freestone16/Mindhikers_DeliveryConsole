@@ -289,12 +289,19 @@
 111. **附录 5 "待决议题"一条只包一个决策点**：CE 曾把 "Handoff 撤销窗口 + 存储选型" 打包成 A8 一条，老卢审阅时拆不开拍板；**议题耦合会拖慢审批**，拆 A8a / A8b 更清晰
 112. **提交老卢前必做一次"白话翻译"自查**：工程语言的风险描述 / 技术选型议题老卢会要求"通俗讲讲"；老杨在子代理交付后、提交老卢前自动做一次翻译，减少一轮来回
 
+## Shell 视图职责红线（MIN-136）
+
+113. **Token 命名强制 `--gc-*` 前缀**：新代码只允许使用 `--gc-bg-base` / `--gc-text-primary` / `--gc-line-subtle` 等 `--gc-*` token；旧 `--shell-bg` / `--ink-*` / `--line-soft` / `--surface-*` 已废弃，保留 alias 仅作兼容，新代码严禁引用
+114. **Shell 主路径只允许 Rail + Content + Drawer 三栏**：SaaSApp.tsx 不得渲染 Header / StatusFooter / CrucibleHistorySheet 等 chrome；这些组件仅用于独立页面（如 `/llm-config`）
+115. **ChatPanel 只保留对话主体 + composer**：顶部 badge 行、工具按钮、设置面板、chip 行全部移除，由 ShellLayout / ConversationStream 统管
+
 ---
 
 ## 更新日志
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-21 | 新增 Shell 视图职责红线 113-115（MIN-136 P0 语义对齐） |
 | 2026-04-17 | 新增子代理产出治理规则 110-112（Phase 1-6 实施计划 v1.1 老卢终审沉淀） |
 | 2026-04-14 | 新增底座同步规则 101-109（MIN-94 治理同步，与 SaaS 侧 102-113 对应） |
 | 2026-04-14 | 新增回灌治理规则 95-100（MIN-135 Phase 2） |
