@@ -17,7 +17,7 @@ function createProjectRoot() {
           {
             chapterId: 'ch1',
             chapterName: '开篇',
-            chapterIndex: 1,
+            chapterIndex: 0,
             options: [
               {
                 id: 'ch1-opt1',
