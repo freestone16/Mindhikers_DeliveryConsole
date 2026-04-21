@@ -1,8 +1,8 @@
 {
   "global": {
-    "provider": "kimi",
-    "model": "kimi-k2.5",
-    "baseUrl": "https://api.moonshot.cn/v1"
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "baseUrl": "https://api.deepseek.com/v1"
   },
   "generation": {
     "image": {
