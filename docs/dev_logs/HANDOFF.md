@@ -1,311 +1,131 @@
-🕐 Last updated: 2026-04-18 04:50 CST
-🌿 Branch: `MHSDC-GC-SSE`（Phase 1 全部完成 ✅）| 开发基线：`MHSDC-GC-SSE`
+🕐 Last updated: 2026-04-21 03:45 CST
+🌿 Branch: `MHSDC-GC-SSE`（P0 已完成，待进入 P1）
 👤 Conductor: 老杨（OldYang）｜ Owner: 老卢（Zhou Lu）
 
 ---
 
-# GoldenCrucible-SSE · 外部团队接手文档
+# GoldenCrucible-SSE · 接手文档
 
-> **当前状态**：Phase 1 完成 ✅ · **全部 11 任务完成** · 等待老卢最终验收 → Phase 2（Roundtable 入壳）就绪
-
----
-
-## 一、你在接手什么
-
-这是 **GoldenCrucible** 产品的 UI 大重构项目（代号 UI Architecture）。目标是把现有功能从临时架构重整为一套对标 Claude Code 质感的、可插拔的四段式工作流产品。
-
-**产品主线**（四段式工作流）：
-```
-GoldenRador（选题）→ Roundtable（圆桌辩论）→ GoldenCrucible（炼制）→ GoldenQuill（改写）
-```
-
-**两大架构灵魂**（贯穿所有 Phase，任何时候都不能稀释）：
-1. **Pluggable Slot Architecture** —— 三层可插拔：Channel（调性）/ Persona（人格）/ Skill（技能），加新能力不改代码只填卡片
-2. **Cross-Module Handoff Contract** —— 四段流转契约，每一棒可追溯、可反悔（30s Toast）、可一键回溯源头
+> **当前状态**：P0 已完成（C1 + C2 已 commit）。SaaSApp.tsx 已裁掉 Header/StatusFooter/CrucibleHistorySheet，主路径 token 已统一为 `--gc-*`，ChatPanel 顶部 header 已移除。`npm run typecheck:saas` ✅ / `npm run build` ✅。下一跳：P1 视图职责归位。
 
 ---
 
-## 二、环境与代码库
+## 一、上一会话做了什么（2026-04-20 ~ 04-21）
 
-### 本地路径
-```
-SSE（你的工作线）：/Users/luzhoua/MHSDC/GoldenCrucible-SSE      分支：MHSDC-GC-SSE
-SaaS（生产预发）：/Users/luzhoua/MHSDC/GoldenCrucible-SaaS      ⛔ 禁止外部团队触碰
-```
+1. **发现偏差**：5182 实际运行的 Shell 与 PRD §5.4/§5.5 正面冲突
+   - 中栏挂的是 `CrucibleStage`（应该是 `ConversationStream` 主对话）
+   - 右栏 `ArtifactDrawer` 里塞的是 `ChatPanel`（应该是 4 Tab Artifact）
+   - 13 个文件仍引用旧 token (`--line-soft` / `--shell-bg` / `--ink-*`)，导致全屏"黑边"观感
+   - 左栏 Rail 缺 Sessions 列表
+   - OriginBreadcrumb 原语已写但未被消费
 
-### 端口（SSE 线，⚠️ 不要用 SaaS 的端口）
-| 服务 | 端口 |
-|---|---|
-| Backend | **3009** |
-| Frontend | **5182** |
+2. **产出 1 份审计报告**：`docs/reviews/2026-04-20_visual-diff-audit.md`
+   - 4 对截图对比（demo Screen 1~4 vs 当前 5182）
+   - P0~P4 五档优先级清单
+   - 黑边 root cause 分析
+   - 真实 DOM 树 + token 计算值
 
-> 权威账本：`~/.vibedir/global_ports_registry.yml`
-> 常见错误：SaaS 用 3010/5183，与 SSE 不同，搞混会撞线崩溃。
+3. **产出 1 份实施方案**：`docs/plans/2026-04-20-001-shell-semantic-alignment-plan.md`
+   - 老卢 6 条硬约束记账
+   - P0~P4 五档分解（每档含文件清单、行数估算、验收、降级）
+   - DAG（P0 串行前置 → P1 → P2/P3 并行 → P4 收口）
+   - Commit 拆分（C1~C10，按"功能 vs 治理文档分开"原则）
+   - 6 项待老卢拍板议题（Q1~Q6）
 
-### 环境变量（复制 `.env.example` 开始）
-```bash
-cp .env.example .env.local
-# 必填项：
-PORT=3009
-VITE_APP_PORT=5182
-VITE_API_BASE_URL=http://localhost:3009
-APP_BASE_URL=http://localhost:5182
-CORS_ORIGIN=http://localhost:5182
-SESSION_SECRET=<32+位随机串>
-# LLM Provider 至少配一个：
-OPENAI_API_KEY= 或 ANTHROPIC_API_KEY= 或 DEEPSEEK_API_KEY=
-```
-> ⚠️ `.env` 只写英文注释（中文会让 dotenv 解析失败）
-
-### 本地启动
-```bash
-cd /Users/luzhoua/MHSDC/GoldenCrucible-SSE
-npm install
-npm run dev        # 同时启动前后端（concurrently）
-npm run build      # 构建验证
-npm run typecheck  # 类型检查
-```
-
-### 部署
-| 线 | 域名 | 权限 |
-|---|---|---|
-| SSE（你负责）| `golden-crucible-saas-sse.up.railway.app` | 外部团队可部署验证 |
-| SaaS（生产）| 另一条域名 | ⛔ 禁止触碰 |
+4. **方案已通过老卢审核**（2026-04-21 凌晨）：字体、暖灰色阶、Origin breadcrumb、Source/Target 卡片、Handoff checklist 整体效果"没有问题"
 
 ---
 
-## 三、必读文档（按顺序）
+## 二、当前会话完成（P0 · 裁 chrome + 统一 token）
 
-| 优先级 | 文件 | 读什么 |
-|---|---|---|
-| ⭐⭐⭐ 本文件 | `docs/dev_logs/HANDOFF.md` | 当前状态、进入方式 |
-| ⭐⭐⭐ 实施计划 | `docs/plans/2026-04-17_UI_Architecture_Phase1-6_Implementation_Plan.md` | **Phase 1 任务分解（你最需要的）**、附录 1 接入指南、附录 2 研发红线、附录 5 已拍板决策 |
-| ⭐⭐⭐ PRD v1.0 | `docs/plans/2026-04-16_UI_Architecture_PRD_v1.0.md` | 总纲 + §3（Slot）+ §4（Handoff）+ §7（路由/状态）+ §8（Design System）+ §11（Phase 路线）|
-| ⭐⭐ 视觉锚点 | `demos/ui-north-star/` | 视觉终局 4 屏 demo（运行：`python3 -m http.server 5173 --directory demos/ui-north-star`，键盘 1/2/3/4 切屏）|
-| ⭐⭐ 扫雷报告 | `docs/dev_logs/2026-04-16_persistence-diff-scan.md` | Phase 2 必读：`appendSpikesToCrucibleConversation` 从 RT 仓库拷入的操作清单 |
-| ⭐ 研发红线 | `docs/04_progress/rules.md` | 109+ 条精炼规则，遇到疑问先查这里 |
-| ⭐ 北极星简报 | `docs/plans/2026-04-15_UI_Architecture_North_Star_Brief.md` | 视觉纪律 + 红线（Phase 1 实现组件原语时参考）|
+**已完成**：
+- P0-T1：从 `src/SaaSApp.tsx` 主渲染剥离 `<Header>` / `<StatusFooter>` / `<CrucibleHistorySheet>`
+- P0-T2：主路径旧→新 token 替换（SaaSApp.tsx / AuthBoundary.tsx / ChatPanel.tsx / ShellErrorBoundary / ModuleErrorBoundary）
+- P0-T3：裁 `ChatPanel.tsx` 顶部 header（badge、工具按钮、设置面板移除）
 
----
+**验收结果**：
+- `npm run typecheck:saas` ✅
+- `npm run build` ✅（587.28 kB JS / 184.69 kB gzip）
+- 主路径（SaaSApp.tsx / shell/ / modules/）旧 token 清零
 
-## 四、Linear Issue 结构
-
-```
-MIN-94  黄金坩埚 SaaS 安全上线（总父 issue）
-└── MIN-136  UI Architecture · Phase 1 · Design System + Shell 空壳  ← 你的入口
-    ├── MIN-137  P1.T1 · tokens.css 工程化                           工时：M  前置：无
-    ├── MIN-138  P1.T2 · 组件原语库第一批（通用）                     工时：L  前置：T1
-    ├── MIN-139  P1.T3 · Shell 级原语                                工时：M  前置：T2
-    ├── MIN-140  P1.T4 · OriginBreadcrumb Shell 级原语               工时：S  前置：T3
-    ├── MIN-141  P1.T5 · React Router v6 切换 + URL scheme           工时：M  前置：T3  ⚠️风险R1
-    ├── MIN-142  P1.T6 · React Query v5 + Zustand 骨架               工时：S  前置：T5
-    ├── MIN-143  P1.T7 · ErrorBoundary 分层                          工时：S  前置：T6
-    ├── MIN-144  P1.T8 · requireWorkspace middleware                  工时：M  前置：无  ⚠️风险R4
-    ├── MIN-145  P1.T9 · ModuleRegistry + Slot Registry 骨架         工时：M  前置：T3
-    ├── MIN-146  P1.T10 · Shell 空壳 E2E + 响应式验证                 工时：S  前置：T3~T9
-    └── MIN-147  P1.T11 · Handoff 原语占位                           工时：S  前置：T2
-```
-
-> 工时档：S ≈ 半天内 / M ≈ 1-3 天 / L ≈ 3-5 天。不要做精确人天估算。
-
-**建议并行路径**（Phase 1 最优执行顺序）：
-```
-T1 → T2 → T3 ──→ T4
-              ├─→ T5 → T6 → T7
-              └─→ T9
-T8（与上述全程并行，无前置）
-所有完成 → T10 → T11
-```
+**已 commit**：
+- C1：`refs MIN-136 P0 裁 SaaS chrome + 统一 --gc-* tokens`（5 files, -354/+173）
+- C2：`refs MIN-136 P0 治理：token 命名规则入 rules.md`（rules.md +3 条红线）
 
 ---
 
-## 五、已拍板的关键决策（不要重议）
+## 三、下一会话要做什么（P1 · 视图职责归位）
 
-| 议题 | 决策 |
-|---|---|
-| 模块命名 | GoldenRador / Roundtable / GoldenCrucible / **GoldenQuill**（对外文案）/ Delivery Console |
-| 代码代号 | `rador` / `roundtable` / `crucible` / **`writer`**（小写，跨 API/Router/Schema 一致）|
-| 视觉锚点 | Claude Code（主）+ Codex（辅）；设计理念：奥卡姆 · 简单 · 强壮 · 底蕴 · 内涵 |
-| 前端数据层 | **React Query v5**（TanStack Query）|
-| 状态管理 | **Zustand**：Shell 全局 1 个 `shellStore` + 每模块 1 个内部 store，**禁跨模块直访** |
-| 路由 | **React Router v6 BrowserRouter**；兼容层保留到 Phase 3 结束 |
-| Persona 注册表 | 合并到 `personas/*.json` + `PersonaManifestSchema`；`soul_registry.yml` 降级为映射表过渡 |
-| 归档策略 | 软归档 + 365 天 TTL |
-| Handoff 撤销 | 30 秒 Toast 反悔按钮 |
-| Thesis/TopicCandidate 存储 | JSON 文件（与现有 conversation 一致），DB 化延到 v2 |
-| 埋点 | 保守档：Sentry + Pino 结构化日志；日志 schema 对齐 PostHog，v2 升级 |
-| Slot schema | 三层均预留 `visibility: z.enum(['workspace']).default('workspace')` 字段 |
-| SaaS 底座 | Phase 1-6 全程 SaaS 不推新底座迭代，SSE 一气呵成，不触发回灌 |
+### 起手前必读
 
----
+1. 本文件
+2. `docs/plans/2026-04-20-001-shell-semantic-alignment-plan.md` §4.P1
+3. `docs/04_progress/rules.md`（规则 113-115）
 
-## 六、Phase 1 验收 checklist（Phase 1 完成的标志）
+### P1 目标
 
-- [x] `npm run build` + `npm run typecheck` 双绿
-- [x] Shell 空壳能在 1280 / 768 / mobile 三断点正常启动（Playwright MCP 验证）
-- [x] `rg useHashRoute` 零结果（4 处调用点全部迁移到 React Router v6）
-- [ ] `rg "var(--gc-"` 所有命中都有对应 token 定义（无悬挂变量）— 待补验
-- [x] `requireWorkspace` 已注册，现有 Crucible 接口回归通过
-- [ ] axe-core 零 violation（空壳范围）— 降级到 Phase 2 组件入壳时补做
-- [ ] Storybook/ladle 覆盖通用原语 ≥ 80% — Phase 2+ 持续补做
-- [ ] `golden-crucible-saas-sse.up.railway.app` 部署冒烟通过 — 等 push 后验证
+把 Chat 主区从 Drawer 挪回中栏，把 Drawer 改成 Thesis/SpikePack/Snapshot/Reference 4 Tab，把左栏补出 Sessions 列表。
+
+**P1 子任务**：
+- P1-T1：扩 `ConversationStream` 原语（messages + renderer 接口）
+- P1-T2：Crucible / Roundtable 各自实现 `MessageRenderer`
+- P1-T3：ArtifactDrawer 4 Tab schema 落地
+- P1-T4：左栏 Sessions 列表（mock 可）
+- P1-T5：移除 Drawer 里的 ChatPanel
+
+**关键决策已确认**（老卢 2026-04-21）：
+- Q1：LLM API key 配置不用变
+- Q4：按开发最佳实践拆分 commit
+- Q6：红线已明确，直接执行
 
 ---
 
-## 七、绝对红线（违反立即停工，找老杨）
+## 四、当前分支状态
 
-1. **不在 `main` 直接开发**；功能分支命名 `feature/P{N}.T{M}-xxx`，PR 到 `MHSDC-GC-SSE`，老杨 review 后合并
-2. **不触碰 SaaS 生产域名**；SSE 功能先在 SSE Railway 域名验证
-3. **不拍板 PRD 未决事项**；发现新盲点写进 PR description 提给老杨
-4. **不用 Write 工具改 >50 行文件**；必须用 Edit（patches 方式）
-5. **TypeScript 类型导入必须 `import type`**，与普通 import 分行写
-6. **新增 CSS token 必须 `rg "var(--"` 校对全量引用**，防浅底白字
-7. **SSE 每种后端 event type 前端必须有处理**；`error` 类型必须抛给用户
-8. **所有外部请求必须有超时**（30s）+ AbortController
-9. **`.env` 只写英文注释**；中文导致 dotenv 解析失败
-10. **端口写死前查账本**：`~/.vibedir/global_ports_registry.yml`
-
-> 完整 109 条红线：`docs/04_progress/rules.md`
-
----
-
-## 八、分支与 Commit 纪律
-
-```bash
-# 每个任务建独立分支
-git checkout -b feature/P1.T1-tokens-css
-
-# commit 格式
-git commit -m "refs MIN-137 P1.T1 tokens.css 工程化为 CSS vars + Tailwind 映射"
-
-# Phase 1 全部任务完成后，老杨统一验收再合 MHSDC-GC-SSE
-```
-
-**每个 commit 前必做**：`npm run build` + `npm run typecheck` 通过再提交。
+- 当前分支：`MHSDC-GC-SSE`
+- 主分支：`main`
+- P0 commit 已创建（C1 + C2）
+- 工作树剩余未提交改动（非 P0 范围）：
+  - `M docs/04_progress/dev_progress.md`
+  - `M docs/dev_logs/HANDOFF.md`（本次更新，待 commit）
+  - `M src/components/Header.tsx` / `src/modules/*` / `src/shell/shellStore.ts`（9c29b15 之前的工作残留）
+  - `?? docs/dev_logs/2026-04-20.md` / `2026-04-21.md`
+  - `?? docs/plans/2026-04-19-001-...`、`2026-04-20-001-shell-semantic-alignment-plan.md`
+  - `?? docs/reviews/2026-04-20_visual-diff-audit.md`
+  - `?? src/modules/crucible/*`、`src/modules/roundtable/*`、`src/shell/ShellLayout.tsx`、`src/shell/ShellLayout.module.css`
+  - `?? .playwright-mcp/`、`tmp/`（噪音，提交前必须排除）
 
 ---
 
-## 九、Phase 全景（外部团队参考，只做 Phase 1）
+## 五、关键约束（不许重议）
 
-| Phase | 范围 | 状态 |
-|---|---|---|
-| **Phase 1** | Design System + Shell 空壳 | ✅ **已完成**（11/11 任务全部完成，T10 响应式验证通过）|
-| Phase 2 | Roundtable 入壳（从 RT 仓库迁入）| ⏳ 等 Phase 1 完成 |
-| Phase 3 | GoldenCrucible 包装为 feature slice | ⏳ 等 Phase 2 |
-| Phase 4 | GoldenRador 粗轮廓 | ⏳ 等 Phase 3；部分任务可与 Phase 2/3 并行 |
-| Phase 5 | GoldenQuill（Writer）粗轮廓 | ⏳ 等 Phase 3 |
-| Phase 6 | 持续优化 + v2 能力 | ⏳ 等 Phase 4/5 |
-
-**Phase 2 预告（Phase 1 期间可提前了解）**：
-- 从 `GoldenCrucible-Roundtable` 仓库 `origin/sse-export` 分支文件级迁入
-- **不搬** `Sidebar.tsx` / `App.tsx`（由新 Shell 取代）
-- `appendSpikesToCrucibleConversation` 函数从 RT 侧 `server/crucible-persistence.ts` L890-961 拷入 SSE
-- 操作清单：`docs/dev_logs/2026-04-16_persistence-diff-scan.md`
+老卢已拍板的 6 条硬约束（方案 §1）：
+1. Artifact 语义 = Thesis + SpikePack + ConversationSnapshot + Reference
+2. 三栏同时承载 Roundtable + Crucible，圆桌→坩埚必须丝滑
+3. 左 Rail / 右 Drawer 都可手动折叠（64px / 44px + `[` / `]` 快捷键）
+4. Origin 徽章永久显示
+5. Drawer 首秒 auto-peek 3s 后折叠
+6. 整体对标 Claude Code 简洁感，守 7 条红线
 
 ---
 
-## 十、联系与升级
+## 六、Linear 议题挂载
 
-| 角色 | 职责 | 触达方式 |
-|---|---|---|
-| **老杨（OldYang）** | 架构调度、PR review、未决事项裁决 | 任何时候找老杨，不要自行拍板 |
-| **老卢（Zhou Lu）** | 产品 Owner，最终决策 | 通过老杨转达 |
-
-**遇到以下情况立即找老杨**：
-- 实施中发现 PRD 与代码现实有矛盾
-- 某个任务的前置假设不成立
-- 测试/构建连续 2 次以上无法通过
-- 需要新增依赖包（评估是否与架构方向冲突）
+- 主 issue：`MIN-136`（Phase 1 - Shell 语义对齐）
+- 提交口径：`refs MIN-136 <摘要>`
+- 收口口径（P0~P4 全部跑通后）：`fixes MIN-136 Phase 1 Shell 语义对齐完成`
 
 ---
 
-## 十一、已完成的 Commits（参考历史）
+## 七、绝对红线（违反即任务失败）
 
-### Phase 1 进行中
-
-| Commit | Branch | 说明 |
-|---|---|---|
-| `3b6a203` | `feature/P1.T5-react-router-v6` | refs MIN-141 P1.T5 React Router v6 切换 + URL scheme |
-| `2a1f97e` | `feature/P1.T1-tokens-css` | refs MIN-137 tokens.css 工程化：CSS vars + fonts.css + Tailwind v4 @theme 映射 |
-| `d7d85cf` | `feature/P1.T8-require-workspace` | refs MIN-144 crucible 路由提取到 server/routes/ + requireWorkspace 中间件 |
-
-### Phase 0 收尾
-
-| Commit | 说明 |
-|---|---|
-| `ea7b526` | refs MIN-138 P1.T2 组件原语库第一批（通用）— 15 组件 31 文件，typecheck + build 绿 |
-| `d1c7cc6` | refs MIN-94 UI Architecture Phase 1-6 Implementation Plan v1.1（老卢 approved）|
-| `746737d` | refs MIN-94 UI Architecture PRD Phase 0（北极星 + 骨架 + 双轨产出）|
-| `9c97467` | refs MIN-135 update HANDOFF: mark cleanup complete |
-| `f9fdd5e` | cleanup: 删除 runtime autosave + 误提交 `.sse-backup` 文件 |
-| `bf0fcb9` | Phase 1: 核心模块回灌 + 架构升级 + 测试同步 + 路由对齐（34 files）|
-
-### Phase 1 DAG 进度
-
-```
-T1 ✅ (2a1f97e) → T2 ✅ → T3 ✅ → T4 ✅
-                                    → T5 ✅ (3b6a203) → T6 ✅ (7eed19e) → T7 ✅ (d4aad6e)
-                                    → T9 ✅
-T8 ✅ (d7d85cf)（无下游依赖，Phase 2+ 使用）
-T11 ✅ → T10 ✅ (MIN-146, Playwright 响应式验证通过)
-```
-
-**Phase 1 完成 ✅**
-
-### 本窗口新增 Commits
-
-| Commit | 说明 |
-|---|---|
-| `ba8b777` | refs MIN-136 fix: SSE 端口 fallback 硬编码与账本对齐 3009/5182 |
-| `b2fd052` | merge T5: React Router v6 切换 + URL scheme |
-| merge T6 | React Query v5 + Zustand 骨架 (7eed19e) |
-| merge T7 | ErrorBoundary 分层 (d4aad6e) |
-
-### T6 变更明细
-- 新增 `@tanstack/react-query` + `zustand` 依赖
-- 新增 `src/lib/query-client.ts`（QueryClient 全局配置）
-- 新增 `src/shell/shellStore.ts`（Zustand：activeModule / activeSessionId / sidebarOpen / artifactDrawerOpen）
-- 新增 `src/modules/crucible/useConversations.ts`（示例 query hook，Phase 2 数据层模式参考）
-- 修改 `src/main.tsx`（注册 QueryClientProvider）
-
-### T7 变更明细
-- 新增 `src/shell/error-boundaries/ShellErrorBoundary.tsx`（全局兜底，全屏错误页 + 刷新按钮）
-- 新增 `src/shell/error-boundaries/ModuleErrorBoundary.tsx`（模块级隔离，inline 错误提示 + 重试按钮）
-- 修改 `src/main.tsx`（ShellErrorBoundary 包裹在最外层）
-
-### T10 收口 Checklist（已完成）
-
-- [x] `npm run typecheck:saas` ✅ 通过
-- [x] `npm run build` ✅ 通过（596 KB JS, 2.97s）
-- [x] `rg useHashRoute` 零结果 ✅
-- [x] `requireWorkspace` 已注册在 crucible 路由 ✅
-- [x] 三断点响应式验证（1280 / 768 / mobile）✅ — Playwright MCP 验证通过
-- [~] axe-core 零 violation — 降级到 Phase 2 组件入壳时补做
-- [ ] Railway 部署冒烟 — 等 push 后验证
-- [x] 更新 HANDOFF + dev_progress 收口标记 ✅
-
-### T1 变更明细
-- 新增 `src/styles/tokens.css`（101 行 CSS custom properties，`--gc-*` 前缀）
-- 新增 `src/styles/fonts.css`（Fraunces / Instrument Sans / JetBrains Mono）
-- 改写 `src/index.css`（Tailwind v4 `@theme` 映射，替换旧 `:root` vars）
-- 修改 `index.html`（字体 preconnect + 标题改为 "Golden Crucible"）
-
-### T8 变更明细
-- 新增 `server/auth/workspace-middleware.ts`（requireWorkspace 中间件，支持 auth-bypass + 灰度开关）
-- 新增 `server/routes/crucible.ts`（从 index.ts 提取 ~300 行路由，含 BYOK/conversations/autosave）
-- 新增 `server/routes/roundtable.ts`、`rador.ts`、`writer.ts`（空占位）
-- 修改 `server/index.ts`（删除 330 行内联路由，替换为 `app.use('/api/crucible', crucibleRouter)`）
-
-## 十二、暂缓 / 搁置项（不在本次交付范围）
-
-| 事项 | 状态 | 原因 |
-|---|---|---|
-| Roundtable 回搬 SSE | ⏸️ 暂缓至 Phase 2 | Shell 空壳未就绪 |
-| SaaS ChatPanel 修复提交 | ⏸️ 搁置 | 老卢要求暂不处理 |
-| Phase 3B 老卢验收 V1-V11 | ⏸️ 搁置 | 老卢要求暂不执行 |
-| SaaS 底座回灌 | ✅ 本轮不触发 | 2026-04-17 老卢拍板：SSE 一气呵成 |
+1. ❌ 不在 `main` 直接开发
+2. ❌ 不擅自 commit / push（必须显式拦截 + 老卢确认）
+3. ❌ 不混 commit（功能代码 vs 治理文档严格分开）
+4. ❌ 不引入 `.playwright-mcp/`、`tmp/` 噪音进 commit
+5. ❌ 不擅自修改 `.claude/launch.json` 里 frontend / backend 配置（那是老卢日常工作流的端口配置）
+6. ❌ 不擅自 kill 5182 / 3009 端口上的进程（那是老卢 VSCode 在跑）
 
 ---
 
-*最后更新：老杨（OldYang），2026-04-18*
-*Phase 1 全部完成，等待老卢最终验收 → Phase 2 启动*
+*下一窗口启动时第一动作：读本文件 + 方案文档；第二动作：`git status` 核对工作树；第三动作：与老卢确认 Q1/Q4/Q6 三个议题；第四动作：动手 P0。*
