@@ -275,20 +275,6 @@ export async function generateGlobalBRollPlan(
 
 const MAX_RETRIES = 2;
 
-// 智能模板推荐函数 - 根据内容推荐合适的模板
-function suggestTemplateFromContent(prompt: string, quote: string): string {
-  const content = (prompt + quote).toLowerCase();
-
-  if (content.match(/金句|名言|观点|quote|生命目标|涌现|核心|要旨|精髓/)) return 'TextReveal';
-  if (content.match(/\d+[万千亿百万]|增长|统计|数据|指标|14.5万|0.839/)) return 'NumberCounter';
-  if (content.match(/对比|vs|传统|觉醒|otto|inga|归因|涌现|分屏|对立|区别/)) return 'ComparisonSplit';
-  if (content.match(/\d{4}|年份|年代|从.*到|演化|历史|时间线|编年|路线/)) return 'TimelineFlow';
-  if (content.match(/象限|坐标|四象限|分布|矩阵/)) return 'DataChartQuadrant';
-  if (content.match(/照片|图片|背景图|缩放|电影|氛围/)) return 'CinematicZoom';
-
-  return 'ConceptChain'; // 兜底
-}
-
 async function generateGlobalBRollPlanWithRetry(
   chapters: { id: string; name: string; text: string }[],
   brollTypes: ('remotion' | 'generative' | 'artlist' | 'internet-clip' | 'user-capture' | 'infographic')[],
@@ -537,4 +523,3 @@ export function generateFallbackOptions(
     rationale: '兜底方案（LLM 生成失败）',
   }));
 }
-

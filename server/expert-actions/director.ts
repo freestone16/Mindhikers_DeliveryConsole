@@ -1,8 +1,29 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExpertActionAdapter } from '../expert-actions';
+import type { ExpertActionAdapter } from '../expert-actions';
 import { callLLM } from '../llm';
 import { loadConfig } from '../llm-config';
+
+function deepMerge(target: Record<string, any>, source: Record<string, any>): Record<string, any> {
+    const output = { ...target };
+
+    for (const [key, value] of Object.entries(source)) {
+        if (
+            value
+            && typeof value === 'object'
+            && !Array.isArray(value)
+            && target[key]
+            && typeof target[key] === 'object'
+            && !Array.isArray(target[key])
+        ) {
+            output[key] = deepMerge(target[key], value);
+        } else {
+            output[key] = value;
+        }
+    }
+
+    return output;
+}
 
 export const DirectorAdapter: ExpertActionAdapter = {
     expertId: 'Director',
@@ -176,13 +197,15 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                 if (updates.name) opt.name = updates.name;
                 if (updates.prompt) opt.prompt = updates.prompt;
                 if (updates.imagePrompt) opt.imagePrompt = updates.imagePrompt;
+                if (updates.type) opt.type = updates.type;
 
                 // 深度覆盖 props 属性，用于修改 Remotion 内部的文案排版、不换行等
                 if (updates.props && typeof updates.props === 'object') {
-                    opt.props = {
-                        ...(opt.props || {}),
-                        ...updates.props
-                    };
+                    opt.props = deepMerge(opt.props || {}, updates.props);
+                }
+
+                if (updates.type || updates.prompt || updates.imagePrompt || updates.props) {
+                    delete opt.previewUrl;
                 }
                 break;
             }

@@ -6,17 +6,21 @@ interface StatusDashboardProps {
 }
 
 export const StatusDashboard = ({ state }: StatusDashboardProps) => {
+    const modules = state.modules;
+    if (!modules) {
+        return null;
+    }
 
-    const directorTotal = state.modules.director.items.length;
-    const directorDone = state.modules.director.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
+    const directorTotal = modules.director.items.length;
+    const directorDone = modules.director.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
 
-    const musicTotal = state.modules.music.items.length;
-    const musicDone = state.modules.music.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
+    const musicTotal = modules.music.items.length;
+    const musicDone = modules.music.items.reduce((acc: number, i: any) => acc + (i.checked ? 1 : 0), 0);
 
-    const marketingSubmitted = state.modules.marketing.isSubmitted;
+    const marketingSubmitted = modules.marketing.isSubmitted;
 
-    const shortsTotal = (state.modules.shorts as any)?.items?.length || (state.modules.shorts as any)?.scripts?.length || 0;
-    const shortsDone = (state.modules.shorts as any)?.items?.filter((s: any) => s.status === 'published').length || 0;
+    const shortsTotal = (modules.shorts as any)?.items?.length || (modules.shorts as any)?.scripts?.length || 0;
+    const shortsDone = (modules.shorts as any)?.items?.filter((s: any) => s.status === 'published').length || 0;
 
     const totalTasks = directorTotal + musicTotal + 1 + shortsTotal;
     const totalDone = directorDone + musicDone + (marketingSubmitted ? 1 : 0) + shortsDone;
@@ -71,7 +75,7 @@ export const StatusDashboard = ({ state }: StatusDashboardProps) => {
                 <StatusItem
                     icon={MonitorPlay}
                     label="Visual"
-                    phase={state.modules.director.phase}
+                    phase={modules.director.phase}
                     done={directorDone}
                     total={directorTotal}
                     colorClass="text-blue-400"
@@ -81,7 +85,7 @@ export const StatusDashboard = ({ state }: StatusDashboardProps) => {
                 <StatusItem
                     icon={Music}
                     label="Audio"
-                    phase={state.modules.music.phase}
+                    phase={modules.music.phase}
                     done={musicDone}
                     total={musicTotal}
                     colorClass="text-purple-400"
@@ -95,7 +99,7 @@ export const StatusDashboard = ({ state }: StatusDashboardProps) => {
                     <div className="flex flex-col">
                         <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Thumbnail</span>
                         <div className="text-sm font-bold text-white leading-none">
-                            {state.modules.thumbnail.variants.length > 0 ? 'Review' : 'Pending'}
+                            {modules.thumbnail.variants.length > 0 ? 'Review' : 'Pending'}
                         </div>
                     </div>
                 </div>

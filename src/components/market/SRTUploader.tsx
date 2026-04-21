@@ -18,7 +18,7 @@ interface SRTUploaderProps {
 }
 
 export const SRTUploader: React.FC<SRTUploaderProps> = ({
-    projectId,
+    projectId: _projectId,
     chapters,
     onChaptersLoaded,
 }) => {

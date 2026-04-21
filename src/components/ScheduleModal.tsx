@@ -12,6 +12,7 @@ interface ScheduleModalProps {
 }
 
 export const ScheduleModal = ({ item, isOpen, onClose, onSave, state, mode = 'schedule' }: ScheduleModalProps) => {
+    const modules = state?.modules;
     const [title, setTitle] = useState(item.title);
     const [description, setDescription] = useState(item.description);
     const [tags, setTags] = useState(item.tags.join(', '));
@@ -29,10 +30,10 @@ export const ScheduleModal = ({ item, isOpen, onClose, onSave, state, mode = 'sc
     // In 'edit' mode, we might not want to enforce required fields validation as strictly, or default to current values
 
     const handleImportMarketing = () => {
-        if (!state?.modules.marketing.strategy.seo) return;
-        const seo = state.modules.marketing.strategy.seo;
-        const social = state.modules.marketing.strategy.social;
-        const geo = state.modules.marketing.strategy.geo;
+        if (!modules?.marketing?.strategy?.seo) return;
+        const seo = modules.marketing.strategy.seo;
+        const social = modules.marketing.strategy.social;
+        const geo = modules.marketing.strategy.geo;
 
         const importedTitle = seo.titleCandidates?.[0] || title;
         const importedDesc = `${seo.description || ''}\n\n${social?.twitterThread || ''}`;
@@ -110,7 +111,7 @@ export const ScheduleModal = ({ item, isOpen, onClose, onSave, state, mode = 'sc
                         {mode === 'schedule' ? 'Schedule Video' : `Video Details: ${item.title}`}
                     </h2>
                     <div className="flex items-center gap-2">
-                        {state?.modules.marketing.isSubmitted && (
+                        {modules?.marketing?.isSubmitted && (
                             <button
                                 onClick={handleImportMarketing}
                                 className="px-3 py-1.5 text-[#3ea6ff] hover:bg-[#263850] rounded text-sm font-medium transition-colors uppercase tracking-wide"

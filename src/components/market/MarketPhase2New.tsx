@@ -13,7 +13,7 @@ import {
     Sparkles, Loader2, ArrowLeft, AlertCircle, CheckCircle2,
     LayoutList, RefreshCw
 } from 'lucide-react';
-import type { MarketModule_V3, MarketingPlan, MarketingPlanRow, SRTChapter } from '../../types';
+import type { MarketModule_V3, MarketingPlan, SRTChapter } from '../../types';
 import { SRTUploader } from './SRTUploader';
 import { MarketPlanTable } from './MarketPlanTable';
 import { MarketConfirmBar } from './MarketConfirmBar';
@@ -60,14 +60,6 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
             p.keywordId === keywordId ? { ...p, ...updates } : p
         );
         // Also fill any missing plans (shouldn't happen but guard)
-        onUpdate({ ...current, plans });
-    };
-
-    const updatePlanRows = (keywordId: string, rows: MarketingPlanRow[]) => {
-        const current = dataRef.current;
-        const plans = current.plans.map(p =>
-            p.keywordId === keywordId ? { ...p, rows } : p
-        );
         onUpdate({ ...current, plans });
     };
 
@@ -179,11 +171,6 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
     // ── Derived State ─────────────────────────────────────────────────────────
 
     const hasAnyPlan = data.plans.some(p => p.generationStatus === 'ready');
-    const allGenerating = goldenKWs.length > 0 &&
-        goldenKWs.every(kw => {
-            const p = data.plans.find(pl => pl.keywordId === kw.id);
-            return p?.generationStatus === 'generating';
-        });
     const anyGenerating = data.plans.some(p => p.generationStatus === 'generating');
 
     // ── No golden keywords ────────────────────────────────────────────────────

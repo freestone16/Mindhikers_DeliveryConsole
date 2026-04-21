@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import {
     CheckCircle2, Circle, RefreshCw, ChevronDown, ChevronRight,
-    Loader2, Edit3, Tag, List, Image, Settings, FileText, Type
+    Loader2, Tag, List, Image, Settings, FileText, Type
 } from 'lucide-react';
 import type { MarketingPlan, MarketingPlanRow, DescriptionBlock } from '../../types';
 import { DescriptionEditor } from './DescriptionEditor';

@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { Request, Response } from 'express';
-import { LLMConfigSchema, LLMConfig, DEFAULT_LLM_CONFIG, PROVIDER_INFO, IMAGE_MODELS, VIDEO_MODELS } from '../src/schemas/llm-config';
+import type { Request, Response } from 'express';
+import { LLMConfigSchema, DEFAULT_LLM_CONFIG, PROVIDER_INFO, IMAGE_MODELS, VIDEO_MODELS } from '../src/schemas/llm-config';
+import type { LLMConfig } from '../src/schemas/llm-config';
 
 const CONFIG_DIR = path.join(process.cwd(), '.agent', 'config');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'llm_config.json');
@@ -37,22 +38,7 @@ const saveConfig = (config: LLMConfig) => {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 };
 
-const PROVIDER_ENV_MAP: Record<string, string[]> = {
-  openai: ['OPENAI_API_KEY'],
-  deepseek: ['DEEPSEEK_API_KEY'],
-  zhipu: ['ZHIPU_API_KEY'],
-  siliconflow: ['SILICONFLOW_API_KEY'],
-  kimi: ['KIMI_API_KEY'],
-  volcengine: ['VOLCENGINE_ACCESS_KEY'],
-  yinli: ['YINLI_API_KEY'],
-};
-
-const getDefaultModel = (provider: string): string => {
-  const info = PROVIDER_INFO[provider];
-  return info?.models[0] || 'unknown';
-};
-
-export const getConfigStatus = (req: Request, res: Response) => {
+export const getConfigStatus = (_req: Request, res: Response) => {
   const config = loadConfig();
 
   const providers = Object.keys(PROVIDER_INFO).reduce((acc, provider) => {
@@ -236,7 +222,7 @@ export const testConnection = async (req: Request, res: Response) => {
   }
 };
 
-export const testAllConnections = async (req: Request, res: Response) => {
+export const testAllConnections = async (_req: Request, res: Response) => {
   const results: Record<string, any> = {};
   const envPath = path.join(process.cwd(), '.env');
   let envContent = '';
@@ -318,7 +304,7 @@ export const testAllConnections = async (req: Request, res: Response) => {
   res.json(results);
 };
 
-export const getSavedKeys = (req: Request, res: Response) => {
+export const getSavedKeys = (_req: Request, res: Response) => {
   const envPath = path.join(process.cwd(), '.env');
   const savedKeys: Record<string, any> = {};
 

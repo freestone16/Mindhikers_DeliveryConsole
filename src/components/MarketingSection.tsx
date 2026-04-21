@@ -33,7 +33,7 @@ interface MarketingSectionProps {
 export const MarketingSection: React.FC<MarketingSectionProps> = ({
     projectId,
     scriptPath,
-    socket,
+    socket: _socket,
 }) => {
     // 状态管理（通过 useExpertState 实现 Socket.IO 持久化同步）
     const { state: rawData, updateState } = useExpertState<MarketModule_V3>(

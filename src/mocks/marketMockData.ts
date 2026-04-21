@@ -2,14 +2,24 @@ import type { MarketModule_V2, TitleTagSet, TubeBuddyScore } from '../types';
 
 export const mockTubeBuddyScore = (seed: number): TubeBuddyScore => {
     const rand = (min: number, max: number) => Math.floor((seed * 17 + min) % max);
+    const searchVolume = rand(40, 90);
+    const competition = rand(30, 80);
+    const optimization = rand(50, 95);
+    const relevance = rand(60, 100);
+    const overallScore = rand(60, 95);
     return {
-        overallScore: rand(60, 95),
+        overall: overallScore,
+        searchVolume,
+        competition,
+        optimization,
+        relevance,
+        overallScore,
         weightedScore: rand(55, 92),
         metrics: {
-            searchVolume: rand(40, 90),
-            competition: rand(30, 80),
-            optimization: rand(50, 95),
-            relevance: rand(60, 100)
+            searchVolume,
+            competition,
+            optimization,
+            relevance
         },
         rawMetrics: {
             monthlySearches: rand(1000, 500000),

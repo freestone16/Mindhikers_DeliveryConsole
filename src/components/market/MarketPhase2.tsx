@@ -67,9 +67,9 @@ export const MarketPhase2: React.FC<MarketPhase2Props> = ({
                                             <div className="text-white font-medium text-base mb-1">{set.title}</div>
                                             {set.tubeBuddyScore && (
                                                 <div className="flex items-center gap-3 text-xs text-slate-400 mt-2 bg-slate-900/50 p-2 rounded">
-                                                    <span>搜索量: <span className="text-blue-400">{set.tubeBuddyScore.metrics.searchVolume}</span></span>
-                                                    <span>竞争度: <span className="text-yellow-400">{100 - set.tubeBuddyScore.metrics.competition}</span></span>
-                                                    <span>相关度: <span className="text-green-400">{set.tubeBuddyScore.metrics.relevance}</span></span>
+                                                    <span>搜索量: <span className="text-blue-400">{set.tubeBuddyScore.metrics?.searchVolume ?? set.tubeBuddyScore.searchVolume}</span></span>
+                                                    <span>竞争度: <span className="text-yellow-400">{100 - (set.tubeBuddyScore.metrics?.competition ?? set.tubeBuddyScore.competition)}</span></span>
+                                                    <span>相关度: <span className="text-green-400">{set.tubeBuddyScore.metrics?.relevance ?? set.tubeBuddyScore.relevance}</span></span>
                                                 </div>
                                             )}
                                         </td>
