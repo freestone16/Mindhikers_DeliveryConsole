@@ -73,7 +73,7 @@ PROJECTS_BASE=/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindH
 
 # LLM 配置
 LLM_PROVIDER=deepseek
-DEEPSEEK_API_KEY=sk-9372b8945e474177bc55ace85176bf19
+DEEPSEEK_API_KEY=<your-deepseek-api-key>
 ```
 
 **修改项目：**
