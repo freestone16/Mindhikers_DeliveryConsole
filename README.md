@@ -1,229 +1,55 @@
-# Delivery Console
+# Distribution Terminal — 分发终端
 
-MindHikers 项目的内容交付管理控制台。用于管理视频项目的制作流程，包括导演、音乐、缩略图、营销等模块。
-
-> 当前 Director 新家工作区：`/Users/luzhoua/MHSDC/DeliveryConsole/Director`
-> 端口 SSOT：`~/.vibedir/global_ports_registry.yml` -> `.env.local` -> runtime
-> 当前账本口径：前端 `5178`，后端 `3005`
+> **MHSDC** 产品线 3  
+> 负责 MindHikers 内容的多平台分发编排，聚焦 Queue + SSE + Connector 架构
 
 ---
 
-## 📁 项目结构
+## 这是什么
 
-**⚠️ 历史搬迁（2025-02-20）+ 当前开发新家（2026-03-14）**
+`Distribution Terminal` 是 MindHikers 创作者工具矩阵的**分发编排层**，承接 Director / Marketing / Shorts 等上游模块的产物，完成最后一公里的多平台发布：
 
-```
-/Users/luzhoua/
-├── DeliveryConsole/                    ← 本项目代码
-│   ├── src/                            ← React 前端代码
-│   ├── server/                         ← Node.js 后端
-│   ├── skills/                         ← Python Skill 执行器
-│   ├── .env                            ← 配置文件（关键）
-│   └── README.md                       ← 本文档
-│
-└── Mylife_lawrence/
-    └── Obsidian_Antigravity/
-        └── Projects/
-            └── MindHikers/
-                └── Projects/           ← 项目数据（保留在原处）
-                    ├── CSET-SP3/       ← 当前激活项目
-                    ├── CSET-EP4/
-                    ├── CSET-EP5/
-                    └── ...
-```
-
-**数据分离原因：** 摆脱 Obsidian 索引负担，node_modules 不再影响笔记库性能。
+- **分发队列（Queue）**：任务调度、优先级管理、失败重试
+- **SSE 实时推送**：发布状态实时回传前端
+- **平台连接器（Connector）**：YouTube、X、微信公众号等平台的统一接入层
+- **状态持久化**：发布记录、失败原因、重试历史全链路可追溯
 
 ---
 
-## 🚀 快速开始
+## 当前状态
 
-### 方式 1：本地开发（推荐）
-
-```bash
-cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-npm run dev
-```
-
-服务启动后：
-- 前端：`http://localhost:5178`
-- 后端：`http://localhost:3005`
-
-### 方式 2：Docker（网络稳定时使用）
-
-```bash
-cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-make dev
-```
-
-**注意：** 如果遇到 Docker Hub 连接问题，请使用方式 1。
-
----
-
-## ⚙️ 环境配置
-
-### 关键配置文件：`.env.local`
-
-```bash
-# 当前工作区名称
-PROJECT_NAME=MindHikers Delivery Console
-
-# 端口以账本为准
-PORT=3005
-VITE_BACKEND_PORT=3005
-VITE_APP_PORT=5178
-
-# 项目数据基础路径（⚠️ 关键配置）
-# DeliveryConsole 代码与项目数据已分离，必须指定完整路径
-PROJECTS_BASE=/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects
-
-# 开发时留空走 Vite proxy
-VITE_API_BASE=
-```
-
-**修改项目：**
-1. 编辑 `.env.local` 中的运行时配置
-2. 重启服务
-3. 或使用界面上的项目切换功能
-
----
-
-## 📂 数据目录说明
-
-项目数据保留在原处，不影响 Obsidian：
-
-```
-Projects/
-├── CSET-SP3/
-│   ├── 01_Reference/           # 参考资料
-│   ├── 02_Script/              # 脚本文件
-│   ├── 03_Thumbnail_Plan/      # 缩略图方案
-│   ├── 04_Visuals/             # 视觉方案（Director 输出）
-│   ├── 04_Music_Plan/          # 音乐方案
-│   ├── 05_Marketing/           # 营销方案
-│   ├── 05_Shorts_Output/       # Shorts 方案
-│   ├── delivery_store.json     # 项目状态数据
-│   └── .tasks/                 # 任务文件
-```
-
----
-
-## 🛠️ 开发说明
-
-### 技术栈
-
-- **前端：** React + TypeScript + Vite + Tailwind CSS
-- **后端：** Node.js + Express + Socket.io
-- **Skill 执行：** Python 3
-- **容器化：** Docker + Docker Compose
-
-### 常用命令
-
-```bash
-# 开发模式
-npm run dev
-
-# 构建
-npm run build
-
-# 代码检查
-npm run lint
-
-# Docker 构建
-make init
-
-# Docker 启动
-make dev
-
-# Docker 停止
-make stop
-
-# Docker 日志
-make logs
-```
-
-### 重要文件
-
-| 文件 | 说明 |
+| 维度 | 状态 |
 |------|------|
-| `.env.local` | 当前工作区运行时配置（端口、项目数据路径） |
-| `server/index.ts` | 后端主入口 |
-| `scripts/runtime-env.js` | 脚本共享的运行时端口解析 |
-| `src/App.tsx` | 前端主组件 |
-| `skills/executor.py` | Skill 执行器 |
-| `skills/connectors/registry.py` | LLM 连接器注册表 |
+| 分支 | `MHSDC-DT` |
+| 阶段 | 待建设 / 一期基线已立 |
+| 架构 | Queue + SSE + Connector |
+
+**已完成（截至 2026-03-20）**：
+- 独立分支与 worktree 建立
+- 总体设计方案与一期实施方案落盘
+- 分发队列迁移到项目内 `06_Distribution/`
+- 基础服务层拆出：auth / queue / store / types / sse
+- `projectId` 级别的前端页面读写已接通
+- Phase 1 首个里程碑代码与自验收闭环完成
 
 ---
 
-## 🐛 已知问题与修复
+## 快速导航
 
-### 1. DeepSeek Model Not Exist 错误
-
-**问题：** 调用 LLM 时返回 `Model Not Exist` 错误。
-
-**原因：** `skills/connectors/registry.py` 第 56 行代码逻辑错误，把字符串 `"DIRECTOR_LLM_MODEL"` 当作模型名传给 API。
-
-**修复：**
-```python
-# 错误
-model_key = f"{prefix}LLM_MODEL" or os.environ.get('LLM_MODEL')
-
-# 正确
-model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
-```
-
-**状态：** 已修复（2025-02-20）。
-
-### 2. Docker Hub 连接问题
-
-**问题：** `make dev` 时 Docker Hub 连接失败。
-
-**解决：** 使用本地开发模式 `npm run dev`。
+| 你想看 | 读这个 |
+|--------|--------|
+| 模块治理入口 | `./AGENTS.md` |
+| 项目族入口 | `/Users/luzhoua/MHSDC/AGENTS.md` |
+| 全局治理入口 | `/Users/luzhoua/.codex/AGENTS.md` |
 
 ---
 
-## 🔄 版本历史
+## 注意事项
 
-### v2.0.1 (2025-02-20)
-
-- **变更：** 项目代码从 Obsidian 目录分离到 `/Users/luzhoua/DeliveryConsole/`
-- **修复：** `registry.py` 模型名称读取逻辑错误
-- **说明：** 数据目录（Projects/）保留在原处，不受影响
-
-### v2.0.0 (2025-02-13)
-
-- 初始版本
+- 当前目录为旧 Delivery Console 物理现场，代码已迁往新工作面
+- 分发终端作为一级模块的定位不变，后续将在此目录上重建
+- 物理目录名含空格（`Distribution Terminal`），是已知技术治理风险点
 
 ---
 
-## 📝 Antigravity 交接说明
-
-**如需在 Antigravity 中继续开发：**
-
-1. **项目位置：** `/Users/luzhoua/DeliveryConsole/`
-2. **数据位置：** `/Users/luzhoua/Mylife_lawrence/Obsidian_Antigravity/Projects/MindHikers/Projects/`
-3. **启动方式：** `cd /Users/luzhoua/DeliveryConsole && npm run dev`
-4. **关键配置：** 检查 `.env` 中的 `PROJECTS_BASE` 路径是否正确
-5. **注意事项：** 不要移动 Projects/ 数据目录，只需修改 `.env.local` 即可
-
-## 运行时纪律
-
-- 端口以全局账本 `~/.vibedir/global_ports_registry.yml` 为单一事实来源
-- `.env.local` 承接当前工作区被分配的端口
-- `vite.config.ts`、`scripts/check-port.js`、`scripts/preview.js`、`start.sh`、PM2/launch 配置都必须跟随 `.env.local`
-- 业务代码不应再写死 `localhost:3002` / `5173`
-
----
-
-## 📞 联系方式
-
-如有问题，请参考 `docs/` 目录或查看 Makefile 中的帮助信息。
-
-```bash
-make help
-```
-
----
-
-**最后更新：** 2025-02-20
-**文档维护：** AI Assistant
+*最后更新：2026-04-24*
