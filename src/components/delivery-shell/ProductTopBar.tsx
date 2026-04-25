@@ -59,7 +59,7 @@ export function ProductTopBar({
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const activeProject = projects.find(p => p.isActive) || projects[0];
+  const activeProject = projects.find(p => p.name === projectId) || projects.find(p => p.isActive) || projects[0];
   const activeScript = scripts.find(s => s.path === selectedScriptPath);
 
   return (
@@ -99,7 +99,7 @@ export function ProductTopBar({
                 <button key={p.name} onClick={() => { onSelectProject(p.name); setProjectDropdownOpen(false); }}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px',
-                    background: p.isActive ? 'rgba(201,117,69,0.08)' : 'transparent',
+                    background: (p.name === projectId || p.isActive) ? 'rgba(201,117,69,0.08)' : 'transparent',
                     border: 'none', cursor: 'pointer', color: 'var(--shell-text)', font: 'inherit',
                   }}>
                   {p.name}

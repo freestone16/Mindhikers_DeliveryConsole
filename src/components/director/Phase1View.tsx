@@ -237,64 +237,7 @@ export const Phase1View = ({
         </PhasePanel>
       </div>
 
-      <div className="w-72 flex-shrink-0 flex flex-col gap-4">
-        <PhasePanel>
-          <PhasePanelHeader
-            title={
-              <>
-                <Lightbulb className="w-4 h-4 text-[#c97545]" />
-                <span className="text-sm font-bold text-[#342d24]">当前上下文</span>
-              </>
-            }
-          />
-          <PhasePanelBody className="space-y-3">
-            <div className="space-y-1">
-              <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">项目</span>
-              <div className="text-sm text-[#342d24] font-medium truncate">{projectId || '未选择'}</div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">剧本</span>
-              <div className="text-sm text-[#342d24] font-medium truncate">{scriptPath ? scriptPath.split('/').pop() : '未选择'}</div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-[#8f8372] uppercase tracking-wider font-bold">状态</span>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isApproved ? 'bg-[#62835c]' : 'bg-[#c97545]'}`} />
-                <span className="text-sm text-[#342d24]">{isApproved ? '概念已确认' : '概念待确认'}</span>
-              </div>
-            </div>
-          </PhasePanelBody>
-        </PhasePanel>
 
-        <PhasePanel>
-          <PhasePanelHeader
-            title={
-              <>
-                <Upload className="w-4 h-4 text-[#c97545]" />
-                <span className="text-sm font-bold text-[#342d24]">输入来源</span>
-              </>
-            }
-          />
-          <PhasePanelBody className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-[#6b5e4f]">
-              <span className="w-5 h-5 rounded bg-[#f4efe5] flex items-center justify-center text-[10px] font-bold text-[#8f8372]">1</span>
-              <span>剧本结构分析</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-[#6b5e4f]">
-              <span className="w-5 h-5 rounded bg-[#f4efe5] flex items-center justify-center text-[10px] font-bold text-[#8f8372]">2</span>
-              <span>视觉风格推理</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-[#6b5e4f]">
-              <span className="w-5 h-5 rounded bg-[#f4efe5] flex items-center justify-center text-[10px] font-bold text-[#8f8372]">3</span>
-              <span>B-roll 类型匹配</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-[#6b5e4f]">
-              <span className="w-5 h-5 rounded bg-[#f4efe5] flex items-center justify-center text-[10px] font-bold text-[#8f8372]">4</span>
-              <span>章节分段建议</span>
-            </div>
-          </PhasePanelBody>
-        </PhasePanel>
-      </div>
     </div>
   );
 };
