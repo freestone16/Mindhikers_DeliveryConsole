@@ -15,8 +15,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: delivery-console-dev
     ports:
-      - "5173:5173" # Vite frontend
-      - "3002:3002" # Express backend
+      - "5178:5178" # Vite frontend
+      - "3005:3005" # Express backend
     volumes:
       # 源码挂载 - 热更新（VirtioFS 实时同步）
       - .:/app

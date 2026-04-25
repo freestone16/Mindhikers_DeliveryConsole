@@ -90,8 +90,8 @@ model = os.environ.get(f"{prefix}LLM_MODEL") or os.environ.get('LLM_MODEL')
 - [x] 代码成功移动到新位置
 - [x] `.env` 配置文件更新正确
 - [x] `npm run dev` 启动成功
-- [x] 前端服务正常（http://localhost:5173）
-- [x] 后端服务正常（http://localhost:3002）
+- [x] 前端服务正常（http://localhost:5178）
+- [x] 后端服务正常（http://localhost:3005）
 - [x] 项目数据读取正常（检测到 CSET-SP3 等项目）
 - [x] Expert 模块加载正常
 

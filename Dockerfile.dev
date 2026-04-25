@@ -21,8 +21,8 @@ RUN npm ci
 # Source code is mounted via volume (not COPY'd) for hot-reload
 # COPY . .  ← intentionally omitted for dev
 
-# Ports: Vite (5173) + Backend (3002)
-EXPOSE 5173 3002
+# Ports: Vite (5178) + Backend (3005)
+EXPOSE 5178 3005
 
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]

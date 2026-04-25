@@ -24,8 +24,8 @@ init: ## First-time build (slow, installs npm deps)
 
 dev: ## Start dev environment (frontend + backend)
 	@echo "$(BLUE)Starting Delivery Console...$(NC)"
-	@echo "$(YELLOW)Frontend: http://localhost:5173$(NC)"
-	@echo "$(YELLOW)Backend:  http://localhost:3002$(NC)"
+	@echo "$(YELLOW)Frontend: http://localhost:5178$(NC)"
+	@echo "$(YELLOW)Backend:  http://localhost:3005$(NC)"
 	@echo ""
 	docker compose up
 
@@ -33,8 +33,8 @@ dev-d: ## Start dev environment (detached/background)
 	@echo "$(BLUE)Starting Delivery Console (detached)...$(NC)"
 	docker compose up -d
 	@echo "$(GREEN)✓ Running in background$(NC)"
-	@echo "$(YELLOW)Frontend: http://localhost:5173$(NC)"
-	@echo "$(YELLOW)Backend:  http://localhost:3002$(NC)"
+	@echo "$(YELLOW)Frontend: http://localhost:5178$(NC)"
+	@echo "$(YELLOW)Backend:  http://localhost:3005$(NC)"
 
 stop: ## Stop containers
 	@echo "$(BLUE)Stopping containers...$(NC)"

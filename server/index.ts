@@ -42,9 +42,7 @@ const app = express();
 // [C4] CORS Origin 白名单 — 只允许本地前端和显式配置的 origin
 const corsAllowlist = [
     'http://localhost:5178',
-    'http://localhost:5173',
     'http://127.0.0.1:5178',
-    'http://127.0.0.1:5173',
     process.env.FRONTEND_ORIGIN,
 ].filter(Boolean) as string[];
 
