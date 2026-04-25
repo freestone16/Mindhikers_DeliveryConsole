@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Play, Maximize2, X, Loader2, CheckCircle, AlertCircle, Check,
-  RefreshCw, Video, ChevronDown, ChevronUp, BarChart3, Layers,
+  Video, BarChart3, Layers,
   Film, Code
 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import {
-  PhasePanel, PhasePanelHeader, PhasePanelBody, PhasePanelFooter,
-  PhaseEmptyState, PhaseLoadingState
+  PhasePanel, PhasePanelHeader, PhasePanelBody,
+  PhaseEmptyState
 } from './phase-layouts/PhasePanel';
 import type { DirectorChapter, SceneOption, BRollType } from '../../types';
 
@@ -253,9 +253,9 @@ const Phase3OptionRow = ({
           <p className="text-[#342d24] text-xs leading-relaxed line-clamp-3">
             {option.prompt || option.imagePrompt || '暂无方案描述'}
           </p>
-          {(option as Record<string, unknown>).rationale && (
+          {option.rationale && (
             <p className="text-[#8f8372] text-[10px] italic mt-0.5 line-clamp-2">
-              {(option as Record<string, unknown>).rationale as string}
+              {option.rationale}
             </p>
           )}
         </div>
@@ -510,14 +510,12 @@ function computePipelineStats(chapters: DirectorChapter[]): PipelineStats {
 interface RenderPipelineBoardProps {
   chapters: DirectorChapter[];
   pendingTaskKeys: Set<string>;
-  visibleCount: number;
-  visibleApprovedCount: number;
   totalCount: number;
   totalApproved: number;
 }
 
 function RenderPipelineBoard({
-  chapters, pendingTaskKeys, visibleCount, visibleApprovedCount, totalCount, totalApproved
+  chapters, pendingTaskKeys, totalCount, totalApproved
 }: RenderPipelineBoardProps) {
   const stats = computePipelineStats(chapters);
   const processingCount = pendingTaskKeys.size;
@@ -609,14 +607,14 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
           option: {
             id: o.id,
             type: o.type,
-            template: (o as Record<string, unknown>).template,
-            props: (o as Record<string, unknown>).props,
+            template: o.template,
+            props: o.props,
             name: o.name,
-            prompt: (o as Record<string, unknown>).prompt,
-            imagePrompt: (o as Record<string, unknown>).imagePrompt || o.revisedPrompt,
-            infographicLayout: (o as Record<string, unknown>).infographicLayout,
-            infographicStyle: (o as Record<string, unknown>).infographicStyle,
-            infographicUseMode: (o as Record<string, unknown>).infographicUseMode,
+            prompt: o.prompt,
+            imagePrompt: o.imagePrompt || o.revisedPrompt,
+            infographicLayout: o.infographicLayout,
+            infographicStyle: o.infographicStyle,
+            infographicUseMode: o.infographicUseMode,
           }
         }))
     );
@@ -654,14 +652,14 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
       option: {
         id: option.id,
         type: option.type,
-        template: (option as Record<string, unknown>).template,
-        props: (option as Record<string, unknown>).props,
+        template: option.template,
+        props: option.props,
         name: option.name,
-        prompt: (option as Record<string, unknown>).prompt,
-        imagePrompt: option.revisedPrompt || (option as Record<string, unknown>).imagePrompt,
-        infographicLayout: (option as Record<string, unknown>).infographicLayout,
-        infographicStyle: (option as Record<string, unknown>).infographicStyle,
-        infographicUseMode: (option as Record<string, unknown>).infographicUseMode,
+        prompt: option.prompt,
+        imagePrompt: option.revisedPrompt || option.imagePrompt,
+        infographicLayout: option.infographicLayout,
+        infographicStyle: option.infographicStyle,
+        infographicUseMode: option.infographicUseMode,
       }
     };
 
@@ -721,8 +719,6 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
       <RenderPipelineBoard
         chapters={chapters}
         pendingTaskKeys={pendingTaskKeys}
-        visibleCount={visibleCount}
-        visibleApprovedCount={visibleApprovedCount}
         totalCount={totalCount}
         totalApproved={totalApproved}
       />

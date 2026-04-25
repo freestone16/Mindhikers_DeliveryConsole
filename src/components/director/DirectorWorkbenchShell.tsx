@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Phase } from '../types';
+import type { Phase } from '../../types';
 import { DirectorStageHeader } from './DirectorStageHeader';
 
 interface DirectorWorkbenchShellProps {

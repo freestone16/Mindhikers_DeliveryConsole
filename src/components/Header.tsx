@@ -25,6 +25,8 @@ interface HeaderProps {
 
 export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelectScript, activeModule, onModuleChange }: HeaderProps) => {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [projectsLoading, setProjectsLoading] = useState(false);
+    const [projectsError, setProjectsError] = useState<string | null>(null);
     const [scripts, setScripts] = useState<ScriptFile[]>([]);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isScriptDropdownOpen, setIsScriptDropdownOpen] = useState(false);
@@ -33,12 +35,21 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
 
     // ... (fetch logic remains same)
     const fetchProjects = async () => {
+        setProjectsLoading(true);
+        setProjectsError(null);
         try {
             const res = await fetch('/api/projects');
+            if (!res.ok) {
+                throw new Error(`projects request failed: ${res.status}`);
+            }
             const data = await res.json();
-            setProjects(data.projects);
+            setProjects(data.projects || []);
         } catch (e) {
             console.error('Failed to fetch projects:', e);
+            setProjects([]);
+            setProjectsError('项目加载失败，请检查 PROJECTS_BASE 配置');
+        } finally {
+            setProjectsLoading(false);
         }
     };
 
@@ -158,8 +169,12 @@ export const Header = ({ projectId, selectedScriptPath, onSelectProject, onSelec
                                     <div className="px-3 py-2 border-b border-slate-700 text-xs text-slate-500 uppercase tracking-wider">
                                         Available Projects
                                     </div>
-                                    {projects.length === 0 ? (
+                                    {projectsLoading ? (
                                         <div className="px-3 py-4 text-sm text-slate-500 text-center">加载中...</div>
+                                    ) : projectsError ? (
+                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">{projectsError}</div>
+                                    ) : projects.length === 0 ? (
+                                        <div className="px-3 py-4 text-sm text-slate-500 text-center">当前没有可用项目</div>
                                     ) : (
                                         <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                             {projects.map(p => (

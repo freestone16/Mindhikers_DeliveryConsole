@@ -64,7 +64,7 @@ describe('Phase2View', () => {
 
   it('shows B-Roll selector when not confirmed', () => {
     render(<Phase2View {...baseProps} />);
-    expect(screen.getByText('Select B-Roll Types')).toBeInTheDocument();
+    expect(screen.getByText('选择 B-Roll 类型')).toBeInTheDocument();
   });
 
   it('shows summary strip and chapter rail when confirmed', () => {

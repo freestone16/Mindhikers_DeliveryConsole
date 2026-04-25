@@ -1,4 +1,4 @@
-import type { Phase } from '../types';
+import type { Phase } from '../../types';
 
 interface DirectorPhaseStepperProps {
   phase: Phase;
@@ -6,20 +6,6 @@ interface DirectorPhaseStepperProps {
   hasChapters: boolean;
   onPhaseChange: (phase: Phase) => void;
 }
-
-const phaseLabels: Record<Phase, string> = {
-  1: 'Concept',
-  2: '初审',
-  3: '二审',
-  4: 'XML 导出',
-};
-
-const phaseColors: Record<Phase, string> = {
-  1: 'bg-[#f4d03f]/20 text-[#9a7d0a]',
-  2: 'bg-[#5dade2]/20 text-[#2874a6]',
-  3: 'bg-[#58d68d]/20 text-[#1e8449]',
-  4: 'bg-[#af7ac5]/20 text-[#6c3483]',
-};
 
 export function DirectorPhaseStepper({
   phase,

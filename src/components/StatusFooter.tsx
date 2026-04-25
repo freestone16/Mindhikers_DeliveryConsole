@@ -54,13 +54,13 @@ export const StatusFooter = ({ isConnected }: { isConnected: boolean }) => {
                 <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`}></span>
                     <span className="text-slate-400 font-mono">
-                        {isConnected ? 'SYSTEM ONLINE' : 'DISCONNECTED'}
+                        {isConnected ? 'DIRECTOR ONLINE' : 'DISCONNECTED'}
                     </span>
                 </div>
 
                 {/* Version */}
                 <div className="text-slate-600">
-                    MindHikers Console {version}
+                    Director Console {version}
                 </div>
 
                 {/* Skill Sync Status with Dropdown */}

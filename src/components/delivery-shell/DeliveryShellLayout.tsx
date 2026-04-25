@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProductTopBar } from './ProductTopBar';
 import { WorkstationRail } from './WorkstationRail';
 import { ContextDrawer } from './ContextDrawer';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import '../../styles/delivery-shell.css';
 
 export interface ScriptFile {

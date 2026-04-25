@@ -24,16 +24,30 @@ export function ProductTopBar({
   scripts,
 }: ProductTopBarProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [scriptDropdownOpen, setScriptDropdownOpen] = useState(false);
   const projectRef = useRef<HTMLDivElement>(null);
   const scriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setProjectsLoading(true);
+    setProjectsError(null);
     fetch('/api/projects')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) {
+          throw new Error(`projects request failed: ${r.status}`);
+        }
+        return r.json();
+      })
       .then(data => setProjects(data.projects || []))
-      .catch(() => {});
+      .catch((error) => {
+        console.error('Failed to fetch projects:', error);
+        setProjects([]);
+        setProjectsError('项目加载失败，请检查 PROJECTS_BASE 配置');
+      })
+      .finally(() => setProjectsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -75,7 +89,13 @@ export function ProductTopBar({
               background: 'var(--shell-panel-solid)', border: '1px solid var(--shell-border)',
               borderRadius: 8, minWidth: 220, boxShadow: 'var(--shell-shadow)', marginTop: 4,
             }}>
-              {projects.map(p => (
+              {projectsLoading ? (
+                <div style={{ padding: '10px 14px', color: 'var(--shell-muted)', fontSize: '0.9rem' }}>加载中...</div>
+              ) : projectsError ? (
+                <div style={{ padding: '10px 14px', color: 'var(--shell-muted)', fontSize: '0.9rem' }}>{projectsError}</div>
+              ) : projects.length === 0 ? (
+                <div style={{ padding: '10px 14px', color: 'var(--shell-muted)', fontSize: '0.9rem' }}>当前没有可用项目</div>
+              ) : projects.map(p => (
                 <button key={p.name} onClick={() => { onSelectProject(p.name); setProjectDropdownOpen(false); }}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px',

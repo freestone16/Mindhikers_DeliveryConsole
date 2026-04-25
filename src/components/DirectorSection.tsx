@@ -360,58 +360,6 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
     onUpdate({ ...data, items: updated });
   };
 
-  const handleRenderChecked = async () => {
-    const RENDERABLE_TYPES = ['remotion', 'seedance', 'generative', 'infographic'];
-
-    // 收集所有勾选的可渲染 option，带完整 option 数据供后端渲染
-    const checkedItems = chapters.flatMap(c =>
-      c.options
-        .filter(o => o.isChecked && RENDERABLE_TYPES.includes(o.type))
-        .map(o => ({
-          chapterId: c.chapterId,
-          option: {
-            id: o.id,
-            type: o.type,
-            template: (o as any).template,
-            props: (o as any).props,
-            name: o.name,
-            prompt: (o as any).prompt,
-            imagePrompt: (o as any).imagePrompt,
-            infographicLayout: (o as any).infographicLayout,
-            infographicStyle: (o as any).infographicStyle,
-            infographicUseMode: (o as any).infographicUseMode,
-          },
-        }))
-    );
-
-    if (!checkedItems.length) {
-      const anyChecked = chapters.some(c => c.options.some(o => o.isChecked));
-      if (anyChecked) {
-        alert('当前选中的素材（如互联网素材/用户采集）无需触发 AI 渲染，您可以直接进入 Phase 3 进行后续处理。');
-      }
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/director/phase2/render_checked', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, chapters: checkedItems })
-      });
-      const data = await response.json();
-      if (response.ok && data.taskKeys?.length) {
-        // 把所有任务 key 存入 state，通知各卡片开始轮询
-        setPendingBatchTaskKeys(new Set(data.taskKeys));
-        console.log(`[Batch Render] 触发成功：${data.message}`);
-      } else {
-        alert('渲染触发失败：' + (data.error || '未知错误'));
-      }
-    } catch (e) {
-      console.error(e);
-      alert('渲染请求错误');
-    }
-  };
-
   // ── Phase 3 mutation handlers (same pattern as Phase 2: mutate → persist → sync) ──
 
   const handlePhase3ApproveOption = (chapterId: string, optionId: string) => {

@@ -31,9 +31,6 @@ const TYPE_LABELS: Record<string, string> = {
   infographic: '📊 信息图',
 };
 
-// Artlist、互联网/用户截图不需要 AI 预览；infographic static 模式由后端直接生图
-const PREVIEW_SUPPORTED_TYPES = ['remotion', 'generative', 'seedance', 'infographic'];
-
 // Types that require manual upload (non-AI sources)
 const UPLOAD_REQUIRED_TYPES = ['internet-clip', 'user-capture', 'artlist'];
 
@@ -66,7 +63,6 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
   const quoteText = option.quote || getScriptPreview(chapter.scriptText);
   const taskKey = `${chapter.chapterId}-${option.id}`;
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
-  const isChecked = option.isChecked;
 
   // Lightbox state
   const [showLightbox, setShowLightbox] = useState(false);

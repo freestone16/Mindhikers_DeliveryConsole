@@ -40,7 +40,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
 };
 
-const toneClassMap: Record<DebugMetric['tone'], string> = {
+const toneClassMap: Record<NonNullable<DebugMetric['tone']>, string> = {
   default: 'border-slate-700 bg-slate-950/60 text-slate-200',
   info: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
   success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',

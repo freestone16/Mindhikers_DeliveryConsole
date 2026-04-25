@@ -1,4 +1,4 @@
-import type { Phase } from '../types';
+import type { Phase } from '../../types';
 
 interface DirectorStageHeaderProps {
   projectId: string;
@@ -6,14 +6,8 @@ interface DirectorStageHeaderProps {
   conceptApproved: boolean;
   onPhaseChange: (phase: Phase) => void;
   hasChapters: boolean;
+  onBackToSessions?: () => void;
 }
-
-const phaseLabels: Record<Phase, string> = {
-  1: '概念定向',
-  2: '视觉方案',
-  3: '渲染编排',
-  4: '导出交付',
-};
 
 const phaseStatusText = (phase: Phase, approved: boolean): string => {
   if (phase === 1 && !approved) return '概念待生成';

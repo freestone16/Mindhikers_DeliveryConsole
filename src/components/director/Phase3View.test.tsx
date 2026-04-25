@@ -32,10 +32,9 @@ describe('Phase3View', () => {
   const baseProps = {
     projectId: 'CSET-Test',
     chapters: [] as DirectorChapter[],
-    isLoading: false,
-    onApprove: vi.fn(),
+    onApproveOption: vi.fn(),
+    onUpdateOption: vi.fn(),
     onBatchApprove: vi.fn(),
-    onRenderBatch: vi.fn(),
     onProceed: vi.fn(),
   };
 

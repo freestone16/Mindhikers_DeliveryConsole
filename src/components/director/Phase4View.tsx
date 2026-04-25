@@ -4,8 +4,7 @@ import {
   FolderOpen, ArrowRight, Package, AlertTriangle, Check
 } from 'lucide-react';
 import {
-  PhasePanel, PhasePanelHeader, PhasePanelBody,
-  PhaseEmptyState, PhaseLoadingState
+  PhasePanel, PhasePanelHeader, PhasePanelBody
 } from './phase-layouts/PhasePanel';
 import type { DirectorChapter } from '../../types';
 
