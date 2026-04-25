@@ -21,23 +21,24 @@
 6. 服务器启动后验证关键环境变量是否正确加载
 7. **ESM 模块不要在顶层缓存依赖 dotenv 的环境变量**；像 `PROJECTS_BASE` 这类值必须在函数调用时读取，否则 import 先于 `dotenv.config()` 会拿到错误 fallback
 8. **项目路径解析必须统一走共享 helper**（如 `server/project-paths.ts`）；禁止在 `server/*` 里各自实现 `getProjectRoot()` 或各自写 `PROJECTS_BASE` fallback
+9. **重建模块分支时必须同时迁移路径治理、`.env.example` 和启动口径**；不能保留上一条产品线的默认项目名或 runtime fallback
 
 ---
 
 ## 文件操作
 
-9. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
-10. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
-11. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
-12. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
+10. **永远不要对大文件（>50行）使用 Write 工具进行部分修复**，必须用 Edit
+11. 修复前验证：读取完整文件 → 确认修改位置 → old_string 包含 5-10 行上下文
+12. 核心文件修改前创建备份：`cp file.ts file.ts.backup`
+13. 发现文件被覆盖后：检查行数 → grep 关键函数 → 立即恢复
 
 ---
 
 ## 版本恢复
 
-13. 恢复版本时不要同时添加新修改，先验证恢复是否成功
-14. 版本回滚步骤：git checkout → 重启 → 验证 → 再添加新功能
-15. 在 dev_progress.md 记录已知正常工作的 commit hash
+14. 恢复版本时不要同时添加新修改，先验证恢复是否成功
+15. 版本回滚步骤：git checkout → 重启 → 验证 → 再添加新功能
+16. 在 dev_progress.md 记录已知正常工作的 commit hash
 
 ---
 
@@ -271,6 +272,8 @@
 127. **本项目凡是网页验收/页面交互验证，默认优先 Agent Browser，不要先手用 Playwright MCP**：只有在 Agent Browser 明确不可用且已向用户说明是 fallback 时，才允许改用 Playwright；否则会偏离当前测试协议
 130. **"Claude 规划 + 外包实施"分工模式下，收到"出方案"类请求必须严格停在文档层**：不要擅自进入代码实施阶段；用户说"继续"时优先视为"继续完善方案"而非"开始实施"，除非上下文明确指示实施。越界已发生时必须立即从备份回滚并用 grep 验证零残留
 131. **跨多会话/多方执行的方案必须明确"棒次"**：采用串行执行时，所有协调语义只写进"后做"的那一份方案；"先做"的方案一字不动；"后做"方案顶部必须有"执行前置检查清单"，任一项未 ✅ 不允许开工
+132. **Director adapter 更新画面相关字段时必须同时处理缓存失效**：`update_option_fields` 修改 `props/type/template/prompt/imagePrompt` 后，必须显式失效旧 `previewUrl/previewStatus`；否则 UI 会把旧预览误当成新方案证据
+133. **Director option 的 `props` 更新必须深度合并**：不能用浅合并覆盖嵌套对象；像 `textStyle.fontSize`、布局参数这类已有字段必须在局部修改时保留下来
 
 ---
 
