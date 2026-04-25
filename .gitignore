@@ -24,8 +24,15 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+
 # Test coverage
 coverage/
+
+# Generated test evidence
+testing/director/artifacts/*.png
 
 # Temporary files
 *.tmp
