@@ -1,13 +1,13 @@
-🕐 Last updated: 2026-04-19
+🕐 Last updated: 2026-04-25
 🌿 Branch: MHSDC-DC-MKT
 
 ## 当前状态
 
+- **工作区 WIP 已全部清理** — v4.1.0 遗留修改 + PRD v1 产出文档已分类提交（5 commits）
 - SD-207 MarketingMaster 追认式 PRD v1 草案已落盘于 `docs/02_design/marketing/`
-- 本轮为"讨论 + 文档产出"，**无代码改动**
 - 产出物：`_master.md` + `sd207_prd.md` + `sd207_implementation.md` + `_index.md` 挂回
 - 完整决策链见 `docs/dev_logs/2026-04-19_SD207_PRD_Brainstorm.md`
-- PRD v1 草案预留扩展锚点（§9），老卢将在新窗口提交新需求合并入 PRD
+- PRD v1 草案预留扩展锚点（§9），等待老卢新窗口注入新需求
 
 ## WIP
 
@@ -17,10 +17,10 @@
 
 ## 待解决问题（存量）
 
-- `scriptPath change detection` 修复尚未提交（v4.1.0 遗留 WIP，见 2026-04-02 dev log §4）
+- ✅ `scriptPath change detection` 修复 — **已提交**（commit 91d513d）
+- ✅ Director/ThumbnailMaster 的 skill 修改 — **已提交**（commit 033fbc1）
 - server 各模块 fallback 路径不一致（`__dirname` vs `process.cwd()`）—— 登记为 T4/P2 已知债务
 - `test-director.ts:11` 老路径硬编码 —— 登记为 T5/P2
-- Director/ThumbnailMaster 的 skill 修改仍 unstaged（见 2026-04-02 dev log §4）
 
 ## 下一步
 
