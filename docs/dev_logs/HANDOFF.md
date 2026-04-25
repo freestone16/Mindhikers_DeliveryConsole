@@ -1,11 +1,11 @@
-**时间**: 2026-04-25 09:27 CST
+**时间**: 2026-04-25 16:45 CST
 **分支**: `MHSDC-DC-director`
 
 # HANDOFF — Director 模块
 
 ## 一句话接力
 
-下一窗口直接在 `/Users/luzhoua/MHSDC/DeliveryConsole/Director` 开，不要再回到 `DirectorFinal` 做实施。本轮已完成 DirectorFinal 差异批量审计与安全 cherry-pick：代码只摘 `StatusFooter` 的 Director 身份文案，治理摘取一条模块重建路径规则；路径治理补丁此前已回灌且扫描干净。下一步进入提交前分拣。
+本轮聚焦导演大师模块 UI 排错：三栏布局边栏收起后中间内容未扩展 + 清理代码中所有遗留的 5173 旧端口字样。布局修复代码已落盘，待用户在浏览器中硬刷新验证。5173 清理已完成。
 
 ## 当前事实
 
@@ -17,6 +17,68 @@
 - 参考来源分支: `director-final`
 - `director-final` 已从 `/private/tmp/director-final` 迁到 `/Users/luzhoua/MHSDC/DeliveryConsole/DirectorFinal`
 - `/private/tmp/director-final` 已不存在
+
+## 本轮新增改动（未 commit）
+
+### 1. 三栏布局自适应修复
+
+**问题**: 左右边栏缩放按钮点击后，中间内容区（"欢迎使用影视导演"卡片等）完全不变，没有利用新空出的空间。
+
+**根因分析**:
+- `DeliveryShellLayout.tsx` 的 `bodyClass` 在两边同时收起时，会同时附加 `shell-body--drawer-collapsed` 和 `shell-body--rail-collapsed`。由于 CSS specificity 相同，后定义的 `.shell-body--rail-collapsed` 覆盖了前者，导致 grid 实际生效的是 `60px 1fr 360px`（drawer 列仍是 360px，没缩）。
+- 中间内容链路（`.shell-center` → `.director-workbench` → `.director-workbench__content` → `PhasePanel` → `PhaseEmptyState`）缺乏 `flex` stretch 机制，内容没有占满可用宽度。
+
+**修改文件**:
+- `src/components/delivery-shell/DeliveryShellLayout.tsx`
+  - `bodyClass` 逻辑改为：两边同时收起时只附加 `shell-body--both-collapsed`，避免 specificity 冲突
+- `src/styles/delivery-shell.css`
+  - `.shell-center` → 加 `display: flex; flex-direction: column; min-width: 0`
+  - `.director-workbench` → 加 `width: 100%; min-width: 0`
+  - `.director-workbench__content` → 加 `width: 100%; min-width: 0`
+- `src/App.tsx`
+  - 中间包装 div 加 `width: '100%'`
+- `src/components/director/phase-layouts/PhasePanel.tsx`
+  - `PhasePanel` 加 `w-full`
+  - `PhaseEmptyState` 内容区加 `w-full max-w-2xl`
+
+**验证状态**: `npm run build` 已通过。gstack browse 因客户端渲染 + accessibility tree 限制，无法精确验证交互后的 DOM 状态。需要用户在浏览器中手动点击左右边栏收起按钮，确认中间内容区是否扩展。
+
+**如仍无变化**: 可能是浏览器缓存旧 bundle，请尝试 **Cmd+Shift+R（Mac）/ Ctrl+F5（Win）** 强制刷新。
+
+### 2. 清理代码中所有 5173 旧端口字样
+
+**背景**: 项目当前实际使用端口 5178（前端）和 3005（后端），但代码中仍残留大量旧端口 5173/3002 的引用。
+
+**修改文件**:
+- `server/index.ts` — CORS 白名单删除 `http://localhost:5173` 和 `http://127.0.0.1:5173`
+- `docker-compose.yml` — 端口映射改为 `5178:5178` 和 `3005:3005`
+- `Dockerfile.dev` — EXPOSE 改为 `5178 3005`
+- `Dockerfile.frontend` — EXPOSE 改为 `5178`
+- `Makefile` — `dev` 和 `dev-d` 提示信息改为 5178/3005
+- `test_http.js` — 改为 5178
+- `test_browser.js` — 改为 5178
+- `RELOCATION.md` — 验证清单改为 5178/3005
+
+**未改文件**（历史文档/备份/废弃依赖，不属于代码）:
+- `docs/` 下所有历史文档、计划、日志
+- `node_modules_bad/` 下废弃依赖
+- `*.backup` 备份文件
+
+### 3. 当前运行中的服务
+
+```
+后端 Express: localhost:3005 (PID 97008)
+前端 Vite:   localhost:5178 (PID 97078)
+```
+
+如需重启：
+```bash
+pkill -f "tsx watch server/index.ts" 2>/dev/null || true
+pkill -f "vite.*--host" 2>/dev/null || true
+nohup npx tsx watch server/index.ts > /tmp/director-backend.log 2>&1 &
+sleep 3
+nohup npx vite --host > /tmp/director-frontend.log 2>&1 &
+```
 
 ## 当前结论
 
@@ -106,7 +168,7 @@ MHSDC-DC-director
 在 `/Users/luzhoua/MHSDC/DeliveryConsole/Director` 执行：
 
 ```bash
-rg "from './project-root'|from \"./project-root\"|PROJECTS_BASE\\s*=|process\\.env\\.PROJECTS_BASE" server src --glob '!*.backup' --glob '!server/project-paths.ts'
+rg "from './project-root'|from \"./project-root\"|PROJECTS_BASE\s*=|process\.env\.PROJECTS_BASE" server src --glob '!*.backup' --glob '!server/project-paths.ts'
 rg "project-root" server src --glob '!*.backup'
 ```
 
@@ -178,7 +240,15 @@ npm run test:run -- src/__tests__/server/project-paths.test.ts src/__tests__/dir
 
 不要顺手重构 UI、文案、布局或旧模块类型债。
 
-### 2. 提交前分拣
+### 2. 布局修复 ✅ 已验证
+
+**根因**: `@media (max-width: 1440px)` 内部只定义了 `.shell-body` 的基础 grid，没有定义 collapsed 状态。当 viewport < 1440px 时，media query 内的 `.shell-body` 和 `.shell-body--both-collapsed` specificity 相同，但 media query 在 CSS 文件后面，后定义胜出，直接覆盖了 collapsed 状态，导致 grid 永远被锁死在 `220px 1fr 320px`。
+
+**修复**: 在 `@media (max-width: 1440px)` 内补齐 `.shell-body--drawer-collapsed`、`.shell-body--rail-collapsed`、`.shell-body--both-collapsed` 的 grid 定义。
+
+**状态**: 用户已手动验证，布局修复生效。边栏收起后中间内容区正常扩展。
+
+### 3. 提交前分拣
 
 当前目标分支仍有 tracked pycache 删除状态：
 
@@ -233,6 +303,17 @@ skills/connectors/__pycache__/*.pyc
 
 - `.gitignore` 增加 `__pycache__/`、`*.py[cod]`
 - `.gitignore` 增加 `testing/director/artifacts/*.png`
+
+### 本轮新增：三栏布局自适应修复
+
+- `DeliveryShellLayout.tsx` — bodyClass 逻辑修复，避免 both-collapsed 时 CSS specificity 冲突
+- `delivery-shell.css` — `.shell-center`、`.director-workbench`、`.director-workbench__content` 加 flex stretch
+- `App.tsx` — 中间包装 div 加 `width: 100%`
+- `PhasePanel.tsx` — `PhasePanel` 和 `PhaseEmptyState` 加 `w-full`，确保空状态卡片随容器扩展
+
+### 本轮新增：5173 旧端口清理
+
+- `server/index.ts`、`docker-compose.yml`、`Dockerfile.dev`、`Dockerfile.frontend`、`Makefile`、`test_http.js`、`test_browser.js`、`RELOCATION.md` 中所有 5173/3002 改为当前实际端口 5178/3005
 
 ## 最近验证结果
 

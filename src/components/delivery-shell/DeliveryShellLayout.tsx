@@ -62,8 +62,10 @@ export function DeliveryShellLayout({
 
   const bodyClass = [
     'shell-body',
-    drawerCollapsed ? 'shell-body--drawer-collapsed' : '',
-    railCollapsed ? 'shell-body--rail-collapsed' : '',
+    drawerCollapsed && railCollapsed ? 'shell-body--both-collapsed'
+      : drawerCollapsed ? 'shell-body--drawer-collapsed'
+      : railCollapsed ? 'shell-body--rail-collapsed'
+      : '',
   ].filter(Boolean).join(' ');
 
   return (

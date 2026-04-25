@@ -8,7 +8,7 @@ interface PhasePanelProps {
 export function PhasePanel({ children, className = '' }: PhasePanelProps) {
   return (
     <div
-      className={`rounded-xl border border-[#e4dbcc] overflow-hidden ${className}`}
+      className={`rounded-xl border border-[#e4dbcc] overflow-hidden w-full ${className}`}
       style={{ background: 'rgba(255, 252, 247, 0.78)' }}
     >
       {children}
@@ -69,13 +69,15 @@ interface PhaseEmptyStateProps {
 
 export function PhaseEmptyState({ icon, title, description, actions }: PhaseEmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center text-center p-12 gap-4">
-      <div className="text-[#c97545]">{icon}</div>
-      <div>
-        <h3 className="text-lg font-bold text-[#342d24] mb-1">{title}</h3>
-        {description && <p className="text-sm text-[#8f8372]">{description}</p>}
+    <div className="flex flex-col items-center justify-center text-center p-12 gap-4 w-full">
+      <div className="w-full max-w-2xl flex flex-col items-center gap-4">
+        <div className="text-[#c97545]">{icon}</div>
+        <div>
+          <h3 className="text-lg font-bold text-[#342d24] mb-1">{title}</h3>
+          {description && <p className="text-sm text-[#8f8372]">{description}</p>}
+        </div>
+        {actions && <div className="flex items-center gap-3 mt-2">{actions}</div>}
       </div>
-      {actions && <div className="flex items-center gap-3 mt-2">{actions}</div>}
     </div>
   );
 }
