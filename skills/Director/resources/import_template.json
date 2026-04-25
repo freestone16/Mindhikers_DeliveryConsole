@@ -1,0 +1,43 @@
+{
+    "chapters": [
+        {
+            "chapterId": "ch1",
+            "chapterName": "引子：问题的提出",
+            "chapterIndex": 0,
+            "scriptText": "（在此填入对应的原文片段）",
+            "options": [
+                {
+                    "id": "ch1-opt-1",
+                    "name": "深空数据涌现",
+                    "type": "remotion",
+                    "template": "ConceptChain",
+                    "props": {
+                        "title": "认知演化链条",
+                        "theme": "deep-space",
+                        "nodes": [
+                            {
+                                "id": "n1",
+                                "label": "精准表达",
+                                "icon": "💬",
+                                "color": "#3498db",
+                                "desc": "用语言定义思想"
+                            },
+                            {
+                                "id": "n2",
+                                "label": "清晰思维",
+                                "icon": "🧠",
+                                "color": "#9b59b6",
+                                "desc": "逻辑与结构能力"
+                            }
+                        ]
+                    },
+                    "quote": "原文引用",
+                    "prompt": "视觉描述",
+                    "imagePrompt": "English tags for AI image generation, applying minimalist composition and deep navy chromatic calibration",
+                    "rationale": "选择在此处使用ConceptChain的专业理由"
+                }
+            ],
+            "isLocked": false
+        }
+    ]
+}
