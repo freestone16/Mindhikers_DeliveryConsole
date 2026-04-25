@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  GenProviderSchema,
+  IMAGE_MODELS_BY_PROVIDER,
+  VIDEO_MODELS_BY_PROVIDER,
+  inferVisualProviderFromModel,
+  type GenProvider,
+  type VisualTaskType,
+} from './visual-models';
 
 export const LLMProviderSchema = z.enum([
   'openai',
@@ -10,29 +18,35 @@ export const LLMProviderSchema = z.enum([
   'yinli'
 ]);
 
-export const GenProviderSchema = z.enum(['volcengine', 'siliconflow']);
-
 export const ExpertLLMConfigSchema = z.object({
   provider: LLMProviderSchema.nullable(),
   model: z.string().nullable(),
   baseUrl: z.string().nullable(),
 });
 
-export const GenerationConfigSchema = z.object({
-  imageModel: z.string().nullable(),
-  videoModel: z.string().nullable(),
+export const GenerationTargetSchema = z.object({
+  provider: GenProviderSchema,
+  model: z.string(),
 });
 
-export const ExpertConfigSchema: z.ZodType<{
-  enabled: boolean;
-  llm: { provider: string | null; model: string | null; baseUrl: string | null } | null;
-  imageModel: string | null;
-  videoModel: string | null;
-}> = z.object({
+export const GenerationConfigSchema = z.object({
+  image: GenerationTargetSchema,
+  video: GenerationTargetSchema,
+});
+
+export const ExpertConfigSchema = z.object({
   enabled: z.boolean(),
   llm: ExpertLLMConfigSchema.nullable(),
-  imageModel: z.string().nullable(),
-  videoModel: z.string().nullable(),
+});
+
+export const ExpertConfigMapSchema = z.object({
+  crucible: ExpertConfigSchema.nullable(),
+  writer: ExpertConfigSchema.nullable(),
+  director: ExpertConfigSchema.nullable(),
+  music: ExpertConfigSchema.nullable(),
+  thumbnail: ExpertConfigSchema.nullable(),
+  marketing: ExpertConfigSchema.nullable(),
+  shorts: ExpertConfigSchema.nullable(),
 });
 
 export const LLMConfigSchema = z.object({
@@ -41,26 +55,16 @@ export const LLMConfigSchema = z.object({
     model: z.string(),
     baseUrl: z.string().nullable(),
   }),
-  generation: z.object({
-    imageModel: z.string(),
-    videoModel: z.string(),
-  }),
-  experts: z.object({
-    crucible: ExpertConfigSchema.nullable(),
-    writer: ExpertConfigSchema.nullable(),
-    director: ExpertConfigSchema.nullable(),
-    music: ExpertConfigSchema.nullable(),
-    thumbnail: ExpertConfigSchema.nullable(),
-    marketing: ExpertConfigSchema.nullable(),
-    shorts: ExpertConfigSchema.nullable(),
-  }),
+  generation: GenerationConfigSchema,
+  experts: ExpertConfigMapSchema,
 });
 
 export type LLMProvider = z.infer<typeof LLMProviderSchema>;
-export type GenProvider = z.infer<typeof GenProviderSchema>;
 export type ExpertLLMConfig = z.infer<typeof ExpertLLMConfigSchema>;
 export type GenerationConfig = z.infer<typeof GenerationConfigSchema>;
+export type GenerationTarget = z.infer<typeof GenerationTargetSchema>;
 export type ExpertConfig = z.infer<typeof ExpertConfigSchema>;
+export type ExpertConfigMap = z.infer<typeof ExpertConfigMapSchema>;
 export type LLMConfig = z.infer<typeof LLMConfigSchema>;
 
 export const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -70,8 +74,14 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
     baseUrl: 'https://api.siliconflow.cn/v1',
   },
   generation: {
-    imageModel: 'doubao-image-01',
-    videoModel: 'doubao-video-01',
+    image: {
+      provider: 'volcengine',
+      model: 'doubao-seedream-4-5-251128',
+    },
+    video: {
+      provider: 'volcengine',
+      model: 'doubao-seedance-1-5-pro',
+    },
   },
   experts: {
     crucible: null,
@@ -82,6 +92,17 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
     marketing: null,
     shorts: null,
   },
+};
+
+export const resolveGlobalLLMConfig = (config?: Partial<LLMConfig> | null) => {
+  const hasGlobalConfig = Boolean(config?.global);
+  const provider = config?.global?.provider || DEFAULT_LLM_CONFIG.global.provider;
+  const model = config?.global?.model || DEFAULT_LLM_CONFIG.global.model;
+  const baseUrl = hasGlobalConfig
+    ? (config?.global?.baseUrl ?? null)
+    : DEFAULT_LLM_CONFIG.global.baseUrl;
+
+  return { provider, model, baseUrl };
 };
 
 export const PROVIDER_INFO: Record<string, {
@@ -103,7 +124,7 @@ export const PROVIDER_INFO: Record<string, {
     type: 'llm',
     envVars: ['DEEPSEEK_API_KEY'],
     baseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner'],
   },
   zhipu: {
     name: 'Zhipu AI',
@@ -120,11 +141,11 @@ export const PROVIDER_INFO: Record<string, {
     models: ['Pro/moonshotai/Kimi-K2.5', 'Pro/deepseek-ai/DeepSeek-V3.2'],
   },
   kimi: {
-    name: 'Kimi (Moonshot)',
+    name: 'Kimi (Moonshot AI)',
     type: 'llm',
     envVars: ['KIMI_API_KEY'],
     baseUrl: 'https://api.moonshot.cn/v1',
-    models: ['kimi-k2.5'],
+    models: ['kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'],
   },
   yinli: {
     name: 'Yinli的引力',
@@ -133,30 +154,132 @@ export const PROVIDER_INFO: Record<string, {
     baseUrl: 'https://yinli.one/v1',
     models: ['claude-sonnet-4-6-thinking'],
   },
+  google: {
+    name: 'Google Gemini Image',
+    type: 'generation',
+    envVars: ['GOOGLE_API_KEY'],
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    models: IMAGE_MODELS_BY_PROVIDER.google.map((item) => item.id),
+  },
   volcengine: {
     name: 'Volcengine (火山引擎)',
     type: 'generation',
-    envVars: ['VOLCENGINE_ACCESS_KEY', 'VOLCENGINE_ENDPOINT_ID_IMAGE', 'VOLCENGINE_ENDPOINT_ID_VIDEO'],
+    envVars: ['VOLCENGINE_ACCESS_KEY'],
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    models: ['doubao-seedream-5.0-litenew', 'doubao-seedream-4-5-251128', 'doubao-seedance-1-5-pro'],
+    models: [
+      ...IMAGE_MODELS_BY_PROVIDER.volcengine.map((item) => item.id),
+      ...VIDEO_MODELS_BY_PROVIDER.volcengine.map((item) => item.id),
+    ],
   },
 };
 
-export const IMAGE_MODELS = [
-  { id: 'doubao-seedream-5.0-litenew', name: '豆包 Seedream 5.0 Lite (推荐)' },
-  { id: 'doubao-seedream-4-5-251128', name: '豆包 Seedream 4.5' },
-  { id: 'doubao-seedream-4-0-250828', name: '豆包 Seedream 4.0' },
-  { id: 'doubao-seedream-3-0-t2i-250415', name: '豆包 Seedream 3.0 T2I' },
-  { id: 'kolors', name: 'Kolors (SiliconFlow)' },
-  { id: 'stable-diffusion-xl', name: 'Stable Diffusion XL' },
-];
+export const normalizeGenerationTarget = (
+  taskType: VisualTaskType,
+  target?: Partial<GenerationTarget> | null,
+): GenerationTarget => {
+  const fallback = DEFAULT_LLM_CONFIG.generation[taskType];
+  const inferredProvider = inferVisualProviderFromModel(taskType, target?.model);
+  const provider = target?.provider || inferredProvider || fallback.provider;
+  const options = taskType === 'image'
+    ? IMAGE_MODELS_BY_PROVIDER[provider]
+    : VIDEO_MODELS_BY_PROVIDER[provider];
 
-export const VIDEO_MODELS = [
-  { id: 'doubao-seedance-1-5-pro', name: '豆包 Seedance 1.5 Pro (推荐)' },
-  { id: 'doubao-seedance-1-0-pro', name: '豆包 Seedance 1.0 Pro' },
-  { id: 'doubao-seedance-1-0-lite', name: '豆包 Seedance 1.0 Lite' },
-  { id: 'wan2.1-t2v-14b', name: 'Wan2.1 T2V 14B' },
-];
+  if (!options.length) return fallback;
+
+  const model = options.some((item) => item.id === target?.model)
+    ? target!.model!
+    : options[0].id;
+
+  return {
+    provider,
+    model,
+  };
+};
+
+export const normalizeGenerationConfig = (generation?: unknown): GenerationConfig => {
+  if (!generation || typeof generation !== 'object') {
+    return DEFAULT_LLM_CONFIG.generation;
+  }
+
+  const raw = generation as {
+    image?: Partial<GenerationTarget> | null;
+    video?: Partial<GenerationTarget> | null;
+    imageModel?: string | null;
+    videoModel?: string | null;
+  };
+
+  return {
+    image: normalizeGenerationTarget('image', raw.image || (raw.imageModel ? { model: raw.imageModel } : undefined)),
+    video: normalizeGenerationTarget('video', raw.video || (raw.videoModel ? { model: raw.videoModel } : undefined)),
+  };
+};
+
+const normalizeExpertLLMConfig = (raw?: unknown): ExpertLLMConfig | null => {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const candidate = raw as Partial<ExpertLLMConfig>;
+  const provider = candidate.provider ?? null;
+  const model = candidate.model ?? null;
+  const baseUrl = candidate.baseUrl ?? null;
+
+  if (provider === null && model === null && baseUrl === null) {
+    return null;
+  }
+
+  return ExpertLLMConfigSchema.parse({
+    provider,
+    model,
+    baseUrl,
+  });
+};
+
+export const normalizeExpertConfig = (raw?: unknown): ExpertConfig | null => {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const candidate = raw as {
+    enabled?: unknown;
+    llm?: unknown;
+  };
+
+  return {
+    enabled: Boolean(candidate.enabled),
+    llm: normalizeExpertLLMConfig(candidate.llm),
+  };
+};
+
+export const normalizeExpertsConfig = (experts?: unknown): ExpertConfigMap => {
+  const raw = (experts && typeof experts === 'object') ? experts as Record<string, unknown> : {};
+
+  return {
+    crucible: normalizeExpertConfig(raw.crucible),
+    writer: normalizeExpertConfig(raw.writer),
+    director: normalizeExpertConfig(raw.director),
+    music: normalizeExpertConfig(raw.music),
+    thumbnail: normalizeExpertConfig(raw.thumbnail),
+    marketing: normalizeExpertConfig(raw.marketing),
+    shorts: normalizeExpertConfig(raw.shorts),
+  };
+};
+
+/**
+ * 归一化 provider/model/baseUrl 三字段联动
+ * 切换 provider 时自动修正 model 和 baseUrl，防止错配
+ */
+export function normalizeProviderConfig(
+  provider: string,
+  model?: string | null,
+  _baseUrl?: string | null
+): { provider: LLMProvider; model: string; baseUrl: string } {
+  const info = PROVIDER_INFO[provider];
+  const parsedProvider = LLMProviderSchema.safeParse(provider);
+  if (!parsedProvider.success || !info || info.type !== 'llm') {
+    const fallback = PROVIDER_INFO.deepseek;
+    return { provider: 'deepseek', model: fallback.models[0], baseUrl: fallback.baseUrl };
+  }
+
+  const validModel = (model && info.models.includes(model)) ? model : info.models[0];
+  return { provider: parsedProvider.data, model: validModel, baseUrl: info.baseUrl };
+}
 
 export const EXPERT_LIST = [
   { id: 'crucible', name: 'Crucible', icon: '🔥', description: '思维拆解' },
@@ -167,3 +290,11 @@ export const EXPERT_LIST = [
   { id: 'marketing', name: 'Marketing', icon: '📢', description: 'SEO/推广' },
   { id: 'shorts', name: 'Shorts', icon: '⚡', description: '短视频' },
 ];
+
+export {
+  GenProviderSchema,
+  IMAGE_MODELS_BY_PROVIDER,
+  VIDEO_MODELS_BY_PROVIDER,
+};
+
+export type { GenProvider };

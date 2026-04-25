@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { LLMConfig, ExpertConfig } from '../schemas/llm-config';
+import type { LLMConfig, ExpertConfig, GenProvider } from '../schemas/llm-config';
+import type { VisualModelOption } from '../schemas/visual-models';
 
 interface ConfigStatus {
   providers: Record<string, {
@@ -12,13 +13,13 @@ interface ConfigStatus {
   generation: LLMConfig['generation'];
   experts: Record<string, ExpertConfig | null>;
   availableModels: {
-    image: { id: string; name: string }[];
-    video: { id: string; name: string }[];
+    image: Record<GenProvider, VisualModelOption[]>;
+    video: Record<GenProvider, VisualModelOption[]>;
   };
 }
 
 interface SavedKeys {
-  [provider: string]: { last4: string; configured: boolean; endpointImageLast8?: string; endpointVideoLast8?: string };
+  [provider: string]: { last4: string; configured: boolean };
 }
 
 export const useLLMConfig = () => {
@@ -33,7 +34,7 @@ export const useLLMConfig = () => {
 
   const fetchSavedKeys = async () => {
     try {
-      const res = await fetch('http://localhost:3002/api/llm-config/keys');
+      const res = await fetch('/api/llm-config/keys');
       const data = await res.json();
       setSavedKeys(data);
     } catch (err) {
@@ -43,7 +44,7 @@ export const useLLMConfig = () => {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('http://localhost:3002/api/llm-config/status');
+      const res = await fetch('/api/llm-config/status');
       const data = await res.json();
       setStatus(data);
     } catch (err) {
@@ -54,7 +55,7 @@ export const useLLMConfig = () => {
   };
 
   const saveApiKey = async (provider: string, apiKey: string, apiKey2?: string, projectId?: string) => {
-    const res = await fetch('http://localhost:3002/api/llm-config/api-key', {
+    const res = await fetch('/api/llm-config/api-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, apiKey, apiKey2, projectId }),
@@ -72,7 +73,7 @@ export const useLLMConfig = () => {
     generation?: Partial<LLMConfig['generation']>;
     experts?: Record<string, ExpertConfig | null>;
   }) => {
-    const res = await fetch('http://localhost:3002/api/llm-config', {
+    const res = await fetch('/api/llm-config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -83,7 +84,7 @@ export const useLLMConfig = () => {
   };
 
   const testConnection = async (provider: string) => {
-    const res = await fetch('http://localhost:3002/api/llm-config/test', {
+    const res = await fetch('/api/llm-config/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider }),
@@ -92,7 +93,7 @@ export const useLLMConfig = () => {
   };
 
   const testAllConnections = async () => {
-    const res = await fetch('http://localhost:3002/api/llm-config/test-all', {
+    const res = await fetch('/api/llm-config/test-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
