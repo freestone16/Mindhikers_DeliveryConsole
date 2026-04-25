@@ -6,6 +6,30 @@ import { loadConfig } from '../llm-config';
 import type { LLMProvider } from '../../src/schemas/llm-config';
 import { tryResolveDirectorFastPath } from '../director-bridge';
 
+function mergePlainObject(base: unknown, patch: Record<string, unknown>): Record<string, unknown> {
+    const merged: Record<string, unknown> = {
+        ...((base && typeof base === 'object') ? base as Record<string, unknown> : {}),
+    };
+
+    for (const [key, value] of Object.entries(patch)) {
+        const current = merged[key];
+        if (
+            value &&
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            current &&
+            typeof current === 'object' &&
+            !Array.isArray(current)
+        ) {
+            merged[key] = mergePlainObject(current, value as Record<string, unknown>);
+        } else {
+            merged[key] = value;
+        }
+    }
+
+    return merged;
+}
+
 export const DirectorAdapter: ExpertActionAdapter = {
     expertId: 'Director',
 
@@ -196,8 +220,12 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
 
                 // [C3] BRollType 合法值枚举
                 const VALID_TYPES = new Set([
-                    'remotion', 'internet-clip', 'user-capture', 'text-to-video',
-                    'infographic', 'ai-generated-image', 'svg-animation',
+                    'remotion', 'seedance', 'generative', 'artlist',
+                    'internet-clip', 'user-capture', 'infographic',
+                    'text-to-video', 'ai-generated-image', 'svg-animation',
+                ]);
+                const PREVIEW_INVALIDATING_FIELDS = new Set([
+                    'type', 'prompt', 'imagePrompt', 'template', 'props', 'quote', 'svgPrompt',
                 ]);
 
                 // [C3] 原型污染防护 — 用 Object.create(null) 遍历，杜绝 __proto__/constructor
@@ -207,13 +235,14 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
                     safeUpdates[key] = (updates as Record<string, unknown>)[key];
                 }
 
+                let shouldInvalidatePreview = false;
+
                 // type 变更时校验枚举 + 级联清理
                 if (safeUpdates.type !== undefined && safeUpdates.type !== opt.type) {
                     if (!VALID_TYPES.has(safeUpdates.type as string)) {
                         return { success: false, error: `非法 type 值: "${safeUpdates.type}"` };
                     }
-                    opt.previewUrl = null;
-                    opt.previewStatus = null;
+                    shouldInvalidatePreview = true;
                     opt.template = null;
                     opt.props = null;
                     console.log(`[Director] Type changed ${opt.type} -> ${safeUpdates.type} for ${opt.id}, cleared preview/template/props`);
@@ -224,10 +253,18 @@ Please generate ONLY the final English prompt text. Do NOT include any explanati
 
                     const value = safeUpdates[key];
                     if (key === 'props' && typeof value === 'object' && value !== null) {
-                        opt.props = { ...(opt.props || {}), ...(value as Record<string, unknown>) };
+                        opt.props = mergePlainObject(opt.props, value as Record<string, unknown>);
                     } else {
                         (opt as Record<string, unknown>)[key] = value;
                     }
+                    if (PREVIEW_INVALIDATING_FIELDS.has(key)) {
+                        shouldInvalidatePreview = true;
+                    }
+                }
+
+                if (shouldInvalidatePreview) {
+                    if (safeUpdates.previewUrl === undefined) opt.previewUrl = null;
+                    if (safeUpdates.previewStatus === undefined) opt.previewStatus = null;
                 }
                 break;
             }

@@ -26,6 +26,7 @@ function createProjectRoot() {
                 prompt: 'old prompt',
                 imagePrompt: 'old image prompt',
                 previewUrl: 'https://example.com/old.png',
+                previewStatus: 'ready',
                 props: { title: 'old title' },
               },
             ],
@@ -72,7 +73,31 @@ describe('DirectorAdapter', () => {
     const option = store.modules.director.items[0].options[0];
 
     expect(option.type).toBe('internet-clip');
-    expect(option.previewUrl).toBeUndefined();
+    expect(option.previewUrl).toBeNull();
+    expect(option.previewStatus).toBeNull();
+  });
+
+  it('invalidates preview when prompt fields change', async () => {
+    const projectRoot = createProjectRoot();
+
+    const result = await DirectorAdapter.executeAction('update_option_fields', {
+      chapterId: 'ch2',
+      optionId: 'ch2-opt1',
+      updates: {
+        imagePrompt: 'new image prompt',
+      },
+    }, projectRoot);
+
+    expect(result.success).toBe(true);
+
+    const store = JSON.parse(
+      fs.readFileSync(path.join(projectRoot, 'delivery_store.json'), 'utf-8')
+    );
+    const option = store.modules.director.items[0].options[0];
+
+    expect(option.imagePrompt).toBe('new image prompt');
+    expect(option.previewUrl).toBeNull();
+    expect(option.previewStatus).toBeNull();
   });
 
   it('merges nested props through update_option_fields without system-side normalization', async () => {
@@ -115,6 +140,7 @@ describe('DirectorAdapter', () => {
     expect(option.props.textColor).toBe('#ff4757');
     expect(option.props.textStyle.fontSize).toBe('32px');
     expect(option.props.textStyle.whiteSpace).toBe('nowrap');
-    expect(option.previewUrl).toBeUndefined();
+    expect(option.previewUrl).toBeNull();
+    expect(option.previewStatus).toBeNull();
   });
 });
