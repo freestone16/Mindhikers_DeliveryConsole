@@ -9,7 +9,7 @@
  *   - useExpertState hook 管理状态 + Socket.IO 持久化
  *   - Props: { projectId, scriptPath, socket }
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TrendingUp, ChevronRight, Settings } from 'lucide-react';
 import type { MarketModule_V3 } from '../types';
 import { useExpertState } from '../hooks/useExpertState';
@@ -24,6 +24,7 @@ import { defaultMarketV3State } from '../mocks/marketMockDataV3';
 interface MarketingSectionProps {
     projectId: string;
     scriptPath: string;
+    scriptSelectedAt?: string;
     socket: any;
 }
 
@@ -33,6 +34,7 @@ interface MarketingSectionProps {
 export const MarketingSection: React.FC<MarketingSectionProps> = ({
     projectId,
     scriptPath,
+    scriptSelectedAt,
     socket,
 }) => {
     // 状态管理（通过 useExpertState 实现 Socket.IO 持久化同步）
@@ -45,12 +47,70 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
     // （旧 V2 state 有 phase 字段但缺少 phase1SubStep / candidates 等 V3 字段）
     const data: MarketModule_V3 = { ...defaultMarketV3State, ...(rawData as Partial<MarketModule_V3>) };
 
+    // ── 文稿变化检测：选了文稿（含重新选同一个）则 Reset 全部营销状态 ──
+    const prevSelectedAtRef = useRef<string | undefined>();
+    const hasHandledScriptRef = useRef(false);
+    useEffect(() => {
+        if (!scriptPath) return;
+        const storedPath = data.selectedScript?.path;
+        const scriptFilename = scriptPath.split('/').pop() || scriptPath;
+
+        // 首次挂载：记录 selectedAt，只做必要的 legacy 回填或 path 不同的 reset
+        if (prevSelectedAtRef.current === undefined) {
+            prevSelectedAtRef.current = scriptSelectedAt;
+
+            if (!storedPath) {
+                // Legacy state（没记录过 scriptPath）→ 只回填，不 reset
+                if (data.candidates?.length > 0 && !hasHandledScriptRef.current) {
+                    hasHandledScriptRef.current = true;
+                    updateState(projectId, {
+                        ...data,
+                        selectedScript: { filename: scriptFilename, path: scriptPath },
+                    });
+                }
+            } else if (storedPath !== scriptPath) {
+                // 挂载时发现路径已不同 → Reset
+                console.log(`[MarketingMaster] 文稿已切换: ${storedPath} → ${scriptPath}，重置状态`);
+                updateState(projectId, {
+                    ...defaultMarketV3State,
+                    selectedScript: { filename: scriptFilename, path: scriptPath },
+                });
+            }
+            return;
+        }
+
+        // 非首次挂载：selectedAt 变了 = 用户重新点选了文稿（不管路径是否相同）→ Reset
+        if (scriptSelectedAt && scriptSelectedAt !== prevSelectedAtRef.current) {
+            prevSelectedAtRef.current = scriptSelectedAt;
+            console.log(`[MarketingMaster] 文稿重新选择 → 重置状态回 Phase 1`);
+            updateState(projectId, {
+                ...defaultMarketV3State,
+                selectedScript: { filename: scriptFilename, path: scriptPath },
+            });
+            return;
+        }
+
+        // path 变了（可能来自其他来源的更新）→ Reset
+        if (storedPath && storedPath !== scriptPath) {
+            prevSelectedAtRef.current = scriptSelectedAt;
+            console.log(`[MarketingMaster] 文稿路径变化: ${storedPath} → ${scriptPath}，重置状态`);
+            updateState(projectId, {
+                ...defaultMarketV3State,
+                selectedScript: { filename: scriptFilename, path: scriptPath },
+            });
+        }
+    }, [scriptPath, scriptSelectedAt, data.selectedScript?.path]);
+
     // 默认设置面板开关
     const [showSettings, setShowSettings] = useState(false);
 
-    // ── 核心 update 函数 ──
+    // ── 核心 update 函数：自动附带当前 scriptPath ──
     const onUpdate = (newData: MarketModule_V3) => {
-        updateState(projectId, newData);
+        const scriptFilename = scriptPath.split('/').pop() || scriptPath;
+        updateState(projectId, {
+            ...newData,
+            selectedScript: { filename: scriptFilename, path: scriptPath },
+        });
     };
 
     // ── Phase 切换 ──

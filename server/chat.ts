@@ -4,7 +4,11 @@ import type { ChatMessage, ChatHistory, ExpertContextMap } from '../src/types';
 import { loadConfig } from './llm-config';
 import { PROVIDER_INFO } from '../src/schemas/llm-config';
 
-const PROJECTS_BASE = process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
+// NOTE: Do NOT use a module-level const here — dotenv.config() runs AFTER this module is imported.
+// Always read process.env.PROJECTS_BASE lazily (at call time) to get the correct value.
+function getProjectsBase(): string {
+    return process.env.PROJECTS_BASE || path.resolve(__dirname, '../../../Projects');
+}
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -409,7 +413,7 @@ export function formatMultimodalMessages(
 }
 
 export function getProjectRoot(projectId: string): string {
-    return path.resolve(PROJECTS_BASE, projectId);
+    return path.resolve(getProjectsBase(), projectId);
 }
 
 // End of file

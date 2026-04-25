@@ -165,6 +165,7 @@ function App() {
                                         <MarketingSection
                                             projectId={state.projectId}
                                             scriptPath={state.selectedScript?.path || ''}
+                                            scriptSelectedAt={state.selectedScript?.selectedAt}
                                             socket={socket}
                                         />
                                     ) : (

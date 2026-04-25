@@ -29,6 +29,9 @@ export const useExpertState = <T>(expertId: string, initialState: T) => {
 
         socket.on(updateEvent, handleServerUpdate);
 
+        // 组件挂载时主动请求当前数据（防止切换页签后丢失进度）
+        socket.emit('request-expert-data', { expertId });
+
         return () => {
             socket.off(updateEvent, handleServerUpdate);
         };

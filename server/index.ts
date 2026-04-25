@@ -564,6 +564,14 @@ io.on('connection', (socket) => {
         io.to(newData.projectId).emit('delivery-data', newData); // Send to project room
     });
 
+    socket.on('request-expert-data', ({ expertId }) => {
+        const projectId = socketToProjectMap.get(socket);
+        if (!projectId || !expertId) return;
+        const projectRoot = getProjectRoot(projectId);
+        const expertData = loadExpertState(projectRoot, expertId);
+        socket.emit(`expert-data-update:${expertId}`, expertData);
+    });
+
     socket.on('update-expert-data', (payload) => {
         const { expertId, projectId, data } = payload || {};
         if (!projectId || !expertId) {
