@@ -271,13 +271,14 @@ export function normalizeProviderConfig(
   _baseUrl?: string | null
 ): { provider: LLMProvider; model: string; baseUrl: string } {
   const info = PROVIDER_INFO[provider];
-  if (!info || info.type !== 'llm') {
+  const parsedProvider = LLMProviderSchema.safeParse(provider);
+  if (!parsedProvider.success || !info || info.type !== 'llm') {
     const fallback = PROVIDER_INFO.deepseek;
     return { provider: 'deepseek', model: fallback.models[0], baseUrl: fallback.baseUrl };
   }
 
   const validModel = (model && info.models.includes(model)) ? model : info.models[0];
-  return { provider, model: validModel, baseUrl: info.baseUrl };
+  return { provider: parsedProvider.data, model: validModel, baseUrl: info.baseUrl };
 }
 
 export const EXPERT_LIST = [

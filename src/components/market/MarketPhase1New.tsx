@@ -63,12 +63,6 @@ export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
     // Ref for accumulating scored data during SSE to avoid stale closures
     const scoringDataRef = useRef<MarketModule_V3 | null>(null);
 
-    // ── Sub-step navigation helpers ──────────────────────────────────────
-
-    const goToSubStep = (step: MarketModule_V3['phase1SubStep']) => {
-        onUpdate({ ...data, phase1SubStep: step });
-    };
-
     // ── 1.1 → 1.2: go to scoring ────────────────────────────────────────
 
     const handleGoToScoring = useCallback(() => {

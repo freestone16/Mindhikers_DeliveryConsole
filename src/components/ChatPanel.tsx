@@ -207,9 +207,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setIsStreaming(false);
             // 找到最近的 confirmed action 消息，更新其状态为 executed，避免追加重复消息
             const msgs = [...messagesRef.current];
-            const lastConfirmedIdx = msgs.findLastIndex(
-                (m: any) => m.actionConfirm?.status === 'confirmed'
-            );
+            let lastConfirmedIdx = -1;
+            for (let i = msgs.length - 1; i >= 0; i -= 1) {
+                if (msgs[i].actionConfirm?.status === 'confirmed') {
+                    lastConfirmedIdx = i;
+                    break;
+                }
+            }
             if (lastConfirmedIdx >= 0) {
                 msgs[lastConfirmedIdx] = {
                     ...msgs[lastConfirmedIdx],
@@ -341,9 +345,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const handleConfirmAction = (actionConfirm: ToolCallConfirmation) => {
-        const nextMessages = messagesRef.current.map(msg =>
+        const nextMessages: ChatMessage[] = messagesRef.current.map((msg): ChatMessage =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
-                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'confirmed' } }
+                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'confirmed' as const } }
                 : msg
         );
         setMessagesWithRef(nextMessages);
@@ -359,9 +363,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const handleCancelAction = (actionConfirm: ToolCallConfirmation) => {
-        const nextMessages = messagesRef.current.map(msg =>
+        const nextMessages: ChatMessage[] = messagesRef.current.map((msg): ChatMessage =>
             msg.actionConfirm?.confirmId === actionConfirm.confirmId
-                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'cancelled' }, content: '已取消该操作。' }
+                ? { ...msg, actionConfirm: { ...actionConfirm, status: 'cancelled' as const }, content: '已取消该操作。' }
                 : msg
         );
         setMessagesWithRef(nextMessages);

@@ -1,4 +1,5 @@
 export type PhaseState = 'concept' | 'execution';
+export type Phase = 1 | 2 | 3 | 4;
 
 export interface BaseItem {
     id: string;
@@ -145,6 +146,13 @@ export interface DeliveryState {
     selectedScript?: SelectedScript;
     activeExpertId?: string;
     activeModule?: 'crucible' | 'delivery' | 'distribution';
+    modules?: {
+        director: DirectorModule;
+        music: MusicModule;
+        thumbnail: ThumbnailModule;
+        marketing: MarketingModule;
+        shorts: ShortsModule | ShortsModule_V2;
+    };
 }
 
 // --- Visual Audit Module (v3.1) ---
@@ -469,13 +477,25 @@ export interface TitleTagSet {
     userComment?: string;
 }
 
-/** TubeBuddy Keyword Explorer 评分 (Sprint 3 — 真实 DOM 提取后使用此 flat 结构) */
+/** TubeBuddy Keyword Explorer 评分，兼容旧嵌套结构与新版 flat 结构 */
 export interface TubeBuddyScore {
-    overall: number;        // 综合评分 0-100
-    searchVolume: number;   // 搜索量 0-100
-    competition: number;    // 竞争度 0-100
-    optimization: number;   // 优化度 0-100
-    relevance: number;      // 相关度 0-100
+    overall?: number;        // 综合评分 0-100
+    searchVolume?: number;   // 搜索量 0-100
+    competition?: number;    // 竞争度 0-100
+    optimization?: number;   // 优化度 0-100
+    relevance?: number;      // 相关度 0-100
+    overallScore?: number;
+    weightedScore?: number;
+    metrics?: {
+        searchVolume: number;
+        competition: number;
+        optimization: number;
+        relevance: number;
+    };
+    rawMetrics?: {
+        monthlySearches?: number;
+        competitionLevel?: 'low' | 'medium' | 'high' | string;
+    };
 }
 
 export interface MarketModule_V2 {
@@ -619,6 +639,8 @@ export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: string;
+    kind?: 'chat' | 'system_status' | 'system_action';
+    systemTitle?: string;
     attachments?: Attachment[];
     actionConfirm?: ToolCallConfirmation;
 }
@@ -631,7 +653,9 @@ export interface ToolCallConfirmation {
     title?: string;
     targetLabel?: string;
     diffLabel?: string;
-    status: 'pending' | 'confirmed' | 'cancelled';
+    status: 'pending' | 'confirmed' | 'cancelled' | 'executed';
+    resultMessage?: string;
+    resultSuccess?: boolean;
 }
 
 export interface Attachment {

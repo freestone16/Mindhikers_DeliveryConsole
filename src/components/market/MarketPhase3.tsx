@@ -95,7 +95,7 @@ export const MarketPhase3: React.FC<MarketPhase3Props> = ({
                         <div className="flex items-center gap-2">
                             <span className="text-green-400 font-medium">TubeBuddy 综合评分</span>
                             <span className="text-2xl font-bold text-green-300">
-                                {selectedSet.tubeBuddyScore.overallScore}
+                                {selectedSet.tubeBuddyScore.overall ?? selectedSet.tubeBuddyScore.overallScore ?? 0}
                             </span>
                         </div>
                     </div>

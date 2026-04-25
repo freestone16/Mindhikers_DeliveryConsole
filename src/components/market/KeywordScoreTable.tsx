@@ -199,12 +199,14 @@ export const KeywordScoreTable: React.FC<KeywordScoreTableProps> = ({
                             {data.candidates.map((kw, kwIdx) =>
                                 kw.variants.map((variant, vIdx) => {
                                     const score = variant.tubeBuddyScore;
+                                    const metrics = score?.metrics;
+                                    const overall = score?.overall ?? score?.overallScore;
                                     const isFirstVariant = vIdx === 0;
                                     return (
                                         <tr
                                             key={`${kw.id}-${variant.script}`}
                                             className={`hover:bg-slate-700/20 transition-colors ${
-                                                score ? scoreBg(score.overall) : ''
+                                                overall !== undefined ? scoreBg(overall) : ''
                                             }`}
                                         >
                                             {/* Index — only on first variant row */}
@@ -234,19 +236,19 @@ export const KeywordScoreTable: React.FC<KeywordScoreTableProps> = ({
 
                                             {/* Scores */}
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.overall} />
+                                                <ScoreCell value={overall} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.searchVolume} />
+                                                <ScoreCell value={metrics?.searchVolume ?? score?.searchVolume} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.competition} />
+                                                <ScoreCell value={metrics?.competition ?? score?.competition} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.optimization} />
+                                                <ScoreCell value={metrics?.optimization ?? score?.optimization} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.relevance} />
+                                                <ScoreCell value={metrics?.relevance ?? score?.relevance} />
                                             </td>
 
                                             {/* Status */}
