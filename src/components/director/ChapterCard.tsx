@@ -9,6 +9,7 @@ interface ChapterCardProps {
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
   pendingTaskKeys?: Set<string>;
+  isActive?: boolean;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -430,12 +431,19 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 const cleanChapterName = (name: string) =>
   name.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
 
-export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendingTaskKeys }: ChapterCardProps) => {
+export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendingTaskKeys, isActive }: ChapterCardProps) => {
+  const cardRef = useRef<HTMLDivElement>(null);
   const isAnyOptionChecked = chapter.options.length > 0 && chapter.options.every(opt => opt.isChecked);
   const displayName = cleanChapterName(chapter.chapterName);
 
+  useEffect(() => {
+    if (isActive && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isActive]);
+
   return (
-    <div className="rounded-lg border border-[#e4dbcc] overflow-hidden" style={{ background: 'rgba(255,252,247,0.78)' }}>
+    <div ref={cardRef} className="rounded-lg border border-[#e4dbcc] overflow-hidden" style={{ background: 'rgba(255,252,247,0.78)' }}>
       <div className="bg-[#f4efe5] px-4 py-2 border-b border-[#e4dbcc] flex items-center gap-3">
         <span className="text-[#c97545] font-bold text-sm">第{chapter.chapterIndex + 1}章</span>
         <span className="text-[#342d24] font-medium">{displayName}</span>

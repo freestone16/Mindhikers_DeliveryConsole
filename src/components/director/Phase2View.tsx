@@ -220,30 +220,17 @@ export const Phase2View = ({
               </div>
             )}
 
-            {activeChapter && (
+            {filteredChapters.map(chapter => (
               <ChapterCard
-                key={activeChapter.chapterId}
-                chapter={activeChapter}
+                key={chapter.chapterId}
+                chapter={chapter}
                 projectId={projectId}
                 onSelect={onSelect}
                 onToggleCheck={onToggleCheck}
                 pendingTaskKeys={pendingTaskKeys}
+                isActive={chapter.chapterId === activeChapterId}
               />
-            )}
-
-            {/* 其他章节（折叠展示） */}
-            {filteredChapters
-              .filter(ch => ch.chapterId !== activeChapter?.chapterId)
-              .map(chapter => (
-                <ChapterCard
-                  key={chapter.chapterId}
-                  chapter={chapter}
-                  projectId={projectId}
-                  onSelect={onSelect}
-                  onToggleCheck={onToggleCheck}
-                  pendingTaskKeys={pendingTaskKeys}
-                />
-              ))}
+            ))}
           </div>
         </div>
       </div>
