@@ -1,4 +1,4 @@
-**时间**: 2026-04-25 16:45 CST
+**时间**: 2026-04-26 09:20 CST
 **分支**: `MHSDC-DC-director`
 
 # HANDOFF — Director 模块
@@ -325,9 +325,59 @@ skills/connectors/__pycache__/*.pyc
 - `/api/scripts?projectId=CSET-Seedance2`: 返回真实脚本
 - Agent Browser UI smoke: 页面、项目下拉、脚本列表、P1 主区域、Drawer tabs 正常
 
-## 交付目标
+## 2026-04-26 新增修复
 
-下一窗口最终应产出：
+### 1. TopBar 项目同步修复 ✅
 
-1. 输出可给老卢确认的提交拆分建议
-2. 等老卢确认 Linear issue 后，再进入 commit
+**问题**：ProductTopBar 显示的项目名永远锁死 CSET-EP4，不跟随用户实际选择。
+**根因**：`activeProject` 只看 `p.isActive` 或取数组第一个，无视传入的 `projectId`。
+**修复**：`src/components/delivery-shell/ProductTopBar.tsx`
+- `activeProject` 优先匹配 `p.name === projectId`
+- 下拉列表高亮同步改为根据 `projectId` 判断
+
+### 2. Phase1 冗余面板删除 ✅
+
+**文件**：`src/components/director/Phase1View.tsx`
+- 删除右侧「当前上下文」面板（项目/剧本/状态）
+- 删除右侧「输入来源」面板（4 条硬编码装饰文本）
+
+### 3. Phase2 滚动跳回问题修复 ✅
+
+**问题**：点击第三章后往下滑，内容跳回第一章。
+**根因**：`Phase2View` 把 `activeChapter` 抽出来置顶，其余章节按原顺序排在下面。
+**修复**：`src/components/director/Phase2View.tsx` + `ChapterCard.tsx`
+- 取消「置顶当前章节」设计，所有章节按原顺序渲染
+- `ChapterCard` 新增 `isActive` prop，激活时自动 `scrollIntoView`
+- 点击左侧导航自动平滑滚动到对应章节
+
+## 待处理问题（下一窗口）
+
+### Phase2 页面崩溃（Aw, Snap! Error code: 5）
+
+**根因分析**：Chrome 内存溢出
+- 31 选项 × 7 章 ≈ 200+ 张预览图同时加载
+- 每个选项行有 `setTimeout` 轮询（每 2 秒），组件卸载未清理
+- Lightbox Portal 频繁创建/销毁 DOM
+
+**建议修复方向**：
+1. 图片懒加载（IntersectionObserver，只加载可视区域）
+2. 轮询定时器在 `useEffect` cleanup 中清理
+3. Lightbox 用单例模式，避免每行都创建 Portal
+4. 考虑虚拟滚动（React Window）处理大量选项
+
+## 当前分支状态
+
+- `MHSDC-DC-director` 领先远程 4 commit
+- 服务运行中：后端 3005 / 前端 5178
+
+## 下一窗口启动必读
+
+```bash
+cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
+git branch --show-current  # 应返回 MHSDC-DC-director
+```
+
+**待办**：
+1. Phase2 内存溢出修复（图片懒加载 + 轮询清理）
+2. 崩溃问题复现验证
+3. build + 验收
