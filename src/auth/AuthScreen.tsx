@@ -62,21 +62,21 @@ export const AuthScreen = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(192,140,85,0.16),transparent_32%),linear-gradient(180deg,#fffaf2_0%,#f6efe5_54%,#f1e8dd_100%)] text-[var(--ink-1)]">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(192,140,85,0.16),transparent_32%),linear-gradient(180deg,#fffaf2_0%,#f6efe5_54%,#f1e8dd_100%)] text-[var(--gc-text-primary)]">
             <div className="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-12">
                 <div className="grid w-full gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-                    <section className="rounded-[36px] border border-[rgba(125,98,67,0.14)] bg-[rgba(255,252,247,0.78)] p-8 shadow-[0_24px_80px_rgba(111,84,52,0.08)] backdrop-blur-xl lg:p-10">
+                    <section className="rounded-[36px] border border-[rgba(125,98,67,0.14)] bg-[rgba(255,252,247,0.78)] p-8 backdrop-blur-xl lg:p-10">
                         <div className="mb-8 flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(178,114,57,0.12)] text-[var(--accent)]">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(178,114,57,0.12)] text-[var(--gc-accent)]">
                                 <LockKeyhole className="h-6 w-6" />
                             </div>
                             <div>
-                                <p className="text-sm uppercase tracking-[0.24em] text-[var(--ink-3)]">Golden Crucible SaaS</p>
-                                <h1 className="mh-display text-3xl font-semibold tracking-tight text-[var(--ink-1)]">账号体系已接入</h1>
+                                <p className="text-sm uppercase tracking-[0.24em] text-[var(--gc-text-tertiary)]">Golden Crucible SaaS</p>
+                                <h1 className="mh-display text-3xl font-semibold tracking-tight text-[var(--gc-text-primary)]">账号体系已接入</h1>
                             </div>
                         </div>
 
-                        <div className="space-y-4 text-[15px] leading-7 text-[var(--ink-2)]">
+                        <div className="space-y-4 text-[15px] leading-7 text-[var(--gc-text-secondary)]">
                             <p>这一版已经切到多账号底座：登录后会自动拿到一个 personal workspace，后续再把对话、黑板和产物逐步收口到 workspace 维度。</p>
                             <p>当前登录入口已按三类规划：Google、微信扫码、通用邮箱注册/登录。微信这条会优先做网站应用扫码登录，配置齐了就能直接接通。</p>
                             {status?.usingDefaultSecret ? (
@@ -87,13 +87,13 @@ export const AuthScreen = () => {
                         </div>
                     </section>
 
-                    <section className="rounded-[32px] border border-[rgba(125,98,67,0.14)] bg-[rgba(255,255,255,0.84)] p-6 shadow-[0_20px_70px_rgba(111,84,52,0.08)] backdrop-blur-xl lg:p-8">
+                    <section className="rounded-[32px] border border-[rgba(125,98,67,0.14)] bg-[rgba(255,255,255,0.84)] p-6 backdrop-blur-xl lg:p-8">
                         <div className="mb-5 grid gap-3">
                             <button
                                 type="button"
                                 onClick={() => void handleSocialSignIn('google')}
                                 disabled={isSubmitting || activeProvider !== null || !status?.googleEnabled}
-                                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--line-soft)] bg-white px-4 py-3 text-sm font-medium text-[var(--ink-1)] transition hover:border-[var(--line-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--gc-line-subtle)] bg-white px-4 py-3 text-sm font-medium text-[var(--gc-text-primary)] transition hover:border-[var(--gc-line-default)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {activeProvider === 'google' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
                                 {status?.googleEnabled ? '使用 Google 登录' : 'Google 登录待配置'}
@@ -110,24 +110,24 @@ export const AuthScreen = () => {
                             </button>
                         </div>
 
-                        <div className="mb-6 rounded-2xl border border-[var(--line-soft)] bg-[rgba(247,242,235,0.72)] px-4 py-3 text-xs leading-6 text-[var(--ink-3)]">
+                        <div className="mb-6 rounded-2xl border border-[var(--gc-line-subtle)] bg-[rgba(247,242,235,0.72)] px-4 py-3 text-xs leading-6 text-[var(--gc-text-tertiary)]">
                             {status?.wechatEnabled
                                 ? '微信入口已接到网站应用登录，用户会跳到微信二维码授权页完成扫码。'
                                 : '微信开放平台配置暂未补齐，当前先预留扫码登录位；你准备完 AppID / Secret 和域名后即可接通。'}
                         </div>
 
-                        <div className="mb-6 flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-1">
+                        <div className="mb-6 flex rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-1">
                             <button
                                 type="button"
                                 onClick={() => setMode('sign-in')}
-                                className={`flex-1 rounded-full px-4 py-2 text-sm transition-colors ${mode === 'sign-in' ? 'bg-[var(--accent)] text-white' : 'text-[var(--ink-3)]'}`}
+                                className={`flex-1 rounded-full px-4 py-2 text-sm transition-colors ${mode === 'sign-in' ? 'bg-[var(--gc-accent)] text-white' : 'text-[var(--gc-text-tertiary)]'}`}
                             >
                                 登录
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setMode('sign-up')}
-                                className={`flex-1 rounded-full px-4 py-2 text-sm transition-colors ${mode === 'sign-up' ? 'bg-[var(--accent)] text-white' : 'text-[var(--ink-3)]'}`}
+                                className={`flex-1 rounded-full px-4 py-2 text-sm transition-colors ${mode === 'sign-up' ? 'bg-[var(--gc-accent)] text-white' : 'text-[var(--gc-text-tertiary)]'}`}
                             >
                                 注册
                             </button>
@@ -136,33 +136,33 @@ export const AuthScreen = () => {
                         <div className="space-y-4">
                             {mode === 'sign-up' ? (
                                 <label className="block">
-                                    <span className="mb-2 block text-sm text-[var(--ink-3)]">昵称</span>
+                                    <span className="mb-2 block text-sm text-[var(--gc-text-tertiary)]">昵称</span>
                                     <input
                                         value={name}
                                         onChange={(event) => setName(event.target.value)}
-                                        className="w-full rounded-2xl border border-[var(--line-soft)] bg-white px-4 py-3 outline-none transition focus:border-[var(--accent)]"
+                                        className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white px-4 py-3 outline-none transition focus:border-[var(--gc-accent)]"
                                         placeholder="输入你的名字"
                                     />
                                 </label>
                             ) : null}
 
                             <label className="block">
-                                <span className="mb-2 block text-sm text-[var(--ink-3)]">邮箱</span>
+                                <span className="mb-2 block text-sm text-[var(--gc-text-tertiary)]">邮箱</span>
                                 <input
                                     value={email}
                                     onChange={(event) => setEmail(event.target.value)}
-                                    className="w-full rounded-2xl border border-[var(--line-soft)] bg-white px-4 py-3 outline-none transition focus:border-[var(--accent)]"
+                                    className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white px-4 py-3 outline-none transition focus:border-[var(--gc-accent)]"
                                     placeholder="you@example.com"
                                     type="email"
                                 />
                             </label>
 
                             <label className="block">
-                                <span className="mb-2 block text-sm text-[var(--ink-3)]">密码</span>
+                                <span className="mb-2 block text-sm text-[var(--gc-text-tertiary)]">密码</span>
                                 <input
                                     value={password}
                                     onChange={(event) => setPassword(event.target.value)}
-                                    className="w-full rounded-2xl border border-[var(--line-soft)] bg-white px-4 py-3 outline-none transition focus:border-[var(--accent)]"
+                                    className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white px-4 py-3 outline-none transition focus:border-[var(--gc-accent)]"
                                     placeholder="至少 8 位"
                                     type="password"
                                 />
@@ -178,7 +178,7 @@ export const AuthScreen = () => {
                                 type="button"
                                 onClick={() => void handleSubmit()}
                                 disabled={isSubmitting || activeProvider !== null || !email.trim() || !password || (mode === 'sign-up' && !name.trim())}
-                                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--gc-accent)] px-4 py-3 text-sm font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {isSubmitting && activeProvider === 'email' ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'sign-up' ? <UserPlus className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
                                 {mode === 'sign-up' ? '使用邮箱创建账号并进入工作区' : '使用邮箱登录并继续'}

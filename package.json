@@ -30,6 +30,7 @@
     "@babel/plugin-transform-react-jsx-source": "^7.27.1",
     "@rolldown/pluginutils": "^1.0.0-rc.3",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/react-query": "^5.99.0",
     "@types/babel__core": "^7.20.5",
     "@types/multer": "^2.0.0",
     "@types/subtitle": "^2.0.6",
@@ -49,6 +50,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-refresh": "^0.18.0",
+    "react-router-dom": "^6.30.3",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "subtitle": "^4.2.2",
@@ -57,7 +59,8 @@
     "uuid": "^13.0.0",
     "vite": "^7.3.1",
     "yaml": "^2.8.1",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",

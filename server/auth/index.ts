@@ -32,6 +32,13 @@ export const resolveAuthSecret = () => process.env.BETTER_AUTH_SECRET?.trim()
 
 export const isUsingDefaultAuthSecret = () => resolveAuthSecret() === DEFAULT_SECRET;
 
+const resolveTrustedOrigins = () => Array.from(new Set([
+    process.env.APP_BASE_URL?.trim(),
+    process.env.CORS_ORIGIN?.trim(),
+    process.env.VITE_API_BASE_URL?.trim(),
+    resolveAuthBaseUrl(),
+].filter((origin): origin is string => Boolean(origin))));
+
 export const isGoogleAuthEnabled = () => Boolean(
     process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim(),
 );
@@ -84,6 +91,7 @@ export const getAuth = () => {
             baseURL: resolveAuthBaseUrl(),
             basePath: AUTH_BASE_PATH,
             secret: resolveAuthSecret(),
+            trustedOrigins: resolveTrustedOrigins(),
             database: getAuthPool(),
             emailAndPassword: {
                 enabled: true,

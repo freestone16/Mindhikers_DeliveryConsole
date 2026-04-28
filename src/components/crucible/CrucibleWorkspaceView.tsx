@@ -13,6 +13,19 @@ import type {
 } from './types';
 import { CRUCIBLE_DEFAULT_PAIR } from './soulRegistry';
 
+export interface CrucibleWorkspaceArtifactState {
+    conversationId?: string;
+    topicTitle?: string;
+    presentables: CanvasAsset[];
+    crystallizedQuotes: CanvasAsset[];
+    roundAnchors: RoundAnchor[];
+    roundIndex: number;
+    thesisReady: boolean;
+    stageLabel?: string;
+    toolTraces: NonNullable<CrucibleTurnResponse['toolTraces']>;
+    lastDialogue?: CrucibleDialogue | null;
+}
+
 const ASSET_META = {
     ascii: { icon: Boxes, label: '结构' },
     mindmap: { icon: BrainCircuit, label: '脑图' },
@@ -42,6 +55,7 @@ interface CrucibleWorkspaceProps {
     onTurnSettled?: () => void;
     onConversationStateChange?: (payload: { conversationId?: string; roundIndex: number }) => void;
     onTurnError?: (payload: { message: string; code?: string }) => void;
+    onArtifactStateChange?: (payload: CrucibleWorkspaceArtifactState) => void;
 }
 
 const toCanvasAsset = (asset: HostRoutedAsset): CanvasAsset => ({
@@ -176,6 +190,7 @@ export const CrucibleWorkspace = ({
     onTurnSettled,
     onConversationStateChange,
     onTurnError,
+    onArtifactStateChange,
 }: CrucibleWorkspaceProps) => {
     const snapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [workspaceId]);
     const [presentables, setPresentables] = useState<CanvasAsset[]>(() => snapshot?.presentables?.length ? snapshot.presentables : []);
@@ -246,6 +261,33 @@ export const CrucibleWorkspace = ({
             roundIndex,
         });
     }, [conversationId, roundIndex, onConversationStateChange]);
+
+    useEffect(() => {
+        onArtifactStateChange?.({
+            conversationId: conversationId || undefined,
+            topicTitle,
+            presentables,
+            crystallizedQuotes,
+            roundAnchors,
+            roundIndex,
+            thesisReady,
+            stageLabel: stageLabel || undefined,
+            toolTraces,
+            lastDialogue,
+        });
+    }, [
+        conversationId,
+        topicTitle,
+        presentables,
+        crystallizedQuotes,
+        roundAnchors,
+        roundIndex,
+        thesisReady,
+        stageLabel,
+        toolTraces,
+        lastDialogue,
+        onArtifactStateChange,
+    ]);
 
     useEffect(() => {
         const snapshotPayload = {

@@ -1,45 +1,97 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/fonts.css";
 
 :root {
-  --shell-bg: #f4eee3;
-  --shell-bg-strong: #ece2d4;
+  --shell-bg: var(--gc-bg-base);
+  --shell-bg-strong: var(--gc-bg-raised);
   --surface-0: rgba(255, 251, 245, 0.84);
   --surface-1: #fffaf2;
-  --surface-2: #f5ecdf;
-  --surface-3: #eadfce;
+  --surface-2: var(--gc-bg-sunken);
+  --surface-3: var(--gc-line-default);
   --line-soft: rgba(104, 84, 55, 0.14);
   --line-strong: rgba(104, 84, 55, 0.24);
-  --ink-1: #2f261b;
-  --ink-2: #61533f;
-  --ink-3: #8f7d66;
-  --accent: #8e6337;
-  --accent-soft: #dcc3a2;
-  --accent-muted: #b79672;
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  --ink-1: var(--gc-text-primary);
+  --ink-2: var(--gc-text-secondary);
+  --ink-3: var(--gc-text-tertiary);
+  --accent: var(--gc-accent);
+  --accent-soft: var(--gc-accent-tint);
+  --accent-muted: var(--gc-accent-ink);
+  font-family: var(--gc-font-sans);
+}
+
+@theme {
+  --color-gc-bg-base: var(--gc-bg-base);
+  --color-gc-bg-raised: var(--gc-bg-raised);
+  --color-gc-bg-sunken: var(--gc-bg-sunken);
+  --color-gc-bg-quiet: var(--gc-bg-quiet);
+  --color-gc-bg-inverted: var(--gc-bg-inverted);
+
+  --color-gc-text-primary: var(--gc-text-primary);
+  --color-gc-text-secondary: var(--gc-text-secondary);
+  --color-gc-text-tertiary: var(--gc-text-tertiary);
+  --color-gc-text-quiet: var(--gc-text-quiet);
+  --color-gc-text-inverted: var(--gc-text-inverted);
+
+  --color-gc-line-hairline: var(--gc-line-hairline);
+  --color-gc-line-subtle: var(--gc-line-subtle);
+  --color-gc-line-default: var(--gc-line-default);
+  --color-gc-line-strong: var(--gc-line-strong);
+
+  --color-gc-accent: var(--gc-accent);
+  --color-gc-accent-hover: var(--gc-accent-hover);
+  --color-gc-accent-ink: var(--gc-accent-ink);
+  --color-gc-accent-tint: var(--gc-accent-tint);
+  --color-gc-accent-hairline: var(--gc-accent-hairline);
+
+  --color-gc-success: var(--gc-success);
+  --color-gc-success-tint: var(--gc-success-tint);
+  --color-gc-warning: var(--gc-warning);
+  --color-gc-error: var(--gc-error);
+
+  --font-gc-serif: var(--gc-font-serif);
+  --font-gc-sans: var(--gc-font-sans);
+  --font-gc-mono: var(--gc-font-mono);
+
+  --spacing-gc-s-1: var(--gc-s-1);
+  --spacing-gc-s-2: var(--gc-s-2);
+  --spacing-gc-s-3: var(--gc-s-3);
+  --spacing-gc-s-4: var(--gc-s-4);
+  --spacing-gc-s-6: var(--gc-s-6);
+  --spacing-gc-s-8: var(--gc-s-8);
+  --spacing-gc-s-12: var(--gc-s-12);
+  --spacing-gc-s-16: var(--gc-s-16);
+
+  --radius-gc-sm: var(--gc-radius-sm);
+  --radius-gc-md: var(--gc-radius-md);
+  --radius-gc-lg: var(--gc-radius-lg);
+  --radius-gc-pill: var(--gc-radius-pill);
 }
 
 html,
 body,
 #root {
+  width: 100%;
+  height: 100%;
   min-height: 100%;
 }
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top left, rgba(217, 187, 148, 0.18), transparent 26%),
-    linear-gradient(180deg, #f8f3eb 0%, #f4eee3 100%);
-  color: var(--ink-1);
+  background: var(--gc-bg-base);
+  color: var(--gc-text-primary);
+  font-family: var(--gc-font-sans);
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 h1,
 h2,
 h3,
 .mh-display {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-family: var(--gc-font-serif);
 }
 
-/* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
