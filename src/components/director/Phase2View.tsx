@@ -4,7 +4,7 @@ import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import { StoryboardSummaryStrip } from './phase-layouts/StoryboardSummaryStrip';
 import { ChapterRail } from './phase-layouts/ChapterRail';
-import { PhasePanel, PhasePanelHeader, PhasePanelBody } from './phase-layouts/PhasePanel';
+import { PhasePanel, PhasePanelHeader, PhasePanelBody, PhaseLoadingState } from './phase-layouts/PhasePanel';
 import type { DirectorChapter, BRollType, SceneOption } from '../../types';
 
 interface Phase2ViewProps {
@@ -156,82 +156,101 @@ export const Phase2View = ({
         />
 
         <div className="flex-1 min-w-0 overflow-auto">
-          <div className="flex flex-col gap-4">
+          {isLoading && chapters.length === 0 ? (
             <PhasePanel>
-              <PhasePanelHeader
-                title={<span className="text-sm font-bold text-[#342d24]">过滤视觉方案</span>}
-                actions={
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
-                      className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
-                    >
-                      显示全部
-                    </button>
-                    <button
-                      onClick={() => setBrollSelections([])}
-                      className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
-                    >
-                      清空过滤
-                    </button>
-                  </div>
-                }
+              <PhaseLoadingState
+                title="正在生成视觉方案..."
+                subtitle="导演大师正在为你的剧本构思分镜..."
               />
-              <PhasePanelBody>
-                <BRollSelector
-                  selected={brollSelections}
-                  onChange={setBrollSelections}
-                  disabled={isLoading}
-                />
-                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
-                  <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
-                  <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
-                      style={{ backgroundColor: '#faf6ef' }}
-                      ref={el => {
-                        if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
-                      }}
-                      checked={visibleCheckedCount === visibleOptionsCount && visibleOptionsCount > 0}
-                      disabled={visibleOptionsCount === 0}
-                      onChange={(e) => {
-                        const isChecked = e.target.checked;
-                        onBatchSetCheck((opt) => matchesFilter(opt.type), isChecked);
-                      }}
-                    />
-                    <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
-                      全选当前视图方案 <span className="text-[#8f8372]">({visibleCheckedCount}/{visibleOptionsCount})</span>
-                    </span>
-                  </label>
-                </div>
-              </PhasePanelBody>
             </PhasePanel>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <PhasePanel>
+                <PhasePanelHeader
+                  title={<span className="text-sm font-bold text-[#342d24]">过滤视觉方案</span>}
+                  actions={
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setBrollSelections(['remotion', 'seedance', 'generative', 'artlist', 'internet-clip', 'user-capture', 'infographic'])}
+                        className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+                      >
+                        显示全部
+                      </button>
+                      <button
+                        onClick={() => setBrollSelections([])}
+                        className="text-xs bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] px-3 py-1.5 rounded transition-colors"
+                      >
+                        清空过滤
+                      </button>
+                    </div>
+                  }
+                />
+                <PhasePanelBody>
+                  <BRollSelector
+                    selected={brollSelections}
+                    onChange={setBrollSelections}
+                    disabled={isLoading}
+                  />
+                  <div className="flex items-center gap-3 mt-4 pt-4 border-t border-[#e4dbcc]">
+                    <span className="text-xs text-[#8f8372] font-medium">批量操作:</span>
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-[#f4efe5] p-1.5 -ml-1.5 rounded transition-colors group">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer accent-[#c97545] rounded border-[#d8c8ae] focus:ring-0 focus:ring-offset-0 disabled:opacity-50"
+                        style={{ backgroundColor: '#faf6ef' }}
+                        ref={el => {
+                          if (el) el.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleOptionsCount;
+                        }}
+                        checked={visibleCheckedCount === visibleOptionsCount && visibleOptionsCount > 0}
+                        disabled={visibleOptionsCount === 0}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          onBatchSetCheck((opt) => matchesFilter(opt.type), isChecked);
+                        }}
+                      />
+                      <span className="text-xs text-[#6b5e4f] group-hover:text-[#342d24] select-none flex items-center gap-1">
+                        全选当前视图方案 <span className="text-[#8f8372]">({visibleCheckedCount}/{visibleOptionsCount})</span>
+                      </span>
+                    </label>
+                  </div>
+                </PhasePanelBody>
+              </PhasePanel>
 
-            {allChecked && (
-              <div className="flex justify-end">
-                <button
-                  onClick={onProceed}
-                  className="px-5 py-2.5 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  提交 → Phase 3
-                </button>
-              </div>
-            )}
+              {isLoading && (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="w-8 h-8 text-[#c97545] animate-spin" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[#342d24]">正在重新生成视觉方案...</p>
+                    <p className="text-xs text-[#8f8372] mt-1">导演大师正在调整分镜细节</p>
+                  </div>
+                </div>
+              )}
 
-            {filteredChapters.map(chapter => (
-              <ChapterCard
-                key={chapter.chapterId}
-                chapter={chapter}
-                projectId={projectId}
-                onSelect={onSelect}
-                onToggleCheck={onToggleCheck}
-                pendingTaskKeys={pendingTaskKeys}
-                isActive={chapter.chapterId === activeChapterId}
-              />
-            ))}
-          </div>
+              {allChecked && !isLoading && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={onProceed}
+                    className="px-5 py-2.5 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    提交 → Phase 3
+                  </button>
+                </div>
+              )}
+
+              {!isLoading && filteredChapters.map(chapter => (
+                <ChapterCard
+                  key={chapter.chapterId}
+                  chapter={chapter}
+                  projectId={projectId}
+                  onSelect={onSelect}
+                  onToggleCheck={onToggleCheck}
+                  pendingTaskKeys={pendingTaskKeys}
+                  isActive={chapter.chapterId === activeChapterId}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

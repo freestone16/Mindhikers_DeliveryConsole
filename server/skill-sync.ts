@@ -85,10 +85,10 @@ export const syncSkills = async (io: Server) => {
 
     // RemotionStudio 特殊处理：完整 Node 项目不做 cpSync，只验证可达性
     // 可达即视为已同步（与其他 Skill 同等身份）
+    // SSOT: SKILLS_BASE → REMOTION_STUDIO_DIR 显式覆盖
     const remotionCandidates = [
         process.env.REMOTION_STUDIO_DIR,
         process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'RemotionStudio'),
-        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio'),
     ].filter(Boolean) as string[];
     const remotionDir = remotionCandidates.find(d => fs.existsSync(path.join(d, 'node_modules', '.bin', 'remotion')));
     if (remotionDir) {
@@ -103,7 +103,6 @@ export const syncSkills = async (io: Server) => {
     // svg-architect 特殊处理：Python 工具技能，不走 cpSync，只验证可达性
     const svgArchitectCandidates = [
         process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'svg-architect'),
-        path.join(os.homedir(), '.gemini/antigravity/skills/svg-architect'),
     ].filter(Boolean) as string[];
     const svgArchitectDir = svgArchitectCandidates.find(d => fs.existsSync(path.join(d, 'scripts', 'run_pipeline.py')));
     if (svgArchitectDir) {

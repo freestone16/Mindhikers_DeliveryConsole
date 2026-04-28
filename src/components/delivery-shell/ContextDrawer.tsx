@@ -78,8 +78,9 @@ export function ContextDrawer({
         </button>
       </div>
       <div className="shell-drawer__content">
-        {/* Chat tab: always mounted, display:none when hidden to preserve blob URLs */}
-        <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
+        {/* Chat tab: always mounted, display:none when hidden to preserve blob URLs.
+            Chat tab 不加外层 padding，由 ChatPanel 自管，避免双重留白 */}
+        <div style={{ display: activeTab === 'chat' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <ChatPanel
             isOpen={activeTab === 'chat'}
             onToggle={onToggleCollapse}
@@ -89,26 +90,26 @@ export function ContextDrawer({
           />
         </div>
 
-
         {activeTab === 'runtime' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="shell-drawer__pane--padded">
             <RuntimePanel
               currentModel={runtimeData?.currentModel}
               logs={runtimeData?.logs}
               isLoading={runtimeData?.isLoading}
               startTime={runtimeData?.startTime}
+              socket={socket}
             />
           </div>
         )}
 
         {activeTab === 'artifacts' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="shell-drawer__pane--padded">
             <ArtifactsPanel projectId={projectId} />
           </div>
         )}
 
         {activeTab === 'handoff' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="shell-drawer__pane--padded">
             <HandoffPanel projectId={projectId} />
           </div>
         )}

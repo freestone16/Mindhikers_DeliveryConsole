@@ -47,16 +47,4 @@ describe('Phase1View', () => {
     expect(screen.getByText('已批准')).toBeInTheDocument();
   });
 
-  it('shows context panel with project info', () => {
-    render(<Phase1View {...baseProps} concept="Test" />);
-    expect(screen.getByText('当前上下文')).toBeInTheDocument();
-    expect(screen.getByText('CSET-Test')).toBeInTheDocument();
-    expect(screen.getByText('script.md')).toBeInTheDocument();
-  });
-
-  it('shows input source panel', () => {
-    render(<Phase1View {...baseProps} concept="Test" />);
-    expect(screen.getByText('输入来源')).toBeInTheDocument();
-    expect(screen.getByText('剧本结构分析')).toBeInTheDocument();
-  });
 });

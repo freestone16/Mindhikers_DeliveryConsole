@@ -274,6 +274,9 @@
 131. **跨多会话/多方执行的方案必须明确"棒次"**：采用串行执行时，所有协调语义只写进"后做"的那一份方案；"先做"的方案一字不动；"后做"方案顶部必须有"执行前置检查清单"，任一项未 ✅ 不允许开工
 132. **Director adapter 更新画面相关字段时必须同时处理缓存失效**：`update_option_fields` 修改 `props/type/template/prompt/imagePrompt` 后，必须显式失效旧 `previewUrl/previewStatus`；否则 UI 会把旧预览误当成新方案证据
 133. **Director option 的 `props` 更新必须深度合并**：不能用浅合并覆盖嵌套对象；像 `textStyle.fontSize`、布局参数这类已有字段必须在局部修改时保留下来
+134. **Skills SSOT 已迁移到 Mindhikers**：自 2026-04-27 起，导演大师 5 个 skill（Director / RemotionStudio / svg-architect / remotion-best-practices / remotion-visual-qa）的唯一真相源是 `/Users/luzhoua/Mindhikers/.claude/skills/`，通过 `.env` 的 `SKILLS_BASE` 注入。旧 SSOT `~/.gemini/antigravity/skills/` 完整保留作 GoldenCrucibleLab 等其他消费方使用，但 DeliveryConsole/Director 不再读取
+135. **Skill 路径解析禁止硬编码 `.gemini/antigravity/skills`**：必须通过 `process.env.SKILLS_BASE` 获取；新增 fallback 时要意识到这是项目级配置，不是用户家目录约定。`skill-loader.ts` 已经清理，`svg-architect.ts / director.ts / skill-sync.ts` 暂留 fallback 但 SKILLS_BASE 优先级更高永远先命中
+136. **ESM 模块解析 SKILLS_BASE 必须走函数 lazy 求值**：不能在顶层 `const SKILL_SEARCH_PATHS = [process.env.SKILLS_BASE, ...]` 写死，因为 import 早于 dotenv.config()。正确做法是 `function getSkillSearchPaths() { return [process.env.SKILLS_BASE, ...]; }`，每次调用时读取（与 rules #7 一致）
 
 ---
 

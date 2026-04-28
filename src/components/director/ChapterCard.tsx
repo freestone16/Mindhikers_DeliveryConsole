@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Check, Loader2, Image, Upload, FileVideo, ZoomIn, X } from 'lucide-react';
 import type { DirectorChapter, SceneOption } from '../../types';
 
@@ -51,22 +50,30 @@ interface OptionRowProps {
   onSelect: (chapterId: string, optionId: string) => void;
   onToggleCheck: (chapterId: string, optionId: string) => void;
   isPendingBatch?: boolean;
+  onShowLightbox: (url: string) => void;
 }
 
-const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck, isPendingBatch }: OptionRowProps) => {
+const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck, isPendingBatch, onShowLightbox }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed' | 'failed'>('idle');
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSelected = chapter.selectedOptionId === option.id;
   const rowId = `${chapter.chapterIndex + 1}-${index + 1}`;
   const quoteText = option.quote || getScriptPreview(chapter.scriptText);
   const taskKey = `${chapter.chapterId}-${option.id}`;
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
 
-  // Lightbox state
-  const [showLightbox, setShowLightbox] = useState(false);
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (option.previewUrl) {
@@ -155,13 +162,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
     fileInputRef.current?.click();
   };
 
-  // ESC to close lightbox
-  useEffect(() => {
-    if (!showLightbox) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowLightbox(false); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [showLightbox]);
+
 
   const handleGenerateThumbnailWithPrompt = async (promptOverride?: string) => {
     const effectivePrompt = promptOverride || option.imagePrompt || option.prompt;
@@ -223,7 +224,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
         } else if (data.status === 'failed') {
           setThumbStatus('failed');
         } else if (data.status === 'processing' || data.status === 'pending') {
-          setTimeout(poll, 2000);
+          timeoutRef.current = setTimeout(poll, 2000);
         }
       } catch (error) {
         setThumbStatus('failed');
@@ -285,13 +286,14 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               <img
                 src={previewUrl}
                 alt="Preview"
+                loading="lazy"
                 className="w-full h-full object-cover cursor-zoom-in"
-                onClick={() => setShowLightbox(true)}
+                onClick={() => onShowLightbox(previewUrl)}
               />
               {/* Zoom overlay */}
               <div
                 className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 cursor-zoom-in"
-                onClick={() => setShowLightbox(true)}
+                onClick={() => onShowLightbox(previewUrl)}
               >
                 <ZoomIn className="w-8 h-8 text-white drop-shadow" />
               </div>
@@ -383,29 +385,6 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
       </div>
 
-      {/* Lightbox Portal */}
-      {showLightbox && previewUrl && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-6"
-          onClick={() => setShowLightbox(false)}
-        >
-          <button
-            className="fixed top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full z-10"
-            onClick={() => setShowLightbox(false)}
-          >
-            <X className="w-6 h-6 text-white" />
-          </button>
-          <img
-            src={previewUrl}
-            alt="Preview fullsize"
-            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', width: 'auto', height: 'auto' }}
-            className="rounded shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          />
-        </div>,
-        document.body
-      )}
-
       {/* 确认 Checkbox (col 1) */}
       <div className="col-span-1 flex items-center justify-center">
         {/* 已经不需要强绑定 isSelected 才能发确认了，每行都有自己独立的 isChecked */}
@@ -435,12 +414,20 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendi
   const cardRef = useRef<HTMLDivElement>(null);
   const isAnyOptionChecked = chapter.options.length > 0 && chapter.options.every(opt => opt.isChecked);
   const displayName = cleanChapterName(chapter.chapterName);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isActive && cardRef.current) {
+    if (isActive && cardRef.current && typeof cardRef.current.scrollIntoView === 'function') {
       cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [isActive]);
+
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxUrl]);
 
   return (
     <div ref={cardRef} className="rounded-lg border border-[#e4dbcc] overflow-hidden" style={{ background: 'rgba(255,252,247,0.78)' }}>
@@ -474,11 +461,33 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendi
                 onSelect={onSelect}
                 onToggleCheck={onToggleCheck}
                 isPendingBatch={pendingTaskKeys?.has(`${chapter.chapterId}-${option.id}`) ?? false}
+                onShowLightbox={setLightboxUrl}
               />
             );
           })}
         </div>
       </div>
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-6"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="fixed top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full z-10"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Preview fullsize"
+            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', width: 'auto', height: 'auto' }}
+            className="rounded shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

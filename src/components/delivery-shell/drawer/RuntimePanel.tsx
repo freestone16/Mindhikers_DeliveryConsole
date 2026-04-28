@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Image, Video } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface LogEntry {
   timestamp: number;
@@ -7,42 +7,88 @@ interface LogEntry {
   message: string;
 }
 
+interface SkillSyncStatus {
+  status: 'done' | 'error';
+  synced?: string[];
+  count?: number;
+  message?: string;
+  timestamp?: string;
+}
+
 interface RuntimePanelProps {
   currentModel?: { provider: string; model: string } | null;
   logs?: LogEntry[];
   isLoading?: boolean;
   startTime?: number | null;
+  socket?: any;
 }
 
-function SkillInfoCard() {
+const ALL_SKILLS = [
+  { name: 'Director', label: '影视导演', kind: 'expert' },
+  { name: 'MusicDirector', label: '音乐总监', kind: 'expert' },
+  { name: 'ThumbnailMaster', label: '缩略图大师', kind: 'expert' },
+  { name: 'ShortsMaster', label: '短视频大师', kind: 'expert' },
+  { name: 'MarketingMaster', label: '营销大师', kind: 'expert' },
+  { name: 'RemotionStudio', label: 'Remotion 渲染', kind: 'tool' },
+  { name: 'svg-architect', label: 'SVG 架构', kind: 'tool' },
+];
+
+function SyncedSkillsCard({ socket }: { socket?: any }) {
+  const [syncStatus, setSyncStatus] = useState<SkillSyncStatus | null>(null);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (data: SkillSyncStatus) => setSyncStatus(data);
+    socket.on('skill-sync-status', handler);
+    return () => { socket.off('skill-sync-status', handler); };
+  }, [socket]);
+
+  const synced = new Set(syncStatus?.synced ?? []);
+  const isDone = syncStatus?.status === 'done';
+
   return (
     <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
-      <h3 className="text-xs text-[#8f8372] uppercase font-bold mb-2">Skill 信息</h3>
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center gap-2">
-          <Cpu className="w-3.5 h-3.5 text-[#c97545]" />
-          <span className="text-[#342d24]">Director Skill</span>
-          <span className="text-[#8f8372] ml-auto">v2.1</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Image className="w-3.5 h-3.5 text-[#5b7c6f]" />
-          <span className="text-[#342d24]">文生图</span>
-          <span className="text-[#8f8372] ml-auto">doubao-seedream</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Video className="w-3.5 h-3.5 text-[#7c6f5b]" />
-          <span className="text-[#342d24]">文生视频</span>
-          <span className="text-[#8f8372] ml-auto">seedance-v4</span>
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs text-[#8f8372] uppercase font-bold">已同步 Skills</h3>
+        <span className="text-[10px] text-[#8f8372]">
+          {syncStatus ? `${synced.size}/${ALL_SKILLS.length}` : '等待同步...'}
+        </span>
+      </div>
+      <div className="space-y-1">
+        {ALL_SKILLS.map(skill => {
+          const ok = synced.has(skill.name);
+          return (
+            <div key={skill.name} className="flex items-center gap-2 text-xs">
+              {isDone && ok ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#62835c] shrink-0" />
+              ) : isDone ? (
+                <AlertCircle className="w-3.5 h-3.5 text-[#c97545] shrink-0" />
+              ) : (
+                <span className="w-3.5 h-3.5 rounded-full border border-[#d8c8ae] shrink-0" />
+              )}
+              <span className="text-[#342d24] truncate">{skill.label}</span>
+              <span className="text-[10px] text-[#8f8372] ml-auto shrink-0">
+                {skill.kind === 'tool' ? '工具' : '专家'}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-export function RuntimePanel({ currentModel, logs = [], isLoading = false, startTime }: RuntimePanelProps) {
-  console.log('[RuntimePanel] render:', { currentModel, logsCount: logs.length, isLoading, startTime });
+export function RuntimePanel({ currentModel, logs = [], isLoading = false, startTime, socket }: RuntimePanelProps) {
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [version, setVersion] = useState<string>('');
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => { if (data.version) setVersion(data.version); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let interval: number;
@@ -85,30 +131,48 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
       case 'siliconflow': return 'SiliconFlow';
       case 'deepseek': return 'DeepSeek';
       case 'yinli': return 'Yinli';
+      case 'kimi': return 'Kimi';
+      case 'google': return 'Google';
       default: return provider || 'Unknown';
     }
   };
 
   return (
-    <div className="flex flex-col gap-4 h-full">
-      <SkillInfoCard />
+    <div className="flex flex-col gap-3 h-full">
+      <SyncedSkillsCard socket={socket} />
 
-      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs text-[#8f8372] uppercase font-bold flex items-center gap-2">
-            <Info className="w-3.5 h-3.5" />
-            LLM 模型
-          </h3>
-          <div className="flex items-center gap-2 text-xs">
+      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)] space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-[#8f8372] font-medium">
+            <Cpu className="w-3.5 h-3.5" />
+            LLM
+          </span>
+          <span className="text-[#342d24]">
             {currentModel ? (
               <>
-                <span className="text-[#8f8372]">{providerLabel(currentModel.provider)}</span>
-                <span className="text-[#8f8372] opacity-60">({currentModel.model})</span>
+                {providerLabel(currentModel.provider)}
+                <span className="text-[#8f8372] ml-1">/ {currentModel.model}</span>
               </>
             ) : (
-              <span className="text-[#8f8372] opacity-60">未配置</span>
+              <span className="text-[#8f8372]">未配置</span>
             )}
-          </div>
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-[#8f8372] font-medium">
+            <Zap className="w-3.5 h-3.5" />
+            Remotion
+          </span>
+          <span className="text-[#342d24]">RemotionStudio</span>
+        </div>
+
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-[#8f8372] font-medium">
+            <Info className="w-3.5 h-3.5" />
+            Console
+          </span>
+          <span className="text-[#342d24]">{version ? `v${version}` : '—'}</span>
         </div>
       </div>
 

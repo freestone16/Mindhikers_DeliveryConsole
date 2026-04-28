@@ -679,15 +679,16 @@ const thumbnailTasks = new Map<string, {
 import { spawn } from 'child_process';
 import os from 'os';
 
-// 与 remotion-api-renderer / skill-sync 同源的 3 级候选路径
-const REMOTION_STUDIO_DIR = (() => {
+// 与 remotion-api-renderer / skill-sync 同源的候选路径
+// SSOT: SKILLS_BASE → REMOTION_STUDIO_DIR 显式覆盖
+function resolveRemotionStudioDir(): string {
     const candidates = [
         process.env.REMOTION_STUDIO_DIR,
         process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'RemotionStudio'),
-        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio'),
     ].filter(Boolean) as string[];
     return candidates.find(d => fs.existsSync(d)) || candidates[candidates.length - 1] || '/missing-remotion-studio';
-})();
+}
+const REMOTION_STUDIO_DIR = resolveRemotionStudioDir();
 
 interface RemotionLayer {
   id: string;

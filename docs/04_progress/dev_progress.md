@@ -41,6 +41,8 @@
 | v4.3.0 | 2026-03-20 | **日志系统三层重组** - dev_progress 精简为里程碑表；HANDOFF.md 交接机制；dev_logs 按日分文件 |
 | v4.3.1 | 2026-03-28 | **Director 视觉模型配置收口** - 默认视觉路由成为唯一真相源；Google 图生接入；Director 视觉运行时路由器落地 |
 | v4.3.2 | 2026-04-24 | **Director 第二阶段系统性清理** - 修复 TypeScript 契约漂移、adapter props 深合并/preview 失效、中文化测试口径与 runtime/UI smoke |
+| v4.3.3 | 2026-04-26 | **Director 第三轮 bug 修复与布局/状态栏恢复** - Phase2 内存溢出修复（懒加载+定时器清理+Lightbox 单例化）、Phase1 批注清空、Phase2 loading 提示恢复、ChapterRail 收窄、底部状态栏（LLM/Remotion/计时）回归 |
+| v4.4.0 | 2026-04-27 | **SSOT 迁移到 Mindhikers** - 导演大师 5 个 skill（Director / RemotionStudio / svg-architect / remotion-best-practices / remotion-visual-qa）从 `~/.gemini/antigravity/skills/` copy 到 `/Users/luzhoua/Mindhikers/.claude/skills/`；`.env` 与 `skill-loader.ts` 切到新 SSOT；旧 SSOT 完整保留不动；RemotionStudio 精简至 610M（排除 out/renders/payloads/test_*） |
 
 ---
 

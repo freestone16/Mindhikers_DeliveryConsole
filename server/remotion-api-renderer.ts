@@ -1,19 +1,16 @@
 import path from 'path';
-import os from 'os';
 import fs from 'fs';
 import { spawn } from 'child_process';
 
 /**
  * 按优先级链解析 RemotionStudio 路径（与 skill-sync 同源配置）：
  *   1. REMOTION_STUDIO_DIR 环境变量（显式指定）
- *   2. SKILLS_BASE/RemotionStudio（跟随 skills 配置）
- *   3. ~/.gemini/antigravity/skills/RemotionStudio（兜底默认）
+ *   2. SKILLS_BASE/RemotionStudio（跟随 skills SSOT）
  */
 function resolveRemotionStudioDir(): string {
     const candidates = [
         process.env.REMOTION_STUDIO_DIR,
         process.env.SKILLS_BASE && path.join(process.env.SKILLS_BASE, 'RemotionStudio'),
-        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio'),
     ].filter(Boolean) as string[];
 
     for (const dir of candidates) {

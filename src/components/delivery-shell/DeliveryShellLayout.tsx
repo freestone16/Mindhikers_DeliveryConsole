@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProductTopBar } from './ProductTopBar';
 import { WorkstationRail } from './WorkstationRail';
 import { ContextDrawer } from './ContextDrawer';
+import { DeliveryStatusBar } from './DeliveryStatusBar';
 import '../../styles/delivery-shell.css';
 
 export interface ScriptFile {
@@ -89,7 +90,12 @@ export function DeliveryShellLayout({
           onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
         />
         <div className="shell-center">
-          {children}
+          <div className="flex flex-col h-full">
+            <div className="flex-1 min-h-0 overflow-auto">
+              {children}
+            </div>
+            <DeliveryStatusBar runtimeData={runtimeData} socket={socket} />
+          </div>
         </div>
         <ContextDrawer
           collapsed={drawerCollapsed}

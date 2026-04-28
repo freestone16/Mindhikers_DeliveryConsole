@@ -5,14 +5,17 @@
  */
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 
-// 技能搜索路径优先级：全局 Antigravity → 项目级 .agent/skills → 本地 skills/
-const SKILL_SEARCH_PATHS = [
-    path.join(os.homedir(), '.gemini/antigravity/skills'),
-    process.env.SKILLS_BASE || '',
-    path.resolve(__dirname, '../skills'),
-];
+// 技能搜索路径：SKILLS_BASE 是 SSOT（指向 Mindhikers/.claude/skills），
+// 本地 skills/ 是 cpSync 后的兜底镜像。
+// 注意：getSkillSearchPaths 在每次调用时读取 SKILLS_BASE，
+// 避免 ESM 顶层缓存早于 dotenv.config() 的陷阱（rules.md #7）。
+function getSkillSearchPaths(): string[] {
+    return [
+        process.env.SKILLS_BASE || '',
+        path.resolve(__dirname, '../skills'),
+    ].filter(Boolean);
+}
 
 // 缓存已加载的 SKILL.md 内容，避免重复读取磁盘
 const skillCache = new Map<string, { content: string; loadedAt: number }>();
@@ -39,7 +42,7 @@ export function loadSkillKnowledge(skillName: string): string {
         return cached.content;
     }
 
-    for (const basePath of SKILL_SEARCH_PATHS) {
+    for (const basePath of getSkillSearchPaths()) {
         if (!basePath) continue;
         const skillPath = path.join(basePath, skillName, 'SKILL.md');
         if (fs.existsSync(skillPath)) {
@@ -80,7 +83,7 @@ export function loadMultipleSkills(skillNames: string[]): string {
  * @returns 模板内容，找不到则返回空字符串
  */
 function loadSkillPrompt(skillName: string, promptName: string): string {
-    for (const basePath of SKILL_SEARCH_PATHS) {
+    for (const basePath of getSkillSearchPaths()) {
         if (!basePath) continue;
         const promptPath = path.join(basePath, skillName, 'prompts', `${promptName}.md`);
         if (fs.existsSync(promptPath)) {
@@ -104,7 +107,7 @@ function loadSkillPrompt(skillName: string, promptName: string): string {
  * @returns 资源内容，找不到则返回空字符串
  */
 function loadSkillResource(skillName: string, resourceName: string): string {
-    for (const basePath of SKILL_SEARCH_PATHS) {
+    for (const basePath of getSkillSearchPaths()) {
         if (!basePath) continue;
         const resourcePath = path.join(basePath, skillName, 'resources', `${resourceName}.md`);
         if (fs.existsSync(resourcePath)) {
@@ -125,15 +128,13 @@ function loadSkillResource(skillName: string, resourceName: string): string {
  * 从 RemotionStudio 加载模板速查表（catalog.md）
  *
  * 沙漏架构：模板知识由 RemotionStudio 自身维护，是唯一事实来源。
- * 搜索路径：SKILL_SEARCH_PATHS + RemotionStudio 专属候选路径
+ * 搜索路径：getSkillSearchPaths() + RemotionStudio 专属候选路径
  */
 function loadRemotionCatalog(): string {
-    // 候选路径：通用 Skill 搜索路径 + RemotionStudio 专属路径
+    // 候选路径：通用 Skill 搜索路径 + REMOTION_STUDIO_DIR 显式覆盖
     const candidatePaths = [
-        ...SKILL_SEARCH_PATHS.filter(Boolean).map(p => path.join(p!, 'RemotionStudio', 'catalog.md')),
-        // RemotionStudio 专属候选（与 skill-sync.ts 同源）
+        ...getSkillSearchPaths().map(p => path.join(p, 'RemotionStudio', 'catalog.md')),
         process.env.REMOTION_STUDIO_DIR && path.join(process.env.REMOTION_STUDIO_DIR, 'catalog.md'),
-        path.join(os.homedir(), '.gemini/antigravity/skills/RemotionStudio/catalog.md'),
     ].filter(Boolean) as string[];
 
     for (const catalogPath of candidatePaths) {
@@ -158,10 +159,7 @@ function loadRemotionCatalog(): string {
  * 提供 platform_profiles（画布规格）和主题规格供 Director LLM 参考。
  */
 function loadSvgArchitectSpec(): string {
-    const candidatePaths = [
-        ...SKILL_SEARCH_PATHS.filter(Boolean).map(p => path.join(p!, 'svg-architect')),
-        path.join(os.homedir(), '.gemini/antigravity/skills/svg-architect'),
-    ].filter(Boolean);
+    const candidatePaths = getSkillSearchPaths().map(p => path.join(p, 'svg-architect'));
 
     for (const skillDir of candidatePaths) {
         const profilesPath = path.join(skillDir, 'resources', 'platform_profiles.json');
@@ -340,8 +338,8 @@ function extractCoreContent(raw: string, maxChars: number): string {
  */
 export function listAvailableSkills(): string[] {
     const skills: string[] = [];
-    for (const basePath of SKILL_SEARCH_PATHS) {
-        if (!basePath || !fs.existsSync(basePath)) continue;
+    for (const basePath of getSkillSearchPaths()) {
+        if (!fs.existsSync(basePath)) continue;
         try {
             const entries = fs.readdirSync(basePath, { withFileTypes: true });
             for (const entry of entries) {

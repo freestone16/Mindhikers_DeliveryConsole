@@ -124,7 +124,7 @@ export const PROVIDER_INFO: Record<string, {
     type: 'llm',
     envVars: ['DEEPSEEK_API_KEY'],
     baseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner'],
   },
   zhipu: {
     name: 'Zhipu AI',

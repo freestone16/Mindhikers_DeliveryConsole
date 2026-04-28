@@ -117,12 +117,28 @@ export const requestDirectorImage = async (
       outputDir: options.outputDir,
     });
 
+    if (result.image_url) {
+      return {
+        success: true,
+        imageUrl: result.image_url,
+        sourceProvider: resolved.provider,
+        sourceModel: resolved.model,
+      };
+    }
+
+    console.warn(`[Director Visual Runtime] Google image failed: ${result.error}, falling back to volcengine`);
+    const fallbackResult = await generateImageWithVolc(prompt, {
+      model: 'doubao-seedream-4-5-251128',
+      size: options.size,
+    });
+
     return {
-      success: Boolean(result.image_url),
-      imageUrl: result.image_url,
-      error: result.error,
-      sourceProvider: resolved.provider,
-      sourceModel: resolved.model,
+      success: Boolean(fallbackResult.image_url || fallbackResult.task_id),
+      imageUrl: fallbackResult.image_url,
+      taskId: fallbackResult.task_id,
+      error: fallbackResult.error,
+      sourceProvider: 'volcengine',
+      sourceModel: 'doubao-seedream-4-5-251128',
     };
   }
 

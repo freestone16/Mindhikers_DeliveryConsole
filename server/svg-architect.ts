@@ -8,16 +8,14 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
-// SVG-Architect skill 搜索路径（与 skill-sync.ts 同源）
-const SKILL_SEARCH_PATHS = [
-    process.env.SKILLS_BASE,
-    path.join(os.homedir(), '.gemini/antigravity/skills'),
-];
+// SVG-Architect skill 搜索路径：SKILLS_BASE 是 SSOT（rules.md #7：每次调用时读取）
+function getSkillSearchPaths(): string[] {
+    return [process.env.SKILLS_BASE].filter(Boolean) as string[];
+}
 
 // 4K profile 规格（与 platform_profiles.json 同步）
 const PROFILES: Record<string, { width: number; height: number; safeArea: { x: number; y: number; w: number; h: number } }> = {
@@ -29,8 +27,7 @@ const PROFILES: Record<string, { width: number; height: number; safeArea: { x: n
  * 定位 svg-architect skill 根目录
  */
 function resolveSvgArchitectDir(): string | null {
-    for (const base of SKILL_SEARCH_PATHS) {
-        if (!base) continue;
+    for (const base of getSkillSearchPaths()) {
         const dir = path.join(base, 'svg-architect');
         if (fs.existsSync(path.join(dir, 'scripts', 'run_pipeline.py'))) {
             return dir;

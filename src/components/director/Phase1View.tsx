@@ -67,7 +67,7 @@ export const Phase1View = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
 
-  const templatePath = "~/.gemini/antigravity/skills/Director/prompts/broll.md";
+  const templatePath = "~/Mindhikers/.claude/skills/Director/prompts/broll.md";
 
   const handleCopyPath = () => {
     navigator.clipboard.writeText(templatePath);
@@ -218,7 +218,7 @@ export const Phase1View = ({
               />
               <div className="flex justify-end gap-2 mt-3">
                 <button
-                  onClick={() => onRevise(feedback)}
+                  onClick={() => { onRevise(feedback); setFeedback(''); }}
                   className="px-4 py-2 bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] rounded-lg flex items-center gap-2 border border-[#e4dbcc] text-sm font-medium transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />

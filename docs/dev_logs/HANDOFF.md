@@ -1,383 +1,143 @@
-**时间**: 2026-04-26 09:20 CST
+**时间**: 2026-04-27 14:50 CST
 **分支**: `MHSDC-DC-director`
 
 # HANDOFF — Director 模块
 
 ## 一句话接力
 
-本轮聚焦导演大师模块 UI 排错：三栏布局边栏收起后中间内容未扩展 + 清理代码中所有遗留的 5173 旧端口字样。布局修复代码已落盘，待用户在浏览器中硬刷新验证。5173 清理已完成。
+本窗口完成 SSOT 迁移：导演大师涉及的 5 个 skill 已从 `~/.gemini/antigravity/skills/` copy 到 `/Users/luzhoua/Mindhikers/.claude/skills/`，`.env` 与 `skill-loader.ts` 已切到新 SSOT 并经服务启动日志验证生效；旧 SSOT 一字未动，零删除。前面老卢提的 3 件 UI 优化（footer 右对齐 / 运行态显示真实 skill 列表 / chat 紧凑化）**本窗口未动手**，让位给 SSOT 迁移，留给下一窗口。
 
 ## 当前事实
 
 - 当前 worktree: `/Users/luzhoua/MHSDC/DeliveryConsole/Director`
 - 当前分支: `MHSDC-DC-director`
-- 远程状态: `origin/MHSDC-DC-director...HEAD` 为 `0 0`，当前无 ahead/behind
-- 当前工作树: 有意保留未提交改动，等待老卢验收、分拣和确认提交口径
-- 参考来源 worktree: `/Users/luzhoua/MHSDC/DeliveryConsole/DirectorFinal`
-- 参考来源分支: `director-final`
-- `director-final` 已从 `/private/tmp/director-final` 迁到 `/Users/luzhoua/MHSDC/DeliveryConsole/DirectorFinal`
-- `/private/tmp/director-final` 已不存在
+- 服务运行中：后端 `http://127.0.0.1:3005`、前端 `http://localhost:5178/`（启动 PID 见 `/tmp/director-dev.log`）
+- 工作树：有未 commit 改动（含 v4.3.3 残留 + 本轮 SSOT 改动）
+- 日志铁证（启动时打印）：
+  - `✅ RemotionStudio reachable: /Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio`
+  - `✅ svg-architect reachable: /Users/luzhoua/Mindhikers/.claude/skills/svg-architect`
+  - `✅ Skill Sync Complete. Synced: 6/7`
 
-## 本轮新增改动（未 commit）
+## 本窗口已完成（未 commit）
 
-### 1. 三栏布局自适应修复
+### 1. 物理迁移到 Mindhikers/.claude/skills/
 
-**问题**: 左右边栏缩放按钮点击后，中间内容区（"欢迎使用影视导演"卡片等）完全不变，没有利用新空出的空间。
+| Skill | 来源 | 大小 | 备注 |
+|---|---|---|---|
+| `Director/` | `~/.gemini/antigravity/skills/Director/` | 88 KB | 完整版（SKILL.md + prompts/ + resources/ + workflows/） |
+| `RemotionStudio/` | 同源（rsync 排除） | **610 MB** | 排除 `out/ renders/ payloads/ test_file.mp4 test_payload.json render_*.sh run_verification.js` |
+| `svg-architect/` | 同源 | 96 KB | Python 工具技能 |
+| `remotion-best-practices/` | 同源 | 188 KB | Remotion 红线手册 |
+| `remotion-visual-qa/` | 同源 | 8 KB | 视觉 QA 协议 |
 
-**根因分析**:
-- `DeliveryShellLayout.tsx` 的 `bodyClass` 在两边同时收起时，会同时附加 `shell-body--drawer-collapsed` 和 `shell-body--rail-collapsed`。由于 CSS specificity 相同，后定义的 `.shell-body--rail-collapsed` 覆盖了前者，导致 grid 实际生效的是 `60px 1fr 360px`（drawer 列仍是 360px，没缩）。
-- 中间内容链路（`.shell-center` → `.director-workbench` → `.director-workbench__content` → `PhasePanel` → `PhaseEmptyState`）缺乏 `flex` stretch 机制，内容没有占满可用宽度。
+冲突处理：原 `Mindhikers/.claude/skills/Director/` 是 stub（SKILL.md 5.9KB + references/ + workflows/，无 prompts/ 无 resources/），已重命名为 `Director.stub-bk-20260427/` 备份保留，再把完整版 copy 进 `Director/`。
 
-**修改文件**:
-- `src/components/delivery-shell/DeliveryShellLayout.tsx`
-  - `bodyClass` 逻辑改为：两边同时收起时只附加 `shell-body--both-collapsed`，避免 specificity 冲突
-- `src/styles/delivery-shell.css`
-  - `.shell-center` → 加 `display: flex; flex-direction: column; min-width: 0`
-  - `.director-workbench` → 加 `width: 100%; min-width: 0`
-  - `.director-workbench__content` → 加 `width: 100%; min-width: 0`
-- `src/App.tsx`
-  - 中间包装 div 加 `width: '100%'`
-- `src/components/director/phase-layouts/PhasePanel.tsx`
-  - `PhasePanel` 加 `w-full`
-  - `PhaseEmptyState` 内容区加 `w-full max-w-2xl`
+旧 SSOT (`~/.gemini/antigravity/skills/`) **零变动**。GoldenCrucibleLab 等其他消费方继续用旧路径，零中断。
 
-**验证状态**: `npm run build` 已通过。gstack browse 因客户端渲染 + accessibility tree 限制，无法精确验证交互后的 DOM 状态。需要用户在浏览器中手动点击左右边栏收起按钮，确认中间内容区是否扩展。
+### 2. .env 切换 SSOT
 
-**如仍无变化**: 可能是浏览器缓存旧 bundle，请尝试 **Cmd+Shift+R（Mac）/ Ctrl+F5（Win）** 强制刷新。
-
-### 2. 清理代码中所有 5173 旧端口字样
-
-**背景**: 项目当前实际使用端口 5178（前端）和 3005（后端），但代码中仍残留大量旧端口 5173/3002 的引用。
-
-**修改文件**:
-- `server/index.ts` — CORS 白名单删除 `http://localhost:5173` 和 `http://127.0.0.1:5173`
-- `docker-compose.yml` — 端口映射改为 `5178:5178` 和 `3005:3005`
-- `Dockerfile.dev` — EXPOSE 改为 `5178 3005`
-- `Dockerfile.frontend` — EXPOSE 改为 `5178`
-- `Makefile` — `dev` 和 `dev-d` 提示信息改为 5178/3005
-- `test_http.js` — 改为 5178
-- `test_browser.js` — 改为 5178
-- `RELOCATION.md` — 验证清单改为 5178/3005
-
-**未改文件**（历史文档/备份/废弃依赖，不属于代码）:
-- `docs/` 下所有历史文档、计划、日志
-- `node_modules_bad/` 下废弃依赖
-- `*.backup` 备份文件
-
-### 3. 当前运行中的服务
-
-```
-后端 Express: localhost:3005 (PID 97008)
-前端 Vite:   localhost:5178 (PID 97078)
+```diff
+- SKILLS_BASE=/Users/luzhoua/.gemini/antigravity/skills
+- REMOTION_STUDIO_DIR=/Users/luzhoua/.gemini/antigravity/skills/RemotionStudio
++ SKILLS_BASE=/Users/luzhoua/Mindhikers/.claude/skills
++ REMOTION_STUDIO_DIR=/Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio
 ```
 
-如需重启：
-```bash
-pkill -f "tsx watch server/index.ts" 2>/dev/null || true
-pkill -f "vite.*--host" 2>/dev/null || true
-nohup npx tsx watch server/index.ts > /tmp/director-backend.log 2>&1 &
-sleep 3
-nohup npx vite --host > /tmp/director-frontend.log 2>&1 &
+### 3. server/skill-loader.ts 移除硬编码 .gemini fallback
+
+- 删除顶层常量 `SKILL_SEARCH_PATHS`（曾把 `~/.gemini/antigravity/skills` 写死为第一优先级）
+- 改用 `getSkillSearchPaths()` 函数：每次调用时读 `process.env.SKILLS_BASE`，避免 ESM 顶层缓存早于 dotenv.config() 的陷阱（rules.md #7）
+- 全文 7 处引用统一替换为 `getSkillSearchPaths()`
+
+## 本窗口刻意没做（重要 — 下一窗口要做）
+
+老卢之前点了头要做的 3 件 UI 优化，这一窗口为了让 SSOT 迁移结构清晰，**全部跳过**了。下一窗口必须接着做：
+
+1. **底部 `DeliveryStatusBar` 改造**（确认方案：保留 footer，内容右对齐）
+   - 移除：LLM provider/model、RemotionStudio、版本号
+   - 保留：DIRECTOR ONLINE 圆点 + 生成中计时
+   - 文件：`src/components/delivery-shell/DeliveryStatusBar.tsx`
+
+2. **`RuntimePanel` 改造**（确认方案：只显示 skill 列表）
+   - 删除写死的 `SkillInfoCard`（"Director Skill v2.1 / doubao-seedream / seedance-v4"）
+   - 新增"已同步 Skills"区块：订阅 socket 事件 `skill-sync-status`，显示真实的 6/7 sync 状态
+   - 把 LLM 模型、RemotionStudio、版本号 三项从底部状态栏迁过来
+   - 文件：`src/components/delivery-shell/drawer/RuntimePanel.tsx` + `ContextDrawer.tsx`（订阅 socket 事件）
+
+3. **右栏 ChatPanel 紧凑化**
+   - `.shell-drawer__content { padding: 16px }` 在 chat tab 下收成 0
+   - 文件：`src/styles/delivery-shell.css`
+
+## 已知 Caveat
+
+### Skill Sync 显示 6/7（缺 ThumbnailMaster）
+
+`server/skill-sync.ts` 的 `EXPERTS` 数组期望 5 个专家全在 SSOT：
+```ts
+['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster']
 ```
 
-## 当前结论
+Mindhikers/.claude/skills/ 下：
+- ✅ Director（本轮新 copy 的完整版）
+- ✅ MusicDirector（旧有 stub）
+- ✅ ShortsMaster（旧有 stub）
+- ✅ MarketingMaster（旧有 stub）
+- ❌ **ThumbnailMaster**（不存在）
 
-`MHSDC-DC-director` 已经完成第二阶段系统性清理，并在 2026-04-25 复核了 DirectorFinal 路径治理对等性：
+→ Sync 实际为 6/7（缺 1 个专家 + RemotionStudio + svg-architect）
 
-- `npm run build` 已通过
-- focused tests 8 个文件 / 46 个测试已通过
-- 真实项目 runtime smoke 已通过
-- Agent Browser UI smoke 已通过
-- TypeScript 契约漂移、Director adapter 根因、中文测试口径、Market 旧类型引用、runtime/UI 噪音规则都已处理
-- 已新增差异审计：`docs/plans/2026-04-25-directorfinal-cherrypick-diff-audit.md`
-- 本轮实际 cherry-pick：`src/components/StatusFooter.tsx` 中 `SYSTEM ONLINE` -> `DIRECTOR ONLINE`、`MindHikers Console` -> `Director Console`
-- 本轮实际治理回灌：`docs/04_progress/rules.md` 增加“重建模块分支时必须同时迁移路径治理、`.env.example` 和启动口径”
-- `server/project-paths.ts` 与 DirectorFinal 一致
-- `server/project-root.ts` 已不存在
-- 非 backup 文件中 `project-root` 旧引用为 0
-- 除 `server/project-paths.ts` 和测试外，无业务代码直接读取 `process.env.PROJECTS_BASE`
-- `/api/projects` 运行时读取 `getProjectsBase()`
-- `/api/projects/switch` 使用 `getProjectRoot(projectName)`
-- `server/distribution.ts` 队列文件路径运行时读取 `getProjectsBase()`
-- Header / ProductTopBar 已有项目 loading / error / empty 三态
-- `.env.example` 已明确 `PROJECTS_BASE=/path/to/your/Projects`
+**当前影响**：切换到"缩略图大师"专家时，ChatPanel 会读不到 SKILL.md，退化到通用助手兜底。导演大师工作流不受影响。
 
-本轮对照结论：
+**修复方案**（如需）：从 `~/.gemini/antigravity/skills/ThumbnailMaster/` cp 一份过去（用户 Q1=C 范围里没勾这个，所以本轮不动）。
 
-1. 不做 `git merge director-final`
-2. 不做整枝 `git cherry-pick director-final`
-3. 本轮不从 DirectorFinal 新增摘路径治理代码补丁，因为目标分支此前已经吃到这组等价能力
-4. 不搬 SaaS/Auth/Crucible shell、布局策略或历史会话差异
-5. 只摘了与 Director 模块身份一致、且不牵引 shell 的 footer 文案小补丁，以及一条事故治理规则
-6. 已批量判定 DirectorFinal 剩余差异，不再按“一颗一颗”无限摘；若要继续，只能另立产品身份/布局策略决策
-7. build/focused tests 已复跑通过，下一步进入提交前分拣
+### 3 个 server 文件仍残留 .gemini 硬编码 fallback（功能不受影响）
 
-## 为什么实施要在 Director，而不是 DirectorFinal
+未清理：
+- `server/svg-architect.ts:19` — `path.join(os.homedir(), '.gemini/antigravity/skills')`
+- `server/director.ts:687` — RemotionStudio 第三优先级 fallback
+- `server/skill-sync.ts:91, 106` — RemotionStudio / svg-architect 第三优先级 fallback
 
-最小回灌的目标是让 `MHSDC-DC-director` 变干净、完整、可提交，所以实施现场应放在 `/Users/luzhoua/MHSDC/DeliveryConsole/Director`。
+**为什么不影响功能**：这三处都是候选数组的最后一项，且 `SKILLS_BASE` 在第一优先级且 Mindhikers 新路径文件齐全，永远会先命中新 SSOT，旧路径不会被走到。日志已证实。
 
-`DirectorFinal` 的作用只是：
+**遗留它的代价**：违反 rules.md #8（路径解析必须统一走 helper，禁止各自硬编码）。下一窗口顺手清理。
 
-- 提供已验证的参考差异
-- 对照路径治理是否已经等价
-- 必要时用来查某个实现细节
+### 旧 SSOT 完整保留
 
-不要在 `DirectorFinal` 继续做新修复后再搬，因为那会制造第二个待同步源头，让回灌边界继续变复杂。
+`~/.gemini/antigravity/skills/` 一字未动。GoldenCrucibleLab 仍消费旧路径，零中断。
 
-## 绝对边界
+## 验证清单（老卢自验时参考）
 
-1. 不做 `git merge director-final`
-2. 不做整枝 `git cherry-pick director-final`
-3. 不把 DirectorFinal 的 SaaS / GoldenCrucible 壳层差异搬进 Director
-4. 不删除目标分支当前有效的 Director shell / ProductTopBar 结构
-5. 不覆盖目标分支自己的 HANDOFF / daily log 历史，只追加或重写当前交接结论
-6. 不在未确认 Linear issue 前 commit
-7. 不 push
-
-## 下一窗口启动命令
-
-```bash
-cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-```
-
-必读文件：
-
-```bash
-docs/dev_logs/HANDOFF.md
-docs/plans/2026-04-24-director-minimal-backport-execution-plan.md
-docs/04_progress/rules.md
-```
-
-先核对现场：
-
-```bash
-git branch --show-current
-git status --short --branch
-```
-
-期望分支：
-
-```text
-MHSDC-DC-director
-```
-
-## 已完成复核事项
-
-### 1. 路径治理缺口扫描
-
-在 `/Users/luzhoua/MHSDC/DeliveryConsole/Director` 执行：
-
-```bash
-rg "from './project-root'|from \"./project-root\"|PROJECTS_BASE\s*=|process\.env\.PROJECTS_BASE" server src --glob '!*.backup' --glob '!server/project-paths.ts'
-rg "project-root" server src --glob '!*.backup'
-```
-
-判断标准：
-
-- 非 backup 文件不应再 import `project-root`: 已满足
-- `server/project-root.ts` 不应存在: 已满足
-- `process.env.PROJECTS_BASE` 原则上只应出现在 `server/project-paths.ts` 和相关测试里: 已满足；额外只剩 `server/index.ts` 的说明性注释
-- `server/index.ts` 中关于 `PROJECTS_BASE` 的说明性注释不是问题: 已确认
-
-### 2. 对照 DirectorFinal，但不要搬整枝差异
-
-只允许参考这些能力：
-
-- `server/project-paths.ts` 是否为路径 SSOT
-- `ensureProjectsBaseExists()` 是否在服务启动前执行
-- `/api/projects` 是否运行时读取 `getProjectsBase()`
-- `/api/projects/switch` 是否使用 `getProjectRoot(projectName)`
-- `server/distribution.ts` 队列路径是否运行时读取
-- Header / ProductTopBar 是否已有 loading / error / empty 三态
-- `.env.example` 是否明确 `PROJECTS_BASE=/path/to/your/Projects`
-
-对照结论：以上能力目标分支均已具备；这不代表两边没有差异，而是这组可安全回灌的路径治理补丁已经落到目标分支，不需要本轮重复摘。
-
-本轮新增 cherry-pick：
-
-- `src/components/StatusFooter.tsx`
-  - `SYSTEM ONLINE` -> `DIRECTOR ONLINE`
-  - `MindHikers Console` -> `Director Console`
-  - 未摘 DirectorFinal 中的 `activeChatExpertId`、`/api/llm-config/chatbox`、SaaS runtime config 等牵引链路
-- `docs/04_progress/rules.md`
-  - 增加模块重建必须迁移路径治理、`.env.example` 和启动口径的事故规则
-
-不要回灌这些 DirectorFinal 差异：
-
-- `src/SaaSApp.tsx`
-- `src/components/delivery-shell/DeliveryShellLayout.tsx` 中移除 `ProductTopBar` 的结构变化
-- `src/styles/delivery-shell.css` 的布局高度策略，除非目标分支复现布局问题
-- GoldenCrucible / SaaS-only 路由、认证、历史会话相关差异
-
-## 已完成验证
-
-### 1. 复跑验证
-
-不要为了“回灌”制造代码改动。本轮已复跑：
-
-```bash
-npm run build
-npm run test:run -- src/__tests__/server/project-paths.test.ts src/__tests__/director-bridge.test.ts src/__tests__/director-adapter.test.ts src/components/director/ChapterCard.test.tsx src/components/director/Phase1View.test.tsx src/components/director/Phase2View.test.tsx src/components/director/Phase3View.test.tsx src/components/director/Phase4View.test.tsx
-```
-
-结果：
-
-- `npm run build`: 通过
-- focused tests: 8 files / 46 tests 通过
-- build 仅有既有 CSS minify warning 与 chunk size warning，不阻塞
-- Agent Browser: 默认 delivery shell 主界面可打开，无页面错误；但当前默认 Director shell 不渲染 `StatusFooter`，所以本轮 footer 文案只完成源码/build 验证，不包装成默认页面可见验证
-
-## 下一步具体事项
-
-### 1. 如果后续又发现路径治理缺口
-
-只允许做最小 patch：
-
-- `./project-root` import 改成 `./project-paths`
-- 静态 `PROJECTS_BASE` 常量改成运行时 `getProjectsBase()`
-- 项目根路径拼接改成 `getProjectRoot(projectId)` 或 `resolveProjectPath()`
-- 如缺测试，只补 `src/__tests__/server/project-paths.test.ts` 的聚焦断言
-
-不要顺手重构 UI、文案、布局或旧模块类型债。
-
-### 2. 布局修复 ✅ 已验证
-
-**根因**: `@media (max-width: 1440px)` 内部只定义了 `.shell-body` 的基础 grid，没有定义 collapsed 状态。当 viewport < 1440px 时，media query 内的 `.shell-body` 和 `.shell-body--both-collapsed` specificity 相同，但 media query 在 CSS 文件后面，后定义胜出，直接覆盖了 collapsed 状态，导致 grid 永远被锁死在 `220px 1fr 320px`。
-
-**修复**: 在 `@media (max-width: 1440px)` 内补齐 `.shell-body--drawer-collapsed`、`.shell-body--rail-collapsed`、`.shell-body--both-collapsed` 的 grid 定义。
-
-**状态**: 用户已手动验证，布局修复生效。边栏收起后中间内容区正常扩展。
-
-### 3. 提交前分拣
-
-当前目标分支仍有 tracked pycache 删除状态：
-
-```text
-skills/__pycache__/*.pyc
-skills/connectors/__pycache__/*.pyc
-```
-
-推荐处理：
-
-- 单独作为 runtime cache 噪音治理提交
-- 不和 Director adapter / 类型契约 / 测试口径修复混在一个 commit
-- commit 前必须问老卢确认 Linear issue 与提交拆分
-
-当前新生成的 `testing/director/artifacts/*.png` 已被 `.gitignore` 压住。若需要把截图作为正式证据，必须显式说明并单独处理。
-
-如果触达页面、布局、项目切换、脚本列表或 shell 结构，再使用 Agent Browser 做 UI smoke。本轮只更新治理文档，不触发 UI smoke。
-
-## 已完成内容摘要
-
-### 类型契约漂移修复
-
-- `src/types.ts` 补齐 `Phase`
-- 扩展 `ChatMessage.kind/systemTitle`
-- 扩展 `ToolCallConfirmation.status = executed`
-- 兼容新版/旧版 `TubeBuddyScore`
-- 允许旧 Dashboard 临时读取可选 `DeliveryState.modules`
-- `src/schemas/llm-config.ts` 用 schema 解析 provider
-- `src/components/ChatPanel.tsx` 替换 `findLastIndex`，避免 ES2023 API 和当前 ES2022 lib 不匹配
-
-### Director Phase 组件清理
-
-- 修复 director 组件中错误的 `Phase` import
-- 清理未使用 import / prop / 局部变量
-- `Phase3View` 去掉不安全类型转换
-- `DirectorStageHeader` 接收 `onBackToSessions`
-
-### Market / Legacy UI 兼容清理
-
-- Market 相关组件兼容 flat 与 nested `TubeBuddyScore`
-- `StatusDashboard`、`ScheduleModal` 对旧 `modules` 状态做可选兼容
-- `SRTUploader` 上传时带上 `projectId`
-
-### Director adapter 根因修复
-
-- `update_option_fields` 的 `props` 改成深度合并
-- `type/prompt/imagePrompt/template/props/quote/svgPrompt` 变更会失效旧 preview
-- `VALID_TYPES` 补齐当前 Phase2 真实 B-Roll 类型，同时保留旧别名兼容
-- `director-adapter.test.ts` 锁住深合并与 preview 失效行为
-
-### 运行时噪音治理
-
-- `.gitignore` 增加 `__pycache__/`、`*.py[cod]`
-- `.gitignore` 增加 `testing/director/artifacts/*.png`
-
-### 本轮新增：三栏布局自适应修复
-
-- `DeliveryShellLayout.tsx` — bodyClass 逻辑修复，避免 both-collapsed 时 CSS specificity 冲突
-- `delivery-shell.css` — `.shell-center`、`.director-workbench`、`.director-workbench__content` 加 flex stretch
-- `App.tsx` — 中间包装 div 加 `width: 100%`
-- `PhasePanel.tsx` — `PhasePanel` 和 `PhaseEmptyState` 加 `w-full`，确保空状态卡片随容器扩展
-
-### 本轮新增：5173 旧端口清理
-
-- `server/index.ts`、`docker-compose.yml`、`Dockerfile.dev`、`Dockerfile.frontend`、`Makefile`、`test_http.js`、`test_browser.js`、`RELOCATION.md` 中所有 5173/3002 改为当前实际端口 5178/3005
-
-## 最近验证结果
-
-- `npm run build`: 通过
-- focused tests: 8 files / 46 tests 通过
-- `/health`: 正常
-- `/api/projects`: 返回真实 `CSET-*` 项目
-- `/api/projects/switch`: 可切换到 `CSET-Seedance2`
-- `/api/scripts?projectId=CSET-Seedance2`: 返回真实脚本
-- Agent Browser UI smoke: 页面、项目下拉、脚本列表、P1 主区域、Drawer tabs 正常
-
-## 2026-04-26 新增修复
-
-### 1. TopBar 项目同步修复 ✅
-
-**问题**：ProductTopBar 显示的项目名永远锁死 CSET-EP4，不跟随用户实际选择。
-**根因**：`activeProject` 只看 `p.isActive` 或取数组第一个，无视传入的 `projectId`。
-**修复**：`src/components/delivery-shell/ProductTopBar.tsx`
-- `activeProject` 优先匹配 `p.name === projectId`
-- 下拉列表高亮同步改为根据 `projectId` 判断
-
-### 2. Phase1 冗余面板删除 ✅
-
-**文件**：`src/components/director/Phase1View.tsx`
-- 删除右侧「当前上下文」面板（项目/剧本/状态）
-- 删除右侧「输入来源」面板（4 条硬编码装饰文本）
-
-### 3. Phase2 滚动跳回问题修复 ✅
-
-**问题**：点击第三章后往下滑，内容跳回第一章。
-**根因**：`Phase2View` 把 `activeChapter` 抽出来置顶，其余章节按原顺序排在下面。
-**修复**：`src/components/director/Phase2View.tsx` + `ChapterCard.tsx`
-- 取消「置顶当前章节」设计，所有章节按原顺序渲染
-- `ChapterCard` 新增 `isActive` prop，激活时自动 `scrollIntoView`
-- 点击左侧导航自动平滑滚动到对应章节
-
-## 待处理问题（下一窗口）
-
-### Phase2 页面崩溃（Aw, Snap! Error code: 5）
-
-**根因分析**：Chrome 内存溢出
-- 31 选项 × 7 章 ≈ 200+ 张预览图同时加载
-- 每个选项行有 `setTimeout` 轮询（每 2 秒），组件卸载未清理
-- Lightbox Portal 频繁创建/销毁 DOM
-
-**建议修复方向**：
-1. 图片懒加载（IntersectionObserver，只加载可视区域）
-2. 轮询定时器在 `useEffect` cleanup 中清理
-3. Lightbox 用单例模式，避免每行都创建 Portal
-4. 考虑虚拟滚动（React Window）处理大量选项
-
-## 当前分支状态
-
-- `MHSDC-DC-director` 领先远程 4 commit
-- 服务运行中：后端 3005 / 前端 5178
+- [ ] 浏览器打开 `http://localhost:5178/`，进入 Director Phase2
+- [ ] 后端日志中确认 `RemotionStudio reachable: /Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio`
+- [ ] Phase2 生成视觉方案：能正常拉起 LLM、能渲染预览图（说明 Director Skill 加载链路从新 SSOT 正常）
+- [ ] Chatbox 修改某条方案：能跑通 `update_option_fields` 工具调用（说明 prompts/chat_edit.md 从新 SSOT 加载）
+- [ ] 浏览器右栏切到"运行态"tab：注意当前还是写死的 SkillInfoCard，**不是真实 sync 状态** — 这部分待下一窗口改
 
 ## 下一窗口启动必读
 
 ```bash
 cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-git branch --show-current  # 应返回 MHSDC-DC-director
+git branch --show-current        # 应返回 MHSDC-DC-director
+lsof -i :3005 -i :5178           # 应都在线
+tail -50 /tmp/director-dev.log   # 看最近一次启动日志
 ```
 
-**待办**：
-1. Phase2 内存溢出修复（图片懒加载 + 轮询清理）
-2. 崩溃问题复现验证
-3. build + 验收
+必读：
+- `docs/dev_logs/HANDOFF.md`（本文件）
+- `docs/04_progress/rules.md`
+- `docs/04_progress/dev_progress.md`
+
+## 本轮文件清单
+
+| 文件 | 改动 |
+|---|---|
+| `.env` | `SKILLS_BASE` + `REMOTION_STUDIO_DIR` 切换到 Mindhikers |
+| `server/skill-loader.ts` | 删 SKILL_SEARCH_PATHS 常量 + 改 getSkillSearchPaths() lazy 函数 + 7 处引用替换 |
+| `/Users/luzhoua/Mindhikers/.claude/skills/Director/` | 新增（替换原 stub，stub 备份至 `Director.stub-bk-20260427/`） |
+| `/Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio/` | 新增（610M，rsync 排除测试产物） |
+| `/Users/luzhoua/Mindhikers/.claude/skills/svg-architect/` | 新增 |
+| `/Users/luzhoua/Mindhikers/.claude/skills/remotion-best-practices/` | 新增 |
+| `/Users/luzhoua/Mindhikers/.claude/skills/remotion-visual-qa/` | 新增 |
+| `docs/04_progress/dev_progress.md` | 追加 v4.4.0 |
+| `docs/04_progress/rules.md` | 追加 SSOT 切换条目（rule #134-135） |
+| `docs/dev_logs/HANDOFF.md` | 覆盖写本文件 |
