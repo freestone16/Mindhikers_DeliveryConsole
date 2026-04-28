@@ -948,14 +948,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
 
             {warning && (
-                <div className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--gc-text-secondary)]">
+                <div className="mx-2 mt-3 flex items-center gap-2 rounded-2xl border border-[rgba(184,144,77,0.24)] bg-[rgba(255,244,220,0.95)] px-3 py-2 text-[12px] text-[var(--gc-text-secondary)]">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
                     {warning}
                 </div>
             )}
 
             {showTrialBanner && trialStatus && (
-                <div className={`mx-4 mt-3 rounded-2xl border px-3 py-2.5 text-[12px] ${trialBannerTone}`}>
+                <div className={`mx-2 mt-3 rounded-2xl border px-3 py-2.5 text-[12px] ${trialBannerTone}`}>
                     <div className="font-medium">
                         免费试用：剩余 {trialStatus.usage.conversationsRemaining} / {trialStatus.limits.conversationLimit} 个对话
                         {trialStatus.usage.currentConversationId
@@ -966,7 +966,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-4 py-4" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-3" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
                 {messages.length === 0 && !streamingContent ? (
                     <div className="mt-8 rounded-[24px] border border-dashed border-[var(--gc-line-subtle)] bg-[rgba(255,255,255,0.38)] px-4 py-6 text-center text-sm text-[var(--gc-text-tertiary)]">
                         {emptyStateText}
@@ -989,7 +989,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                         </div>
                                     )}
 
-                                    <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                                    <div className={`max-w-[94%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
                                         <div className={`mb-1 flex items-center gap-2 text-[11px] ${isUser ? 'flex-row-reverse text-right' : 'text-left'} text-[var(--gc-text-tertiary)]`}>
                                             <span className="font-medium text-[var(--gc-text-secondary)]">{author.name}</span>
                                         </div>
@@ -1086,7 +1086,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
 
             {attachments.length > 0 && (
-                <div className="border-t border-[var(--gc-line-subtle)] px-4 py-2">
+                <div className="border-t border-[var(--gc-line-subtle)] px-2 py-2">
                     <div className="flex flex-wrap gap-2">
                         {attachments.map((att, index) => (
                             <div key={`${att.name}_${index}`} className="relative">
@@ -1103,7 +1103,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
             )}
 
-            <div className="border-t border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.92)] px-4 py-3">
+            <div className="border-t border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.92)] px-2 py-3">
                 <div className="flex items-center gap-2">
                     <div className="grid h-9 w-9 flex-shrink-0 place-items-center overflow-hidden rounded-2xl border border-[rgba(146,118,82,0.12)] bg-[var(--gc-col-left)] text-sm font-semibold text-[var(--gc-text-primary)]">
                         {resolvedCurrentUserBadge.avatarImage ? (

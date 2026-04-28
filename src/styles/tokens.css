@@ -93,9 +93,10 @@
   --gc-dur-slow:  280ms;   /* handoff ceremony only */
 
   /* ---------- Layout ---------- */
-  --gc-col-left:            260px;
-  --gc-col-right:           360px;
-  --gc-col-right-collapsed: 44px;
+  --gc-col-left:            288px;
+  --gc-col-left-collapsed:  64px;
+  --gc-col-right:           336px;
+  --gc-col-right-collapsed: 48px;
   --gc-topbar-h:            44px;
   --gc-composer-h:          76px;
   --gc-prose-max:           680px;

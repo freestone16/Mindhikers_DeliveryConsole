@@ -70,38 +70,38 @@ export const StatusFooter = ({
     const syncedSkills = useMemo(() => syncStatus?.synced || [], [syncStatus]);
 
     return (
-        <footer className="z-[50] w-full border-t border-[var(--line-soft)] bg-[rgba(255,250,242,0.82)] px-6 py-2 text-xs backdrop-blur">
+        <footer className="z-[50] w-full border-t border-[var(--gc-line-subtle)] bg-[rgba(255,250,242,0.82)] px-6 py-2 text-xs backdrop-blur">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                    <span className="font-mono text-[var(--ink-2)]">
+                    <span className="font-mono text-[var(--gc-text-secondary)]">
                         {isConnected ? 'CONSOLE ONLINE' : 'DISCONNECTED'}
                     </span>
                 </div>
 
-                <div className="text-[var(--ink-3)]">
+                <div className="text-[var(--gc-text-tertiary)]">
                     MindHikers Delivery Console {version}
                 </div>
 
                 <div className="relative flex items-center gap-3" ref={dropdownRef}>
-                    <span className="text-[var(--ink-3)]">{chatLlmLabel}</span>
+                    <span className="text-[var(--gc-text-tertiary)]">{chatLlmLabel}</span>
                     {syncStatus?.status === 'done' && (
                         <>
                             <CheckCircle className="h-3 w-3 text-emerald-600" />
                             <button
                                 type="button"
                                 onClick={() => setShowSkills((prev) => !prev)}
-                                className="inline-flex items-center gap-1 text-[var(--ink-2)] transition-colors hover:text-[var(--ink-1)]"
+                                className="inline-flex items-center gap-1 text-[var(--gc-text-secondary)] transition-colors hover:text-[var(--gc-text-primary)]"
                             >
                                 Skills Synced ({syncStatus.count || 0})
                                 <ChevronUp className={`h-3 w-3 transition-transform ${showSkills ? 'rotate-0' : 'rotate-180'}`} />
                             </button>
                             {showSkills && (
-                                <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-3 shadow-[0_16px_40px_rgba(117,88,55,0.14)]">
-                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Loaded Skills</div>
+                                <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-3">
+                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">Loaded Skills</div>
                                     <div className="flex flex-wrap gap-2">
                                         {syncedSkills.map((skill: string) => (
-                                            <span key={skill} className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-1)] px-2 py-1 text-[11px] text-[var(--ink-2)]">
+                                            <span key={skill} className="rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-col-left)] px-2 py-1 text-[11px] text-[var(--gc-text-secondary)]">
                                                 {skill}
                                             </span>
                                         ))}
@@ -112,8 +112,8 @@ export const StatusFooter = ({
                     )}
                     {(!syncStatus || syncStatus.status === 'syncing') && isConnected && (
                         <>
-                            <Loader2 className="h-3 w-3 animate-spin text-[var(--accent-muted)]" />
-                            <span className="text-[var(--ink-3)]">Checking Skills...</span>
+                            <Loader2 className="h-3 w-3 animate-spin text-[var(--gc-accent-muted)]" />
+                            <span className="text-[var(--gc-text-tertiary)]">Checking Skills...</span>
                         </>
                     )}
                     {syncStatus?.status === 'warning' && (
@@ -122,17 +122,17 @@ export const StatusFooter = ({
                             <button
                                 type="button"
                                 onClick={() => setShowSkills((prev) => !prev)}
-                                className="inline-flex items-center gap-1 text-[var(--ink-2)] transition-colors hover:text-[var(--ink-1)]"
+                                className="inline-flex items-center gap-1 text-[var(--gc-text-secondary)] transition-colors hover:text-[var(--gc-text-primary)]"
                             >
                                 Skills Synced ({syncStatus.count || 0})
                                 <ChevronUp className={`h-3 w-3 transition-transform ${showSkills ? 'rotate-0' : 'rotate-180'}`} />
                             </button>
                             {showSkills && (
-                                <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-3 shadow-[0_16px_40px_rgba(117,88,55,0.14)]">
-                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Loaded Skills</div>
+                                <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-3">
+                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">Loaded Skills</div>
                                     <div className="flex flex-wrap gap-2">
                                         {syncedSkills.map((skill: string) => (
-                                            <span key={skill} className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-1)] px-2 py-1 text-[11px] text-[var(--ink-2)]">
+                                            <span key={skill} className="rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-col-left)] px-2 py-1 text-[11px] text-[var(--gc-text-secondary)]">
                                                 {skill}
                                             </span>
                                         ))}

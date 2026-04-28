@@ -1,11 +1,19 @@
 import type { ModuleManifest, ModuleRegistryState } from './types';
+import { crucibleManifest } from './crucible/manifest';
+import { roundtableManifest } from './roundtable/manifest';
 
 const state: ModuleRegistryState = {
   modules: new Map(),
   listeners: new Set(),
+  snapshot: [],
 };
 
+function rebuildSnapshot(): void {
+  state.snapshot = Array.from(state.modules.values()).sort((a, b) => a.order - b.order);
+}
+
 function notify(): void {
+  rebuildSnapshot();
   for (const listener of state.listeners) {
     listener();
   }
@@ -26,7 +34,7 @@ export function getModule(id: string): ModuleManifest | undefined {
 }
 
 export function getRegisteredModules(): ModuleManifest[] {
-  return Array.from(state.modules.values()).sort((a, b) => a.order - b.order);
+  return state.snapshot;
 }
 
 export function subscribe(listener: () => void): () => void {
@@ -36,12 +44,5 @@ export function subscribe(listener: () => void): () => void {
   };
 }
 
-// Crucible placeholder — Phase 1 default registration
-registerModule({
-  id: 'crucible',
-  label: '炼制',
-  icon: null!,
-  path: '/m/crucible',
-  order: 10,
-  description: '黄金坩埚',
-});
+registerModule(crucibleManifest);
+registerModule(roundtableManifest);

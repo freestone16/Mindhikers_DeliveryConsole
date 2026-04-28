@@ -3,7 +3,7 @@ import { ChevronDown, FolderOpen, Database, FileText, Settings } from 'lucide-re
 import { buildApiUrl } from '../config/runtime';
 import { UserAvatarMenu } from './UserAvatarMenu';
 
-export type HeaderModule = 'crucible' | 'delivery' | 'distribution';
+export type HeaderModule = 'crucible' | 'roundtable' | 'rador' | 'writer' | 'delivery' | 'distribution';
 
 interface Project {
     name: string;
@@ -43,15 +43,27 @@ interface HeaderProps {
 const MODULE_META: Record<HeaderModule, { label: string; activeClass: string }> = {
     crucible: {
         label: '黄金坩埚',
-        activeClass: 'bg-[var(--accent)] text-white',
+        activeClass: 'bg-[var(--gc-accent)] text-white',
+    },
+    roundtable: {
+        label: '圆桌',
+        activeClass: 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]',
+    },
+    rador: {
+        label: '雷达',
+        activeClass: 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]',
+    },
+    writer: {
+        label: '写作',
+        activeClass: 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]',
     },
     delivery: {
         label: '交付终端',
-        activeClass: 'bg-[var(--surface-2)] text-[var(--ink-1)]',
+        activeClass: 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]',
     },
     distribution: {
         label: '分发终端',
-        activeClass: 'bg-[var(--surface-2)] text-[var(--ink-1)]',
+        activeClass: 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]',
     },
 };
 
@@ -144,24 +156,24 @@ export const Header = ({
 
     return (
         <>
-            <header className="relative z-[100] border-b border-[var(--line-soft)] bg-[rgba(255,250,242,0.84)] px-4 py-2.5 backdrop-blur-xl">
+            <header className="relative z-[100] border-b border-[var(--gc-line-subtle)] bg-[rgba(255,250,242,0.84)] px-4 py-2.5 backdrop-blur-xl">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <img src="/logo.png" alt="MindHikers Logo" className="h-9 w-9 rounded-2xl border border-[var(--line-soft)] object-cover shadow-[0_8px_20px_rgba(130,102,70,0.08)]" />
+                        <img src="/logo.png" alt="MindHikers Logo" className="h-9 w-9 rounded-2xl border border-[var(--gc-line-subtle)] object-cover" />
                         <div>
-                            <h1 className="mh-display text-[18px] font-semibold tracking-tight text-[var(--ink-1)]">{appTitle}</h1>
+                            <h1 className="mh-display text-[18px] font-semibold tracking-tight text-[var(--gc-text-primary)]">{appTitle}</h1>
                         </div>
                     </div>
 
                     {modules.length > 1 ? (
-                        <div className="flex rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-1 shadow-[0_10px_24px_rgba(130,102,70,0.05)]">
+                        <div className="flex rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-1">
                             {modules.map((module) => (
                                 <button
                                     key={module}
                                     onClick={() => onModuleChange(module)}
                                     className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${activeModule === module
                                         ? MODULE_META[module].activeClass
-                                        : 'text-[var(--ink-3)] hover:text-[var(--ink-1)]'
+                                        : 'text-[var(--gc-text-tertiary)] hover:text-[var(--gc-text-primary)]'
                                         }`}
                                 >
                                     {MODULE_META[module].label}
@@ -194,8 +206,8 @@ export const Header = ({
                                         disabled={isCrucibleLocked}
                                         title={isCrucibleLocked ? '议题尚未定稿，暂不可创建项目' : undefined}
                                         className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] transition-colors ${isCrucibleLocked
-                                            ? 'cursor-not-allowed border-[var(--line-soft)] bg-[rgba(237,231,222,0.82)] text-[var(--ink-3)]'
-                                            : 'cursor-pointer border-[var(--line-soft)] bg-[var(--surface-0)] text-[var(--ink-2)] hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]'
+                                            ? 'cursor-not-allowed border-[var(--gc-line-subtle)] bg-[rgba(237,231,222,0.82)] text-[var(--gc-text-tertiary)]'
+                                            : 'cursor-pointer border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] text-[var(--gc-text-secondary)] hover:border-[var(--gc-line-default)] hover:text-[var(--gc-text-primary)]'
                                             }`}
                                     >
                                         <FolderOpen className="w-4 h-4 flex-shrink-0" />
@@ -204,12 +216,12 @@ export const Header = ({
                                     </button>
 
                                     {isDropdownOpen && !isCrucibleLocked && (
-                                        <div className="absolute top-full right-0 z-[9999] mt-2 w-72 overflow-hidden rounded-3xl border border-[var(--line-soft)] bg-[var(--surface-1)] shadow-[0_24px_50px_rgba(117,88,55,0.14)]">
-                                            <div className="border-b border-[var(--line-soft)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)]">
+                                        <div className="absolute top-full right-0 z-[9999] mt-2 w-72 overflow-hidden rounded-3xl border border-[var(--gc-line-subtle)] bg-[var(--gc-col-left)]">
+                                            <div className="border-b border-[var(--gc-line-subtle)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">
                                                 Available Projects
                                             </div>
                                             {projects.length === 0 ? (
-                                                <div className="px-3 py-4 text-center text-sm text-[var(--ink-3)]">加载中...</div>
+                                                <div className="px-3 py-4 text-center text-sm text-[var(--gc-text-tertiary)]">加载中...</div>
                                             ) : (
                                                 <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                                     {projects.map(p => (
@@ -217,17 +229,17 @@ export const Header = ({
                                                             key={p.name}
                                                             onClick={() => handleSwitch(p.name)}
                                                             className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${p.isActive
-                                                                ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--ink-1)]'
-                                                                : 'border-transparent text-[var(--ink-2)] hover:bg-[var(--surface-2)]'
+                                                                ? 'border-[var(--gc-accent)] bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]'
+                                                                : 'border-transparent text-[var(--gc-text-secondary)] hover:bg-[var(--gc-col-content)]'
                                                                 }`}
                                                         >
                                                             <FolderOpen className="w-4 h-4 flex-shrink-0 opacity-60" />
                                                             <span className="flex-1 truncate font-mono">{p.name}</span>
                                                             {p.hasDeliveryStore && (
-                                                                <Database className="h-3.5 w-3.5 flex-shrink-0 text-[var(--accent-muted)]" />
+                                                                <Database className="h-3.5 w-3.5 flex-shrink-0 text-[var(--gc-accent-muted)]" />
                                                             )}
                                                             {p.isActive && (
-                                                                <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] text-[var(--ink-1)]">ACTIVE</span>
+                                                                <span className="rounded-full bg-[var(--gc-accent-soft)] px-2 py-0.5 text-[10px] text-[var(--gc-text-primary)]">ACTIVE</span>
                                                             )}
                                                         </button>
                                                     ))}
@@ -247,24 +259,24 @@ export const Header = ({
                                         disabled={isCrucibleLocked}
                                         title={isCrucibleLocked ? '议题尚未定稿，暂不可创建文稿' : undefined}
                                         className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] transition-colors ${isCrucibleLocked
-                                            ? 'cursor-not-allowed border-[var(--line-soft)] bg-[rgba(237,231,222,0.82)] text-[var(--ink-3)]'
-                                            : 'cursor-pointer border-[var(--line-soft)] bg-[var(--surface-0)] text-[var(--ink-2)] hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]'
+                                            ? 'cursor-not-allowed border-[var(--gc-line-subtle)] bg-[rgba(237,231,222,0.82)] text-[var(--gc-text-tertiary)]'
+                                            : 'cursor-pointer border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] text-[var(--gc-text-secondary)] hover:border-[var(--gc-line-default)] hover:text-[var(--gc-text-primary)]'
                                             }`}
                                     >
                                         <FileText className="w-4 h-4 flex-shrink-0" />
                                         <span className="flex items-center whitespace-nowrap">
-                                            文稿: <span className="ml-1 inline-block max-w-[180px] truncate align-bottom text-[var(--accent)]">{selectedScript?.name || '未选择'}</span>
+                                            文稿: <span className="ml-1 inline-block max-w-[180px] truncate align-bottom text-[var(--gc-accent)]">{selectedScript?.name || '未选择'}</span>
                                         </span>
                                         <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isScriptDropdownOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {isScriptDropdownOpen && !isCrucibleLocked && (
-                                        <div className="absolute top-full right-0 z-[9999] mt-2 w-80 overflow-hidden rounded-3xl border border-[var(--line-soft)] bg-[var(--surface-1)] shadow-[0_24px_50px_rgba(117,88,55,0.14)]">
-                                            <div className="border-b border-[var(--line-soft)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)]">
+                                        <div className="absolute top-full right-0 z-[9999] mt-2 w-80 overflow-hidden rounded-3xl border border-[var(--gc-line-subtle)] bg-[var(--gc-col-left)]">
+                                            <div className="border-b border-[var(--gc-line-subtle)] px-4 py-3 text-xs uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">
                                                 02_Script 文稿
                                             </div>
                                             {scripts.length === 0 ? (
-                                                <div className="px-3 py-4 text-center text-sm text-[var(--ink-3)]">暂无文稿</div>
+                                                <div className="px-3 py-4 text-center text-sm text-[var(--gc-text-tertiary)]">暂无文稿</div>
                                             ) : (
                                                 <div className="max-h-60 overflow-y-auto overflow-x-hidden">
                                                     {scripts.map(s => (
@@ -272,14 +284,14 @@ export const Header = ({
                                                             key={s.path}
                                                             onClick={() => handleScriptSelect(s.path)}
                                                             className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${s.path === selectedScriptPath
-                                                                ? 'border-[var(--accent)] bg-[var(--surface-2)] text-[var(--ink-1)]'
-                                                                : 'border-transparent text-[var(--ink-2)] hover:bg-[var(--surface-2)]'
+                                                                ? 'border-[var(--gc-accent)] bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]'
+                                                                : 'border-transparent text-[var(--gc-text-secondary)] hover:bg-[var(--gc-col-content)]'
                                                                 }`}
                                                         >
                                                             <FileText className="w-4 h-4 flex-shrink-0 opacity-60" />
                                                             <span className="flex-1 truncate">{s.name}</span>
-                                                            <span className="text-xs text-[var(--ink-3)]">{formatSize(s.size)}</span>
-                                                            <span className="text-xs text-[var(--ink-3)]">{s.modifiedAt}</span>
+                                                            <span className="text-xs text-[var(--gc-text-tertiary)]">{formatSize(s.size)}</span>
+                                                            <span className="text-xs text-[var(--gc-text-tertiary)]">{s.modifiedAt}</span>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -293,7 +305,7 @@ export const Header = ({
                         {!hideSettingsButton ? (
                             <button
                                 onClick={() => window.open('/#/llm-config', '_blank')}
-                                className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-2)] transition-colors hover:border-[var(--line-strong)] hover:text-[var(--ink-1)]"
+                                className="rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-2 text-[var(--gc-text-secondary)] transition-colors hover:border-[var(--gc-line-default)] hover:text-[var(--gc-text-primary)]"
                                 title="LLM Configuration"
                             >
                                 <Settings className="w-5 h-5" />

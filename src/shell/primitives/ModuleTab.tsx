@@ -9,24 +9,28 @@ export interface ModuleTabProps extends ButtonHTMLAttributes<HTMLButtonElement> 
   active?: boolean;
   shortcut?: string;
   isSlot?: boolean;
+  collapsed?: boolean;
 }
 
 export const ModuleTab = forwardRef<HTMLButtonElement, ModuleTabProps>(
-  ({ icon, label, active, shortcut, isSlot, className, ...rest }, ref) => (
+  ({ icon, label, active, shortcut, isSlot, collapsed, className, ...rest }, ref) => (
     <button
       ref={ref}
       aria-current={active || undefined}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       className={clsx(
         styles.root,
         active && styles.rootActive,
         isSlot && styles.rootSlot,
+        collapsed && styles.rootCollapsed,
         className,
       )}
       {...rest}
     >
       {!isSlot && <span className={styles.glyph}>{icon}</span>}
-      <span className={styles.name}>{label}</span>
-      {shortcut && !isSlot && <span className={styles.kbd}>{shortcut}</span>}
+      {!collapsed && <span className={styles.name}>{label}</span>}
+      {shortcut && !isSlot && !collapsed && <span className={styles.kbd}>{shortcut}</span>}
     </button>
   ),
 );

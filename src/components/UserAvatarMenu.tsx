@@ -107,7 +107,7 @@ export const UserAvatarMenu = ({
     return (
         <div className="relative" ref={menuRef}>
             {toast ? (
-                <div className="absolute right-0 top-full z-[120] mt-2 w-44 rounded-2xl border border-[rgba(166,117,64,0.12)] bg-[rgba(255,250,242,0.96)] px-3 py-2 text-[12px] text-[var(--ink-2)] shadow-[0_18px_40px_rgba(117,88,55,0.14)]">
+                <div className="absolute right-0 top-full z-[120] mt-2 w-44 rounded-2xl border border-[rgba(166,117,64,0.12)] bg-[rgba(255,250,242,0.96)] px-3 py-2 text-[12px] text-[var(--gc-text-secondary)]">
                     {toast}
                 </div>
             ) : null}
@@ -115,32 +115,32 @@ export const UserAvatarMenu = ({
             <button
                 type="button"
                 onClick={() => setIsOpen((prev) => !prev)}
-                className="grid h-11 w-11 place-items-center overflow-hidden rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] shadow-[0_10px_24px_rgba(130,102,70,0.06)] transition-colors hover:border-[var(--line-strong)]"
+                className="grid h-11 w-11 place-items-center overflow-hidden rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] transition-colors hover:border-[var(--gc-line-default)]"
                 title={`${displayName} 账户菜单`}
             >
                 {avatarImage ? (
                     <img src={avatarImage} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
-                    <span className="text-sm font-semibold text-[var(--ink-1)]">{avatarText}</span>
+                    <span className="text-sm font-semibold text-[var(--gc-text-primary)]">{avatarText}</span>
                 )}
             </button>
 
             {isOpen ? (
-                <div className="absolute right-0 top-full z-[110] mt-3 w-72 overflow-hidden rounded-[28px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.97)] shadow-[0_28px_60px_rgba(117,88,55,0.18)] backdrop-blur-xl">
-                    <div className="border-b border-[var(--line-soft)] bg-[linear-gradient(180deg,rgba(255,251,245,0.98)_0%,rgba(246,236,221,0.92)_100%)] px-4 py-4">
+                <div className="absolute right-0 top-full z-[110] mt-3 w-72 overflow-hidden rounded-[28px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.97)] backdrop-blur-xl">
+                    <div className="border-b border-[var(--gc-line-subtle)] bg-[linear-gradient(180deg,rgba(255,251,245,0.98)_0%,rgba(246,236,221,0.92)_100%)] px-4 py-4">
                         <div className="flex items-center gap-3">
-                            <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl border border-[rgba(166,117,64,0.12)] bg-[var(--surface-1)]">
+                            <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl border border-[rgba(166,117,64,0.12)] bg-[var(--gc-col-left)]">
                                 {avatarImage ? (
                                     <img src={avatarImage} alt={displayName} className="h-full w-full object-cover" />
                                 ) : (
-                                    <span className="text-base font-semibold text-[var(--ink-1)]">{avatarText}</span>
+                                    <span className="text-base font-semibold text-[var(--gc-text-primary)]">{avatarText}</span>
                                 )}
                             </div>
                             <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-[var(--ink-1)]">{displayName}</div>
-                                <div className="truncate text-xs text-[var(--ink-3)]">{email}</div>
+                                <div className="truncate text-sm font-semibold text-[var(--gc-text-primary)]">{displayName}</div>
+                                <div className="truncate text-xs text-[var(--gc-text-tertiary)]">{email}</div>
                                 {workspaceName ? (
-                                    <div className="mt-1 inline-flex rounded-full border border-[rgba(166,117,64,0.12)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[11px] text-[var(--ink-2)]">
+                                    <div className="mt-1 inline-flex rounded-full border border-[rgba(166,117,64,0.12)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[11px] text-[var(--gc-text-secondary)]">
                                         {workspaceName}
                                     </div>
                                 ) : null}
@@ -161,7 +161,7 @@ export const UserAvatarMenu = ({
                                     className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm transition-colors ${
                                         isDanger
                                             ? 'text-[rgb(145,74,55)] hover:bg-[rgba(252,234,226,0.82)]'
-                                            : 'text-[var(--ink-1)] hover:bg-[rgba(255,255,255,0.88)]'
+                                            : 'text-[var(--gc-text-primary)] hover:bg-[rgba(255,255,255,0.88)]'
                                     }`}
                                 >
                                     <Icon className="h-4 w-4 flex-shrink-0" />

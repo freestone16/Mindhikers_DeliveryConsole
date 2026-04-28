@@ -26,7 +26,7 @@ export const useShellStore = create<ShellState & ShellActions>((set) => ({
   activeModule: 'crucible',
   activeSessionId: null,
   sidebarOpen: true,
-  artifactDrawerOpen: false,
+  artifactDrawerOpen: true,
 
   setActiveModule: (module) => set({ activeModule: module }),
   setActiveSessionId: (id) => set({ activeSessionId: id }),

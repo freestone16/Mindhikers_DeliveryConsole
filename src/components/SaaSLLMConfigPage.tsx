@@ -266,38 +266,38 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
     const errorToneClass = errorMeta?.toneClass || ERROR_CATEGORY_META.api_error.toneClass;
 
     return (
-        <div className="min-h-screen bg-[var(--shell-bg)] text-[var(--ink-1)]">
+        <div className="min-h-screen bg-[var(--gc-bg-base)] text-[var(--gc-text-primary)]">
             <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-6 lg:px-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         {onClose ? (
                             <button
                                 onClick={onClose}
-                                className="rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-2 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-1)]"
+                                className="rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-2 text-[var(--gc-text-tertiary)] transition-colors hover:text-[var(--gc-text-primary)]"
                             >
                                 <ArrowLeft className="h-5 w-5" />
                             </button>
                         ) : null}
                         <div>
-                            <h1 className="mh-display text-[22px] font-semibold tracking-tight text-[var(--ink-1)]">LLM / BYOK 配置</h1>
-                            <p className="mt-1 text-sm text-[var(--ink-3)]">这里只处理黄金坩埚 SaaS 的文本模型接入，不包含图生或视生配置。</p>
+                            <h1 className="mh-display text-[22px] font-semibold tracking-tight text-[var(--gc-text-primary)]">LLM / BYOK 配置</h1>
+                            <p className="mt-1 text-sm text-[var(--gc-text-tertiary)]">这里只处理黄金坩埚 SaaS 的文本模型接入，不包含图生或视生配置。</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-5 rounded-[28px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.9)] p-5 shadow-[0_18px_40px_rgba(131,103,70,0.06)]">
+                <div className="mb-5 rounded-[28px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.9)] p-5">
                     <div className="flex items-start gap-3">
-                        <KeyRound className="mt-0.5 h-5 w-5 text-[var(--accent)]" />
+                        <KeyRound className="mt-0.5 h-5 w-5 text-[var(--gc-accent)]" />
                         <div>
-                            <div className="text-sm font-medium text-[var(--ink-1)]">当前口径</div>
-                            <div className="mt-1 text-sm leading-7 text-[var(--ink-2)]">
+                            <div className="text-sm font-medium text-[var(--gc-text-primary)]">当前口径</div>
+                            <div className="mt-1 text-sm leading-7 text-[var(--gc-text-secondary)]">
                                 <details className="group">
-                                    <summary className="cursor-pointer text-sm leading-7 text-[var(--ink-2)]">
+                                    <summary className="cursor-pointer text-sm leading-7 text-[var(--gc-text-secondary)]">
                                         平台默认推荐 <strong>Kimi 原厂 k2.5</strong>，点击了解 BYOK 场景与字段说明。
                                     </summary>
-                                    <div className="mt-2 space-y-2 text-[13px] leading-6 text-[var(--ink-2)]">
+                                    <div className="mt-2 space-y-2 text-[13px] leading-6 text-[var(--gc-text-secondary)]">
                                         <div>何时需要 BYOK：免费额度用完 / 需要特定模型 / 需要更大 token 窗口。</div>
-                                        <ul className="space-y-1 text-[13px] text-[var(--ink-2)]">
+                                        <ul className="space-y-1 text-[13px] text-[var(--gc-text-secondary)]">
                                             <li><strong>Base URL</strong>：服务商的 OpenAI-compatible API 地址</li>
                                             <li><strong>API Key</strong>：服务商后台获取</li>
                                             <li><strong>Model</strong>：服务商支持的模型 ID</li>
@@ -305,77 +305,77 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                                     </div>
                                 </details>
                             </div>
-                            <div className="mt-2 text-xs text-[var(--ink-3)]">{quotaHint}</div>
+                            <div className="mt-2 text-xs text-[var(--gc-text-tertiary)]">{quotaHint}</div>
                         </div>
                     </div>
                 </div>
 
                 <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-                    <section className="rounded-[28px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.9)] p-5 shadow-[0_18px_40px_rgba(131,103,70,0.06)]">
+                    <section className="rounded-[28px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.9)] p-5">
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-base font-semibold text-[var(--ink-1)]">你的 BYOK</h2>
-                                <p className="mt-1 text-sm text-[var(--ink-3)]">支持任何 OpenAI-compatible `chat/completions` 接口。</p>
+                                <h2 className="text-base font-semibold text-[var(--gc-text-primary)]">你的 BYOK</h2>
+                                <p className="mt-1 text-sm text-[var(--gc-text-tertiary)]">支持任何 OpenAI-compatible `chat/completions` 接口。</p>
                             </div>
                             <button
                                 onClick={handleUseKimiTemplate}
-                                className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-0)] px-3 py-1.5 text-xs text-[var(--ink-2)] transition-colors hover:text-[var(--ink-1)]"
+                                className="rounded-full border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] px-3 py-1.5 text-xs text-[var(--gc-text-secondary)] transition-colors hover:text-[var(--gc-text-primary)]"
                             >
                                 使用 Kimi 原厂模板
                             </button>
                         </div>
 
                         {loading ? (
-                            <div className="flex items-center gap-2 text-sm text-[var(--ink-3)]">
+                            <div className="flex items-center gap-2 text-sm text-[var(--gc-text-tertiary)]">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 读取配置中...
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 <label className="block">
-                                    <div className="mb-1.5 text-sm text-[var(--ink-2)]">服务商名称（可选）</div>
+                                    <div className="mb-1.5 text-sm text-[var(--gc-text-secondary)]">服务商名称（可选）</div>
                                     <input
                                         value={providerLabel}
                                         onChange={(event) => setProviderLabel(event.target.value)}
-                                        className="w-full rounded-2xl border border-[var(--line-soft)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--line-strong)]"
+                                        className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--gc-line-default)]"
                                         placeholder="例如：Kimi 原厂 / OpenRouter / 你自己的网关"
                                     />
                                 </label>
 
                                 <label className="block">
-                                    <div className="mb-1.5 text-sm text-[var(--ink-2)]">Base URL</div>
+                                    <div className="mb-1.5 text-sm text-[var(--gc-text-secondary)]">Base URL</div>
                                     <input
                                         value={baseUrl}
                                         onChange={(event) => setBaseUrl(event.target.value)}
-                                        className="w-full rounded-2xl border border-[var(--line-soft)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--line-strong)]"
+                                        className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--gc-line-default)]"
                                         placeholder="https://api.moonshot.cn/v1"
                                     />
                                 </label>
 
                                 <label className="block">
-                                    <div className="mb-1.5 text-sm text-[var(--ink-2)]">Model</div>
+                                    <div className="mb-1.5 text-sm text-[var(--gc-text-secondary)]">Model</div>
                                     <input
                                         value={model}
                                         onChange={(event) => setModel(event.target.value)}
-                                        className="w-full rounded-2xl border border-[var(--line-soft)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--line-strong)]"
+                                        className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white/70 px-4 py-3 text-sm outline-none transition-colors focus:border-[var(--gc-line-default)]"
                                         placeholder="kimi-k2.5"
                                     />
                                 </label>
 
                                 <label className="block">
-                                    <div className="mb-1.5 text-sm text-[var(--ink-2)]">API Key</div>
+                                    <div className="mb-1.5 text-sm text-[var(--gc-text-secondary)]">API Key</div>
                                     <div className="relative">
                                         <input
                                             type={showApiKey ? 'text' : 'password'}
                                             value={apiKey}
                                             onChange={(event) => setApiKey(event.target.value)}
-                                            className="w-full rounded-2xl border border-[var(--line-soft)] bg-white/70 px-4 py-3 pr-12 text-sm outline-none transition-colors focus:border-[var(--line-strong)]"
+                                            className="w-full rounded-2xl border border-[var(--gc-line-subtle)] bg-white/70 px-4 py-3 pr-12 text-sm outline-none transition-colors focus:border-[var(--gc-line-default)]"
                                             placeholder={status?.configured ? '输入新 key 可覆盖已有配置' : '请输入你的 API Key'}
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowApiKey((prev) => !prev)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ink-3)]"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--gc-text-tertiary)]"
                                         >
                                             {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
@@ -386,14 +386,14 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                                     <button
                                         onClick={handleTest}
                                         disabled={testing}
-                                        className="rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] px-4 py-2.5 text-sm text-[var(--ink-2)] transition-colors hover:text-[var(--ink-1)] disabled:opacity-60"
+                                        className="rounded-2xl border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] px-4 py-2.5 text-sm text-[var(--gc-text-secondary)] transition-colors hover:text-[var(--gc-text-primary)] disabled:opacity-60"
                                     >
                                         {testing ? '测试中...' : '测试连接'}
                                     </button>
                                     <button
                                         onClick={handleSave}
                                         disabled={saving}
-                                        className="rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                                        className="rounded-2xl bg-[var(--gc-accent)] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                                     >
                                         {saving ? '保存中...' : '保存 BYOK'}
                                     </button>
@@ -426,7 +426,7 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                                         <div>
                                             <div>{error}</div>
                                             {errorMeta?.suggestion ? (
-                                                <div className="mt-1 text-xs text-[var(--ink-3)]">建议：{errorMeta.suggestion}</div>
+                                                <div className="mt-1 text-xs text-[var(--gc-text-tertiary)]">建议：{errorMeta.suggestion}</div>
                                             ) : null}
                                         </div>
                                     </div>
@@ -435,27 +435,27 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                         )}
                     </section>
 
-                    <aside className="rounded-[28px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.9)] p-5 shadow-[0_18px_40px_rgba(131,103,70,0.06)]">
-                        <h2 className="text-base font-semibold text-[var(--ink-1)]">当前状态</h2>
-                        <div className="mt-4 space-y-3 text-sm text-[var(--ink-2)]">
-                            <div className="rounded-2xl bg-[var(--surface-0)] px-3 py-3">
-                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">模式</div>
+                    <aside className="rounded-[28px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.9)] p-5">
+                        <h2 className="text-base font-semibold text-[var(--gc-text-primary)]">当前状态</h2>
+                        <div className="mt-4 space-y-3 text-sm text-[var(--gc-text-secondary)]">
+                            <div className="rounded-2xl bg-[var(--gc-bg-base)] px-3 py-3">
+                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--gc-text-tertiary)]">模式</div>
                                 <div className="mt-1 font-medium">{trialStatus?.mode === 'byok' ? 'BYOK' : '平台试用'}</div>
                             </div>
-                            <div className="rounded-2xl bg-[var(--surface-0)] px-3 py-3">
-                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">已保存配置</div>
+                            <div className="rounded-2xl bg-[var(--gc-bg-base)] px-3 py-3">
+                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--gc-text-tertiary)]">已保存配置</div>
                                 <div className="mt-1 font-medium">{status?.configured ? '已配置' : '未配置'}</div>
                                 {status?.configured ? (
-                                    <div className="mt-2 space-y-1 text-[12px] text-[var(--ink-3)]">
+                                    <div className="mt-2 space-y-1 text-[12px] text-[var(--gc-text-tertiary)]">
                                         <div>{status.providerLabel || '自定义提供商'}</div>
                                         <div>{status.baseUrl}</div>
                                         <div>{status.model}</div>
                                     </div>
                                 ) : null}
                             </div>
-                            <div className="rounded-2xl bg-[var(--surface-0)] px-3 py-3">
-                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">推荐模板</div>
-                                <div className="mt-2 space-y-2 text-[12px] text-[var(--ink-3)]">
+                            <div className="rounded-2xl bg-[var(--gc-bg-base)] px-3 py-3">
+                                <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--gc-text-tertiary)]">推荐模板</div>
+                                <div className="mt-2 space-y-2 text-[12px] text-[var(--gc-text-tertiary)]">
                                     {RECOMMENDED_PROVIDERS.map((provider) => {
                                         const isSelected = provider.label === normalizedProvider.label
                                             && provider.baseUrl === normalizedProvider.baseUrl
@@ -470,14 +470,14 @@ export const SaaSLLMConfigPage = ({ onClose, onSaved, trialStatus }: SaaSLLMConf
                                                     setModel(provider.model);
                                                 }}
                                                 className={`w-full rounded-2xl border px-3 py-2.5 text-left transition-colors ${isSelected
-                                                    ? 'border-[var(--accent)] bg-[rgba(255,243,226,0.92)] text-[var(--ink-1)] shadow-[0_10px_24px_rgba(166,121,78,0.14)]'
-                                                    : 'border-[var(--line-soft)] bg-white/70 text-[var(--ink-2)] hover:border-[var(--line-strong)]'
+                                                    ? 'border-[var(--gc-accent)] bg-[rgba(255,243,226,0.92)] text-[var(--gc-text-primary)]'
+                                                    : 'border-[var(--gc-line-subtle)] bg-white/70 text-[var(--gc-text-secondary)] hover:border-[var(--gc-line-default)]'
                                                 }`}
                                             >
-                                                <div className="text-sm font-medium text-[var(--ink-1)]">{provider.label}</div>
-                                                <div className="mt-1 text-[12px] text-[var(--ink-3)]">{provider.desc}</div>
-                                                <div className="mt-2 text-[12px] text-[var(--ink-2)]">{provider.baseUrl}</div>
-                                                <div className="text-[11px] text-[var(--ink-3)]">{provider.model}</div>
+                                                <div className="text-sm font-medium text-[var(--gc-text-primary)]">{provider.label}</div>
+                                                <div className="mt-1 text-[12px] text-[var(--gc-text-tertiary)]">{provider.desc}</div>
+                                                <div className="mt-2 text-[12px] text-[var(--gc-text-secondary)]">{provider.baseUrl}</div>
+                                                <div className="text-[11px] text-[var(--gc-text-tertiary)]">{provider.model}</div>
                                             </button>
                                         );
                                     })}

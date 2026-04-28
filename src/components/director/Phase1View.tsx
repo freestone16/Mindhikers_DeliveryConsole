@@ -147,7 +147,7 @@ export const Phase1View = ({
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={onGenerate}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all"
           >
             开始头脑风暴并生成概念提案
           </button>

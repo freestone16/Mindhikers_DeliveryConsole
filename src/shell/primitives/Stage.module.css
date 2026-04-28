@@ -1,8 +1,11 @@
 .root {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
   background: var(--gc-bg-base);
+  overflow: hidden;
 }
 
 .topbar {
@@ -35,7 +38,9 @@
 
 .body {
   flex: 1;
+  min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: var(--gc-s-12) var(--gc-s-16);
 }
 

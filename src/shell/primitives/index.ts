@@ -9,7 +9,13 @@ export type { StageProps, StageTopbarProps, StageBodyProps, StageComposerProps }
 export { ArtifactDrawer } from './ArtifactDrawer';
 export type { ArtifactDrawerProps, ArtifactHeadProps, ArtifactBodyProps, ArtifactFootProps } from './ArtifactDrawer';
 export { ConversationStream } from './ConversationStream';
-export type { ConversationStreamProps } from './ConversationStream';
+export type {
+  ConversationStreamProps,
+  ConversationMessageAuthor,
+  ConversationMessageSpike,
+  ConversationMessageNode,
+  ConversationMessageRenderer,
+} from './ConversationStream';
 export { MessageRenderer } from './MessageRenderer';
 export type { MessageRendererProps } from './MessageRenderer';
 export { HandoffPanel } from './HandoffPanel';
@@ -22,3 +28,17 @@ export { HandoffButton } from './HandoffButton';
 export type { HandoffButtonProps } from './HandoffButton';
 export { OriginBreadcrumb } from './OriginBreadcrumb';
 export type { OriginBreadcrumbProps, OriginCrumb } from './OriginBreadcrumb';
+export { ArtifactTabs, normalizeArtifactTabsData } from '../artifacts';
+export type {
+  ArtifactReferenceItem,
+  ArtifactSnapshotItem,
+  ArtifactSpikePackItem,
+  ArtifactTabId,
+  ArtifactTabItemBase,
+  ArtifactTabItemMap,
+  ArtifactTabMeta,
+  ArtifactTabsData,
+  ArtifactTabsInput,
+  ArtifactTabsProps,
+  ArtifactThesisItem,
+} from '../artifacts';

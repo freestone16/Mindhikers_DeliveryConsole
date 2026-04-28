@@ -379,17 +379,17 @@ function App() {
 
     if (!isConnected) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--shell-bg)] text-[var(--ink-1)]">
+            <div className="min-h-screen flex items-center justify-center bg-[var(--gc-bg-base)] text-[var(--gc-text-primary)]">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-                    <p className="text-sm text-[var(--ink-3)]">Connecting to local console...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-[var(--gc-accent)]" />
+                    <p className="text-sm text-[var(--gc-text-tertiary)]">Connecting to local console...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="h-screen flex flex-col bg-[var(--shell-bg)] text-[var(--ink-1)]">
+            <div className="h-screen flex flex-col bg-[var(--gc-bg-base)] text-[var(--gc-text-primary)]">
             <Header
                 projectId={state.projectId}
                 selectedScriptPath={state.selectedScript?.path}
@@ -441,7 +441,7 @@ function App() {
                     </div>
                     <div
                         style={crucibleSidebarStyle}
-                        className="min-w-[280px] max-w-[1200px] border-l border-[var(--line-soft)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
+                        className="min-w-[280px] max-w-[1200px] border-l border-[var(--gc-line-subtle)] bg-[rgba(255,250,242,0.76)] backdrop-blur-md"
                     >
                         <ChatPanel
                             isOpen={activeModule === 'crucible'}
@@ -558,7 +558,7 @@ const DistributionLayout = ({ activePage, onPageChange }: { activePage: Distribu
 
     return (
         <>
-            <div className="border-b border-[var(--line-soft)] bg-[rgba(255,250,242,0.78)] backdrop-blur-md">
+            <div className="border-b border-[var(--gc-line-subtle)] bg-[rgba(255,250,242,0.78)] backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-6">
                     <nav className="flex gap-1 py-2">
                         {navItems.map((item) => (
@@ -566,8 +566,8 @@ const DistributionLayout = ({ activePage, onPageChange }: { activePage: Distribu
                                 key={item.id}
                                 onClick={() => onPageChange(item.id)}
                                 className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${activePage === item.id
-                                    ? 'bg-[var(--surface-2)] text-[var(--ink-1)]'
-                                    : 'text-[var(--ink-3)] hover:bg-[var(--surface-1)] hover:text-[var(--ink-1)]'
+                                    ? 'bg-[var(--gc-col-content)] text-[var(--gc-text-primary)]'
+                                    : 'text-[var(--gc-text-tertiary)] hover:bg-[var(--gc-col-left)] hover:text-[var(--gc-text-primary)]'
                                     }`}
                             >
                                 {item.icon}

@@ -6,6 +6,7 @@ import { DEFAULT_MODULE, extractModuleId, LLM_CONFIG_PATH, modulePath } from './
 import { type HeaderModule } from './components/Header';
 import { ChatPanel } from './components/ChatPanel';
 import { SaaSLLMConfigPage } from './components/SaaSLLMConfigPage';
+import type { CrucibleWorkspaceArtifactState } from './components/crucible/CrucibleWorkspaceView';
 import { useDeliveryStore, INITIAL_STATE } from './hooks/useDeliveryStore';
 import type { ChatMessage, HostRoutedAsset } from './types';
 import { buildCrucibleHeaderBadges, getCrucibleSpeakerMeta } from './components/crucible/soulRegistry';
@@ -18,7 +19,10 @@ import {
 import type { CrucibleSnapshot } from './components/crucible/types';
 import { useAppAuth } from './auth/useAppAuth';
 import { CrucibleStage, getRegisteredModules, RoundtableStage, subscribe } from './modules';
+import type { RoundtableStageArtifactState } from './modules/roundtable/RoundtableStage';
 import { ShellLayout } from './shell/ShellLayout';
+import { ArtifactTabs } from './shell/primitives';
+import type { ArtifactTabsInput } from './shell/primitives';
 import { useShellStore } from './shell/shellStore';
 type CrucibleTrialStatus = {
     enabled: boolean;
@@ -122,6 +126,177 @@ const shouldHydratePersistedSnapshot = (
     return persistedSnapshot.messages.length > (localSnapshot.messages?.length || 0);
 };
 
+const formatArtifactStamp = (value?: string | number | null) => {
+    if (!value) {
+        return undefined;
+    }
+
+    const date = typeof value === 'number' ? new Date(value) : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return undefined;
+    }
+
+    return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+};
+
+const summarizeArtifactContent = (value?: string | null) => {
+    if (!value) {
+        return '内容待生成';
+    }
+
+    const normalized = value
+        .replace(/\s+/g, ' ')
+        .replace(/[#>*`-]/g, ' ')
+        .trim();
+
+    if (!normalized) {
+        return '内容待生成';
+    }
+
+    return normalized.length > 96 ? `${normalized.slice(0, 96)}...` : normalized;
+};
+
+const toInitialCrucibleArtifactState = (
+    snapshot?: CrucibleSnapshot | null,
+): CrucibleWorkspaceArtifactState => ({
+    conversationId: snapshot?.conversationId,
+    topicTitle: snapshot?.topicTitle,
+    presentables: snapshot?.presentables ?? [],
+    crystallizedQuotes: snapshot?.crystallizedQuotes ?? [],
+    roundAnchors: snapshot?.roundAnchors ?? [],
+    roundIndex: snapshot?.roundIndex ?? 0,
+    thesisReady: snapshot?.thesisReady ?? false,
+    stageLabel: snapshot?.decisionSummary?.stageLabel,
+    toolTraces: snapshot?.toolTraces ?? [],
+    lastDialogue: snapshot?.lastDialogue ?? null,
+});
+
+const EMPTY_ROUNDTABLE_ARTIFACT_STATE: RoundtableStageArtifactState = {
+    sessionId: null,
+    rounds: [],
+    spikes: [],
+    selectedSlugs: [],
+};
+
+const buildCrucibleArtifactTabsData = (
+    artifactState: CrucibleWorkspaceArtifactState,
+): ArtifactTabsInput => {
+    const artifactAssets = [
+        ...artifactState.presentables,
+        ...artifactState.crystallizedQuotes,
+    ];
+    const conversationLabel = artifactState.conversationId
+        ? `会话 ${artifactState.conversationId}`
+        : '尚未建立会话';
+
+    return {
+        thesis: artifactState.thesisReady || artifactState.topicTitle
+            ? [
+                {
+                    id: `thesis-${artifactState.conversationId || 'draft'}`,
+                    title: artifactState.topicTitle || '当前论题',
+                    summary: artifactState.thesisReady
+                        ? '论文入口已就绪，可以继续进入成稿生成。'
+                        : '论题正在继续收束，当前仍处于坩埚推演阶段。',
+                    meta: [
+                        artifactState.stageLabel || '坩埚推演中',
+                        `第 ${Math.max(artifactState.roundIndex, 0)} 轮`,
+                    ],
+                    status: artifactState.thesisReady ? 'ready' : 'draft',
+                    source: conversationLabel,
+                },
+            ]
+            : [],
+        spikepack: artifactState.roundAnchors.map((anchor, index) => ({
+            id: anchor.id,
+            title: anchor.title || `Round Anchor ${index + 1}`,
+            summary: anchor.summary || summarizeArtifactContent(anchor.content),
+            meta: [`第 ${index + 1} 个锚点`],
+            frozenAt: artifactState.roundIndex
+                ? `第 ${artifactState.roundIndex} 轮后`
+                : undefined,
+            sessionId: artifactState.conversationId,
+        })),
+        snapshot: artifactState.conversationId || artifactState.lastDialogue || artifactState.toolTraces.length > 0
+            ? [
+                {
+                    id: `snapshot-${artifactState.conversationId || 'draft'}`,
+                    title: artifactState.topicTitle || '当前快照',
+                    summary: artifactState.lastDialogue?.utterance
+                        || `已累计 ${artifactState.toolTraces.length} 条工具痕迹，可用于回溯当前坩埚状态。`,
+                    meta: artifactState.toolTraces.slice(0, 3).map((trace) => `${trace.tool}:${trace.status}`),
+                    capturedAt: artifactState.conversationId ? '当前活跃会话' : '本地草稿',
+                    scope: conversationLabel,
+                },
+            ]
+            : [],
+        reference: artifactAssets.map((asset) => ({
+            id: asset.id,
+            title: asset.title,
+            summary: asset.summary || summarizeArtifactContent(asset.content),
+            meta: [asset.type],
+            source: asset.subtitle || artifactState.topicTitle || 'Crucible',
+        })),
+    };
+};
+
+const buildRoundtableArtifactTabsData = (
+    artifactState: RoundtableStageArtifactState,
+): ArtifactTabsInput => ({
+    thesis: artifactState.rounds.length > 0
+        ? [
+            {
+                id: `roundtable-thesis-${artifactState.sessionId || 'draft'}`,
+                title: '圆桌当前判断',
+                summary: artifactState.rounds[artifactState.rounds.length - 1]?.synthesis?.summary
+                    || '圆桌正在形成阶段性综合判断。',
+                meta: [
+                    `${artifactState.selectedSlugs.length} 位哲人`,
+                    `${artifactState.rounds.length} 轮讨论`,
+                ],
+                status: artifactState.rounds.length > 1 ? 'active' : 'opening',
+                source: artifactState.sessionId || '尚未建立 session',
+            },
+        ]
+        : [],
+    spikepack: artifactState.spikes.map((spike) => ({
+        id: spike.id,
+        title: spike.title,
+        summary: spike.summary,
+        meta: [
+            spike.sourceSpeaker,
+            `Round ${spike.roundIndex + 1}`,
+        ],
+        frozenAt: formatArtifactStamp(spike.timestamp),
+        sessionId: artifactState.sessionId || undefined,
+    })),
+    snapshot: artifactState.rounds
+        .filter((round) => round.synthesis)
+        .map((round) => ({
+            id: `roundtable-snapshot-${round.roundIndex}`,
+            title: `第 ${round.roundIndex + 1} 轮快照`,
+            summary: round.synthesis?.summary || '该轮暂无综合摘要',
+            meta: [`${round.turns.length} 次发言`],
+            capturedAt: round.turns[round.turns.length - 1]
+                ? formatArtifactStamp(round.turns[round.turns.length - 1].timestamp)
+                : undefined,
+            scope: artifactState.sessionId || 'roundtable',
+        })),
+    reference: artifactState.selectedSlugs.map((slug) => ({
+        id: `persona-${slug}`,
+        title: slug,
+        summary: '当前轮次已选中的圆桌参与者。',
+        meta: ['persona'],
+        source: 'Roundtable',
+    })),
+});
+
 function SaaSApp() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -139,6 +314,10 @@ function SaaSApp() {
     const [crucibleInjectedMessages, setCrucibleInjectedMessages] = useState<ChatMessage[]>(() => toCrucibleInjectedMessages(initialCrucibleSnapshot));
     const [crucibleTurnSettledToken, setCrucibleTurnSettledToken] = useState(0);
     const [crucibleWorkspaceKey, setCrucibleWorkspaceKey] = useState(0);
+    const [crucibleArtifactState, setCrucibleArtifactState] = useState<CrucibleWorkspaceArtifactState>(() => (
+        toInitialCrucibleArtifactState(initialCrucibleSnapshot)
+    ));
+    const [roundtableArtifactState, setRoundtableArtifactState] = useState<RoundtableStageArtifactState>(EMPTY_ROUNDTABLE_ARTIFACT_STATE);
 
     const [crucibleConversationState, setCrucibleConversationState] = useState({
         conversationId: initialCrucibleSnapshot?.conversationId || '',
@@ -152,9 +331,16 @@ function SaaSApp() {
     const [thesisError, setThesisError] = useState<string | null>(null);
     const previousContextRef = useRef({ projectId: '', scriptPath: '' });
     const injectedRoundKeysRef = useRef<Set<string>>(new Set());
+    const artifactDrawerAutoPeekFiredRef = useRef(false);
+    const artifactDrawerUserTouchedRef = useRef(false);
     const activeModule = useShellStore((shell) => shell.activeModule);
+    const activeSessionId = useShellStore((shell) => shell.activeSessionId);
+    const sidebarOpen = useShellStore((shell) => shell.sidebarOpen);
     const setActiveModule = useShellStore((shell) => shell.setActiveModule);
+    const setActiveSessionId = useShellStore((shell) => shell.setActiveSessionId);
+    const toggleSidebar = useShellStore((shell) => shell.toggleSidebar);
     const artifactDrawerOpen = useShellStore((shell) => shell.artifactDrawerOpen);
+    const setArtifactDrawerOpen = useShellStore((shell) => shell.setArtifactDrawerOpen);
     const toggleArtifactDrawer = useShellStore((shell) => shell.toggleArtifactDrawer);
     const registeredModules = useSyncExternalStore(subscribe, getRegisteredModules, getRegisteredModules);
 
@@ -177,6 +363,22 @@ function SaaSApp() {
         [currentUserBadge],
     );
 
+    const resolvedModule = extractModuleId(location.pathname) ?? DEFAULT_MODULE;
+    const activeModuleLabel = registeredModules.find((module) => module.id === activeModule)?.label;
+    const crucibleArtifactTabs = useMemo(
+        () => buildCrucibleArtifactTabsData(crucibleArtifactState),
+        [crucibleArtifactState],
+    );
+    const roundtableArtifactTabs = useMemo(
+        () => buildRoundtableArtifactTabsData(roundtableArtifactState),
+        [roundtableArtifactState],
+    );
+
+    const handleArtifactDrawerToggle = useCallback(() => {
+        artifactDrawerUserTouchedRef.current = true;
+        toggleArtifactDrawer();
+    }, [toggleArtifactDrawer]);
+
     const hydrateCrucibleSnapshot = useCallback((snapshot: CrucibleSnapshot) => {
         writeCrucibleSnapshot(snapshot, { workspaceId: crucibleWorkspaceId });
         window.localStorage.setItem(crucibleAutosaveBootstrapKey, 'done');
@@ -193,6 +395,7 @@ function SaaSApp() {
             roundIndex: snapshot.roundIndex || 0,
         });
         setCrucibleThesisReady(snapshot.thesisReady || false);
+        setCrucibleArtifactState(toInitialCrucibleArtifactState(snapshot));
         setActiveModule('crucible');
         setCrucibleWorkspaceKey((prev) => prev + 1);
         setChatResetToken((prev) => prev + 1);
@@ -216,6 +419,7 @@ function SaaSApp() {
             roundIndex: 0,
         });
         setCrucibleThesisReady(false);
+        setCrucibleArtifactState(toInitialCrucibleArtifactState(null));
         setChatResetToken((prev) => prev + 1);
         if (options?.remount) {
             setCrucibleWorkspaceKey((prev) => prev + 1);
@@ -342,6 +546,7 @@ function SaaSApp() {
             return;
         }
 
+        setActiveSessionId(null);
         const nextModule = module as typeof DEFAULT_MODULE | 'roundtable' | 'rador' | 'writer';
         navigate(modulePath(nextModule));
     };
@@ -437,6 +642,13 @@ function SaaSApp() {
             roundIndex: payload.roundIndex,
         });
     }, []);
+    const handleCrucibleArtifactStateChange = useCallback((payload: CrucibleWorkspaceArtifactState) => {
+        setCrucibleArtifactState(payload);
+        setCrucibleThesisReady(payload.thesisReady);
+    }, []);
+    const handleRoundtableArtifactStateChange = useCallback((payload: RoundtableStageArtifactState) => {
+        setRoundtableArtifactState(payload);
+    }, []);
     const handleCrucibleTurnError = useCallback((payload: { message: string }) => {
         setCrucibleTrialWarning(payload.message);
         void refreshCrucibleTrialStatus();
@@ -484,10 +696,63 @@ function SaaSApp() {
         }
     }, [activeModule, location.pathname, setActiveModule]);
 
+    useEffect(() => {
+        const moduleFromPath = extractModuleId(location.pathname);
+        if (moduleFromPath !== 'crucible' && moduleFromPath !== 'roundtable') {
+            return;
+        }
+        if (artifactDrawerAutoPeekFiredRef.current) {
+            return;
+        }
+
+        artifactDrawerAutoPeekFiredRef.current = true;
+        artifactDrawerUserTouchedRef.current = false;
+        setArtifactDrawerOpen(true);
+
+        const timer = window.setTimeout(() => {
+            if (!artifactDrawerUserTouchedRef.current) {
+                setArtifactDrawerOpen(false);
+            }
+        }, 3000);
+
+        // Keep the one-shot timer alive through React dev StrictMode effect replay.
+        void timer;
+    }, [location.pathname, setArtifactDrawerOpen]);
+
+    useEffect(() => {
+        const isEditableTarget = (target: EventTarget | null) => {
+            if (!(target instanceof HTMLElement)) return false;
+            const tag = target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+            if (target.isContentEditable) return true;
+            return false;
+        };
+
+        const handleKeydown = (event: KeyboardEvent) => {
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
+            if (isEditableTarget(event.target)) return;
+
+            if (event.key === '[') {
+                event.preventDefault();
+                toggleSidebar();
+                return;
+            }
+
+            if (event.key === ']') {
+                event.preventDefault();
+                handleArtifactDrawerToggle();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeydown);
+        return () => window.removeEventListener('keydown', handleKeydown);
+    }, [handleArtifactDrawerToggle, toggleSidebar]);
+
     const handleSendRoundtableToCrucible = useCallback(() => {
         setActiveModule('crucible');
+        setActiveSessionId(null);
         navigate(modulePath('crucible'));
-    }, [navigate, setActiveModule]);
+    }, [navigate, setActiveModule, setActiveSessionId]);
 
     if (location.pathname === LLM_CONFIG_PATH) {
         return (
@@ -503,13 +768,40 @@ function SaaSApp() {
         return <Navigate to={modulePath()} replace />;
     }
 
-    const resolvedModule = extractModuleId(location.pathname) ?? DEFAULT_MODULE;
-    const activeModuleLabel = registeredModules.find((module) => module.id === activeModule)?.label;
+    const crucibleConversationPanel = (
+        <ChatPanel
+            key={`crucible-chat-${chatResetToken}`}
+            isOpen={resolvedModule === 'crucible'}
+            onToggle={handleArtifactDrawerToggle}
+            expertId={CRUCIBLE_EXPERT_ID}
+            projectId={crucibleProjectId}
+            scriptPath={state.selectedScript?.path || ''}
+            resetToken={chatResetToken}
+            displayName={crucibleTopicTitle}
+            panelTitle="对话"
+            currentUserBadge={currentUserBadge}
+            headerBadges={crucibleHeaderBadges}
+            externalMessages={crucibleInjectedMessages}
+            onUserMessage={handleCrucibleUserPrompt}
+            onRouteAsset={handleCrucibleRouteAsset}
+            onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
+            onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
+            blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
+            crucibleTurnSettledToken={crucibleTurnSettledToken}
+            workspaceId={crucibleWorkspaceId}
+            trialStatus={crucibleTrialStatus}
+            externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
+            thesisReady={crucibleThesisReady}
+            onEnterThesisWriter={handleEnterThesisWriter}
+            socket={socket}
+        />
+    );
     const shellViews = {
         crucible: {
             keepMounted: true,
             content: (
                 <CrucibleStage
+                    conversation={crucibleConversationPanel}
                     workspaceKey={crucibleWorkspaceKey}
                     projectId={crucibleProjectId}
                     scriptPath={state.selectedScript?.path || ''}
@@ -524,42 +816,27 @@ function SaaSApp() {
                     onTurnSettled={handleCrucibleTurnSettled}
                     onConversationStateChange={handleCrucibleConversationStateChange}
                     onTurnError={handleCrucibleTurnError}
+                    onArtifactStateChange={handleCrucibleArtifactStateChange}
                 />
             ),
             drawer: (
-                <ChatPanel
-                    key={`crucible-chat-${chatResetToken}`}
-                    isOpen={resolvedModule === 'crucible'}
-                    onToggle={toggleArtifactDrawer}
-                    expertId={CRUCIBLE_EXPERT_ID}
-                    projectId={crucibleProjectId}
-                    scriptPath={state.selectedScript?.path || ''}
-                    resetToken={chatResetToken}
-                    displayName={crucibleTopicTitle}
-                    panelTitle="对话"
-                    currentUserBadge={currentUserBadge}
-                    headerBadges={crucibleHeaderBadges}
-                    externalMessages={crucibleInjectedMessages}
-                    onUserMessage={handleCrucibleUserPrompt}
-                    onRouteAsset={handleCrucibleRouteAsset}
-                    onPersistedSnapshotSaved={handleRestoreCrucibleHistory}
-                    onResetAll={() => resetCrucibleState({ remount: true, clearPersisted: true })}
-                    blackboardHint={crucibleHasBoardContent ? '中屏有参考内容挂出来了，你可以顺便看一眼。' : null}
-                    crucibleTurnSettledToken={crucibleTurnSettledToken}
-                    workspaceId={crucibleWorkspaceId}
-                    trialStatus={crucibleTrialStatus}
-                    externalWarning={crucibleTrialWarning || thesisError || thesisQuotaWarning}
-                    thesisReady={crucibleThesisReady}
-                    onEnterThesisWriter={handleEnterThesisWriter}
-                    socket={socket}
-                />
+                <ArtifactTabs data={crucibleArtifactTabs} />
             ),
-            drawerTitle: '对话',
+            drawerTitle: 'Artifacts',
             drawerExpanded: artifactDrawerOpen,
-            onDrawerToggle: toggleArtifactDrawer,
+            onDrawerToggle: handleArtifactDrawerToggle,
         },
         roundtable: {
-            content: <RoundtableStage onSendToCrucible={handleSendRoundtableToCrucible} />,
+            content: (
+                <RoundtableStage
+                    onSendToCrucible={handleSendRoundtableToCrucible}
+                    onArtifactStateChange={handleRoundtableArtifactStateChange}
+                />
+            ),
+            drawer: <ArtifactTabs data={roundtableArtifactTabs} defaultActiveTab="spikepack" />,
+            drawerTitle: 'Artifacts',
+            drawerExpanded: artifactDrawerOpen,
+            onDrawerToggle: handleArtifactDrawerToggle,
         },
     };
 
@@ -582,6 +859,10 @@ function SaaSApp() {
             views={shellViews}
             workspaceName={workspace?.activeWorkspace.name}
             displayName={authSession?.user.name?.trim() || authSession?.user.email || activeModuleLabel}
+            activeSessionId={activeSessionId}
+            onSessionChange={setActiveSessionId}
+            sidebarOpen={sidebarOpen}
+            onSidebarToggle={toggleSidebar}
         />
     );
 }

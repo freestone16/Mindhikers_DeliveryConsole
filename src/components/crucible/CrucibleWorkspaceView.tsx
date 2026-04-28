@@ -13,6 +13,19 @@ import type {
 } from './types';
 import { CRUCIBLE_DEFAULT_PAIR } from './soulRegistry';
 
+export interface CrucibleWorkspaceArtifactState {
+    conversationId?: string;
+    topicTitle?: string;
+    presentables: CanvasAsset[];
+    crystallizedQuotes: CanvasAsset[];
+    roundAnchors: RoundAnchor[];
+    roundIndex: number;
+    thesisReady: boolean;
+    stageLabel?: string;
+    toolTraces: NonNullable<CrucibleTurnResponse['toolTraces']>;
+    lastDialogue?: CrucibleDialogue | null;
+}
+
 const ASSET_META = {
     ascii: { icon: Boxes, label: '结构' },
     mindmap: { icon: BrainCircuit, label: '脑图' },
@@ -42,6 +55,7 @@ interface CrucibleWorkspaceProps {
     onTurnSettled?: () => void;
     onConversationStateChange?: (payload: { conversationId?: string; roundIndex: number }) => void;
     onTurnError?: (payload: { message: string; code?: string }) => void;
+    onArtifactStateChange?: (payload: CrucibleWorkspaceArtifactState) => void;
 }
 
 const toCanvasAsset = (asset: HostRoutedAsset): CanvasAsset => ({
@@ -176,6 +190,7 @@ export const CrucibleWorkspace = ({
     onTurnSettled,
     onConversationStateChange,
     onTurnError,
+    onArtifactStateChange,
 }: CrucibleWorkspaceProps) => {
     const snapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [workspaceId]);
     const [presentables, setPresentables] = useState<CanvasAsset[]>(() => snapshot?.presentables?.length ? snapshot.presentables : []);
@@ -246,6 +261,33 @@ export const CrucibleWorkspace = ({
             roundIndex,
         });
     }, [conversationId, roundIndex, onConversationStateChange]);
+
+    useEffect(() => {
+        onArtifactStateChange?.({
+            conversationId: conversationId || undefined,
+            topicTitle,
+            presentables,
+            crystallizedQuotes,
+            roundAnchors,
+            roundIndex,
+            thesisReady,
+            stageLabel: stageLabel || undefined,
+            toolTraces,
+            lastDialogue,
+        });
+    }, [
+        conversationId,
+        topicTitle,
+        presentables,
+        crystallizedQuotes,
+        roundAnchors,
+        roundIndex,
+        thesisReady,
+        stageLabel,
+        toolTraces,
+        lastDialogue,
+        onArtifactStateChange,
+    ]);
 
     useEffect(() => {
         const snapshotPayload = {
@@ -629,10 +671,10 @@ export const CrucibleWorkspace = ({
     return (
         <div className="flex h-full min-h-0 flex-1 overflow-hidden px-3 py-3 md:px-4 md:py-3">
             <div className="mx-auto grid h-full min-h-0 max-w-[1500px] flex-1 gap-3 xl:grid-cols-[172px_minmax(0,1fr)]">
-                <aside className="order-2 flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.92)] p-2.5 shadow-[0_14px_32px_rgba(131,103,70,0.04)] xl:order-1">
+                <aside className="order-2 flex h-full flex-col overflow-hidden rounded-[12px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.92)] p-2.5 xl:order-1">
                     {crystallizedQuotes.length > 0 && (
                         <div className="mb-2 flex-shrink-0">
-                            <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">结晶内容</div>
+                                    <div className="mb-1.5 px-1 text-[11px] uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">结晶内容</div>
                             <div className="space-y-1">
                                 {crystallizedQuotes.map((quote) => {
                                     const roundMatch = quote.id.match(/^turn_(\d+)_/);
@@ -644,30 +686,30 @@ export const CrucibleWorkspace = ({
                                             type="button"
                                             onClick={() => setActivePresentableId(quote.id)}
                                             className={`w-full rounded-[8px] border px-2 py-1.5 text-left transition ${isActive
-                                                ? 'border-[var(--accent)] bg-[rgba(146,118,82,0.08)]'
-                                                : 'border-transparent bg-transparent hover:border-[var(--line-soft)] hover:bg-[var(--surface-1)]'
+                                                ? 'border-[var(--gc-accent)] bg-[rgba(146,118,82,0.08)]'
+                                                : 'border-transparent bg-transparent hover:border-[var(--gc-line-subtle)] hover:bg-[var(--gc-col-left)]'
                                                 }`}
                                         >
                                             <div className="flex items-start gap-1.5">
-                                                <Quote className="mt-0.5 h-3 w-3 flex-shrink-0 text-[var(--accent)]" />
+                                                <Quote className="mt-0.5 h-3 w-3 flex-shrink-0 text-[var(--gc-accent)]" />
                                                 <div className="min-w-0">
-                                                    <div className="truncate text-[11px] font-medium leading-5 text-[var(--ink-1)]">{quote.title}</div>
-                                                    {quoteRound && <div className="text-[10px] text-[var(--ink-3)]">第{quoteRound}轮</div>}
+                                                    <div className="truncate text-[11px] font-medium leading-5 text-[var(--gc-text-primary)]">{quote.title}</div>
+                                                    {quoteRound && <div className="text-[10px] text-[var(--gc-text-tertiary)]">第{quoteRound}轮</div>}
                                                 </div>
                                             </div>
                                         </button>
                                     );
                                 })}
                             </div>
-                            <div className="my-2 h-px bg-[var(--line-soft)]" />
+                            <div className="my-2 h-px bg-[var(--gc-line-subtle)]" />
                         </div>
                     )}
                     <div className="mb-1.5 flex-shrink-0 px-1">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)]">黑板</div>
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--gc-text-tertiary)]">黑板</div>
                     </div>
                     <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
                         {presentables.length === 0 ? (
-                            <div className="rounded-[8px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,252,248,0.86)] px-3 py-4 text-[12px] leading-6 text-[var(--ink-3)]">
+                            <div className="rounded-[8px] border border-dashed border-[var(--gc-line-subtle)] bg-[rgba(255,252,248,0.86)] px-3 py-4 text-[12px] leading-6 text-[var(--gc-text-tertiary)]">
                                 黑板内容会出现在这里。
                             </div>
                         ) : presentables.map((asset) => {
@@ -681,14 +723,14 @@ export const CrucibleWorkspace = ({
                                     type="button"
                                     onClick={() => setActivePresentableId(asset.id)}
                                     className={`w-full rounded-[8px] border px-2.5 py-2 text-left transition ${isActive
-                                        ? 'border-[var(--line-strong)] bg-[var(--surface-1)] shadow-[0_10px_20px_rgba(131,103,70,0.06)]'
-                                        : 'border-transparent bg-transparent hover:border-[var(--line-soft)] hover:bg-[var(--surface-1)]'
+                                        ? 'border-[var(--gc-line-default)] bg-[var(--gc-col-left)]'
+                                        : 'border-transparent bg-transparent hover:border-[var(--gc-line-subtle)] hover:bg-[var(--gc-col-left)]'
                                         }`}
                                 >
-                                    <div className="text-[var(--ink-3)]">
+                                    <div className="text-[var(--gc-text-tertiary)]">
                                         <Icon className="h-3.5 w-3.5" />
                                     </div>
-                                    <div className="mt-1 text-[12px] font-medium leading-5 text-[var(--ink-1)]">{asset.title}</div>
+                                    <div className="mt-1 text-[12px] font-medium leading-5 text-[var(--gc-text-primary)]">{asset.title}</div>
                                 </button>
                             );
                         })}
@@ -700,12 +742,12 @@ export const CrucibleWorkspace = ({
                         ref={mainScrollRef}
                         className="h-full min-h-0 space-y-2 overflow-y-scroll pr-2"
                     >
-                        <section className="rounded-[12px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.84)] px-4 py-3 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
-                        <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{suggestedTitle || normalizeTopic(topicTitle)}</div>
+                        <section className="rounded-[12px] border border-[var(--gc-line-subtle)] bg-[rgba(255,251,245,0.84)] px-4 py-3">
+                        <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--gc-text-primary)] md:text-[26px]">{suggestedTitle || normalizeTopic(topicTitle)}</div>
                         {(stageLabel || toolTraces.length > 0) && (
                             <div className="mt-4 space-y-2">
                                 {stageLabel && (
-                                    <div className="inline-flex rounded-full border border-[rgba(166,117,64,0.16)] bg-[rgba(255,248,238,0.76)] px-3 py-1 text-[11px] tracking-[0.08em] text-[var(--ink-2)]">
+                                    <div className="inline-flex rounded-full border border-[rgba(166,117,64,0.16)] bg-[rgba(255,248,238,0.76)] px-3 py-1 text-[11px] tracking-[0.08em] text-[var(--gc-text-secondary)]">
                                         当前阶段：{stageLabel}
                                     </div>
                                 )}
@@ -714,11 +756,11 @@ export const CrucibleWorkspace = ({
                                         {toolTraces.map((trace) => (
                                             <div
                                                 key={`${trace.tool}-${trace.startedAt}`}
-                                                className="rounded-[10px] border border-[rgba(146,118,82,0.14)] bg-[rgba(255,252,247,0.92)] px-3 py-2 text-[11px] leading-5 text-[var(--ink-2)]"
+                                                className="rounded-[10px] border border-[rgba(146,118,82,0.14)] bg-[rgba(255,252,247,0.92)] px-3 py-2 text-[11px] leading-5 text-[var(--gc-text-secondary)]"
                                             >
-                                                <div className="font-medium text-[var(--ink-1)]">{trace.tool}</div>
+                                                <div className="font-medium text-[var(--gc-text-primary)]">{trace.tool}</div>
                                                 <div>{TOOL_STATUS_COPY[trace.status]}</div>
-                                                <div className="text-[var(--ink-3)]">{trace.mode === 'primary' ? '主执行位' : '支援位'}</div>
+                                                <div className="text-[var(--gc-text-tertiary)]">{trace.mode === 'primary' ? '主执行位' : '支援位'}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -727,7 +769,7 @@ export const CrucibleWorkspace = ({
                         )}
                         {isThinking && (
                             <div className="mt-4 rounded-[8px] border border-[rgba(166,117,64,0.14)] bg-[rgba(255,248,238,0.7)] px-4 py-3">
-                                <div className="text-[12px] leading-6 text-[var(--ink-2)]">
+                                <div className="text-[12px] leading-6 text-[var(--gc-text-secondary)]">
                                     {stageLabel
                                         ? `正在推进：${stageLabel}`
                                         : '正在根据本轮决策整理黑板焦点。'}
@@ -736,17 +778,17 @@ export const CrucibleWorkspace = ({
                         )}
                         </section>
 
-                        <section className="rounded-[12px] border border-[var(--line-soft)] bg-[var(--surface-0)] p-4 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
+                        <section className="rounded-[12px] border border-[var(--gc-line-subtle)] bg-[var(--gc-bg-base)] p-4">
                         {!activePresentable ? (
-                            <div className="rounded-[10px] border border-dashed border-[var(--line-soft)] bg-[#fffdf9] px-4 py-8 text-center text-[13px] leading-7 text-[var(--ink-3)]">
+                            <div className="rounded-[10px] border border-dashed border-[var(--gc-line-subtle)] bg-[#fffdf9] px-4 py-8 text-center text-[13px] leading-7 text-[var(--gc-text-tertiary)]">
                                 暂无黑板内容。
                             </div>
                         ) : (
                         <>
                         <div>
-                            <h2 className="mh-display text-[22px] font-semibold text-[var(--ink-1)]">{activePresentable.title}</h2>
+                            <h2 className="mh-display text-[22px] font-semibold text-[var(--gc-text-primary)]">{activePresentable.title}</h2>
                             {activePresentable.summary && (
-                                <p className="mt-2 text-[15px] leading-8 text-[var(--ink-2)]">{activePresentable.summary}</p>
+                                <p className="mt-2 text-[15px] leading-8 text-[var(--gc-text-secondary)]">{activePresentable.summary}</p>
                             )}
                         </div>
 
@@ -760,7 +802,7 @@ export const CrucibleWorkspace = ({
                                             className="h-full w-full object-cover"
                                         />
                                     ) : (
-                                        <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,rgba(248,239,226,0.92)_0%,rgba(236,217,191,0.72)_100%)] text-[13px] text-[var(--ink-3)]">
+                                        <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,rgba(248,239,226,0.92)_0%,rgba(236,217,191,0.72)_100%)] text-[13px] text-[var(--gc-text-tertiary)]">
                                             {previewStatus === 'loading' ? '正在生成参考图...' : '参考图稍后挂出'}
                                         </div>
                                     )}
@@ -771,15 +813,15 @@ export const CrucibleWorkspace = ({
                         {activePresentable.type === 'reference' && referenceSections ? (
                             previewImageUrl ? (
                                 <article className="mt-4 rounded-[10px] border border-[rgba(146,118,82,0.12)] bg-[#fffdf9] px-4 py-3">
-                                    <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">图注</div>
-                                    <div className="mt-2 text-[15px] leading-8 text-[var(--ink-2)]">
+                                    <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--gc-text-tertiary)]">图注</div>
+                                    <div className="mt-2 text-[15px] leading-8 text-[var(--gc-text-secondary)]">
                                         {previewCaption}
                                     </div>
                                 </article>
                             ) : (
                             <article className="mt-4 max-h-[calc(100vh-460px)] overflow-y-auto rounded-[10px] border border-[rgba(146,118,82,0.12)] bg-[linear-gradient(180deg,#fffdf9_0%,#fbf4e8_100%)] px-5 py-5">
                                 {referenceSections.lead && normalizeComparableText(referenceSections.lead) !== normalizeComparableText(activePresentable.summary || '') && (
-                                    <div className="text-[15px] leading-8 text-[var(--ink-2)]">
+                                    <div className="text-[15px] leading-8 text-[var(--gc-text-secondary)]">
                                         {referenceSections.lead}
                                     </div>
                                 )}
@@ -788,8 +830,8 @@ export const CrucibleWorkspace = ({
                                     <div className={`${referenceSections.lead && normalizeComparableText(referenceSections.lead) !== normalizeComparableText(activePresentable.summary || '') ? 'mt-4 border-t border-[rgba(146,118,82,0.12)] pt-4' : ''} space-y-3`}>
                                         {referenceSections.bullets.map((bullet, index) => (
                                             <div key={`${activePresentable.id}_bullet_${index}`} className="flex gap-3">
-                                                <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent)]"></div>
-                                                <div className="text-[15px] leading-8 text-[var(--ink-1)]">{bullet}</div>
+                                                <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--gc-accent)]"></div>
+                                                <div className="text-[15px] leading-8 text-[var(--gc-text-primary)]">{bullet}</div>
                                             </div>
                                         ))}
                                     </div>
@@ -797,8 +839,8 @@ export const CrucibleWorkspace = ({
                             </article>
                             )
                         ) : (
-                            <div className="mt-4 max-h-[calc(100vh-460px)] overflow-y-auto rounded-[10px] border border-[var(--line-soft)] bg-[#fffdf9] p-4">
-                                <div className="whitespace-pre-wrap text-[15px] leading-8 text-[var(--ink-1)]">
+                            <div className="mt-4 max-h-[calc(100vh-460px)] overflow-y-auto rounded-[10px] border border-[var(--gc-line-subtle)] bg-[#fffdf9] p-4">
+                                <div className="whitespace-pre-wrap text-[15px] leading-8 text-[var(--gc-text-primary)]">
                                     {formatAssetContent(activePresentable.content)}
                                 </div>
                             </div>
@@ -812,7 +854,7 @@ export const CrucibleWorkspace = ({
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex w-3 justify-center">
                             <div className="my-1 w-[6px] rounded-full bg-[rgba(174,149,115,0.18)]">
                                 <div
-                                    className="rounded-full bg-[rgba(142,99,55,0.72)] shadow-[0_4px_10px_rgba(112,78,43,0.16)]"
+                                    className="rounded-full bg-[rgba(142,99,55,0.72)]"
                                     style={{
                                         height: `${mainScrollIndicator.height}px`,
                                         transform: `translateY(${mainScrollIndicator.offset}px)`,
