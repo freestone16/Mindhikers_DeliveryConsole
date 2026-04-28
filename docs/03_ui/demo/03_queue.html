@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>分发终端 · 队列监控</title>
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="flex items-center gap-4">
+    <div class="app-brand">
+      <div class="app-brand-mark">D</div>
+      Distribution Terminal
+    </div>
+    <div class="breadcrumb">
+      <span class="sep">›</span>
+      <span class="crumb">📤 队列监控</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <a class="tab" href="01_landing.html">分发台</a>
+    <a class="tab active">队列</a>
+    <a class="tab">账号</a>
+    <a class="tab">历史</a>
+  </div>
+</header>
+
+<div class="layout-2col">
+
+  <!-- 左：筛选 -->
+  <aside class="sidebar">
+    <div class="sidebar-section-title">状态</div>
+    <a class="sidebar-item active">📋 全部 <span style="margin-left:auto" class="text-xs text-muted">11</span></a>
+    <a class="sidebar-item">⚙️ 执行中 <span style="margin-left:auto" class="text-xs text-muted">1</span></a>
+    <a class="sidebar-item">⏳ 待执行 <span style="margin-left:auto" class="text-xs text-muted">2</span></a>
+    <a class="sidebar-item">✓ 已发布 <span style="margin-left:auto" class="text-xs text-muted">5</span></a>
+    <a class="sidebar-item">📝 草稿态 <span style="margin-left:auto" class="text-xs text-muted">2</span></a>
+    <a class="sidebar-item">⚠ 待重试 <span style="margin-left:auto" class="text-xs text-muted">1</span></a>
+
+    <div class="sidebar-section-title" style="margin-top:18px">平台</div>
+    <a class="sidebar-item">𝕏 X / Twitter</a>
+    <a class="sidebar-item">公 公众号</a>
+    <a class="sidebar-item">▶ YouTube</a>
+    <a class="sidebar-item">B 哔哩哔哩</a>
+
+    <div class="sidebar-section-title" style="margin-top:18px">项目</div>
+    <a class="sidebar-item">📂 CSET-seedance2</a>
+    <a class="sidebar-item">📂 CSET-seedance3</a>
+    <a class="sidebar-item">📂 MHSDC-MarketBrief</a>
+  </aside>
+
+  <!-- 主区：任务列表 -->
+  <main>
+    <div class="page-head flex justify-between items-end">
+      <div>
+        <h1 class="page-title">📤 队列监控 <span class="badge badge-tag">SSE 实时</span></h1>
+        <div class="page-subtitle">最近 24 小时 · 11 条任务 · 自动重试上限 3 次</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">↻ 刷新</button>
+        <button class="btn btn-soft btn-sm">⏸ 全部暂停</button>
+      </div>
+    </div>
+
+    <!-- 执行中 -->
+    <div class="section-title mt-4">⚙️ 执行中</div>
+
+    <div class="queue-row">
+      <div class="platform-icon x">𝕏</div>
+      <div>
+        <div class="title">CSET-seedance2 · X 长文线程</div>
+        <div class="meta">已发送 5 / 8 推 · 风控延时 4'12" 后下一推</div>
+      </div>
+      <span class="badge badge-processing">⚙️ 进行中</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">详情</button>
+      </div>
+    </div>
+
+    <!-- 待执行 -->
+    <div class="section-title mt-6">⏳ 待执行</div>
+
+    <div class="queue-row">
+      <div class="platform-icon youtube">▶</div>
+      <div>
+        <div class="title">CSET-seedance3 · YouTube 主成片</div>
+        <div class="meta">⏰ 定时发布 · 2026-04-27 20:00 · 还剩 4h 12m</div>
+      </div>
+      <span class="badge badge-queued">⏳ 已入队</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">改时间</button>
+        <button class="btn btn-danger btn-sm">取消</button>
+      </div>
+    </div>
+
+    <div class="queue-row">
+      <div class="platform-icon wechat-mp">公</div>
+      <div>
+        <div class="title">MHSDC-MarketBrief · 公众号草稿</div>
+        <div class="meta">立即发布 · 风控延时 2'40" 后开始</div>
+      </div>
+      <span class="badge badge-queued">⏳ 已入队</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">立即执行</button>
+        <button class="btn btn-danger btn-sm">取消</button>
+      </div>
+    </div>
+
+    <!-- 已完成（突出展示草稿态 vs 真发布的视觉差异） -->
+    <div class="section-title mt-6">✅ 已完成 <span class="meta">· 草稿态 与 已发布 视觉区分</span></div>
+
+    <!-- 真直发：YouTube -->
+    <div class="queue-row" style="border-left:3px solid var(--status-published)">
+      <div class="platform-icon youtube">▶</div>
+      <div>
+        <div class="title">CSET-seedance2 · YouTube 主成片</div>
+        <div class="meta">
+          <strong class="text-published">🔗 youtu.be/dQw4w9WgXcQ</strong>
+          · 2026-04-26 14:32 真实推送给观众
+        </div>
+      </div>
+      <span class="badge badge-published">✓ 已发布</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">打开链接</button>
+      </div>
+    </div>
+
+    <!-- 真直发：X -->
+    <div class="queue-row" style="border-left:3px solid var(--status-published)">
+      <div class="platform-icon x">𝕏</div>
+      <div>
+        <div class="title">CSET-seedance3 · X 长文线程</div>
+        <div class="meta">
+          <strong class="text-published">🔗 x.com/luzhoua/status/1789...</strong>
+          · 2026-04-26 11:08 · 8/8 推全部成功
+        </div>
+      </div>
+      <span class="badge badge-published">✓ 已发布</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">打开线程</button>
+      </div>
+    </div>
+
+    <!-- 草稿态：公众号 -->
+    <div class="queue-row" style="border-left:3px solid var(--status-draft); background:var(--color-surface-alt)">
+      <div class="platform-icon wechat-mp">公</div>
+      <div>
+        <div class="title">CSET-seedance2 · 公众号草稿</div>
+        <div class="meta">
+          <strong class="text-draft">📝 已写入公众号后台草稿箱</strong>
+          · 2026-04-26 14:35 · <em style="color:var(--status-failed)">需手动群发才能推送给粉丝</em>
+        </div>
+      </div>
+      <span class="badge badge-draft">📝 草稿态</span>
+      <div class="flex gap-2">
+        <button class="btn btn-primary btn-sm">↗ 打开后台</button>
+      </div>
+    </div>
+
+    <!-- 草稿态：B站 -->
+    <div class="queue-row" style="border-left:3px solid var(--status-draft); background:var(--color-surface-alt)">
+      <div class="platform-icon bilibili">B</div>
+      <div>
+        <div class="title">CSET-seedance3 · B站投稿</div>
+        <div class="meta">
+          <strong class="text-draft">📝 已上传到 B站稿件管理 · 待审核</strong>
+          · 2026-04-26 11:22
+        </div>
+      </div>
+      <span class="badge badge-draft">📝 草稿态</span>
+      <div class="flex gap-2">
+        <button class="btn btn-primary btn-sm">↗ 打开后台</button>
+      </div>
+    </div>
+
+    <!-- 失败重试 -->
+    <div class="section-title mt-6">⚠️ 待重试</div>
+
+    <div class="queue-row" style="border-left:3px solid var(--status-failed)">
+      <div class="platform-icon x">𝕏</div>
+      <div>
+        <div class="title">CSET-seedance3 · X 短推</div>
+        <div class="meta">
+          <span class="text-error">第 2 次重试失败 · HTTP 429 Too Many Requests</span>
+          · 下次重试 2026-04-26 15:08（递增间隔 15 分钟）
+        </div>
+      </div>
+      <span class="badge badge-failed">⚠ 待重试 2/3</span>
+      <div class="flex gap-2">
+        <button class="btn btn-soft btn-sm">查看日志</button>
+        <button class="btn btn-soft btn-sm">立即重试</button>
+      </div>
+    </div>
+
+    <!-- 提示卡：草稿态 vs 已发布的视觉规约说明 -->
+    <div class="panel mt-6" style="border:1px dashed var(--color-border)">
+      <div class="section-title">🎨 视觉规约说明（demo 备注）</div>
+      <div class="text-sm text-secondary" style="line-height:1.7">
+        <div class="flex gap-3 items-center mb-2">
+          <span class="badge badge-published">✓ 已发布</span>
+          <span class="text-xs text-muted">蓝色徽章 + 蓝色左边线 + 真实链接 → 内容已经推送给受众</span>
+        </div>
+        <div class="flex gap-3 items-center mb-2">
+          <span class="badge badge-draft">📝 草稿态</span>
+          <span class="text-xs text-muted">虚线橙徽章 + 橙色左边线 + 略深底色 + 「打开后台」按钮 → 提醒用户必须手动完成最后一步</span>
+        </div>
+        <div class="flex gap-3 items-center mb-2">
+          <span class="badge badge-failed">⚠ 待重试</span>
+          <span class="text-xs text-muted">红色徽章 + 红色左边线 + 重试计数 → 自动重试中或等待手动介入</span>
+        </div>
+        <div class="text-xs text-muted mt-3" style="font-style:italic">
+          这个区分是 PRD 关于「草稿态」核心交互决策的视觉落点：永不让用户把草稿态误认成"真发了"。
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>分发终端 · 编辑卡片</title>
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="flex items-center gap-4">
+    <div class="app-brand">
+      <div class="app-brand-mark">D</div>
+      Distribution Terminal
+    </div>
+    <div class="breadcrumb">
+      <span class="sep">›</span>
+      <a class="crumb" href="01_landing.html">📁 CSET-seedance2</a>
+      <span class="sep">›</span>
+      <span class="crumb">📝 公众号 · 编辑</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <a class="tab" href="01_landing.html">分发台</a>
+    <a class="tab" href="03_queue.html">队列</a>
+  </div>
+</header>
+
+<div class="layout-2col">
+
+  <!-- 左：本组其它平台快速切换 -->
+  <aside class="sidebar">
+    <div class="sidebar-section-title">本素材组</div>
+    <div class="text-xs text-muted" style="padding:0 10px 10px">深度长文 · 8.4k 字</div>
+
+    <a class="sidebar-item" href="#">
+      <span style="width:18px; text-align:center">𝕏</span>
+      <span style="flex:1">X / Twitter</span>
+      <span class="badge badge-ready" style="font-size:10px; padding:2px 6px">就绪</span>
+    </a>
+    <a class="sidebar-item active">
+      <span style="width:18px; text-align:center; color:#07c160">公</span>
+      <span style="flex:1">公众号</span>
+      <span class="badge badge-draft" style="font-size:10px; padding:2px 6px">草稿</span>
+    </a>
+
+    <div class="sidebar-section-title" style="margin-top:18px">导航</div>
+    <a class="sidebar-item" href="01_landing.html">← 返回分发台</a>
+  </aside>
+
+  <!-- 主区：编辑表单 -->
+  <main>
+    <!-- 顶部状态条 -->
+    <div class="page-head flex justify-between items-start">
+      <div>
+        <h1 class="page-title">
+          <span class="platform-icon wechat-mp" style="width:32px; height:32px; font-size:16px">公</span>
+          微信公众号 · 单图文
+        </h1>
+        <div class="page-subtitle">来自 <code style="color:var(--color-module)">02_Script/CSET-seedance2_深度文稿_v2.1.md</code></div>
+      </div>
+      <span class="badge badge-draft">📝 草稿态发布</span>
+    </div>
+
+    <!-- 草稿态横幅说明 -->
+    <div class="panel-tinted mb-4" style="border-left:4px solid var(--status-draft); padding:14px 18px">
+      <div class="font-semibold text-draft mb-2">ⓘ 关于「草稿态」发布</div>
+      <div class="text-sm text-secondary" style="line-height:1.65">
+        微信公众号官方 API 仅支持「创建草稿」，不支持直接群发。点击发布后，系统会把内容写入你的公众号后台草稿箱。
+        <strong style="color:var(--color-text)">最终的群发动作还需要你登录 mp.weixin.qq.com 手动点「群发」。</strong>
+        发布完成后，卡片会显示「打开后台」按钮直达。
+      </div>
+    </div>
+
+    <!-- 通用层 -->
+    <div class="panel mb-4">
+      <div class="section-title">📄 通用内容 <span class="meta">·  X 卡 同步使用这些字段</span></div>
+
+      <div class="field">
+        <label class="field-label">标题<span class="required">*</span></label>
+        <input class="field-input" value="推理模型新世代：当 STEM benchmark 从 27% 跃迁到 87%，意味着什么" />
+        <div class="field-help">公众号建议 ≤ 20 字 · 当前 30 字（建议精简）</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">摘要<span class="required">*</span> <span class="text-muted" style="font-weight:400">· 公众号专用，≤ 120 字</span></label>
+        <textarea class="field-textarea" style="min-height:80px">从 GPT-4 时代到 o4 时代，STEM benchmark 提升 60 个百分点意味着什么？本文从安全测评成本、推理路径透明度、产业应用门槛三个维度，拆解推理模型范式跃迁背后的真正约束。</textarea>
+        <div class="field-help">119 / 120 字</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">正文<span class="required">*</span></label>
+        <textarea class="field-textarea" style="min-height:200px">## 一、benchmark 数字的真相
+
+OpenAI 在 o4 模型卡里宣称 STEM 任务从 GPT-4 时代的 27% 提升到了 87%——这是个非常漂亮的数字，但它的含义需要拆开看。
+
+首先，benchmark 本身是 AIME 2025 + GPQA Diamond 的子集，并不能完全代表实际工业场景的推理能力。其次，这个数字背后是测评成本的 5 倍提升……</textarea>
+        <div class="field-help">8420 字 · 公众号无字数上限</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">标签</label>
+        <div class="flex gap-2" style="flex-wrap:wrap; padding:8px; background:var(--color-bg); border:1px solid var(--color-border); border-radius:8px">
+          <span class="badge badge-tag">#AI推理模型</span>
+          <span class="badge badge-tag">#OpenAI</span>
+          <span class="badge badge-tag">#STEM Benchmark</span>
+          <span class="badge badge-tag">#行业洞察</span>
+          <span class="text-xs text-muted" style="padding:3px 6px">+ 添加</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 公众号高级设置（默认展开） -->
+    <div class="collapsible mb-4">
+      <div class="collapsible-head">
+        <span>⚙️ 公众号高级设置</span>
+        <span class="text-xs text-muted">▼ 已展开</span>
+      </div>
+      <div class="collapsible-body">
+
+        <div class="field">
+          <label class="field-label">封面图（thumb_media_id）<span class="required">*</span></label>
+          <div class="flex gap-3 items-center">
+            <div style="width:120px; height:90px; background:var(--color-surface-alt); border:1px dashed var(--color-border); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--color-text-muted); font-size:11px;">
+              📷 cover.png
+            </div>
+            <div>
+              <div class="text-xs text-secondary">已从 02_Script/cover.png 自动选择</div>
+              <div class="text-xs text-muted mt-2">将自动上传到公众号素材库换取 thumb_media_id</div>
+              <button class="btn btn-soft btn-sm mt-2">替换封面</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">作者</label>
+            <input class="field-input" value="老卢 · MindHikers" />
+          </div>
+          <div class="field">
+            <label class="field-label">原文链接（可选）</label>
+            <input class="field-input" placeholder="留空则不显示「阅读原文」" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label">评论开关</label>
+            <select class="field-select">
+              <option>✓ 允许所有人评论</option>
+              <option>仅粉丝可评论</option>
+              <option>关闭评论</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">付费 / 赞赏</label>
+            <select class="field-select">
+              <option>关闭赞赏</option>
+              <option>开启赞赏</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- X 卡高级设置（折叠） -->
+    <div class="collapsible closed mb-4">
+      <div class="collapsible-head">
+        <span>⚙️ X / Twitter 高级设置（同组联动编辑）</span>
+        <span class="text-xs text-muted">▶ 点击展开</span>
+      </div>
+      <div class="collapsible-body">
+        <!-- 折叠内容占位 -->
+      </div>
+    </div>
+
+    <!-- 风控提示 -->
+    <div class="panel-tinted mb-4" style="font-size:13px">
+      <div class="flex items-center justify-between mb-2">
+        <strong class="text-primary">🛡 防风控延时</strong>
+        <label class="flex items-center gap-2 text-xs text-secondary">
+          <input type="checkbox" class="cb" checked />
+          启用（默认开启）
+        </label>
+      </div>
+      <div class="text-xs text-muted" style="line-height:1.6">
+        系统会在 2-8 分钟内随机延迟发布，避开平台多账号同步检测。一期独立创作者场景下风险低，可关闭以即时发布。
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 底部发布栏 -->
+<div class="action-bar">
+  <div class="summary">
+    草稿将写入 <strong>公众号后台</strong> · 完成后请手动群发
+  </div>
+  <div class="flex gap-3">
+    <button class="btn btn-ghost">取消</button>
+    <button class="btn btn-soft">保存到队列</button>
+    <button class="btn btn-primary">📝 写入草稿箱</button>
+  </div>
+</div>
+
+</body>
+</html>

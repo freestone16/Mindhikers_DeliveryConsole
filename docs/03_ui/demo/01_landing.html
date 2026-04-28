@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>分发终端 · 项目分发台</title>
+<link rel="stylesheet" href="_shared.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="flex items-center gap-4">
+    <div class="app-brand">
+      <div class="app-brand-mark">D</div>
+      Distribution Terminal
+    </div>
+    <div class="breadcrumb">
+      <span class="sep">›</span>
+      <span class="crumb">📁 CSET-seedance2</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <a class="tab active">分发台</a>
+    <a class="tab" href="03_queue.html">队列</a>
+    <a class="tab">账号</a>
+    <a class="tab">历史</a>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- 左侧：项目列表 -->
+  <aside class="sidebar">
+    <div class="sidebar-section-title">项目</div>
+    <a class="sidebar-item active">📂 CSET-seedance2</a>
+    <a class="sidebar-item">📂 CSET-seedance3</a>
+    <a class="sidebar-item">📂 MHSDC-MarketBrief</a>
+    <a class="sidebar-item">📂 Anthropic-MCP-Demo</a>
+
+    <div class="sidebar-section-title" style="margin-top:18px">视图</div>
+    <a class="sidebar-item">🗓 草稿态</a>
+    <a class="sidebar-item">🚀 已发布</a>
+    <a class="sidebar-item">⚠️ 失败重试</a>
+  </aside>
+
+  <!-- 中部主区 -->
+  <main>
+    <!-- 顶部健康条 -->
+    <div class="health-strip mb-4">
+      <div class="flex items-center gap-4">
+        <strong style="color:var(--color-text)">账号健康</strong>
+        <div class="health-item"><span class="health-dot ok"></span>X · 已绑定</div>
+        <div class="health-item"><span class="health-dot ok"></span>YouTube · 已绑定</div>
+        <div class="health-item"><span class="health-dot warn"></span>公众号 · 草稿态</div>
+        <div class="health-item"><span class="health-dot err"></span>B站 · Cookie 过期</div>
+      </div>
+      <a class="btn btn-soft btn-sm">管理账号</a>
+    </div>
+
+    <!-- 项目头 -->
+    <div class="page-head">
+      <h1 class="page-title">📦 CSET-seedance2 <span class="badge badge-tag">5 张卡 · 2 待发</span></h1>
+      <div class="page-subtitle">扫描自 <code style="color:var(--color-module)">/Projects/CSET-seedance2/</code> · 最近一次扫描 2 分钟前 · 共 1 篇长文 + 1 部成片</div>
+    </div>
+
+    <!-- 素材组 1：长文 → X / 公众号 -->
+    <div class="section-title">
+      <span>📝 素材组 · 深度长文</span>
+      <span class="meta">CSET-seedance2_深度文稿_v2.1.md · 8.4k 字 · 写作大师 2026-04-25 产出</span>
+    </div>
+
+    <div class="grid-2 mb-6">
+      <!-- X 卡 -->
+      <div class="publish-card selected">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center gap-3">
+            <div class="platform-icon x">𝕏</div>
+            <div>
+              <div class="font-semibold">X / Twitter</div>
+              <div class="text-xs text-muted">线程发布 · 8 推</div>
+            </div>
+          </div>
+          <span class="badge badge-ready">● 可发布</span>
+        </div>
+        <div class="text-sm text-secondary" style="line-height:1.6">
+          OpenAI 的 o4 推理模型把 STEM 任务从 GPT-4 时代的 27% 拉到 87%，但也意味着安全测评成本翻了 5 倍 ——
+        </div>
+        <div class="flex items-center justify-between mt-4">
+          <input type="checkbox" class="cb" checked />
+          <a class="btn btn-soft btn-sm">编辑 →</a>
+        </div>
+      </div>
+
+      <!-- 公众号 卡（草稿态） -->
+      <div class="publish-card">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center gap-3">
+            <div class="platform-icon wechat-mp">公</div>
+            <div>
+              <div class="font-semibold">微信公众号</div>
+              <div class="text-xs text-muted">单图文 · 8420 字</div>
+            </div>
+          </div>
+          <span class="badge badge-draft">📝 草稿态</span>
+        </div>
+        <div class="text-sm text-secondary" style="line-height:1.6">
+          推理模型新世代：当 STEM benchmark 从 27% 跃迁到 87%，意味着什么 ——
+        </div>
+        <div class="text-xs text-muted mt-2" style="font-style:italic">
+          ⓘ 公众号 API 仅支持创建草稿，需登录后台手动群发
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <input type="checkbox" class="cb" checked />
+          <a class="btn btn-soft btn-sm">编辑 →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 素材组 2：长视频 → YouTube / B站 -->
+    <div class="section-title">
+      <span>🎬 素材组 · 主成片</span>
+      <span class="meta">CSET-seedance2_main_1080p.mp4 · 12'34" · 影视导演 P4 完成</span>
+    </div>
+
+    <div class="grid-2 mb-6">
+      <!-- YouTube 卡 -->
+      <div class="publish-card">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center gap-3">
+            <div class="platform-icon youtube">▶</div>
+            <div>
+              <div class="font-semibold">YouTube</div>
+              <div class="text-xs text-muted">长视频 · 12'34"</div>
+            </div>
+          </div>
+          <span class="badge badge-published">✓ 已发布</span>
+        </div>
+        <div class="text-sm text-secondary" style="line-height:1.6">
+          AI Reasoning Models: From 27% to 87% on STEM Benchmarks —— What This Means
+        </div>
+        <div class="text-xs text-published mt-2">
+          🔗 youtu.be/dQw4w9WgXcQ · 2026-04-26 14:32 发布
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <input type="checkbox" class="cb" disabled />
+          <a class="btn btn-soft btn-sm">查看详情</a>
+        </div>
+      </div>
+
+      <!-- B站 卡（账号红灯置灰） -->
+      <div class="publish-card disabled">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center gap-3">
+            <div class="platform-icon bilibili">B</div>
+            <div>
+              <div class="font-semibold">哔哩哔哩</div>
+              <div class="text-xs text-muted">长视频 · 12'34"</div>
+            </div>
+          </div>
+          <span class="badge badge-disabled">⊘ Cookie 过期</span>
+        </div>
+        <div class="text-sm text-muted" style="line-height:1.6">
+          推理模型新纪元：从 STEM benchmark 27% 跃迁到 87% 意味着什么
+        </div>
+        <div class="text-xs text-muted mt-2">
+          ⓘ 需要先在「账号」页重新登录 B站
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <input type="checkbox" class="cb" disabled />
+          <a class="btn btn-soft btn-sm">去授权</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 占位：未 ready 的素材组（视频未生成市场文案） -->
+    <div class="section-title">
+      <span>📹 素材组 · Shorts 切片</span>
+      <span class="meta">CSET-seedance2_short_60s.mp4 · 缺少市场大师文案</span>
+    </div>
+    <div class="panel" style="text-align:center; color:var(--color-text-muted); padding:24px">
+      <div style="font-size:24px; margin-bottom:6px">⌛</div>
+      <div class="font-semibold text-primary mb-2">需要市场大师文案</div>
+      <div class="text-xs">视频已就绪，但 <code>05_Marketing/short_60s.md</code> 不存在 —— 一期不做 Shorts，本组将自动跳过。</div>
+    </div>
+
+  </main>
+
+  <!-- 右侧：Queue 摘要 -->
+  <aside>
+    <div class="panel mb-4">
+      <div class="section-title justify-between">
+        <span>📤 队列概览</span>
+        <a class="text-xs text-module" href="03_queue.html">全部 →</a>
+      </div>
+      <div class="text-xs text-muted mb-3">最近 24h 发布任务</div>
+
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div class="flex justify-between items-center" style="padding:8px 10px; background:var(--color-bg); border-radius:8px; border:1px solid var(--color-border)">
+          <span class="text-sm">⚙️ 执行中</span>
+          <span class="font-bold text-module">1</span>
+        </div>
+        <div class="flex justify-between items-center" style="padding:8px 10px; background:var(--color-bg); border-radius:8px; border:1px solid var(--color-border)">
+          <span class="text-sm">⏳ 待执行</span>
+          <span class="font-bold">2</span>
+        </div>
+        <div class="flex justify-between items-center" style="padding:8px 10px; background:var(--color-bg); border-radius:8px; border:1px solid var(--color-border)">
+          <span class="text-sm text-success">✓ 已完成</span>
+          <span class="font-bold text-success">7</span>
+        </div>
+        <div class="flex justify-between items-center" style="padding:8px 10px; background:var(--color-bg); border-radius:8px; border:1px solid var(--color-border)">
+          <span class="text-sm text-error">⚠ 待重试</span>
+          <span class="font-bold text-error">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最近活动 -->
+    <div class="panel">
+      <div class="section-title">📜 最近活动</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="text-xs">
+          <div class="text-secondary"><strong style="color:var(--color-text)">YouTube</strong> · 已发布</div>
+          <div class="text-muted">CSET-seedance2 · 2 分钟前</div>
+        </div>
+        <div class="text-xs">
+          <div class="text-secondary"><strong style="color:var(--color-text)">公众号</strong> · 草稿已就绪</div>
+          <div class="text-muted">MHSDC-MarketBrief · 18 分钟前</div>
+        </div>
+        <div class="text-xs">
+          <div class="text-secondary"><strong style="color:var(--color-text)">X</strong> · 第 2 次重试</div>
+          <div class="text-muted">CSET-seedance3 · 32 分钟前</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- 底部发布栏 -->
+<div class="action-bar">
+  <div class="summary">
+    已选 <strong>2</strong> 条 · 1 条直发 + 1 条草稿态
+    <span class="text-muted" style="margin-left:10px">预计 5 分钟内完成</span>
+  </div>
+  <div class="flex gap-3">
+    <button class="btn btn-soft">⏰ 定时发布</button>
+    <button class="btn btn-primary">🚀 立即发布</button>
+  </div>
+</div>
+
+</body>
+</html>

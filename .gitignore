@@ -30,3 +30,6 @@ coverage/
 # Temporary files
 *.tmp
 .cache/
+
+# Local-only Claude Code skills (个人化，不入库)
+.claude/skills/

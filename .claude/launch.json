@@ -31,6 +31,12 @@
       "runtimeArgs": ["vite", "--host"],
       "port": 5181,
       "autoPort": false
+    },
+    {
+      "name": "demo-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs/03_ui/demo"],
+      "port": 8765
     }
   ]
 }
