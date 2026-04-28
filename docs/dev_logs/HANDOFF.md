@@ -1,151 +1,225 @@
-🕐 Last updated: 2026-04-14 15:30
-🌿 Branch: MHSDC-GC-SAAS-staging
+🕐 Last updated: 2026-04-28 20:23 CST
+🌿 Branch: codex/saas-shell-slice-integration
 📍 Scope: MHSDC/GoldenCrucible-SaaS
 
 ---
 
-## Goal
+## 当前一句话
 
-GoldenCrucible-SaaS V1 Phase 3 staging 冒烟测试 + SaaS/SSE 双边治理同步。
-
-## 实施计划
-
-`docs/plans/2026-04-12-001-feat-golden-crucible-saas-v1-implementation-plan.md`（7 个 Unit，3 个交付阶段）
-
-## PRD
-
-`docs/plans/2026-04-11_GoldenCrucible_SaaS_PRD.md`（357 行）
+SaaS staging 派生的独立集成分支已完成 SSE 壳层切片迁移 checkpoint，代码层 `typecheck:saas` / `build` 通过，agent-browser 壳层入口验收通过；尚未回灌 `MHSDC-GC-SAAS-staging`。
 
 ---
 
-## Phase 1 — 全部完成 ✅
+## 本轮目标
 
-| Unit | Linear | Commit | 内容 |
-|------|--------|--------|------|
-| Unit 1 Core Path Readiness | MIN-105 | — | 4 个探索 agent 确认 PRD 就绪 |
-| Unit 5 BYOK Guided Onboarding | MIN-109 | `8ee25ac` `edc06f7` | 服务端错误归类 + 前端引导增强 + 诊断测试 |
-| Unit 6 Auth Smoke Requests | — | — | 3 个 smoke request 文件（GC-SAAS-001/002/003） |
+按 SSE 交接语句执行 SaaS staging 后续切片移植：
 
-## Phase 2 — 全部完成 ✅
-
-| Unit | Linear | Commit | 内容 |
-|------|--------|--------|------|
-| Unit 2 Thesis Convergence Gate | MIN-119 | `d3b04ed` | `detectThesisConvergence()` 纯函数 + thesisReady 全链路 + ChatPanel CTA + 10 测试 |
-| Unit 3 ThesisWriter API + Artifact | MIN-120 | `db75abb` | `crucible-thesiswriter.ts` 新建 + `appendCrucibleThesisArtifact` + 前端下载 |
-| Unit 4 Thesis Trial Quota | MIN-121 | `f70d001` | 平台用户限 2 次论文 + BYOK/VIP 无限制 + 前端额度展示 |
-
-## Phase 3 — Staging 冒烟部分完成 / 存在阻塞 ⚠️
-
-| 验证项 | 结果 |
-|--------|------|
-| TREQ-004 Core Dialogue | ✅ 通过 — SSE 流正常，4 轮对话 + 刷新恢复验证通过（Kimi） |
-| TREQ-005 History/Export | ✅ 通过 — 历史列表、恢复、bundle-json(6KB) 和 markdown(4.5KB) 导出正常 |
-| TREQ-006 ThesisWriter | ⚠️ 阻塞 — Thesis 后端路由在 staging 返回 404，代码存在但未部署 |
-| TREQ-007 BYOK | ⏸️ 待执行 — 依赖 TREQ-006 解阻塞 |
-| Production 主链冒烟 | ✅ 通过 — `gc.mindhikers.com` 首页、auth、version 正常 |
-
-### Phase 3 落盘
-
-- **Commit**: `7147b59` (`refs MIN-108`) — 本地已提交，尚未 push 到远程
-- **报告路径**: `testing/golden-crucible/reports/TREQ-2026-04-12-GC-SAAS-00{4,5,6}.report.md`
-- **证据路径**: `testing/golden-crucible/artifacts/`
+- 禁止整枝 merge SSE → SaaS
+- 从 `MHSDC-GC-SAAS-staging` 拉独立集成分支
+- 按切片迁移：依赖/Router → tokens/primitives → Shell 原语 → ShellLayout/registry → module stages/artifacts → P0/P1 fixes → 必要后端路由整理
+- 每片跑 `npm run typecheck:saas` 与 `npm run build`
+- 最终用 agent-browser 验 `/`、`/m/crucible`、`/m/roundtable`、`/llm-config`
 
 ---
 
-## 治理同步 — 已完成 ✅（未提交）
+## 已完成
 
-### 改动范围
+### 1. 独立集成分支
 
-双边同步了 SaaS 和 SSE 的治理文件，确保核心认知、底座同步规则一致。
+- 当前分支：`codex/saas-shell-slice-integration`
+- 基底：`MHSDC-GC-SAAS-staging`
+- 未整枝 merge SSE
+- 未回灌 SaaS staging
 
-| # | 文件 | 仓库 | 改动 |
-|---|------|------|------|
-| 1 | `AGENTS.md` | SaaS | 完全重写：加 §0.1 核心认知 4 条、§1 架构概览、§6 底座同步完整章节 |
-| 2 | `docs/04_progress/rules.md` | SaaS | 新增规则 102-113（核心认知 + 底座同步 + 文档链路） |
-| 3 | `docs/04_progress/dev_progress.md` | SaaS | 新增 1.19 里程碑 |
-| 4 | `AGENTS.md` | SSE | 加 §0.1 核心认知 + §6 底座同步 + Red Line 补文档链路 |
-| 5 | `docs/04_progress/rules.md` | SSE | 新增规则 101-109（底座同步 + 恢复优先级 + 拉齐纪律） |
+### 2. 本地 checkpoint commit
 
-### 关键决策
+- Commit：`b4c8ba2`
+- Message：`refs MIN-136 feat: checkpoint SaaS shell slice integration`
+- 状态：本地 commit，未 push
 
-- **SaaS ≠ SSE 子集**：SaaS 是独立预发阵地，经过生产级验收
-- **底座 = 6 类基础设施**：路由骨架、认证体系、构建配置、前端壳、共享类型/Schema、通用工具
-- **触发时机**：SaaS 每次验收收口（准备推 main 之前）
-- **冲突原则**：底座以 SaaS 为准，功能以 SSE 为准，判断不了问老卢
-- **健康校验**：build + dev 启动 + 冒烟测试
+Commit 内容范围：
 
-### 状态：⚠️ 5 个文件已修改但未 git commit
+- 依赖：`@tanstack/react-query`、`react-router-dom`、`zustand`
+- 入口：`src/main.tsx`、`src/router.tsx`、`src/lib/query-client.ts`
+- 主题：`src/styles/*`、`src/index.css`
+- primitives：`src/components/primitives/*`
+- Shell：`src/shell/*`
+- modules：`src/modules/*`
+- slots：`src/slots/*`
+- SaaS 壳切换：`src/SaaSApp.tsx`
+- Crucible artifact state 抄送：`src/components/crucible/CrucibleWorkspaceView.tsx`
+- Better Auth trusted origin：`server/auth/index.ts`
 
-需要老卢确认后提交。
+### 3. 切片验证
 
----
+每个主要切片后均已跑：
 
-## 当前阻塞点
-
-### 1. ThesisWriter 后端路由未部署到 staging（阻塞 TREQ-006/007）
-
-- `/api/crucible/thesis/generate` → 404
-- `/api/crucible/thesis/trial-status` → 404
-- 本地代码中存在这些路由 (`server/index.ts:256-268`)
-- Railway staging 部署版本中未生效
-
-### 2. 待回灌的底座修复（3 个 commit）
-
-| Commit | 内容 | 状态 |
-|--------|------|------|
-| `1847fa2` | auth:migrate 加入启动脚本 | 待回灌 SSE |
-| `d897137` | databaseMigration 启用 | 待回灌 SSE |
-| `e33fbef` | thesiswriter 正则修复 | 待确认是否被 backsync 覆盖 |
-
----
-
-## 关键架构知识
-
-### 收敛检测
-
-```typescript
-detectThesisConvergence(roundIndex, source, decision)
-→ roundIndex >= 5 && source === 'socrates' && decision.stageLabel === 'crystallization'
+```bash
+npm run typecheck:saas
+npm run build
 ```
 
-### Thesis 数据流
+最终结果：
 
-```
-CrucibleTurnResult.thesisReady (server)
-→ SSE turn event → CrucibleTurnResponse.thesisReady
-→ CrucibleWorkspaceView state → CrucibleSnapshot.thesisReady
-→ SaaSApp crucibleThesisReady state → ChatPanel thesisReady prop
-→ CTA 渲染 (isCrucibleMode && thesisReady && lastOldluMessageId)
-→ 用户点击 → handleEnterThesisWriter
-→ POST /api/crucible/thesis/generate
-→ callConfiguredLlm(thesisPrompt, byokConfig)
-→ appendCrucibleThesisArtifact (type: 'asset', id: thesis_${ts})
-→ 前端下载 Markdown
-```
+- `npm run typecheck:saas` ✅
+- `npm run build` ✅
+- 构建仍有既有警告：CSS minify 里 `file` 非标准属性提示、chunk size 超 500KB 提示
 
-### Trial Quota 分层
+### 4. agent-browser 壳层验收
 
-- **VIP**：enabled=false, canGenerateThesis=true（不受限）
-- **BYOK**：mode='byok', canGenerateThesis=true（不受限）
-- **平台模式**：CRUCIBLE_THESIS_TRIAL_LIMIT=2，遍历 artifacts 计数 thesis_ 前缀
+已在本地 `http://127.0.0.1:5183` 验证：
 
----
-
-## 约束（Verbatim）
-
-- 禁止在 main 直接开发或写无相关的特性代码
-- 禁止绕过老卢确认
-- 禁止无 issue 归属的提交：`refs MIN-xx <变更摘要>`
-- 所有沟通、思考、方案必须使用中文
-- 分支：`MHSDC-GC-SAAS-staging`
+- `/` ✅ 自动进入 `/m/crucible`
+- `/m/crucible` ✅ Shell 左栏、Crucible 对话区、artifact drawer 可见
+- `/m/crucible` artifact drawer ✅ 四个 tab 可见：Thesis / SpikePack / Snapshot / Reference
+- `/m/roundtable` ✅ 页面可打开，圆桌输入框与 artifact drawer 可见
+- `/m/roundtable` artifact drawer ✅ 四个 tab 可见
+- `/llm-config` ✅ BYOK 配置页可打开，关闭后返回 `/m/crucible`
+- Console ✅ 未出现 `Rendered more hooks`
+- Console ✅ 未出现 `[ShellErrorBoundary] Unhandled error`
+- Errors ✅ 无 page error
+- Network ✅ `/api/...` 与 `/socket.io/...` 走当前同源 `127.0.0.1:5183`，未出现后端端口 `3010` 直连
 
 ---
 
-## 下一步
+## 未完成 / 注意事项
 
-1. **老卢确认治理文件改动 → git commit + push**（SaaS 和 SSE 双边）
-2. **排查 ThesisWriter 路由未部署到 staging 的根因**
-3. **解阻塞后重新执行 TREQ-006 / TREQ-007**
-4. **底座回灌**：将 `1847fa2`、`d897137`、`e33fbef` 三个 commit cherry-pick 到 SSE
-5. **Linear MIN-108 状态推进为 Done**
-6. **推送 commit `7147b59` 到远程**
+### 1. 本地 auth 占位符修复
+
+发现：
+
+- `.env.local` 中 `DATABASE_URL=...` 是占位符
+- 旧逻辑只判断 `DATABASE_URL` 是否有值，导致 auth 被误开启
+- Better Auth 随后拿 `...` 去连 Postgres，报 `Connection terminated unexpectedly`
+
+处理：
+
+- 已在 `server/auth/index.ts` 增加 `resolveDatabaseUrl()`
+- `DATABASE_URL` 为空或等于 `...` 时视为未配置 auth
+- 本地因此进入无认证模式，完成 Shell 验收
+
+结论：
+
+- 本地壳层验收已完成
+- 真实生产/预发 auth 仍依赖真实 `DATABASE_URL`
+- staging 线上登录 smoke 仍建议在回灌前再跑一次
+
+### 2. Roundtable 后端未接入
+
+现状：
+
+- 前端 `RoundtableStage` 已迁入
+- 前端请求路径为同源 `/api/roundtable/...`
+- 当前 SaaS/SSE server 中未发现对应 roundtable API 路由
+
+处理口径：
+
+- 本轮只保证 staging 可用于壳层/页面验证
+- 不把 Roundtable 后端大功能混进本轮壳层迁移
+- production 是否露出 Roundtable 入口仍待老卢最后拍板
+
+### 3. 尚未回灌 SaaS staging
+
+当前成果仍在：
+
+- `codex/saas-shell-slice-integration`
+
+尚未执行：
+
+- merge 回 `MHSDC-GC-SAAS-staging`
+- cherry-pick 回 `MHSDC-GC-SAAS-staging`
+- push
+
+---
+
+## 当前工作区状态
+
+本轮 shell 迁移代码已提交进 `b4c8ba2`。
+
+仍存在大量未提交脏现场，主要是本轮之前/之外的文档、测试报告、pycache 删除、治理资产等；本轮 checkpoint commit 没有收进去。
+
+已确认未提交脏现场包括但不限于：
+
+- `docs/04_progress/dev_progress.md`
+- `docs/dev_logs/HANDOFF.md`（本文件，当前保存进度后会变更）
+- `testing/golden-crucible/*`
+- `skills/__pycache__/*` 删除
+- `.claude/skills`
+- `.playwright-mcp/`
+- `.vibedir/`
+- 早期 `docs/plans/2026-04-06*` 等治理文档
+
+不要误以为这些都是本轮 shell 迁移产生的。
+
+---
+
+## 下一步建议
+
+### 推荐继续路线
+
+1. 提交 auth placeholder fix 与进度文档
+2. 如老卢确认，准备把 `codex/saas-shell-slice-integration` 的验收成果回灌 `MHSDC-GC-SAAS-staging`
+3. 回灌前建议再跑一次：
+   - `npm run typecheck:saas`
+   - `npm run build`
+   - agent-browser `/`、`/m/crucible`、`/m/roundtable`、`/llm-config`
+4. 回灌后 staging 线上再做最终 smoke
+
+### 严禁事项
+
+- 不要直接 merge 整个 SSE 分支进 SaaS
+- 不要在浏览器验收未完成前回灌 staging
+- 不要把未归属的历史脏文件混进 shell 迁移提交
+- 不要擅自决定 Roundtable production 可见性
+
+---
+
+## 关键命令记录
+
+已通过：
+
+```bash
+npm run typecheck:saas
+npm run build
+```
+
+本地 dev 曾启动：
+
+```bash
+npm run dev
+```
+
+本地端口：
+
+- Frontend：`http://localhost:5183/` / `http://127.0.0.1:5183/`
+- Backend：`http://0.0.0.0:3010`
+
+本地 `.env.local` 口径：
+
+- `PORT=3010`
+- `VITE_APP_PORT=5183`
+- `VITE_BACKEND_PORT=3010`
+- `APP_BASE_URL=http://127.0.0.1:5183`
+- `CORS_ORIGIN=http://127.0.0.1:5183`
+- `BETTER_AUTH_URL=http://127.0.0.1:3010`
+
+---
+
+## 接管提示
+
+如果新窗口接管，先执行：
+
+```bash
+git branch --show-current
+git log --oneline -3
+git status --short
+npm run typecheck:saas
+npm run build
+```
+
+期望：
+
+- 分支为 `codex/saas-shell-slice-integration`
+- 最新 commit 至少包含 `b4c8ba2`
+- shell 迁移代码已在 commit 内
+- 工作区仍可能有与本轮无关的历史脏文件

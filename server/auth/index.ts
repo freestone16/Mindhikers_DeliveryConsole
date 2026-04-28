@@ -11,7 +11,15 @@ let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-export const isAuthEnabled = () => Boolean(process.env.DATABASE_URL?.trim());
+const resolveDatabaseUrl = () => {
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    if (!databaseUrl || databaseUrl === '...') {
+        return '';
+    }
+    return databaseUrl;
+};
+
+export const isAuthEnabled = () => Boolean(resolveDatabaseUrl());
 
 export const resolveAuthBaseUrl = () => {
     const explicitBaseUrl = process.env.BETTER_AUTH_URL?.trim()
@@ -48,13 +56,15 @@ export const isWeChatAuthEnabled = () => Boolean(
 );
 
 export const getAuthPool = () => {
-    if (!process.env.DATABASE_URL?.trim()) {
+    const databaseUrl = resolveDatabaseUrl();
+
+    if (!databaseUrl) {
         throw new Error('DATABASE_URL is required for auth');
     }
 
     if (!authPool) {
         authPool = new Pool({
-            connectionString: process.env.DATABASE_URL,
+            connectionString: databaseUrl,
         });
     }
 
