@@ -11,8 +11,8 @@
 | 项目 | 状态 |
 |---|---|
 | 分支 | `MHSDC-DT` |
-| 最新 commit | `a2e3ae5` feat(dt): [A1+A2] 类型扩展 + composer-sources V2（**未 push**） |
-| 上一 commit | `ca3c297` docs(dt): PRD v1 + 实施计划 + demo 视觉（**未 push**） |
+| 最新 commit | `8bc6bdd` docs: HANDOFF 更新（**已 push** 2026-04-29 12:46） |
+| 推送范围 | `060a8f1..8bc6bdd` 共 3 个 commit 已 push 到 origin/MHSDC-DT |
 | 当前任务 | Distribution Terminal 一期落地中。Plan 14 个 Unit，已完成 **A1 + A2**（2/14） |
 | 代码状态 | 干净，所有改动已 commit |
 | 端口口令 | 前端 `5181`、后端 `3005/3008`、demo `8765` |
@@ -103,8 +103,16 @@ Phase D 联调（3 unit）
 
 ## 阻塞项 / 待决策
 
-- [ ] 两个未 push 的 commit（`ca3c297`、`a2e3ae5`）等老卢决定何时 push
+- [x] ~~两个未 push 的 commit~~ → 已 push（2026-04-29 12:46）
 - [ ] 4 平台环境变量（`X_API_KEY`、`WECHAT_MP_APP_ID`、`BILIBILI_COOKIE` 等）需老卢提供，B1/B2/B3 实施时才用得上
+
+## 📍 下次新窗口接续指引（重要）
+
+老卢确认下次开新窗口干 A3。新会话第一句话用：
+
+> 老杨 接 docs/dev_logs/HANDOFF.md 干 A3
+
+OldYang skill 会自动按 §最小接管顺序读这份 HANDOFF + Plan 切到 A3 起点。无需重新解释上下文。
 
 ## 关键文档（按重要性）
 
