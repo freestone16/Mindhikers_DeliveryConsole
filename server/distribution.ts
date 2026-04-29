@@ -14,6 +14,7 @@ import {
 import {
     appendDistributionHistory,
     getDistributionComposerSources,
+    getDistributionComposerSourcesV2,
     listDistributionAssets,
     loadDistributionHistory,
     loadDistributionQueue,
@@ -336,15 +337,30 @@ router.get('/composer-sources', (req, res) => {
     try {
         const projectId = (req.query.projectId || req.query.project) as string;
         const selectedVideoPath = req.query.selectedVideoPath as string | undefined;
+        const apiVersion = (req.query.v as string) || '1';
         if (!projectId) {
             return res.status(400).json({ success: false, error: 'Missing project parameter' });
         }
 
+        // A2: V2 走素材组分组
+        if (apiVersion === '2') {
+            const sourcesV2 = getDistributionComposerSourcesV2(projectId);
+            log('Distribution-Composer', 'SourcesV2', 'READ',
+                `Project=${projectId}, groups=${sourcesV2.groups.length}, warnings=${sourcesV2.warnings.length}`);
+            return res.json({
+                success: true,
+                sources: sourcesV2,
+                version: '2',
+            });
+        }
+
+        // V1 兼容（旧 PublishComposer 仍在用）
         res.json({
             success: true,
             sources: getDistributionComposerSources(projectId, {
                 selectedVideoPath,
             }),
+            version: '1',
         });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });

@@ -4,7 +4,11 @@ import { getProjectRoot, getProjectsBase, resolveProjectPath } from './project-p
 import type {
   DistributionComposerSourceFile,
   DistributionComposerSources,
+  DistributionComposerSourcesV2,
   DistributionHistoryEntry,
+  DistributionMaterialGroup,
+  DistributionPlatformReadyState,
+  DistributionSupportedPlatform,
   DistributionTask,
   DistributionTextAsset,
   DistributionVideoAsset,
@@ -441,6 +445,297 @@ export function getDistributionComposerSources(
     sourceFiles,
     warnings,
   };
+}
+
+/**
+ * === A2 新增 ===
+ *
+ * V2 版本的 composer-sources：按素材组返回。
+ *
+ * 扫描规则：
+ * - 02_Script/*.md  → 每个 .md 一个 longform 组，applicablePlatforms = ['twitter', 'wechat_mp']
+ * - 04_Video/*.mp4  → 每个 .mp4 一个 video 组，applicablePlatforms = ['youtube', 'bilibili']
+ *
+ * Ready 判定规则（PRD R1.3）：
+ * - longform → twitter:    主 .md 存在
+ * - longform → wechat_mp:  主 .md 存在 + 同名 .png 封面图存在
+ * - video    → youtube:    主 .mp4 存在 + (05_Marketing/youtube.md 存在 或 02_Script 有 .md)
+ * - video    → bilibili:   主 .mp4 存在 + 05_Marketing/bilibili.md 存在
+ *
+ * 平台专用文案：若 05_Marketing/<platform>.md 存在，则该 platform 的 suggested* 字段
+ * 来自该文件；否则回退到主素材的 suggested* 字段。
+ *
+ * 路由层用法：
+ *   GET /distribution/composer-sources?projectId=X        → 旧 V1（getDistributionComposerSources）
+ *   GET /distribution/composer-sources?projectId=X&v=2    → 新 V2
+ */
+export function getDistributionComposerSourcesV2(projectId: string): DistributionComposerSourcesV2 {
+  const projectRoot = getProjectRoot(projectId);
+  const scriptDir = path.join(projectRoot, '02_Script');
+  const videoDir = path.join(projectRoot, '04_Video');
+  const marketingDir = path.join(projectRoot, '05_Marketing');
+
+  const groups: DistributionMaterialGroup[] = [];
+  const projectWarnings: string[] = [];
+  const scannedAt = new Date().toISOString();
+
+  // 1. 扫描 longform 素材
+  const scriptFiles = listFilesRecursive(scriptDir, 1).filter((filePath) => {
+    const normalized = path.basename(filePath).toLowerCase();
+    return (
+      normalized.endsWith('.md') &&
+      !filePath.includes(`${path.sep}old${path.sep}`) &&
+      !normalized.includes('twitter_thread')
+    );
+  });
+
+  for (const scriptPath of scriptFiles) {
+    groups.push(buildLongformGroup(projectRoot, scriptPath, marketingDir));
+  }
+
+  // 2. 扫描 video 素材
+  const videoFiles = listFilesRecursive(videoDir, 1).filter((filePath) =>
+    path.basename(filePath).toLowerCase().endsWith('.mp4')
+  );
+
+  for (const videoPath of videoFiles) {
+    groups.push(buildVideoGroup(projectRoot, videoPath, marketingDir, scriptFiles));
+  }
+
+  // 3. 项目级告警
+  if (groups.length === 0) {
+    projectWarnings.push('项目内未找到可用素材（02_Script/*.md 或 04_Video/*.mp4）');
+  }
+  if (!fs.existsSync(scriptDir) && !fs.existsSync(videoDir)) {
+    projectWarnings.push(`项目目录结构不完整：02_Script 与 04_Video 都不存在（projectId=${projectId}）`);
+  }
+
+  // 4. 兼容字段：取第一个 longform 组（如有）填充 legacy
+  const firstLongform = groups.find((g) => g.groupType === 'longform');
+  const legacy: DistributionComposerSources | undefined = firstLongform
+    ? {
+        suggestedTitle: firstLongform.suggestedTitle,
+        suggestedBody: firstLongform.suggestedBody,
+        suggestedTags: firstLongform.suggestedTags,
+        sourceFiles: [firstLongform.primarySource],
+        warnings: firstLongform.warnings,
+      }
+    : undefined;
+
+  ensureDistributionHistory(projectId);
+
+  return {
+    groups,
+    scannedAt,
+    warnings: projectWarnings,
+    legacy,
+  };
+}
+
+/**
+ * 构造 longform 素材组（02_Script/*.md → twitter + wechat_mp）。
+ */
+function buildLongformGroup(
+  projectRoot: string,
+  scriptPath: string,
+  marketingDir: string
+): DistributionMaterialGroup {
+  const baseName = path.basename(scriptPath, path.extname(scriptPath));
+  const groupId = `longform_${slugifyGroupId(baseName)}`;
+  const warnings: string[] = [];
+
+  // 主素材 fallback（提取 title/body/tags）
+  const scriptContent = readTextFileIfExists(scriptPath);
+  const fallback = buildScriptFallback(scriptContent);
+
+  // 平台专用文案（05_Marketing/<platform>.md）
+  const xMarketingPath = findMarketingFile(marketingDir, ['x.md', 'twitter.md']);
+  const wechatMarketingPath = findMarketingFile(marketingDir, [
+    'wechat_mp.md',
+    'wechat.md',
+    '公众号.md',
+  ]);
+
+  // 主标题/正文/标签：优先 X 文案 > Wechat 文案 > Script fallback
+  const platformContent =
+    (xMarketingPath && readTextFileIfExists(xMarketingPath)) ||
+    (wechatMarketingPath && readTextFileIfExists(wechatMarketingPath)) ||
+    '';
+
+  const suggestedTitle = platformContent
+    ? extractTitleFromStructuredText(platformContent) || fallback.title
+    : fallback.title;
+  const suggestedBody = platformContent
+    ? extractBodyFromStructuredText(platformContent) || fallback.body
+    : fallback.body;
+  const suggestedTags = platformContent
+    ? extractTagsFromStructuredText(platformContent).length > 0
+      ? extractTagsFromStructuredText(platformContent)
+      : fallback.tags
+    : fallback.tags;
+
+  if (suggestedTags.length === 0) {
+    warnings.push('Script 与 Marketing 都未提供标签，建议手动补充 tags');
+  }
+
+  // 封面图（同目录下同名 .png）
+  const coverPng = `${path.dirname(scriptPath)}/${baseName}.png`;
+  const hasCover = fs.existsSync(coverPng);
+  if (!hasCover) {
+    // 也尝试 cover.png 作为兜底
+    const altCover = path.join(path.dirname(scriptPath), 'cover.png');
+    if (!fs.existsSync(altCover)) {
+      warnings.push(`未找到封面图（${baseName}.png 或 cover.png），公众号将无法发布`);
+    }
+  }
+
+  // ready 判定
+  const readyState: Partial<Record<DistributionSupportedPlatform, DistributionPlatformReadyState>> = {
+    twitter: { ready: true },
+    wechat_mp: hasCover
+      ? { ready: true }
+      : { ready: false, missingItems: [`封面图 ${baseName}.png 不存在`] },
+  };
+
+  return {
+    groupId,
+    groupType: 'longform',
+    primarySource: {
+      name: path.basename(scriptPath),
+      path: relativeProjectPath(projectRoot, scriptPath),
+      category: 'script',
+    },
+    applicablePlatforms: ['twitter', 'wechat_mp'],
+    suggestedTitle: suggestedTitle || baseName,
+    suggestedBody,
+    suggestedTags,
+    readyState,
+    warnings,
+  };
+}
+
+/**
+ * 构造 video 素材组（04_Video/*.mp4 → youtube + bilibili）。
+ */
+function buildVideoGroup(
+  projectRoot: string,
+  videoPath: string,
+  marketingDir: string,
+  scriptFiles: string[]
+): DistributionMaterialGroup {
+  const baseName = path.basename(videoPath, path.extname(videoPath));
+  const groupId = `video_${slugifyGroupId(baseName)}`;
+  const warnings: string[] = [];
+
+  // 平台专用文案
+  const youtubeMarketingPath = findMarketingFile(marketingDir, ['youtube.md', 'youtube.txt']);
+  const bilibiliMarketingPath = findMarketingFile(marketingDir, [
+    'bilibili.md',
+    'bilibili.txt',
+    'b站.md',
+  ]);
+
+  // 主标题/正文/标签：YouTube 文案 > Bilibili 文案 > Script fallback > 视频文件名
+  let suggestedTitle = '';
+  let suggestedBody = '';
+  let suggestedTags: string[] = [];
+
+  if (youtubeMarketingPath) {
+    const c = readTextFileIfExists(youtubeMarketingPath);
+    suggestedTitle = extractTitleFromStructuredText(c);
+    suggestedBody = extractBodyFromStructuredText(c);
+    suggestedTags = extractTagsFromStructuredText(c);
+  }
+
+  if (!suggestedTitle && bilibiliMarketingPath) {
+    const c = readTextFileIfExists(bilibiliMarketingPath);
+    suggestedTitle = extractTitleFromStructuredText(c);
+    suggestedBody = extractBodyFromStructuredText(c);
+    suggestedTags = extractTagsFromStructuredText(c);
+  }
+
+  if (!suggestedTitle && scriptFiles.length > 0) {
+    const sortedScripts = sortScriptCandidates(scriptFiles);
+    const c = readTextFileIfExists(sortedScripts[0]);
+    const fallback = buildScriptFallback(c);
+    suggestedTitle = fallback.title;
+    suggestedBody = fallback.body;
+    suggestedTags = fallback.tags;
+  }
+
+  if (!suggestedTitle) {
+    suggestedTitle = baseName;
+    warnings.push('未找到任何文案源（05_Marketing/youtube.md / bilibili.md / 02_Script），仅以视频文件名作为标题');
+  }
+
+  // ready 判定
+  const hasYoutubeMarketing = !!youtubeMarketingPath;
+  const hasBilibiliMarketing = !!bilibiliMarketingPath;
+  const hasAnyScriptFallback = scriptFiles.length > 0;
+
+  const readyState: Partial<Record<DistributionSupportedPlatform, DistributionPlatformReadyState>> = {
+    youtube:
+      hasYoutubeMarketing || hasAnyScriptFallback
+        ? { ready: true }
+        : {
+            ready: false,
+            missingItems: ['市场大师文案 05_Marketing/youtube.md 不存在，且 02_Script 无脚本兜底'],
+          },
+    bilibili: hasBilibiliMarketing
+      ? { ready: true }
+      : {
+          ready: false,
+          missingItems: ['市场大师文案 05_Marketing/bilibili.md 不存在'],
+        },
+  };
+
+  return {
+    groupId,
+    groupType: 'video',
+    primarySource: {
+      name: path.basename(videoPath),
+      path: relativeProjectPath(projectRoot, videoPath),
+      category: 'video',
+    },
+    applicablePlatforms: ['youtube', 'bilibili'],
+    suggestedTitle,
+    suggestedBody,
+    suggestedTags,
+    readyState,
+    warnings,
+  };
+}
+
+/**
+ * 在 marketingDir 中按候选文件名（不区分大小写）查找第一个存在的文件。
+ */
+function findMarketingFile(marketingDir: string, candidates: string[]): string | null {
+  if (!fs.existsSync(marketingDir)) {
+    return null;
+  }
+
+  const entries = fs.readdirSync(marketingDir);
+  const lowerEntries = entries.map((e) => ({ name: e, lower: e.toLowerCase() }));
+
+  for (const candidate of candidates) {
+    const found = lowerEntries.find((e) => e.lower === candidate.toLowerCase());
+    if (found) {
+      return path.join(marketingDir, found.name);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 将文件名（含中文/空格）转为安全的 groupId 后缀。
+ * 规则：保留中文/英数/连字符，其它字符转 -，连续 - 折叠。
+ */
+function slugifyGroupId(input: string): string {
+  return input
+    .replace(/[^一-龥a-zA-Z0-9\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 export function loadDistributionHistory(projectId: string): DistributionHistoryEntry[] {
