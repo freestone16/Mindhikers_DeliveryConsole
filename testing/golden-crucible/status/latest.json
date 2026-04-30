@@ -1,8 +1,14 @@
 {
   "module": "golden-crucible",
-  "latest_request": "TREQ-2026-03-20-GC-003-crucible-contextual-search-request",
-  "latest_status": "passed",
-  "latest_claim": "testing/golden-crucible/claims/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.claim.md",
-  "latest_report": "testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md",
-  "updated_at": "2026-03-20T03:18:58.472Z"
+  "latest_request": "GC-GOV-2026-04-30-phase0-3-closure",
+  "latest_status": "governance-updated",
+  "latest_claim": null,
+  "latest_report": "docs/plans/2026-04-30-001-gc-sse-saas-governance-closure-plan.md",
+  "updated_at": "2026-04-30T17:30:00+08:00",
+  "summary": {
+    "sse_shell_smoke": "done_from_2026-04-28_handoff",
+    "saas_staging_shell_smoke": "done_from_2026-04-30_handoff",
+    "skill_sync_indicator": "not_done",
+    "roundtable_backend_api": "not_done"
+  }
 }

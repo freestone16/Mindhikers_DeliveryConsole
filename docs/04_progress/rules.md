@@ -1,10 +1,59 @@
-# Rules - 精炼规则
+# Rules - GoldenCrucible Current Rules
 
 > **每次会话开始时读取此文件**
-> **控制在 50-80 条，只保留"下次一定有用"的规则**
+> **先读 2026-04-30 当前权威规则区；下方 Legacy Archive 仅作历史参考**
 > **详细案例见 `lessons/` 目录**
 
 ---
+
+## 2026-04-30 当前权威规则区
+
+### 分支与发布线
+
+GC 当前只认三条主线：
+
+1. `MHSDC-GC-SSE` 是研发前线，新功能和小修先落这里。
+2. `MHSDC-GC-SAAS-staging` 是预发验收线，只接收验证过的 SSE 切片或 release hotfix。
+3. `main` 是生产线，只接收 staging 验证后的版本。
+4. 正常发布流是 `SSE -> SaaS staging -> production`。
+5. 禁止整枝 merge SSE 到 SaaS staging；跨线同步默认 cherry-pick 小切片。
+6. SaaS staging 上若出现 release-blocking hotfix，修完后必须回灌 SSE。
+
+### 2026-04-30 shell migration 事实
+
+7. SaaS staging 已接收 SSE shell migration，不再把“迁移 SaaS”描述为未来待办。
+8. 后续 shell/status polish 从 SSE 开始，验证通过后再摘樱桃到 SaaS staging。
+9. 左侧模块 glyph/label、右下角 SkillSync indicator、SkillSync source popover 都属于下一小修切片，不属于治理 Phase 0-3。
+10. Roundtable 入口已在 SaaS staging 可见，但 backend API completion 仍是独立后续工作。
+
+### SkillSync 与宿主边界
+
+11. 当前 synced skill 集合是 `Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+12. Roundtable 当前是 module/runtime capability，不是 synced standalone skill；未加入 `server/skill-sync.ts` 前禁止这样描述。
+13. UI 若展示 SkillSync 状态，必须同时能展示 SSOT source root、target root 和 synced skill names。
+14. 业务判断继续归 Socrates：宿主只负责账号、workspace、HTTP/SSE 生命周期、工具执行、持久化、证据链和技术错误回传。
+
+### Testing 与验证
+
+15. 页面查看、UI 验证、截图、交互检查、线上页面核验优先用 `agent-browser`。
+16. testing board 必须记录“已验证 / 未完成 / 待验证”的日期和环境，不得拿旧 smoke 当最新状态。
+17. SaaS staging 验证必须明确网络请求是否走 staging origin，不能出现非预期 localhost 直连。
+18. 本地验证中同源代理 localhost 可以存在，但必须区分 local dev proxy 与线上直连泄漏。
+19. ShellErrorBoundary / Hooks error 是壳层验收硬红线，出现即暂停收口。
+
+### 治理文档
+
+20. `AGENTS.md -> HANDOFF.md -> rules.md -> plans/ -> testing/` 必须可导航。
+21. `HANDOFF.md` 只写当前真实接手状态，不保留已过期“下一步”口径。
+22. `dev_progress.md` 写里程碑事实，不把计划或理解写成已完成。
+23. `rules.md` 顶部当前权威规则优先；下方 legacy archive 保留历史知识但不以旧编号为准。
+24. 提交前遵守分类提交：治理文档与产品代码分开；commit / push 必须先经老卢确认。
+
+---
+
+## Legacy Archive（历史规则，仅供查证）
+
+以下规则来自旧 DeliveryConsole / GC 多阶段开发记录，编号存在重复和漂移。保留它们是为了零损失追溯；当前执行优先级低于上方 2026-04-30 当前权威规则区。
 
 ## 通用开发
 
@@ -301,6 +350,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-30 | 新增当前权威规则区（24 条），旧重复编号区保留为 Legacy Archive |
 | 2026-04-21 | 新增 Shell 视图职责红线 113-115（MIN-136 P0 语义对齐） |
 | 2026-04-17 | 新增子代理产出治理规则 110-112（Phase 1-6 实施计划 v1.1 老卢终审沉淀） |
 | 2026-04-14 | 新增底座同步规则 101-109（MIN-94 治理同步，与 SaaS 侧 102-113 对应） |

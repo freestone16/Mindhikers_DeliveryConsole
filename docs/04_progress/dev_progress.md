@@ -1,6 +1,53 @@
-# Delivery Console — 开发进展 & 遗留问题
+# GoldenCrucible-SSE — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-18 CST
+> **更新日期**: 2026-04-30 CST
+
+---
+
+## 1.32 2026-04-30（GC SSE / SaaS 治理收口 Phase 0-3）
+
+### 本轮主线
+
+按 `docs/plans/2026-04-30-001-gc-sse-saas-governance-closure-plan.md` 执行治理 Phase 0-3。目标不是开发新功能，而是把 SSE 与 SaaS staging 的治理事实、testing 状态和下一步边界重新对齐。
+
+### 已确认事实
+
+- SSE：`MHSDC-GC-SSE`，对齐 `origin/MHSDC-GC-SSE`。
+- SaaS：`MHSDC-GC-SAAS-staging`，对齐 `origin/MHSDC-GC-SAAS-staging`。
+- SaaS staging 已接收 shell migration：
+  - `e17f5d2 refs MIN-136 feat: checkpoint SaaS shell slice integration`
+  - `e610631 refs MIN-136 fix: allow placeholder database URL during shell validation`
+  - `14a7a3e refs MIN-136 fix: exclude local agent metadata from Railway snapshot`
+- SaaS staging 已完成 Railway 部署和 agent-browser smoke：新 Shell、`/m/crucible`、`/m/roundtable`、`/llm-config` 可见，无 Hooks error / ShellErrorBoundary，无非预期 localhost 直连。
+
+### 本轮治理更新
+
+- 更新 `AGENTS.md`：写明 SaaS staging 已接收 shell migration，SSE 重新成为后续小修起点。
+- 更新 `docs/dev_logs/HANDOFF.md`：替换过期的“准备迁移 SaaS”口径。
+- 更新 `docs/04_progress/rules.md`：新增 2026-04-30 当前权威规则区，把旧编号漂移区标为 legacy archive。
+- 更新 testing board / latest：补入 2026-04-29 至 2026-04-30 shell migration、Railway snapshot fix、staging browser smoke、SkillSync 未完成项与 Roundtable backend 未完成项。
+
+### 当前边界
+
+- Roundtable 当前是模块 / runtime capability，不是 synced standalone skill。
+- 当前 synced skill 集合：`Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+- 后续 shell/status polish 必须从 SSE 新切片开始，验证后再 cherry-pick 到 SaaS staging。
+- 本轮没有产品代码改动，不把 build 作为治理收口硬门槛。
+
+### 下一步
+
+治理 Phase 0-3 完成后，启动小修分支：
+
+```text
+codex/gc-shell-status-polish
+```
+
+小修范围：
+
+1. 左侧模块 glyph / label 对齐：`坩 / 炼制`、`辩 / 圆桌`
+2. 右下角 SkillSync 状态指示
+3. 点击展示 SSOT source root、target root、同步 skill 名称
+4. 先 SSE 验证，再摘樱桃到 SaaS staging
 
 ---
 
