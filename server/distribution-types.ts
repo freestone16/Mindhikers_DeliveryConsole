@@ -199,6 +199,13 @@ export interface DistributionTask {
   effectiveStartAt?: string;
   /** 已尝试次数，重试时递增。1=首次执行 */
   attemptCount?: number;
+
+  // === A4 新增 ===
+  /**
+   * 风控延时开关。默认 true。
+   * false 时 systemDelayMs = 0，即时发布无延时。
+   */
+  riskDelayEnabled?: boolean;
 }
 
 export interface DistributionHistoryEntry {

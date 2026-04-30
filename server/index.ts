@@ -28,6 +28,7 @@ import { createDefaultShutdown } from './graceful-shutdown';
 import { setupHealthCheck } from './health';
 import { resolveGlobalLLMConfig } from '../src/schemas/llm-config';
 import { getProjectRoot, getProjectsBase, ensureProjectsBaseExists } from './project-paths';
+import { initScheduler, stopScheduler } from './distribution-scheduler';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -1509,6 +1510,9 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     //    console.log(`🎬 A-roll dir: ${SHORTS_AROLL_DIR}`);
 });
 
+// Initialize Distribution Scheduler (A4)
+initScheduler();
+
 // Initialize Graceful Shutdown
 const shutdownManager = createDefaultShutdown(httpServer);
 shutdownManager.setSocketIO(io);
@@ -1516,6 +1520,10 @@ shutdownManager.setSocketIO(io);
 // Register Watcher Cleanups
 shutdownManager.registerCleanup(async () => {
     console.log('  正在清理服务器监控器 (Watchers)...');
+
+    // 0. Distribution Scheduler
+    stopScheduler();
+    console.log('    ✓ Distribution Scheduler 已停止');
 
     // 1. Delivery Watcher
     if (deliveryWatcher) {

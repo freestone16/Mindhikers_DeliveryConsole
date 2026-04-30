@@ -135,12 +135,12 @@ router.get('/events', (req, res) => {
 
 router.post('/queue/create', (req, res) => {
     try {
-        const { projectId, platforms, assets, scheduleTime, timezone } = req.body;
-        
+        const { projectId, platforms, assets, scheduleTime, timezone, riskDelayEnabled } = req.body;
+
         if (!projectId || !platforms || !assets) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
-        
+
         const queue = loadDistributionQueue(projectId);
         const newTask = createDistributionTask({
             projectId,
@@ -148,6 +148,7 @@ router.post('/queue/create', (req, res) => {
             assets,
             scheduleTime,
             timezone,
+            riskDelayEnabled,
         });
         
         queue.push(newTask);

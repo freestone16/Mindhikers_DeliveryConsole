@@ -6,18 +6,26 @@ export function createDistributionTask(input: {
   assets: DistributionTask['assets'];
   scheduleTime?: string;
   timezone?: string;
+  riskDelayEnabled?: boolean;
 }): DistributionTask {
   const taskId = `dist_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const riskDelayEnabled = input.riskDelayEnabled !== false;
 
-  let systemDelayMs: number | undefined;
-  let scheduledAt: string | undefined;
-  let status: DistributionTask['status'] = 'queued';
+  // A4: 即时发布也支持风控延时（2-8 分钟随机），可关
+  const systemDelayMs = riskDelayEnabled
+    ? Math.floor(Math.random() * (480 - 120) + 120) * 1000
+    : 0;
 
-  if (input.scheduleTime) {
-    systemDelayMs = Math.floor(Math.random() * (10 - 3) + 3) * 60 * 1000;
-    scheduledAt = new Date(input.scheduleTime).toISOString();
-    status = 'scheduled';
-  }
+  const now = Date.now();
+  const scheduleTimeMs = input.scheduleTime
+    ? new Date(input.scheduleTime).getTime()
+    : now;
+
+  const effectiveStartAtMs = scheduleTimeMs + systemDelayMs;
+  const effectiveStartAt = new Date(effectiveStartAtMs).toISOString();
+
+  const status: DistributionTask['status'] =
+    effectiveStartAtMs > now ? 'scheduled' : 'queued';
 
   return {
     taskId,
@@ -27,10 +35,14 @@ export function createDistributionTask(input: {
     scheduleTime: input.scheduleTime,
     timezone: input.timezone || 'Asia/Shanghai',
     systemDelayMs,
+    riskDelayEnabled,
+    effectiveStartAt,
     status,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    scheduledAt,
+    scheduledAt: input.scheduleTime
+      ? new Date(input.scheduleTime).toISOString()
+      : undefined,
   };
 }
 
