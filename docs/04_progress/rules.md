@@ -1,10 +1,55 @@
-# Rules - 精炼规则
+# Rules - GoldenCrucible SaaS Current Rules
 
 > **每次会话开始时读取此文件**
-> **控制在 50-80 条，只保留"下次一定有用"的规则**
+> **先读 2026-04-30 当前权威规则区；下方 Legacy Archive 仅作历史参考**
 > **详细案例见 `lessons/` 目录**
 
 ---
+
+## 2026-04-30 当前权威规则区
+
+### 分支与发布线
+
+1. `MHSDC-GC-SSE` 是研发前线，新功能和小修先落 SSE。
+2. `MHSDC-GC-SAAS-staging` 是预发验收线，只接收验证过的 SSE 切片或 release hotfix。
+3. `main` 是生产线，只接收 staging 验证后的版本。
+4. 正常发布流是 `SSE -> SaaS staging -> production`。
+5. SaaS staging 禁止整枝 merge SSE；跨线同步默认 cherry-pick 小切片。
+6. SaaS staging release hotfix 完成后必须回灌 SSE。
+
+### 2026-04-30 shell migration 事实
+
+7. SaaS staging 已接收 SSE shell migration，不再把“迁移 SaaS”描述为未来待办。
+8. `14a7a3e` 已修复 Railway snapshot 元数据问题。
+9. 后续 shell/status polish 从 SSE 开始，SaaS staging 只负责接收验证后切片。
+10. Roundtable 入口已在 SaaS staging 可见，但 backend API completion 仍是独立后续工作。
+
+### SkillSync 与 Roundtable
+
+11. 当前 synced skill 集合是 `Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+12. Roundtable 当前是 module/runtime capability，不是 synced standalone skill。
+13. UI 若展示 SkillSync 状态，必须同时能展示 SSOT source root、target root 和 synced skill names。
+14. SkillSync lower-right indicator 与 source popover 未完成前，不要把 SkillSync 可视状态写成已验收。
+
+### Staging 验收
+
+15. 页面查看、UI 验证、截图、交互检查、线上页面核验优先用 `agent-browser`。
+16. SaaS staging 验证必须明确网络请求是否走 staging origin，不能出现非预期 localhost 直连。
+17. ShellErrorBoundary / Hooks error 是壳层验收硬红线，出现即暂停接收。
+18. testing board 必须记录日期、环境、已完成项和未完成项，不得拿旧 smoke 当最新状态。
+
+### 治理文档
+
+19. `AGENTS.md -> HANDOFF.md -> rules.md -> plans/ -> testing/` 必须可导航。
+20. `HANDOFF.md` 只写当前真实接手状态，不保留已过期“下一步”口径。
+21. `dev_progress.md` 写里程碑事实，不把计划或理解写成已完成。
+22. 提交前遵守分类提交：治理文档与产品代码分开；commit / push 必须先经老卢确认。
+
+---
+
+## Legacy Archive（历史规则，仅供查证）
+
+以下规则来自旧 DeliveryConsole / GC 多阶段开发记录，编号存在重复和漂移。保留它们是为了零损失追溯；当前执行优先级低于上方 2026-04-30 当前权威规则区。
 
 ## 通用开发
 
@@ -292,5 +337,6 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-30 | 新增当前权威规则区（22 条），旧重复编号区保留为 Legacy Archive |
 | 2026-04-14 | 新增底座同步规则 102-113 + 同步 SSE 规则 103/104/105（MIN-94 治理同步） |
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |

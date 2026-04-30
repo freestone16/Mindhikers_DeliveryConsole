@@ -1,8 +1,16 @@
 {
   "module": "golden-crucible",
-  "latest_request": "TREQ-2026-04-12-GC-SAAS-006-thesiswriter-smoke",
-  "latest_status": "running",
-  "latest_claim": "testing/golden-crucible/claims/TREQ-2026-04-12-GC-SAAS-006-thesiswriter-smoke.claim.md",
-  "latest_report": null,
-  "updated_at": "2026-04-13T16:20:14.768Z"
+  "latest_request": "GC-SAAS-STAGING-2026-04-30-shell-migration-smoke",
+  "latest_status": "passed-with-known-gaps",
+  "latest_claim": null,
+  "latest_report": "docs/dev_logs/2026-04-30.md",
+  "updated_at": "2026-04-30T17:30:00+08:00",
+  "summary": {
+    "staging_shell_smoke": "done",
+    "staging_roundtable_visible": "done",
+    "railway_snapshot_fix": "done",
+    "unexpected_localhost_check": "done",
+    "skill_sync_indicator": "not_done",
+    "roundtable_backend_api": "not_done"
+  }
 }

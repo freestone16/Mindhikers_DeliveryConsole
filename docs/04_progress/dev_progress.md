@@ -1,6 +1,35 @@
-# Delivery Console — 开发进展 & 遗留问题
+# GoldenCrucible-SaaS — 开发进展 & 遗留问题
 
 > **更新日期**: 2026-04-30 CST
+
+---
+
+## 1.21 2026-04-30（SaaS staging 壳层接收后治理收口）
+
+### 本轮主线
+
+与 SSE 的 `2026-04-30-001-gc-sse-saas-governance-closure-plan.md` 对齐治理口径。SaaS staging 已完成 shell migration 接收与 Railway staging smoke，下一功能切片回到 SSE 起步。
+
+### 已确认事实
+
+- 当前分支：`MHSDC-GC-SAAS-staging`
+- 当前状态：对齐 `origin/MHSDC-GC-SAAS-staging`
+- 最新关键提交：
+  - `14a7a3e refs MIN-136 fix: exclude local agent metadata from Railway snapshot`
+  - `e610631 refs MIN-136 fix: allow placeholder database URL during shell validation`
+  - `e17f5d2 refs MIN-136 feat: checkpoint SaaS shell slice integration`
+- Railway staging smoke 已完成：新 Shell、`/m/crucible`、`/m/roundtable`、`/llm-config` 可见，无 Hooks error / ShellErrorBoundary，无非预期 localhost 直连。
+
+### 当前边界
+
+- SaaS staging 等待 SSE 下一小修切片，不直接开新功能。
+- Roundtable 当前是模块 / runtime capability，不是 synced standalone skill。
+- 当前 synced skill 集合：`Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+- SkillSync lower-right indicator 与 SSOT source popover 尚未完成，归入后续 shell/status polish。
+
+### 下一步
+
+SSE 治理 Phase 0-3 完成后，在 SSE 开 `codex/gc-shell-status-polish` 实现并验证。SaaS staging 只 cherry-pick 已验证的小修 commit，不整枝 merge SSE。
 
 ---
 
