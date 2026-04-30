@@ -9,6 +9,8 @@ import {
   markDistributionTaskFailed,
   markDistributionTaskRunning,
   recordDistributionTaskEvent,
+  scheduleAutoRetry,
+  setAutoRetryScheduler,
 } from '../../../server/distribution-execution-service';
 import type { DistributionTask, DistributionTaskEvent } from '../../../server/distribution-types';
 
@@ -211,6 +213,135 @@ describe('distribution-execution-service', () => {
     expect(events[1].progress?.stage).toBe('uploading_media');
     expect(events[2].progress?.stage).toBe('finalizing_result');
     expect(events[3].status).toBe('succeeded');
+  });
+
+  it('annotates failed unsupported platform with errorCategory=unknown and nextRetryAt', async () => {
+    const task = createTask({
+      platforms: ['weibo'],
+      status: 'processing',
+      attemptCount: 1,
+    });
+
+    await executeDistributionTask(task);
+
+    const result = task.results?.weibo;
+    expect(result?.status).toBe('failed');
+    expect(result?.errorCategory).toBe('unknown');
+    expect(result?.attemptCount).toBe(1);
+    expect(result?.nextRetryAt).toBeTruthy();
+    expect(task.status).toBe('retryable');
+  });
+
+  it('marks task failed (not retryable) when only 4xx_auth failures occur', async () => {
+    const authError = Object.assign(new Error('unauthorized'), { status: 401 });
+    vi.mocked(publishToX).mockRejectedValueOnce(authError);
+
+    const task = createTask({
+      platforms: ['twitter'],
+      status: 'processing',
+      attemptCount: 1,
+    });
+
+    await executeDistributionTask(task);
+
+    expect(task.results?.twitter?.errorCategory).toBe('4xx_auth');
+    expect(task.results?.twitter?.nextRetryAt).toBeUndefined();
+    expect(task.status).toBe('failed');
+  });
+
+  it('marks task retryable when mixed 4xx_auth + 5xx failures (5xx is retryable)', async () => {
+    vi.mocked(publishToX).mockRejectedValueOnce(Object.assign(new Error('unauthorized'), { status: 401 }));
+    vi.mocked(publishToYoutube).mockRejectedValueOnce(Object.assign(new Error('upstream'), { status: 503 }));
+
+    const task = createTask({
+      platforms: ['twitter', 'youtube'],
+      status: 'processing',
+      attemptCount: 1,
+    });
+
+    await executeDistributionTask(task);
+
+    expect(task.results?.twitter?.errorCategory).toBe('4xx_auth');
+    expect(task.results?.youtube?.errorCategory).toBe('5xx_server');
+    expect(task.results?.youtube?.nextRetryAt).toBeTruthy();
+    expect(task.status).toBe('retryable');
+  });
+
+  it('classifies 429 as 4xx_rate_limit with attempt-aware delay', async () => {
+    const rateLimit = Object.assign(new Error('too many'), { status: 429 });
+    vi.mocked(publishToX).mockRejectedValueOnce(rateLimit);
+
+    const task = createTask({
+      platforms: ['twitter'],
+      status: 'processing',
+      attemptCount: 2,
+    });
+
+    await executeDistributionTask(task);
+
+    const result = task.results?.twitter;
+    expect(result?.errorCategory).toBe('4xx_rate_limit');
+    expect(result?.attemptCount).toBe(2);
+    expect(result?.nextRetryAt).toBeTruthy();
+    expect(task.status).toBe('retryable');
+  });
+
+  it('invokes registered auto-retry scheduler with the smallest platform delay', async () => {
+    const calls: { delayMs: number }[] = [];
+    setAutoRetryScheduler((_task, delayMs) => calls.push({ delayMs }));
+
+    try {
+      vi.mocked(publishToX).mockRejectedValueOnce(Object.assign(new Error('rate'), { status: 429 })); // 60s
+      vi.mocked(publishToYoutube).mockRejectedValueOnce(Object.assign(new Error('upstream'), { status: 500 })); // 5s
+
+      const task = createTask({
+        platforms: ['twitter', 'youtube'],
+        status: 'processing',
+        attemptCount: 1,
+      });
+
+      await executeDistributionTask(task);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].delayMs).toBe(5_000);
+    } finally {
+      setAutoRetryScheduler(null);
+    }
+  });
+
+  it('does not call auto-retry scheduler when only non-retryable failures present', async () => {
+    const calls: number[] = [];
+    setAutoRetryScheduler(() => calls.push(1));
+
+    try {
+      vi.mocked(publishToX).mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }));
+
+      const task = createTask({
+        platforms: ['twitter'],
+        status: 'processing',
+        attemptCount: 1,
+      });
+
+      await executeDistributionTask(task);
+
+      expect(calls).toHaveLength(0);
+    } finally {
+      setAutoRetryScheduler(null);
+    }
+  });
+
+  it('scheduleAutoRetry is a no-op when no scheduler is registered', () => {
+    setAutoRetryScheduler(null);
+    expect(() => scheduleAutoRetry(createTask(), 1_000)).not.toThrow();
+  });
+
+  it('markDistributionTaskRunning increments attemptCount each run', () => {
+    const task = createTask();
+    markDistributionTaskRunning(task);
+    expect(task.attemptCount).toBe(1);
+    task.status = 'retryable';
+    markDistributionTaskRunning(task);
+    expect(task.attemptCount).toBe(2);
   });
 
   it('creates history entries from platform execution results', () => {

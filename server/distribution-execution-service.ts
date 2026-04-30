@@ -1,7 +1,15 @@
 import { publishToWechatMp } from './connectors/wechat-mp-connector';
 import { publishToX } from './connectors/x-connector';
 import { publishToYoutube } from './connectors/youtube-connector';
+import {
+  applyRetryPolicy,
+  classifyError,
+  computeNextRetryAt,
+  defaultRetryPolicy,
+  type RetryPolicyConfig,
+} from './distribution-retry-policy';
 import type {
+  DistributionErrorCategory,
   DistributionHistoryEntry,
   DistributionPlatformResult,
   DistributionTask,
@@ -18,7 +26,57 @@ function buildFailureResult(platform: string, error: unknown): DistributionPlatf
     platform,
     status: 'failed',
     message,
+    errorCategory: classifyError(error),
   };
+}
+
+function annotateRetryMetadata(
+  result: DistributionPlatformResult,
+  attemptCount: number,
+  policy: RetryPolicyConfig = defaultRetryPolicy
+): DistributionPlatformResult {
+  if (result.status !== 'failed') {
+    return result;
+  }
+
+  const category: DistributionErrorCategory = result.errorCategory ?? classifyError(undefined);
+  const decision = applyRetryPolicy(category, attemptCount, policy);
+
+  return {
+    ...result,
+    errorCategory: category,
+    attemptCount,
+    nextRetryAt:
+      decision.shouldRetry && typeof decision.delayMs === 'number'
+        ? computeNextRetryAt(decision.delayMs)
+        : undefined,
+  };
+}
+
+function isResultRetryable(
+  result: DistributionPlatformResult,
+  attemptCount: number,
+  policy: RetryPolicyConfig = defaultRetryPolicy
+): boolean {
+  if (result.status !== 'failed') return false;
+  const category: DistributionErrorCategory = result.errorCategory ?? 'unknown';
+  return applyRetryPolicy(category, attemptCount, policy).shouldRetry;
+}
+
+type AutoRetryScheduler = (task: DistributionTask, delayMs: number) => void;
+
+let autoRetryScheduler: AutoRetryScheduler | null = null;
+
+/**
+ * A4 单元注入实际的调度器实现（基于 setTimeout）。
+ * A3 只暴露钩子，留下默认 no-op 以避免破坏调用方。
+ */
+export function setAutoRetryScheduler(scheduler: AutoRetryScheduler | null) {
+  autoRetryScheduler = scheduler;
+}
+
+export function scheduleAutoRetry(task: DistributionTask, delayMs: number) {
+  autoRetryScheduler?.(task, delayMs);
 }
 
 function getErrorMessage(error: unknown) {
@@ -119,6 +177,7 @@ export function markDistributionTaskRunning(task: DistributionTask) {
   task.status = 'processing';
   task.error = undefined;
   task.completedAt = undefined;
+  task.attemptCount = (task.attemptCount ?? 0) + 1;
   task.updatedAt = new Date().toISOString();
 }
 
@@ -165,6 +224,7 @@ export async function executeDistributionTask(
 ) {
   const results: Record<string, DistributionPlatformResult> = {};
   const onEvent = options?.onEvent;
+  const attemptCount = task.attemptCount ?? 1;
 
   for (const [index, platform] of task.platforms.entries()) {
     try {
@@ -210,6 +270,8 @@ export async function executeDistributionTask(
         results[platform] = buildFailureResult(platform, `Platform connector not implemented: ${platform}`);
       }
 
+      results[platform] = annotateRetryMetadata(results[platform], attemptCount);
+
       emitTaskEvent(
         task,
         {
@@ -230,7 +292,7 @@ export async function executeDistributionTask(
         onEvent
       );
     } catch (error) {
-      results[platform] = buildFailureResult(platform, error);
+      results[platform] = annotateRetryMetadata(buildFailureResult(platform, error), attemptCount);
 
       emitTaskEvent(
         task,
@@ -253,30 +315,46 @@ export async function executeDistributionTask(
 
   const completedAt = new Date().toISOString();
   const failedResults = Object.values(results).filter((result) => result.status === 'failed');
+  const hasFailures = failedResults.length > 0;
+  const anyRetryable = failedResults.some((result) => isResultRetryable(result, attemptCount));
 
   task.results = results;
   task.completedAt = completedAt;
   task.updatedAt = completedAt;
-  task.status = failedResults.length > 0 ? 'retryable' : 'succeeded';
-  task.error =
-    failedResults.length > 0
-      ? failedResults
-          .map((result) => `${result.platform}: ${result.message || 'Unknown publish failure'}`)
-          .join(' | ')
-      : undefined;
+  task.status = hasFailures ? (anyRetryable ? 'retryable' : 'failed') : 'succeeded';
+  task.error = hasFailures
+    ? failedResults
+        .map((result) => `${result.platform}: ${result.message || 'Unknown publish failure'}`)
+        .join(' | ')
+    : undefined;
+
+  const finalStatus: DistributionTaskStatus = task.status;
 
   emitTaskEvent(
     task,
     {
-      type: failedResults.length > 0 ? 'job_failed' : 'job_succeeded',
-      status: failedResults.length > 0 ? 'retryable' : 'succeeded',
-      message:
-        failedResults.length > 0
-          ? task.error || '任务执行失败，请检查平台结果并重试'
-          : '任务执行完成，所有平台均已成功返回结果',
+      type: hasFailures ? 'job_failed' : 'job_succeeded',
+      status: finalStatus,
+      message: hasFailures
+        ? task.error || '任务执行失败，请检查平台结果并重试'
+        : '任务执行完成，所有平台均已成功返回结果',
     },
     onEvent
   );
+
+  if (anyRetryable) {
+    const nextDelayMs = failedResults
+      .map((result) => {
+        const category: DistributionErrorCategory = result.errorCategory ?? 'unknown';
+        const decision = applyRetryPolicy(category, attemptCount);
+        return decision.shouldRetry ? decision.delayMs ?? 0 : Number.POSITIVE_INFINITY;
+      })
+      .reduce((min, current) => (current < min ? current : min), Number.POSITIVE_INFINITY);
+
+    if (Number.isFinite(nextDelayMs)) {
+      scheduleAutoRetry(task, nextDelayMs);
+    }
+  }
 
   return task;
 }
