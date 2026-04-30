@@ -1,4 +1,4 @@
-Last updated: 2026-04-30 17:30 CST
+Last updated: 2026-04-30 19:40 CST
 Branch: `MHSDC-GC-SSE`
 Conductor: 老杨（OldYang） | Owner: 老卢（Zhou Lu）
 
@@ -8,122 +8,124 @@ Conductor: 老杨（OldYang） | Owner: 老卢（Zhou Lu）
 
 ## 当前一句话
 
-SSE 重新回到 GoldenCrucible 的研发前线：SaaS staging 已接收并部署 SSE 壳层迁移，当前窗口正在做治理 Phase 0-3 收口；治理完成前不启动新的 UI/status 功能修复。
+SSE 已切回研发主线并开始 Roundtable backend API completion：`/api/roundtable/*` 不再是空 router，本地已经能从 `/m/roundtable` 发起一轮圆桌、生成轮次综合、执行导演“止”并展示 Spike。
 
-## 本轮治理结论
+## 本轮完成事实
 
-### 已确认事实
+### 1. 已回到 SSE 研发主线
 
-1. SSE 当前分支是 `MHSDC-GC-SSE`，对齐 `origin/MHSDC-GC-SSE`。
-2. SSE 当前仅有未跟踪计划文档：
-   - `docs/plans/2026-04-30-001-gc-sse-saas-governance-closure-plan.md`
-3. SaaS 当前分支是 `MHSDC-GC-SAAS-staging`，对齐 `origin/MHSDC-GC-SAAS-staging`。
-4. SaaS staging 最新相关提交：
-   - `14a7a3e refs MIN-136 fix: exclude local agent metadata from Railway snapshot`
-   - `e610631 refs MIN-136 fix: allow placeholder database URL during shell validation`
-   - `e17f5d2 refs MIN-136 feat: checkpoint SaaS shell slice integration`
-5. 共享 stash 中仍有 GC 相关备份：
-   - `stash@{0}: On MHSDC-GC-SSE: codex pre new module cleanup 2026-04-30`
-   - `stash@{1}: On MHSDC-GC-SAAS-staging: codex pre shell staging apply cleanup 2026-04-29`
-   - 本轮不查看、不应用、不删除。
+- 当前分支：`MHSDC-GC-SSE`
+- 当前目录：`/Users/luzhoua/MHSDC/GoldenCrucible-SSE`
+- 小修分支 `codex/gc-shell-status-polish` 已 push，但尚未合入 SSE 主线。
+- 本轮没有回到 SaaS staging 做新功能。
 
-### 与旧 handoff 的差异
+### 2. Roundtable backend API 第一段已接通
 
-旧 handoff 仍写着“下一步准备 SaaS staging 切片移植”。这个口径已经过期。
+变更文件：
 
-当前真实状态是：
+- `server/routes/roundtable.ts`
+- `server/index.ts`
+- `src/modules/roundtable/components/PropositionInput.tsx`
 
-1. SaaS staging 已经承接 shell migration。
-2. Roundtable 入口已在 staging 可见。
-3. Railway snapshot 失败已通过 `.railwayignore` 修复。
-4. 后续小修应回到 SSE 起步，再摘樱桃到 SaaS staging。
+已接通的 API：
+
+- `POST /api/roundtable/sharpen`
+- `POST /api/roundtable/sharpen/apply`
+- `POST /api/roundtable/turn/stream`
+- `POST /api/roundtable/director`
+- `GET /api/roundtable/session/:id`
+- `POST /api/roundtable/deepdive`
+- `POST /api/roundtable/deepdive/question`
+- `POST /api/roundtable/deepdive/summarize`
+
+当前实现口径：
+
+1. 这是 SSE 可验证 fallback engine，不是最终 LLM 圆桌引擎。
+2. SSE 先保证前后端契约、SSE event stream、导演指令、Spike、DeepDive 链路跑通。
+3. 后续可在同一 API / event 契约下替换成上游 Roundtable LLM 生成层。
+4. Roundtable 仍是 module / runtime capability，不是 synced standalone skill。
+
+### 3. 前端启动状态修复
+
+`PropositionInput` 的本地 `isStarting` 现在会在 `onStartSession` 完成后复位，避免后端接通后按钮一直停在“正在启动圆桌…”。
+
+## 验证结果
+
+- `npm run typecheck:saas` 通过。
+- `npm run build` 通过，仅保留既有 CSS `file` warning 与 Vite chunk-size warning。
+- API 冒烟通过：
+  - `POST /api/roundtable/turn/stream` 返回 `roundtable_selection`、`roundtable_turn_chunk`、`roundtable_awaiting` 等事件。
+  - `POST /api/roundtable/director` with `止` 返回 Spike。
+- agent-browser 本地验证通过：
+  - URL: `http://localhost:5182/m/roundtable`
+  - 输入：`AI时代教育是不是更好？`
+  - 页面显示 3 位参与哲人、3 条发言、第 1 轮综合。
+  - 点击“停止提取 Spike”后显示 `Spike 发现 (1)`。
+  - browser errors 为空。
+- 截图：
+  - `/tmp/gc-sse-roundtable-backend-api.png`
 
 ## 当前边界
 
-本轮只做治理 Phase 0-3：
+1. 不整枝 merge SSE 到 SaaS staging。
+2. 不把 Roundtable 写进 SkillSync synced skill 集合。
+3. 当前 fallback engine 只解决“后端 API 可用、UI 可验收”的闭环，不承诺最终讨论质量。
+4. 共享 stash 不查看、不应用、不删除：
+   - `stash@{0}: On MHSDC-GC-SSE: codex pre new module cleanup 2026-04-30`
+   - `stash@{1}: On MHSDC-GC-SAAS-staging: codex pre shell staging apply cleanup 2026-04-29`
 
-1. 对齐 SSE / SaaS 治理入口文档。
-2. 清理 `rules.md` 的当前权威口径，降低重复编号误导。
-3. 更新 testing board / latest.json，让测试状态反映 2026-04-29 至 2026-04-30 的事实。
-4. 写清楚下一窗口 shell/status polish 的起点和边界。
+## 下一步
 
-本轮不做：
+### 第二段评估
 
-1. 左侧模块 glyph / label 对齐。
-2. 右下角 SkillSync 状态灯。
-3. SkillSync source popover。
-4. Roundtable backend API 完成。
-5. 整枝 merge SSE 到 SaaS staging。
-6. 删除 stash、临时 worktree 或非 GC 分支。
+不建议在同一个上下文里继续直接做第二段。
 
-## SkillSync 与 Roundtable 口径
+原因：
 
-当前 `server/skill-sync.ts` 的同步 skill 集合应按以下口径记录：
+1. 第二段不是小修，而是上游 Roundtable LLM engine 迁入。
+2. 预计新增/适配文件包括：
+   - `server/roundtable-engine.ts`
+   - `server/roundtable-types.ts`
+   - `server/spike-extractor.ts`
+   - `server/deepdive-engine.ts`
+   - `server/proposition-sharpener.ts`
+   - `server/compression-config.ts`
+   - `server/persona-loader.ts`
+   - `src/schemas/persona.ts`
+   - `personas/*.json`
+   - `server/__tests__/*roundtable*/*spike*/*deepdive*/*persona*`
+3. 还需要手工适配 SSE 的 `server/llm.ts` 超时机制与 `server/crucible-persistence.ts`，不能直接整文件复制。
+4. 当前 first pass 已形成一个可验证、可回滚的小闭环，应先作为独立提交保存。
 
-```text
-Writer
-ThesisWriter
-Researcher
-FactChecker
-Socrates
-```
-
-Roundtable 当前是模块 / runtime capability，不是 synced standalone skill。除非后续明确把 Roundtable 加进 SkillSync，否则文档和 UI 都不能把它描述为同步来的独立 skill。
-
-## 下一步工作
-
-治理收口完成后，下一窗口可启动 shell/status polish 小切片。
-
-推荐分支：
+推荐下一切片：
 
 ```text
-codex/gc-shell-status-polish
+codex/gc-roundtable-llm-engine-bridge
 ```
 
-推荐任务：
+范围：
 
-1. 左侧模块 glyph / label 对齐：
-   - `坩 / 炼制`
-   - `辩 / 圆桌`
-2. 右下角 SkillSync 状态指示：
-   - synced: green
-   - fallback / local-only: warning
-   - failed: red
-3. 单击状态指示后展示：
-   - status
-   - synced count
-   - SSOT source root
-   - target root
-   - synced skill names
-
-## 验证要求
-
-治理 Phase 0-3 结束前至少做：
-
-1. `git status --short --branch` 核对两条 worktree。
-2. 核对修改文件只包含治理文档、testing 状态与本计划文档。
-3. 不运行产品 build 作为硬门槛，因为本轮没有产品代码变更。
-
-shell/status polish 下一窗口再做：
-
-1. `npm run typecheck:saas`
-2. `npm run build`
-3. agent-browser 优先验证：
-   - `/`
-   - `/m/crucible`
-   - `/m/roundtable`
-   - `/llm-config`
+1. 继续把 fallback engine 替换/升级为真实 Roundtable LLM 生成层：
+   - speaker selection
+   - persona loading
+   - spike extractor
+   - deepdive engine
+   - persistence integration
+2. 保持当前 `/api/roundtable/*` 外部契约不变，让前端不用再改一次。
+3. 若要推 SaaS staging，必须等 SSE 这边提交验证后 cherry-pick 小切片，不能整枝 merge。
 
 ## 接管提示
 
-下个窗口如果继续小修，先读：
+新窗口先执行：
 
-1. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/AGENTS.md`
-2. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/dev_logs/HANDOFF.md`
-3. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/04_progress/rules.md`
-4. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/docs/plans/2026-04-30-001-gc-sse-saas-governance-closure-plan.md`
-5. `/Users/luzhoua/MHSDC/GoldenCrucible-SSE/testing/golden-crucible/status/BOARD.md`
+```bash
+git branch --show-current
+git status --short --branch
+git diff --stat
+```
 
-记住一句话：
+期望：
 
-> 先把治理事实闭环，再从 SSE 开小修切片；不要把 Roundtable 说成 synced skill，也不要整枝 merge SSE 到 SaaS。
+- 分支：`MHSDC-GC-SSE`
+- 当前有未提交 Roundtable backend API 变更，除非本窗口已完成提交。
+- 本地 dev 若仍在跑：前端 `http://localhost:5182/`，后端 `http://localhost:3009/`。

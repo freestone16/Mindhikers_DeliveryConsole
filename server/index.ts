@@ -21,6 +21,7 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import crucibleRouter from './routes/crucible';
+import roundtableRouter from './routes/roundtable';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -229,6 +230,7 @@ app.use('/api/market', marketRouter);
 app.get('/api/music/assets', music.getAssets);
 
 app.use('/api/crucible', crucibleRouter);
+app.use('/api/roundtable', roundtableRouter);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');

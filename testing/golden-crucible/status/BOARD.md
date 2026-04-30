@@ -2,11 +2,11 @@
 
 ## Current
 
-- latest_request: `GC-GOV-2026-04-30-phase0-3-closure`
-- latest_status: `governance-updated`
+- latest_request: `GC-SSE-2026-04-30-roundtable-backend-api-first-pass`
+- latest_status: `passed`
 - latest_claim: `none`
-- latest_report: `docs/plans/2026-04-30-001-gc-sse-saas-governance-closure-plan.md`
-- updated_at: `2026-04-30T17:30:00+08:00`
+- latest_report: `docs/dev_logs/2026-04-30.md`
+- updated_at: `2026-04-30T19:40:00+08:00`
 
 ## 2026-04-30 Governance Closure Matrix
 
@@ -25,13 +25,25 @@
 | Railway snapshot fix | SaaS staging | done | `14a7a3e` excludes local agent metadata |
 | SkillSync lower-right indicator | SSE/SaaS | not done | Planned for later shell/status polish |
 | SkillSync SSOT source popover | SSE/SaaS | not done | Planned for later shell/status polish |
-| Roundtable backend API completion | SSE/SaaS | not done | Separate backend completion work |
+| Roundtable backend API first pass | SSE local | done | `/api/roundtable/*` mounted; stream, director, Spike verified |
+| Roundtable LLM engine completion | SSE/SaaS | not done | Replace fallback engine with real persona/LLM/persistence flow |
 | Left module glyph alignment | SSE/SaaS | not done | Planned for later shell/status polish |
+
+## 2026-04-30 Roundtable API Smoke
+
+| Item | Environment | Status | Evidence / note |
+| --- | --- | --- | --- |
+| `/api/roundtable/turn/stream` | SSE local | done | Returned selection, turn chunks, synthesis, awaiting event |
+| `/api/roundtable/director` `止` | SSE local | done | Returned 1 Spike |
+| `/m/roundtable` start session | SSE local | done | 3 speakers, 3 turns, round synthesis visible |
+| Spike extraction UI | SSE local | done | `Spike 发现 (1)` visible |
+| Browser errors | SSE local | done | agent-browser errors empty |
 
 ## Next Verification Gate
 
-Before starting shell/status polish, confirm:
+Before the next SaaS staging cherry-pick, confirm:
 
 1. SSE and SaaS governance documents agree that SSE owns the next small fix slice.
 2. Roundtable is described as a module/runtime capability, not a synced standalone skill.
 3. SkillSync synced set is listed as `Writer`, `ThesisWriter`, `Researcher`, `FactChecker`, `Socrates`.
+4. Roundtable fallback engine limitations are clear and not presented as final LLM quality.

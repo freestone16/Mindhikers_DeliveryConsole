@@ -3,7 +3,7 @@ import { Button } from '../../../components/primitives';
 import { Textarea } from '../../../components/primitives';
 
 interface PropositionInputProps {
-  onStartSession: (proposition: string) => void;
+  onStartSession: (proposition: string) => void | Promise<void>;
   disabled: boolean;
 }
 
@@ -14,14 +14,18 @@ export const PropositionInput = ({
   const [proposition, setProposition] = useState('');
   const [isStarting, setIsStarting] = useState(false);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     const trimmed = proposition.trim();
     if (!trimmed || disabled || isStarting) {
       return;
     }
 
     setIsStarting(true);
-    onStartSession(trimmed);
+    try {
+      await onStartSession(trimmed);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (

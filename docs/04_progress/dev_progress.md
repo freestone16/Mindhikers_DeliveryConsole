@@ -4,6 +4,50 @@
 
 ---
 
+## 1.33 2026-04-30（Roundtable backend API first pass）
+
+### 本轮主线
+
+SSE 切回研发主线后，继续推进 Roundtable backend API completion。目标是先结束 `/api/roundtable/*` 空 router 状态，让前端 Roundtable 模块具备可验证的后端闭环。
+
+### 已完成
+
+- `server/index.ts` 挂载 `/api/roundtable`。
+- `server/routes/roundtable.ts` 实现 first pass fallback engine：
+  - `POST /api/roundtable/sharpen`
+  - `POST /api/roundtable/sharpen/apply`
+  - `POST /api/roundtable/turn/stream`
+  - `POST /api/roundtable/director`
+  - `GET /api/roundtable/session/:id`
+  - `POST /api/roundtable/deepdive`
+  - `POST /api/roundtable/deepdive/question`
+  - `POST /api/roundtable/deepdive/summarize`
+- `src/modules/roundtable/components/PropositionInput.tsx` 修复启动状态复位。
+- 回写 handoff、当日日志、testing board/latest。
+
+### 验证
+
+- `npm run typecheck:saas` ✅
+- `npm run build` ✅（仅保留既有 CSS `file` warning 与 chunk-size warning）
+- API 冒烟 ✅：
+  - `/api/roundtable/turn/stream` 返回 selection / turn chunks / synthesis / awaiting。
+  - `/api/roundtable/director` 执行 `止` 后返回 Spike。
+- agent-browser 本地验证 ✅：
+  - `http://localhost:5182/m/roundtable`
+  - 输入 `AI时代教育是不是更好？`
+  - 页面显示参与哲人、发言、轮次综合、导演指令。
+  - 点击“停止提取 Spike”后显示 `Spike 发现 (1)`。
+  - browser errors 为空。
+
+### 边界
+
+- 当前是 fallback engine first pass，不是最终 LLM 圆桌引擎。
+- Roundtable 仍是 module/runtime capability，不是 SkillSync synced standalone skill。
+- 第二段工作已评估，不建议在同一上下文里直接开干。
+- 推荐下一切片：`codex/gc-roundtable-llm-engine-bridge`，独立迁入/适配真实 persona loader、speaker selection、spike extractor、deepdive engine 与 persistence integration。
+
+---
+
 ## 1.32 2026-04-30（GC SSE / SaaS 治理收口 Phase 0-3）
 
 ### 本轮主线
