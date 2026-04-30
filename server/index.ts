@@ -24,6 +24,7 @@ import { generateCrucibleRemotionPreview } from './crucible-remotion';
 import { generateCrucibleThesis } from './crucible-thesiswriter';
 import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
 import { getCrucibleThesisTrialStatus } from './crucible-trial';
+import roundtableRouter from './routes/roundtable';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -556,6 +557,7 @@ app.delete('/api/crucible/autosave', async (req, res) => {
         res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to clear autosave' });
     }
 });
+app.use('/api/roundtable', roundtableRouter);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');

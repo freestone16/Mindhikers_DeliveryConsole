@@ -4,6 +4,27 @@
 
 ---
 
+## 1.22 2026-04-30（SaaS 接收 SSE Roundtable backend first pass）
+
+### 本轮主线
+
+按老卢三条最终原则收口：不再用全量 diff 噪声描述 SSE/SaaS 差距，只看可发布切片；SaaS staging 接收 SSE 已验证红利；SSE 保持干净并继续作为新功能起点。
+
+### 已完成
+
+- 从 SSE cherry-pick `52f356f refs MIN-136 feat: connect roundtable backend API first pass`。
+- 保留 SaaS 自己的 crucible route 结构，仅新增 `/api/roundtable` router 挂载。
+- 新增 `server/routes/roundtable.ts` first pass fallback engine。
+- 接收 `PropositionInput` 启动状态复位修复。
+
+### 边界
+
+- 当前是 fallback engine first pass，不是最终 Roundtable LLM engine。
+- Roundtable 仍是 module/runtime capability，不是 SkillSync synced standalone skill。
+- shell/status polish 已由 SaaS commit `3507aa6` 接收，不重复 cherry-pick SSE 的等价回并 commit。
+
+---
+
 ## 1.21 2026-04-30（SaaS staging 壳层接收后治理收口）
 
 ### 本轮主线
