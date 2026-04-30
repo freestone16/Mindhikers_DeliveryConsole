@@ -4,6 +4,40 @@
 
 ---
 
+## 1.34 2026-04-30（SSE / SaaS shell-status 治理倒挂修复）
+
+### 本轮主线
+
+按 SSE / SaaS 治理和对比主线执行，不进入 Roundtable LLM engine 第二段。目标是消除“SaaS staging 已有 shell/status polish，而 SSE 研发主线缺失”的倒挂。
+
+### 已完成
+
+- 只读核对 SaaS staging 当前状态：`MHSDC-GC-SAAS-staging` 干净，HEAD 为 `e426635`。
+- 确认 SaaS staging 已有 `3507aa6 refs MIN-136 fix: polish shell module and SkillSync status`。
+- 从 SSE 小修分支来源 commit `03fbb9d` 回并 shell/status polish 代码到 `MHSDC-GC-SSE` 工作区：
+  - SkillSync lower-right indicator
+  - SkillSync SSOT source / target popover
+  - synced skill names 展示
+  - ModuleTab glyph / label 对齐
+- 明确不混入 SaaS release hardening：`.railwayignore`、placeholder DB 仍待逐项判断。
+
+### 验证
+
+- `npm run typecheck:saas` ✅
+- `npm run build` ✅（仅保留既有 CSS `file` warning 与 chunk-size warning）
+- agent-browser ✅：
+  - `/m/crucible`：SkillSync indicator 显示 `5/5`，popover 可见 SSOT source、target root 与 5 个 synced skills。
+  - `/m/roundtable`：模块入口和 SkillSync indicator 正常。
+  - browser errors 为空。
+
+### 当前状态
+
+- 当前回并仍在工作区，尚未 commit。
+- 本地 `52f356f` 仍 ahead 1，尚未 push。
+- 下一步需要确认是否提交当前 shell/status polish + 文档闭环，再确认是否 push SSE。
+
+---
+
 ## 1.33 2026-04-30（Roundtable backend API first pass）
 
 ### 本轮主线
@@ -45,6 +79,14 @@ SSE 切回研发主线后，继续推进 Roundtable backend API completion。目
 - Roundtable 仍是 module/runtime capability，不是 SkillSync synced standalone skill。
 - 第二段工作已评估，不建议在同一上下文里直接开干。
 - 推荐下一切片：`codex/gc-roundtable-llm-engine-bridge`，独立迁入/适配真实 persona loader、speaker selection、spike extractor、deepdive engine 与 persistence integration。
+
+### 21:43 接续评估
+
+- `codex/gc-roundtable-llm-engine-bridge` 是建议分支，不是硬性要求；建议原因是第二段迁入真实 LLM engine 风险大、文件多，适合隔离在独立分支。
+- 当前 SSE 本地 `MHSDC-GC-SSE` ahead 1：`52f356f`，尚未 push。
+- SaaS staging 已有 shell/status polish（`3507aa6`），但 SSE 主线没有；SSE 只在 `codex/gc-shell-status-polish` 有来源 commit `03fbb9d`。
+- 当前最大治理倒挂：SaaS staging 含 shell/status polish，而 SSE 研发主线缺这笔；需要决定是否把 `03fbb9d` 回并到 `MHSDC-GC-SSE`。
+- `52f356f` 是否 cherry-pick 到 SaaS staging 需另行判断；它是 fallback engine first pass，不应直接包装成最终 Roundtable LLM 质量。
 
 ---
 

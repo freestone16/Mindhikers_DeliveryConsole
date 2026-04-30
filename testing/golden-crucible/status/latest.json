@@ -1,14 +1,16 @@
 {
   "module": "golden-crucible",
-  "latest_request": "GC-SSE-2026-04-30-roundtable-backend-api-first-pass",
+  "latest_request": "GC-SSE-2026-04-30-shell-status-polish-backsync",
   "latest_status": "passed",
   "latest_claim": null,
   "latest_report": "docs/dev_logs/2026-04-30.md",
-  "updated_at": "2026-04-30T19:40:00+08:00",
+  "updated_at": "2026-04-30T21:59:00+08:00",
   "summary": {
     "sse_shell_smoke": "done_from_2026-04-28_handoff",
     "saas_staging_shell_smoke": "done_from_2026-04-30_handoff",
-    "skill_sync_indicator": "not_done",
+    "skill_sync_indicator": "done_sse_local_and_saas_staging",
+    "skill_sync_popover": "done_sse_local_and_saas_staging",
+    "left_module_glyph_alignment": "done_sse_local_and_saas_staging",
     "roundtable_backend_api_first_pass": "done",
     "roundtable_llm_engine": "not_done",
     "roundtable_spike_ui": "done"

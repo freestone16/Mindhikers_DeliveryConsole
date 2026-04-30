@@ -2,11 +2,11 @@
 
 ## Current
 
-- latest_request: `GC-SSE-2026-04-30-roundtable-backend-api-first-pass`
+- latest_request: `GC-SSE-2026-04-30-shell-status-polish-backsync`
 - latest_status: `passed`
 - latest_claim: `none`
 - latest_report: `docs/dev_logs/2026-04-30.md`
-- updated_at: `2026-04-30T19:40:00+08:00`
+- updated_at: `2026-04-30T21:59:00+08:00`
 
 ## 2026-04-30 Governance Closure Matrix
 
@@ -23,11 +23,11 @@
 | ShellErrorBoundary check | SaaS staging | done | No ShellErrorBoundary in last staging smoke |
 | Unexpected localhost direct network check | SaaS staging | done | Network stayed on staging origin in last smoke |
 | Railway snapshot fix | SaaS staging | done | `14a7a3e` excludes local agent metadata |
-| SkillSync lower-right indicator | SSE/SaaS | not done | Planned for later shell/status polish |
-| SkillSync SSOT source popover | SSE/SaaS | not done | Planned for later shell/status polish |
+| SkillSync lower-right indicator | SSE local / SaaS staging | done | SaaS staging has `3507aa6`; SSE working tree backsynced from `03fbb9d`, local agent-browser verified |
+| SkillSync SSOT source popover | SSE local / SaaS staging | done | Popover shows SSOT source, target root, and synced skill names |
 | Roundtable backend API first pass | SSE local | done | `/api/roundtable/*` mounted; stream, director, Spike verified |
 | Roundtable LLM engine completion | SSE/SaaS | not done | Replace fallback engine with real persona/LLM/persistence flow |
-| Left module glyph alignment | SSE/SaaS | not done | Planned for later shell/status polish |
+| Left module glyph alignment | SSE local / SaaS staging | done | `炼制` / `圆桌` visible in module rail after shell/status polish |
 
 ## 2026-04-30 Roundtable API Smoke
 
@@ -37,6 +37,15 @@
 | `/api/roundtable/director` `止` | SSE local | done | Returned 1 Spike |
 | `/m/roundtable` start session | SSE local | done | 3 speakers, 3 turns, round synthesis visible |
 | Spike extraction UI | SSE local | done | `Spike 发现 (1)` visible |
+| Browser errors | SSE local | done | agent-browser errors empty |
+
+## 2026-04-30 Shell Status Polish Backsync Smoke
+
+| Item | Environment | Status | Evidence / note |
+| --- | --- | --- | --- |
+| `/m/crucible` SkillSync indicator | SSE local | done | Right-lower indicator visible with `5/5` |
+| SkillSync SSOT popover | SSE local | done | Shows source root, target root, Writer, ThesisWriter, Researcher, FactChecker, Socrates |
+| `/m/roundtable` shell smoke | SSE local | done | Module route visible with SkillSync indicator |
 | Browser errors | SSE local | done | agent-browser errors empty |
 
 ## Next Verification Gate

@@ -1,0 +1,208 @@
+.root {
+  position: absolute;
+  right: var(--gc-s-4);
+  bottom: var(--gc-s-4);
+  z-index: 20;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gc-s-2);
+  min-height: 32px;
+  padding: 0 var(--gc-s-3);
+  border: 1px solid var(--gc-line-subtle);
+  border-radius: var(--gc-radius-md);
+  background: color-mix(in srgb, var(--gc-bg-base) 88%, transparent);
+  color: var(--gc-text-secondary);
+  box-shadow: var(--gc-shadow-sm);
+  backdrop-filter: blur(12px);
+  transition: border-color var(--gc-dur-fast) var(--gc-ease),
+              color var(--gc-dur-fast) var(--gc-ease),
+              background var(--gc-dur-fast) var(--gc-ease);
+}
+
+.button:hover {
+  border-color: var(--gc-line-strong);
+  background: var(--gc-bg-base);
+  color: var(--gc-text-primary);
+}
+
+.button[data-status='done'] .icon {
+  color: var(--gc-success);
+}
+
+.button[data-status='warning'] .icon {
+  color: var(--gc-warning);
+}
+
+.button[data-status='error'] .icon {
+  color: var(--gc-error);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--gc-text-tertiary);
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+.text {
+  font-size: var(--gc-size-sm);
+  font-weight: var(--gc-weight-medium);
+}
+
+.count {
+  min-width: 28px;
+  font-family: var(--gc-font-mono);
+  font-size: 11px;
+  color: var(--gc-text-tertiary);
+  text-align: right;
+}
+
+.chevron,
+.chevronOpen {
+  color: var(--gc-text-tertiary);
+  transition: transform var(--gc-dur-fast) var(--gc-ease);
+}
+
+.chevron {
+  transform: rotate(180deg);
+}
+
+.chevronOpen {
+  transform: rotate(0deg);
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--gc-s-2));
+  width: min(420px, calc(100vw - 32px));
+  padding: var(--gc-s-4);
+  border: 1px solid var(--gc-line-subtle);
+  border-radius: var(--gc-radius-md);
+  background: var(--gc-bg-base);
+  color: var(--gc-text-primary);
+  box-shadow: var(--gc-shadow-lg);
+}
+
+.popoverHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gc-s-4);
+  margin-bottom: var(--gc-s-3);
+}
+
+.eyebrow {
+  font-size: 10px;
+  font-weight: var(--gc-weight-semibold);
+  color: var(--gc-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.title {
+  margin-top: 2px;
+  font-size: var(--gc-size-base);
+  font-weight: var(--gc-weight-semibold);
+}
+
+.badge {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: var(--gc-radius-sm);
+  border: 1px solid var(--gc-line-subtle);
+  font-family: var(--gc-font-mono);
+  font-size: 10px;
+  color: var(--gc-text-secondary);
+}
+
+.badge[data-status='done'] {
+  border-color: color-mix(in srgb, var(--gc-success) 42%, var(--gc-line-subtle));
+  color: var(--gc-success);
+}
+
+.badge[data-status='warning'] {
+  border-color: color-mix(in srgb, var(--gc-warning) 48%, var(--gc-line-subtle));
+  color: var(--gc-warning);
+}
+
+.badge[data-status='error'] {
+  border-color: color-mix(in srgb, var(--gc-error) 42%, var(--gc-line-subtle));
+  color: var(--gc-error);
+}
+
+.message {
+  margin-bottom: var(--gc-s-3);
+  padding: var(--gc-s-2) var(--gc-s-3);
+  border: 1px solid color-mix(in srgb, var(--gc-warning) 32%, var(--gc-line-subtle));
+  border-radius: var(--gc-radius-sm);
+  color: var(--gc-text-secondary);
+  font-size: var(--gc-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: grid;
+  gap: var(--gc-s-2);
+  margin: 0 0 var(--gc-s-4);
+}
+
+.meta div {
+  display: grid;
+  gap: 3px;
+}
+
+.meta dt {
+  font-size: 10px;
+  color: var(--gc-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--gc-font-mono);
+  font-size: 11px;
+  color: var(--gc-text-secondary);
+}
+
+.skillBlock {
+  display: grid;
+  gap: var(--gc-s-2);
+}
+
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gc-s-2);
+}
+
+.skill {
+  padding: 4px 8px;
+  border: 1px solid var(--gc-line-subtle);
+  border-radius: var(--gc-radius-sm);
+  font-size: 11px;
+  color: var(--gc-text-tertiary);
+  background: var(--gc-bg-sunken);
+}
+
+.skill[data-synced='true'] {
+  color: var(--gc-text-primary);
+  border-color: color-mix(in srgb, var(--gc-success) 34%, var(--gc-line-subtle));
+  background: color-mix(in srgb, var(--gc-success) 8%, var(--gc-bg-base));
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
