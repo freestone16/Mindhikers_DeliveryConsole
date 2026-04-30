@@ -1,16 +1,18 @@
 {
   "module": "golden-crucible",
-  "latest_request": "GC-SAAS-STAGING-2026-04-30-shell-migration-smoke",
-  "latest_status": "passed-with-known-gaps",
+  "latest_request": "GC-SAAS-STAGING-2026-04-30-shell-status-polish",
+  "latest_status": "passed",
   "latest_claim": null,
   "latest_report": "docs/dev_logs/2026-04-30.md",
-  "updated_at": "2026-04-30T17:30:00+08:00",
+  "updated_at": "2026-04-30T19:21:00+08:00",
   "summary": {
     "staging_shell_smoke": "done",
     "staging_roundtable_visible": "done",
     "railway_snapshot_fix": "done",
     "unexpected_localhost_check": "done",
-    "skill_sync_indicator": "not_done",
+    "skill_sync_indicator": "done",
+    "skill_sync_popover": "done",
+    "module_glyph_alignment": "done",
     "roundtable_backend_api": "not_done"
   }
 }

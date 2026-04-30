@@ -1,5 +1,5 @@
-Last updated: 2026-04-30 18:20 CST
-Branch: `codex/saas-shell-status-polish-apply`
+Last updated: 2026-04-30 19:21 CST
+Branch: `MHSDC-GC-SAAS-staging`
 Scope: `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
 
 ---
@@ -8,7 +8,7 @@ Scope: `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
 
 ## 当前一句话
 
-SaaS staging 接收分支正在承接 SSE shell/status polish：左侧模块 glyph/label 对齐、右下角 SkillSync 状态入口、SSOT source popover 已通过 cherry-pick 进入当前分支，等待本地 typecheck/build 与 staging 验证。
+SaaS staging 已完成 SSE shell/status polish 接收、fast-forward 合入、Railway 部署与 staging 验证：左侧模块 glyph/label 对齐、右下角 SkillSync 状态入口、SSOT source popover 均已在线可见。
 
 ## 已完成事实
 
@@ -28,7 +28,7 @@ SaaS staging 接收分支正在承接 SSE shell/status polish：左侧模块 gly
   - `14a7a3e refs MIN-136 fix: exclude local agent metadata from Railway snapshot`
 - 修复后 Railway staging build 和 healthcheck 通过。
 
-### 3. Shell/status polish 正在接收
+### 3. Shell/status polish 已接收并部署
 
 来源 SSE commit：
 
@@ -40,6 +40,12 @@ SaaS staging 接收分支正在承接 SSE shell/status polish：左侧模块 gly
 
 ```text
 codex/saas-shell-status-polish-apply
+```
+
+SaaS staging commit：
+
+```text
+3507aa6 refs MIN-136 fix: polish shell module and SkillSync status
 ```
 
 接收内容：
@@ -56,6 +62,19 @@ codex/saas-shell-status-polish-apply
    - `targetRoot`
    - `expected`
 
+验证结果：
+
+- `npm run typecheck:saas` 通过
+- `npm run build` 通过，仅保留 Vite chunk size warning
+- Railway service `golden-crucible-saas` deploy complete，healthcheck 通过
+- agent-browser 已验证：
+  - `/m/crucible`
+  - `/m/roundtable`
+  - `/llm-config`
+- staging 登录态下右下角显示 `SkillSync fallback 5/5`
+- popover 显示 source `/root/.gemini/antigravity/skills`、target `/app/skills`、5 个 synced skills
+- browser errors 为空
+
 ## 当前边界
 
 1. 当前分支只接收 SSE 已验证小修，不做 SaaS 侧额外功能开发。
@@ -65,19 +84,11 @@ codex/saas-shell-status-polish-apply
 5. 共享 stash 不查看、不应用、不删除：
    - `stash@{1}: On MHSDC-GC-SAAS-staging: codex pre shell staging apply cleanup 2026-04-29`
 
-## 验证要求
+## 下一步
 
-当前接收分支必须完成：
-
-1. `npm run typecheck:saas`
-2. `npm run build`
-3. agent-browser 本地或 staging 验证：
-   - `/`
-   - `/m/crucible`
-   - `/m/roundtable`
-   - `/llm-config`
-4. Network 无非预期 localhost 直连。
-5. 无 Hooks error / ShellErrorBoundary。
+1. 回到 SSE 研发主线继续 Roundtable backend API completion。
+2. SaaS staging 暂不做新功能开发，只接收 SSE 验证后的后续 cherry-pick。
+3. 若要推进 production，再从当前 SaaS staging 状态做独立验收与 release 决策。
 
 ## 接管提示
 
@@ -91,6 +102,6 @@ git log --oneline -5
 
 期望：
 
-- 分支：`codex/saas-shell-status-polish-apply` 或已合回 `MHSDC-GC-SAAS-staging`
-- 状态：干净或仅有明确接收验证文档改动
+- 分支：`MHSDC-GC-SAAS-staging`
+- 状态：干净
 - 不整枝 merge SSE
