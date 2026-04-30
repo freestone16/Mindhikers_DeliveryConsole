@@ -2,7 +2,8 @@
   display: flex;
   align-items: center;
   gap: var(--gc-s-3);
-  padding: var(--gc-s-2) var(--gc-s-3);
+  min-height: 36px;
+  padding: 6px var(--gc-s-3);
   border-radius: var(--gc-radius-md);
   color: var(--gc-text-secondary);
   transition: background var(--gc-dur-fast) var(--gc-ease),
@@ -26,10 +27,15 @@
 }
 
 .glyph {
-  width: 16px;
-  height: 16px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   flex: none;
   color: var(--gc-text-tertiary);
+  font-family: var(--gc-font-serif);
+  font-size: 16px;
+  line-height: 1;
 }
 
 .rootActive .glyph {
@@ -70,5 +76,6 @@
 .rootCollapsed {
   justify-content: center;
   gap: 0;
-  padding: 10px;
+  min-height: 40px;
+  padding: 8px;
 }

@@ -1,5 +1,5 @@
-Last updated: 2026-04-30 17:30 CST
-Branch: `MHSDC-GC-SAAS-staging`
+Last updated: 2026-04-30 18:20 CST
+Branch: `codex/saas-shell-status-polish-apply`
 Scope: `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
 
 ---
@@ -8,7 +8,7 @@ Scope: `/Users/luzhoua/MHSDC/GoldenCrucible-SaaS`
 
 ## 当前一句话
 
-SaaS staging 已接收并部署 SSE 壳层迁移，Roundtable 入口已按老卢确认露出；当前 SaaS 线等待 SSE 完成治理收口后，再接收后续 shell/status polish 小切片。
+SaaS staging 接收分支正在承接 SSE shell/status polish：左侧模块 glyph/label 对齐、右下角 SkillSync 状态入口、SSOT source popover 已通过 cherry-pick 进入当前分支，等待本地 typecheck/build 与 staging 验证。
 
 ## 已完成事实
 
@@ -24,63 +24,60 @@ SaaS staging 已接收并部署 SSE 壳层迁移，Roundtable 入口已按老卢
 ### 2. Railway snapshot 修复已完成
 
 - 初始失败点：`Initialization > Snapshot code`。
-- 根因方向：Railway code snapshot 可能吃到本地 agent/worktree metadata。
 - 修复 commit：
   - `14a7a3e refs MIN-136 fix: exclude local agent metadata from Railway snapshot`
 - 修复后 Railway staging build 和 healthcheck 通过。
 
-### 3. Staging smoke 已完成
+### 3. Shell/status polish 正在接收
 
-线上 staging agent-browser 验证结果：
+来源 SSE commit：
 
-- 未登录 `/`：认证页正常。
-- 登录后 `/` / `/m/crucible`：新 Shell 可见。
-- 左侧模块：`炼制` 与 `圆桌` 均可见。
-- `/m/roundtable`：可进入，显示输入命题与开始圆桌按钮。
-- `/llm-config`：BYOK 配置页正常。
-- Errors：无 page error。
-- Console：无 Hooks error / ShellErrorBoundary。
-- Network：请求走 `golden-crucible-saas-staging.up.railway.app` 同源，无非预期 localhost 直连。
+```text
+03fbb9d refs MIN-136 fix: polish shell module and SkillSync status
+```
+
+接收分支：
+
+```text
+codex/saas-shell-status-polish-apply
+```
+
+接收内容：
+
+1. `ModuleTab` glyph 固定为 24px 居中盒，`坩 / 辩` 与 `炼制 / 圆桌` 对齐更稳定。
+2. 新增 Shell 右下角 `SkillSyncStatus`。
+3. SkillSync popover 展示：
+   - runtime status
+   - SSOT source root
+   - target root
+   - synced skills
+4. `server/skill-sync.ts` 状态 payload 补齐：
+   - `sourceRoot`
+   - `targetRoot`
+   - `expected`
 
 ## 当前边界
 
-1. SaaS staging 当前不是下一步功能开发起点。
-2. 后续 shell/status polish 必须先在 SSE 实现和验证。
-3. SaaS staging 只接收经过 SSE 验证的小切片 cherry-pick。
-4. Roundtable backend API 尚未完整接入；当前完成的是壳层入口、页面可见性与 staging 部署。
-5. Roundtable 当前是模块 / runtime capability，不是 synced standalone skill。
-6. 当前 synced skill 集合是 `Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+1. 当前分支只接收 SSE 已验证小修，不做 SaaS 侧额外功能开发。
+2. Roundtable backend API 尚未完整接入；当前完成的是壳层入口、页面可见性与 SkillSync 状态展示。
+3. Roundtable 当前是模块 / runtime capability，不是 synced standalone skill。
+4. 当前 synced skill 集合是 `Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+5. 共享 stash 不查看、不应用、不删除：
+   - `stash@{1}: On MHSDC-GC-SAAS-staging: codex pre shell staging apply cleanup 2026-04-29`
 
-## 当前 stash
+## 验证要求
 
-共享 stash 中仍有历史现场，禁止混入治理或 shell/status polish：
-
-```text
-stash@{1}: On MHSDC-GC-SAAS-staging: codex pre shell staging apply cleanup 2026-04-29
-```
-
-本轮不查看、不应用、不删除。
-
-## 下一步
-
-等待 SSE 完成治理 Phase 0-3 后，下一实施窗口可在 SSE 创建：
-
-```text
-codex/gc-shell-status-polish
-```
-
-SSE 验证通过后，SaaS staging 再创建接收分支并 cherry-pick 单个 polish commit。
-
-SaaS 侧接收时必须验证：
+当前接收分支必须完成：
 
 1. `npm run typecheck:saas`
 2. `npm run build`
-3. agent-browser staging:
+3. agent-browser 本地或 staging 验证：
    - `/`
    - `/m/crucible`
    - `/m/roundtable`
    - `/llm-config`
 4. Network 无非预期 localhost 直连。
+5. 无 Hooks error / ShellErrorBoundary。
 
 ## 接管提示
 
@@ -94,6 +91,6 @@ git log --oneline -5
 
 期望：
 
-- 分支：`MHSDC-GC-SAAS-staging`
-- 状态：干净或仅有明确治理文档改动
-- 下一功能切片来自 SSE，不从 SaaS staging 直接开发
+- 分支：`codex/saas-shell-status-polish-apply` 或已合回 `MHSDC-GC-SAAS-staging`
+- 状态：干净或仅有明确接收验证文档改动
+- 不整枝 merge SSE

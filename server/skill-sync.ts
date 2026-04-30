@@ -35,6 +35,20 @@ let lastSyncStatus: any = null;
 
 export const getLastSyncStatus = () => lastSyncStatus;
 
+const buildSyncStatus = (
+    status: 'done' | 'warning' | 'error',
+    sourceRoot: string,
+    targetRoot: string,
+    payload: Record<string, unknown> = {},
+) => ({
+    status,
+    sourceRoot,
+    targetRoot,
+    expected: SKILLS_TO_SYNC,
+    timestamp: new Date().toISOString(),
+    ...payload,
+});
+
 export const sendSyncStatusToSocket = (socket: Socket) => {
     if (lastSyncStatus) {
         socket.emit('skill-sync-status', lastSyncStatus);
@@ -50,7 +64,10 @@ export const syncSkills = async (io: Server) => {
     // If source and target resolve to the same directory, skip copy
     if (sourceResolved === targetResolved) {
         const available = SKILLS_TO_SYNC.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
-        lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
+        lastSyncStatus = buildSyncStatus('done', sourceResolved, targetResolved, {
+            synced: available,
+            count: available.length,
+        });
         console.log(`✅ Skills in-place. Available: ${available.length}/${SKILLS_TO_SYNC.length}`);
         io.emit('skill-sync-status', lastSyncStatus);
         return;
@@ -60,19 +77,21 @@ export const syncSkills = async (io: Server) => {
     if (!fs.existsSync(SOURCE_ROOT)) {
         if (fs.existsSync(TARGET_ROOT)) {
             const available = SKILLS_TO_SYNC.filter(e => fs.existsSync(path.join(TARGET_ROOT, e)));
-            lastSyncStatus = {
-                status: 'warning',
+            lastSyncStatus = buildSyncStatus('warning', sourceResolved, targetResolved, {
                 synced: available,
                 count: available.length,
-                timestamp: new Date().toISOString(),
                 message: `Global skills root not found: ${SOURCE_ROOT}`,
-            };
+            });
             console.log(`ℹ️ Global skills root missing, keeping local skills. Available: ${available.length}/${SKILLS_TO_SYNC.length}`);
             io.emit('skill-sync-status', lastSyncStatus);
             return;
         }
         console.warn(`⚠️ No skills found at: ${SOURCE_ROOT}`);
-        lastSyncStatus = { status: 'error', message: 'No skills directory found' };
+        lastSyncStatus = buildSyncStatus('error', sourceResolved, targetResolved, {
+            synced: [],
+            count: 0,
+            message: 'No skills directory found',
+        });
         io.emit('skill-sync-status', lastSyncStatus);
         return;
     }
@@ -98,6 +117,9 @@ export const syncSkills = async (io: Server) => {
     const available = SKILLS_TO_SYNC.filter((skill) => fs.existsSync(path.join(TARGET_ROOT, skill)));
 
     console.log(`✅ Skill Sync Complete. Synced: ${available.length}/${SKILLS_TO_SYNC.length}`);
-    lastSyncStatus = { status: 'done', synced: available, count: available.length, timestamp: new Date().toISOString() };
+    lastSyncStatus = buildSyncStatus('done', sourceResolved, targetResolved, {
+        synced: available,
+        count: available.length,
+    });
     io.emit('skill-sync-status', lastSyncStatus);
 };

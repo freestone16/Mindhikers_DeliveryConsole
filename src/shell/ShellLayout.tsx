@@ -5,6 +5,7 @@ import { Avatar } from '../components/primitives';
 import type { ModuleManifest, ModuleSessionItem } from '../modules/types';
 import { ModuleErrorBoundary } from './error-boundaries';
 import { ArtifactDrawer, ModuleTab, Rail } from './primitives';
+import { SkillSyncStatus } from './SkillSyncStatus';
 import { SessionList } from './sessions/SessionList';
 import styles from './ShellLayout.module.css';
 
@@ -119,6 +120,7 @@ export function ShellLayout({
       </Rail>
 
       <div className={styles.main}>
+        <SkillSyncStatus />
         <div className={styles.content}>
           {modules.length === 0 ? (
             <div className={styles.empty}>尚未注册任何模块</div>
