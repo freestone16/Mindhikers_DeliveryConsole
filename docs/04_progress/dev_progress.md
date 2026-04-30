@@ -1,6 +1,55 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-14 CST
+> **更新日期**: 2026-04-30 CST
+
+---
+
+## 1.20 2026-04-30（SaaS 壳层迁移接入 staging + Railway snapshot 修复）
+
+### ✅ 本轮已完成
+
+**SaaS 壳层接收（MIN-136）**
+- 未整枝 merge SSE，按接收分支方式从 `MHSDC-GC-SAAS-staging` 新建 `codex/saas-shell-staging-apply`
+- 依次 cherry-pick SSE 壳层迁移关键 commit：
+  - `b4c8ba2` → `e17f5d2`
+  - `a316677` → `e610631`
+- fast-forward 合入 `MHSDC-GC-SAAS-staging`
+- 推送 `origin/MHSDC-GC-SAAS-staging`
+
+**Roundtable 可见性**
+- 老卢确认 Roundtable production/staging 入口应露出
+- 线上 staging 登录后左侧模块已显示 `炼制` 与 `圆桌`
+- `/m/roundtable` 可进入，页面显示输入命题与开始圆桌按钮
+
+**Railway snapshot 修复**
+- 初次部署失败在 `Initialization > Snapshot code`
+- 根因是 Railway code snapshot 吃到本地 agent/worktree 元数据风险
+- `.railwayignore` 已收紧，排除 `.claude/`、`.vibedir/`、`.playwright-mcp/`、`.codepilot-uploads/`、`testing/`、runtime 产物、本地 smoke 脚本等
+- 修复后 Railway 成功进入 Build 并通过 Healthcheck
+
+### 🎯 验证结论
+
+- `npm run typecheck:saas`：通过
+- `npm run build`：通过
+- Railway staging 成功 deployment：
+  - `5f18972a-be9e-478b-8ac7-36f6cc8681d7`
+- 线上 build 证据：
+  - `✓ 2084 modules transformed`
+  - `dist/assets/index-DmwApuSI.js`
+- agent-browser staging 验证：
+  - 未登录 `/` 认证页正常
+  - 登录后新 Shell 正常
+  - `/m/crucible` 正常
+  - `/m/roundtable` 正常可见
+  - `/llm-config` 正常
+  - 无 Hooks error / ShellErrorBoundary
+  - Network 无非预期 localhost 直连
+
+### ⚠️ 当前说明
+
+- Roundtable 后端 API 仍未完整接入；本轮完成的是壳层入口、页面可见性与 staging 部署
+- 早前历史脏现场仍保存于 stash，后续需单独整理：
+  - `stash@{0}: codex pre shell staging apply cleanup 2026-04-29`
 
 ---
 

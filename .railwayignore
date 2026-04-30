@@ -1,12 +1,38 @@
-node_modules
-node_modules_bad
-dist
-runtime/crucible/autosave.json
-runtime/crucible/projects
-runtime/crucible/sessions
-logs
-uploads
-.git
+node_modules/
+node_modules_bad/
+dist/
+build/
+coverage/
+
+.git/
 .DS_Store
 *.log
-public/assets/bgm
+*.tmp
+
+# Local agent / workspace metadata. These are not runtime inputs and can break
+# Railway code snapshot creation when gitlinks or local worktree state leak in.
+.agent/
+.claude/
+.playwright-mcp/
+.vibedir/
+.codepilot-uploads/
+.codex-tmp-*
+
+# Runtime and generated artifacts
+runtime/crucible/autosave.json
+runtime/crucible/projects/
+runtime/crucible/sessions/
+.gstack/
+logs/
+uploads/
+testing/
+
+# Local-only smoke scripts and scratch files
+test_*
+test-*
+*.pyc
+__pycache__/
+001.png
+
+# Large optional media not needed for the SaaS staging app
+public/assets/bgm/
