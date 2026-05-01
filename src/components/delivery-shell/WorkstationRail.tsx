@@ -1,14 +1,15 @@
 import { PenTool, Eye, Music, Image, Video, Megaphone, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SessionListPanel } from './SessionListPanel';
+import { ProjectContextDock } from './ProjectContextDock';
 import type { ScriptFile } from './DeliveryShellLayout';
 
 const WORKSTATIONS = [
-  { id: 'Director', label: '影视导演', icon: PenTool },
-  { id: 'ShortsMaster', label: '短视频', icon: Video },
-  { id: 'ThumbnailMaster', label: '缩略图', icon: Image },
-  { id: 'MusicMaster', label: '音乐', icon: Music },
-  { id: 'MarketingMaster', label: '营销', icon: Megaphone },
-  { id: 'VisualAudit', label: '视觉审计', icon: Eye },
+  { id: 'Director', label: '影视导演', icon: PenTool, outputDir: '04_Visuals' },
+  { id: 'ShortsMaster', label: '短视频', icon: Video, outputDir: '05_Shorts_Output' },
+  { id: 'ThumbnailMaster', label: '缩略图', icon: Image, outputDir: '03_Thumbnail_Plan' },
+  { id: 'MusicMaster', label: '音乐', icon: Music, outputDir: '04_Music_Plan' },
+  { id: 'MarketingMaster', label: '营销', icon: Megaphone, outputDir: '05_Marketing' },
+  { id: 'VisualAudit', label: '视觉审计', icon: Eye, outputDir: '04_Visuals' },
 ];
 
 interface WorkstationRailProps {
@@ -32,10 +33,16 @@ export function WorkstationRail({
   selectedScriptPath,
   onSelectScript,
   scripts,
+  projectName,
+  modelName,
+  outputDir,
   collapsed = false,
   onToggleCollapse,
 }: WorkstationRailProps) {
-  const activeLabel = WORKSTATIONS.find(ws => ws.id === activeExpertId)?.label || activeExpertId;
+  const activeWorkstation = WORKSTATIONS.find(ws => ws.id === activeExpertId);
+  const activeLabel = activeWorkstation?.label || activeExpertId;
+  const scriptName = selectedScriptPath?.split('/').pop();
+  const resolvedOutputDir = outputDir || activeWorkstation?.outputDir;
 
   if (collapsed) {
     return (
@@ -111,6 +118,13 @@ export function WorkstationRail({
         onSelectScript={onSelectScript}
         expertLabel={activeLabel}
         projectId={projectId}
+      />
+
+      <ProjectContextDock
+        projectName={projectName || projectId}
+        scriptName={scriptName}
+        modelName={modelName}
+        outputDir={resolvedOutputDir}
       />
     </div>
   );

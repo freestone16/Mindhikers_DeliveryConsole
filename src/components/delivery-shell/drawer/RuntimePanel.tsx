@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Zap, CheckCircle2, AlertCircle, ListChecks, Wrench } from 'lucide-react';
 
 interface LogEntry {
   timestamp: number;
@@ -126,6 +126,23 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
     }
   };
 
+  const actionTrace = logs
+    .filter(log => /generate|生成|revise|修订|approve|批准|retry|重试|render|渲染|export|导出|handoff|交接/i.test(log.message))
+    .slice(-5)
+    .reverse();
+  const errorLogs = logs.filter(log => log.type === 'error').slice(-3).reverse();
+  const latestLog = logs[logs.length - 1];
+
+  const getActionLabel = (message: string) => {
+    if (/revise|修订/i.test(message)) return '修订';
+    if (/approve|批准/i.test(message)) return '批准';
+    if (/retry|重试/i.test(message)) return '重试';
+    if (/render|渲染/i.test(message)) return '渲染';
+    if (/export|导出/i.test(message)) return '导出';
+    if (/handoff|交接/i.test(message)) return '交接';
+    return '生成';
+  };
+
   const providerLabel = (provider?: string) => {
     switch (provider) {
       case 'siliconflow': return 'SiliconFlow';
@@ -142,6 +159,22 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
       <SyncedSkillsCard socket={socket} />
 
       <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)] space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-[#8f8372] font-medium">
+            {isLoading ? (
+              <Loader2 className="w-3.5 h-3.5 text-[#c97545] animate-spin" />
+            ) : errorLogs.length > 0 ? (
+              <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#62835c]" />
+            )}
+            当前状态
+          </span>
+          <span className="text-[#342d24]">
+            {isLoading ? `处理中 ${formatElapsed(elapsedSeconds)}` : errorLogs.length > 0 ? '最近有错误' : '待命'}
+          </span>
+        </div>
+
         <div className="flex items-center justify-between text-xs">
           <span className="flex items-center gap-1.5 text-[#8f8372] font-medium">
             <Cpu className="w-3.5 h-3.5" />
@@ -172,8 +205,67 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
             <Info className="w-3.5 h-3.5" />
             Console
           </span>
-          <span className="text-[#342d24]">{version ? `v${version}` : '—'}</span>
+          <span className="text-[#342d24]">{version || '—'}</span>
         </div>
+
+        {latestLog && (
+          <div className="pt-2 mt-1 border-t border-[#e4dbcc] text-[11px] text-[#8f8372] leading-relaxed">
+            最近事件：<span className="text-[#342d24]">{latestLog.message}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs text-[#8f8372] uppercase font-bold flex items-center gap-1.5">
+            <ListChecks className="w-3.5 h-3.5" />
+            动作追踪
+          </h3>
+          <span className="text-[10px] text-[#8f8372]">{actionTrace.length ? `${actionTrace.length} 条` : '等待动作'}</span>
+        </div>
+        {actionTrace.length > 0 ? (
+          <div className="space-y-1">
+            {actionTrace.map((log, i) => (
+              <div key={`${log.timestamp}-${i}`} className="text-[11px] text-[#342d24] bg-[#f8f4ec] border border-[#e4dbcc] rounded px-2 py-1.5">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[9px] text-[#c97545] bg-[rgba(201,117,69,0.12)] px-1 rounded">
+                    {getActionLabel(log.message)}
+                  </span>
+                  <span className="text-[#8f8372]">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div className="leading-snug">{log.message}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#8f8372] leading-relaxed">
+            生成、修订、批准、重试、渲染、导出和交接等动作会在这里形成可追踪上下文。
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs text-[#8f8372] uppercase font-bold flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5" />
+            工具反馈
+          </h3>
+          <span className="text-[10px] text-[#8f8372]">{errorLogs.length ? `${errorLogs.length} 个错误` : '正常'}</span>
+        </div>
+        {errorLogs.length > 0 ? (
+          <div className="space-y-1">
+            {errorLogs.map((log, i) => (
+              <div key={`${log.timestamp}-error-${i}`} className="text-[11px] text-red-700 bg-red-50 border border-red-100 rounded px-2 py-1">
+                <span className="text-red-400 mr-1">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                {log.message}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#8f8372] leading-relaxed">
+            当前没有阻断错误。后续工具调用、渲染失败或 API 异常会在这里优先显露。
+          </p>
+        )}
       </div>
 
       {isLoading && (

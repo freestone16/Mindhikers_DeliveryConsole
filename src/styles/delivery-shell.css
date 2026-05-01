@@ -9,6 +9,8 @@
   --shell-bg-soft: #f8f4ec;
   --shell-panel: rgba(255, 252, 247, 0.78);
   --shell-panel-solid: #fffcf7;
+  --shell-surface: rgba(255, 252, 247, 0.64);
+  --shell-hover: rgba(228, 219, 204, 0.45);
   --shell-border: #e4dbcc;
   --shell-border-strong: #d8c8ae;
   --shell-text: #342d24;

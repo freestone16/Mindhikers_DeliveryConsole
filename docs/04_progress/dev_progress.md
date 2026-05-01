@@ -43,6 +43,8 @@
 | v4.3.2 | 2026-04-24 | **Director 第二阶段系统性清理** - 修复 TypeScript 契约漂移、adapter props 深合并/preview 失效、中文化测试口径与 runtime/UI smoke |
 | v4.3.3 | 2026-04-26 | **Director 第三轮 bug 修复与布局/状态栏恢复** - Phase2 内存溢出修复（懒加载+定时器清理+Lightbox 单例化）、Phase1 批注清空、Phase2 loading 提示恢复、ChapterRail 收窄、底部状态栏（LLM/Remotion/计时）回归 |
 | v4.4.0 | 2026-04-27 | **SSOT 迁移到 Mindhikers** - 导演大师 5 个 skill（Director / RemotionStudio / svg-architect / remotion-best-practices / remotion-visual-qa）从 `~/.gemini/antigravity/skills/` copy 到 `/Users/luzhoua/Mindhikers/.claude/skills/`；`.env` 与 `skill-loader.ts` 切到新 SSOT；旧 SSOT 完整保留不动；RemotionStudio 精简至 610M（排除 out/renders/payloads/test_*） |
+| v4.4.1 | 2026-05-01 | **Director Design System Target** - 根目录新增 `design.md` / `design.zh.md` 作为 Google Stitch 风格设计事实源；补齐设计目标 PRD、UI 续作实施计划、设计验收 request；更新 AGENTS/README/rules/testing/HANDOFF；落地首段 UI 实施（左栏 ProjectContextDock 接入、CSS token 清债、Runtime 动作追踪占位、版本号显示修正），并经 `npm run build` 与 agent-browser 页面验证通过 |
+| v4.4.2 | 2026-05-01 | **Drawer Product Surface First Pass** - 清理非主线 WIP 后推进 Unit 3：Runtime 增加当前状态、最近事件、动作类型标签和工具反馈；Artifacts 增加刷新、loading/error/empty 状态、路径与打开/下载 affordance；Handoff 增加当前可继续状态、下一步建议和刷新/重试；经 `npm run build` 与 agent-browser 1440/980 验证通过 |
 
 ---
 

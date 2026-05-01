@@ -9,6 +9,9 @@ import {
   Palette,
   Film,
   Download,
+  RefreshCw,
+  AlertCircle,
+  ExternalLink,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -125,32 +128,64 @@ export function ArtifactsPanel({ projectId }: ArtifactsPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="rounded-lg border border-[#e4dbcc] p-4 bg-[rgba(255,252,247,0.78)] flex items-center justify-center">
         <Loader2 className="w-5 h-5 text-[#c97545] animate-spin mr-2" />
-        <span className="text-sm text-[#8f8372]">加载产出物...</span>
+        <span className="text-sm text-[#8f8372]">正在扫描 Director 产出物...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-[#e4dbcc] p-4 bg-[rgba(255,252,247,0.78)] text-center">
-        <span className="text-sm text-red-500">{error}</span>
+      <div className="rounded-lg border border-red-100 p-4 bg-red-50 text-center">
+        <AlertCircle className="w-5 h-5 text-red-500 mx-auto mb-2" />
+        <div className="text-sm text-red-600 mb-3">产出物读取失败：{error}</div>
+        <button
+          onClick={fetchArtifacts}
+          className="inline-flex items-center gap-1.5 rounded border border-red-200 bg-white px-2.5 py-1.5 text-xs text-red-700 hover:bg-red-50"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          重试扫描
+        </button>
       </div>
     );
   }
 
   if (phases.length === 0 || totalFiles === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-[#8f8372]">
+      <div className="flex flex-col items-center justify-center py-12 text-[#8f8372] rounded-lg border border-[#e4dbcc] bg-[rgba(255,252,247,0.78)]">
         <FolderOpen className="w-8 h-8 mb-2 opacity-50" />
-        <span className="text-sm">暂无产出物</span>
+        <span className="text-sm text-[#342d24] font-medium">暂无产出物</span>
+        <span className="text-xs mt-1">生成视觉概念、分镜、渲染或导出后会出现在这里。</span>
+        <button
+          onClick={fetchArtifacts}
+          className="mt-3 inline-flex items-center gap-1.5 rounded border border-[#e4dbcc] bg-[#fffcf7] px-2.5 py-1.5 text-xs text-[#342d24] hover:bg-[#f8f4ec]"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          刷新
+        </button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 h-full overflow-y-auto">
+      <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)] flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-bold text-[#342d24]">产出物清单</div>
+          <div className="text-[10px] text-[#8f8372] mt-0.5">
+            {totalFiles} 个文件，来自 {phases.filter(phase => phase.files.length > 0).length} 个阶段
+          </div>
+        </div>
+        <button
+          onClick={fetchArtifacts}
+          className="inline-flex items-center gap-1.5 rounded border border-[#e4dbcc] bg-[#fffcf7] px-2.5 py-1.5 text-xs text-[#342d24] hover:bg-[#f8f4ec] shrink-0"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          刷新
+        </button>
+      </div>
+
       {phases.map(phase => {
         const meta = PHASE_META[phase.phase] || {
           label: phase.label || phase.phase,
@@ -200,6 +235,25 @@ export function ArtifactsPanel({ projectId }: ArtifactsPanelProps) {
                           <span className="opacity-50">·</span>
                           <span>{formatRelativeTime(file.mtime)}</span>
                         </div>
+                        <div className="text-[10px] text-[#8f8372] truncate font-mono mt-0.5">{file.path}</div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          disabled
+                          title="当前 API 尚未提供打开文件端点"
+                          className="grid place-items-center w-7 h-7 rounded border border-[#e4dbcc] text-[#b8aa96] bg-[#f8f4ec] cursor-not-allowed"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled
+                          title="当前 API 尚未提供下载文件端点"
+                          className="grid place-items-center w-7 h-7 rounded border border-[#e4dbcc] text-[#b8aa96] bg-[#f8f4ec] cursor-not-allowed"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );

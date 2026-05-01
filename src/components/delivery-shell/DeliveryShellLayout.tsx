@@ -61,6 +61,10 @@ export function DeliveryShellLayout({
     return onSelectScript(pid, path);
   }, [onSelectScript]);
 
+  const modelName = runtimeData?.currentModel
+    ? `${runtimeData.currentModel.provider} / ${runtimeData.currentModel.model}`
+    : undefined;
+
   const bodyClass = [
     'shell-body',
     drawerCollapsed && railCollapsed ? 'shell-body--both-collapsed'
@@ -86,6 +90,8 @@ export function DeliveryShellLayout({
           selectedScriptPath={selectedScriptPath}
           onSelectScript={handleSelectScript}
           scripts={scripts}
+          projectName={projectId}
+          modelName={modelName}
           collapsed={railCollapsed}
           onToggleCollapse={() => setRailCollapsed(!railCollapsed)}
         />

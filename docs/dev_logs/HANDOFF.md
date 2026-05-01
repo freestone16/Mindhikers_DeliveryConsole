@@ -1,143 +1,180 @@
-**时间**: 2026-04-27 14:50 CST
+**时间**: 2026-05-01 22:48 CST
 **分支**: `MHSDC-DC-director`
 
 # HANDOFF — Director 模块
 
 ## 一句话接力
 
-本窗口完成 SSOT 迁移：导演大师涉及的 5 个 skill 已从 `~/.gemini/antigravity/skills/` copy 到 `/Users/luzhoua/Mindhikers/.claude/skills/`，`.env` 与 `skill-loader.ts` 已切到新 SSOT 并经服务启动日志验证生效；旧 SSOT 一字未动，零删除。前面老卢提的 3 件 UI 优化（footer 右对齐 / 运行态显示真实 skill 列表 / chat 紧凑化）**本窗口未动手**，让位给 SSOT 迁移，留给下一窗口。
+本窗口完成 Director 设计系统目标化并继续推进主线 Unit 3：根目录新增 `design.md` / `design.zh.md`，补齐设计目标 PRD、UI 续作实施计划、测试验收 request；已落地左栏 `ProjectContextDock`、CSS token 修复、Runtime 状态/动作/错误反馈、Artifacts 刷新/错误/空态/操作 affordance、Handoff 当前可继续状态。下一步按新实施计划继续做 Phase 视觉一致化和更深的状态/审计链路。
 
 ## 当前事实
 
 - 当前 worktree: `/Users/luzhoua/MHSDC/DeliveryConsole/Director`
 - 当前分支: `MHSDC-DC-director`
-- 服务运行中：后端 `http://127.0.0.1:3005`、前端 `http://localhost:5178/`（启动 PID 见 `/tmp/director-dev.log`）
-- 工作树：有未 commit 改动（含 v4.3.3 残留 + 本轮 SSOT 改动）
-- 日志铁证（启动时打印）：
-  - `✅ RemotionStudio reachable: /Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio`
-  - `✅ svg-architect reachable: /Users/luzhoua/Mindhikers/.claude/skills/svg-architect`
-  - `✅ Skill Sync Complete. Synced: 6/7`
+- 设计事实源：
+  - `design.md`
+  - `design.zh.md`
+- 主 PRD：
+  - `docs/plans/2026-05-01_director-design-target-prd.md`
+- 续作实施计划：
+  - `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
+- 设计验收 request：
+  - `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
+- 进度已保存：
+  - 里程碑：`docs/04_progress/dev_progress.md` 已追加 `v4.4.1` / `v4.4.2`
+  - 当日日志：`docs/dev_logs/2026-05-01.md`
+- 当前服务：独立 Terminal 启动的 Director 前后端仍应在 `http://localhost:5178/` 与 `127.0.0.1:3005`
 
 ## 本窗口已完成（未 commit）
 
-### 1. 物理迁移到 Mindhikers/.claude/skills/
+### 1. 设计系统目标文档
 
-| Skill | 来源 | 大小 | 备注 |
-|---|---|---|---|
-| `Director/` | `~/.gemini/antigravity/skills/Director/` | 88 KB | 完整版（SKILL.md + prompts/ + resources/ + workflows/） |
-| `RemotionStudio/` | 同源（rsync 排除） | **610 MB** | 排除 `out/ renders/ payloads/ test_file.mp4 test_payload.json render_*.sh run_verification.js` |
-| `svg-architect/` | 同源 | 96 KB | Python 工具技能 |
-| `remotion-best-practices/` | 同源 | 188 KB | Remotion 红线手册 |
-| `remotion-visual-qa/` | 同源 | 8 KB | 视觉 QA 协议 |
+- 新增 `design.md`
+  - Google Stitch / `DESIGN.md` 风格 front matter
+  - 机器可读 tokens
+  - Claude Code 校准原则：不完全 Claude-Code-ify，保留影视创作温度，同时吸收克制、状态透明、命令优先和审计感
+  - 组件、交互、命令、审计、复用和实施优先级
+- 新增 `design.zh.md`
+  - 中文协作镜像
+  - 保留 token key，正文中文化
 
-冲突处理：原 `Mindhikers/.claude/skills/Director/` 是 stub（SKILL.md 5.9KB + references/ + workflows/，无 prompts/ 无 resources/），已重命名为 `Director.stub-bk-20260427/` 备份保留，再把完整版 copy 进 `Director/`。
+### 2. 过程资产更新
 
-旧 SSOT (`~/.gemini/antigravity/skills/`) **零变动**。GoldenCrucibleLab 等其他消费方继续用旧路径，零中断。
+- 新增 `docs/plans/2026-05-01_director-design-target-prd.md`
+- 新增 `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
+- 更新 `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md`
+  - 加 2026-05-01 design target addendum
+  - 明确旧计划作为 origin/history，不再 greenfield 重建 shell
+- 更新 `docs/plans/2026-04-19-003-feat-context-drawer-plan.md`
+  - Runtime / Artifacts / Handoff 从临时展示升级为产品上下文面
+- 更新 `AGENTS.md`
+  - UI / 视觉 / 页面验证前置读取 `design.md` / `design.zh.md`
+- 更新 `README.md`
+  - 增加设计系统入口与当前状态
+- 更新 `docs/04_progress/rules.md`
+  - 新增 #137-140：设计事实源、工作台 shell、状态透明、Runtime/Handoff 产品化
+- 更新 `testing/README.md`、`testing/director/README.md`
+  - 加 UI / 设计系统验收口径
+- 新增 `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
+- 更新 `docs/04_progress/dev_progress.md`
+  - 追加 `v4.4.1 Director Design System Target`
+- 新增 `docs/dev_logs/2026-05-01.md`
+  - 详细记录外部调研、CE 专家结论、过程资产变更、代码实现、验证结果、未完成项和工作区归因
 
-### 2. .env 切换 SSOT
+### 3. 第一段实现
 
-```diff
-- SKILLS_BASE=/Users/luzhoua/.gemini/antigravity/skills
-- REMOTION_STUDIO_DIR=/Users/luzhoua/.gemini/antigravity/skills/RemotionStudio
-+ SKILLS_BASE=/Users/luzhoua/Mindhikers/.claude/skills
-+ REMOTION_STUDIO_DIR=/Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio
-```
+- `src/styles/delivery-shell.css`
+  - 补齐 `--shell-surface`、`--shell-hover`，修掉既有未定义 token
+- `src/components/delivery-shell/DeliveryShellLayout.tsx`
+  - 传递当前模型显示名给左栏
+- `src/components/delivery-shell/WorkstationRail.tsx`
+  - 接入 `ProjectContextDock`
+  - 展示当前项目、当前文稿、全局模型、输出目录
+- `src/components/delivery-shell/drawer/RuntimePanel.tsx`
+  - 增加“动作追踪”占位
+  - 从日志中过滤 generate / revise / approve / retry / render / export / handoff 等动作线索
+  - 修复 Console 版本号重复 `v` 的显示问题
 
-### 3. server/skill-loader.ts 移除硬编码 .gemini fallback
+### 4. Unit 3 Drawer 产品化首段
 
-- 删除顶层常量 `SKILL_SEARCH_PATHS`（曾把 `~/.gemini/antigravity/skills` 写死为第一优先级）
-- 改用 `getSkillSearchPaths()` 函数：每次调用时读 `process.env.SKILLS_BASE`，避免 ESM 顶层缓存早于 dotenv.config() 的陷阱（rules.md #7）
-- 全文 7 处引用统一替换为 `getSkillSearchPaths()`
+- WIP 清理：
+  - `server/director.ts.backup` 与已修改的已跟踪 `temp_images/*` 已恢复到 HEAD
+  - 非本轮未跟踪项已归档到 `/private/tmp/director-wip-archive-20260501-224222/`
+- `src/components/delivery-shell/drawer/RuntimePanel.tsx`
+  - 增加“当前状态”行：待命 / 处理中 / 最近有错误
+  - 增加最近事件展示
+  - 动作追踪增加动作类型标签
+  - 增加“工具反馈”卡片，集中显示最近错误或正常状态
+- `src/components/delivery-shell/drawer/ArtifactsPanel.tsx`
+  - 增加产出物摘要与刷新按钮
+  - 增加 loading / error / empty 的产品态与重试
+  - 文件行展示相对路径
+  - 增加打开 / 下载 affordance；当前 API 暂未提供端点，因此按钮禁用并标注原因
+- `src/components/delivery-shell/drawer/HandoffPanel.tsx`
+  - 增加“当前可继续状态”摘要
+  - 增加下一步建议
+  - 增加刷新、错误重试和空态
 
-## 本窗口刻意没做（重要 — 下一窗口要做）
+## 验证结果
 
-老卢之前点了头要做的 3 件 UI 优化，这一窗口为了让 SSOT 迁移结构清晰，**全部跳过**了。下一窗口必须接着做：
+- `npm run build`：通过
+  - 仅保留既有 CSS minify 警告和 chunk size 警告，非阻断
+- `agent-browser`：
+  - 打开 `http://localhost:5178/`
+  - 确认首屏为 Director 工作台
+  - 确认左栏出现：
+    - 当前项目
+    - 当前文稿
+    - 全局模型
+    - 输出目录
+  - 切到 Runtime tab，确认出现：
+    - 已同步 Skills
+    - LLM
+    - Remotion
+    - Console `v3.8.0`
+    - 动作追踪
+    - 当前状态
+    - 工具反馈
+  - 切到 Artifacts tab，确认出现：
+    - 产出物清单
+    - 刷新按钮
+    - 文件路径
+    - 打开 / 下载禁用 affordance
+  - 切到 Handoff tab，确认出现：
+    - 当前可继续状态
+    - 下一步建议
+    - 阶段状态
+    - 跨模块交接
+  - 980px 视口复查：未发现明显遮挡或重叠
+  - console：无报错
+- 截图：
+  - `/private/tmp/director-shots/screenshot-1777643251203.png`
+  - `/private/tmp/director-shots/screenshot-1777643267758.png`
+  - `/private/tmp/director-shots/screenshot-1777643300087.png`
+  - `/private/tmp/director-shots/unit3-handoff-1440.png`
+  - `/private/tmp/director-shots/unit3-handoff-980.png`
 
-1. **底部 `DeliveryStatusBar` 改造**（确认方案：保留 footer，内容右对齐）
-   - 移除：LLM provider/model、RemotionStudio、版本号
-   - 保留：DIRECTOR ONLINE 圆点 + 生成中计时
-   - 文件：`src/components/delivery-shell/DeliveryStatusBar.tsx`
+## 下一步
 
-2. **`RuntimePanel` 改造**（确认方案：只显示 skill 列表）
-   - 删除写死的 `SkillInfoCard`（"Director Skill v2.1 / doubao-seedream / seedance-v4"）
-   - 新增"已同步 Skills"区块：订阅 socket 事件 `skill-sync-status`，显示真实的 6/7 sync 状态
-   - 把 LLM 模型、RemotionStudio、版本号 三项从底部状态栏迁过来
-   - 文件：`src/components/delivery-shell/drawer/RuntimePanel.tsx` + `ContextDrawer.tsx`（订阅 socket 事件）
+按 `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md` 继续：
 
-3. **右栏 ChatPanel 紧凑化**
-   - `.shell-drawer__content { padding: 16px }` 在 chat tab 下收成 0
-   - 文件：`src/styles/delivery-shell.css`
+1. Unit 4：Director Phase 视觉一致化
+   - emoji-like badge 逐步改为 lucide icon + text 或纯文本
+   - 统一按钮命令文案与状态
+   - 确保 P2/P3 review rows 不被动态文本撑破
+2. Unit 5：状态透明与审计链路
+   - 关键动作进入 runtime/chat/artifacts/handoff
+3. Unit 6：执行设计系统验收 request
+   - `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
 
-## 已知 Caveat
+## 工作区注意
 
-### Skill Sync 显示 6/7（缺 ThumbnailMaster）
+本窗口只应归因于以下新增/修改：
 
-`server/skill-sync.ts` 的 `EXPERTS` 数组期望 5 个专家全在 SSOT：
-```ts
-['Director', 'MusicDirector', 'ThumbnailMaster', 'ShortsMaster', 'MarketingMaster']
-```
-
-Mindhikers/.claude/skills/ 下：
-- ✅ Director（本轮新 copy 的完整版）
-- ✅ MusicDirector（旧有 stub）
-- ✅ ShortsMaster（旧有 stub）
-- ✅ MarketingMaster（旧有 stub）
-- ❌ **ThumbnailMaster**（不存在）
-
-→ Sync 实际为 6/7（缺 1 个专家 + RemotionStudio + svg-architect）
-
-**当前影响**：切换到"缩略图大师"专家时，ChatPanel 会读不到 SKILL.md，退化到通用助手兜底。导演大师工作流不受影响。
-
-**修复方案**（如需）：从 `~/.gemini/antigravity/skills/ThumbnailMaster/` cp 一份过去（用户 Q1=C 范围里没勾这个，所以本轮不动）。
-
-### 3 个 server 文件仍残留 .gemini 硬编码 fallback（功能不受影响）
-
-未清理：
-- `server/svg-architect.ts:19` — `path.join(os.homedir(), '.gemini/antigravity/skills')`
-- `server/director.ts:687` — RemotionStudio 第三优先级 fallback
-- `server/skill-sync.ts:91, 106` — RemotionStudio / svg-architect 第三优先级 fallback
-
-**为什么不影响功能**：这三处都是候选数组的最后一项，且 `SKILLS_BASE` 在第一优先级且 Mindhikers 新路径文件齐全，永远会先命中新 SSOT，旧路径不会被走到。日志已证实。
-
-**遗留它的代价**：违反 rules.md #8（路径解析必须统一走 helper，禁止各自硬编码）。下一窗口顺手清理。
-
-### 旧 SSOT 完整保留
-
-`~/.gemini/antigravity/skills/` 一字未动。GoldenCrucibleLab 仍消费旧路径，零中断。
-
-## 验证清单（老卢自验时参考）
-
-- [ ] 浏览器打开 `http://localhost:5178/`，进入 Director Phase2
-- [ ] 后端日志中确认 `RemotionStudio reachable: /Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio`
-- [ ] Phase2 生成视觉方案：能正常拉起 LLM、能渲染预览图（说明 Director Skill 加载链路从新 SSOT 正常）
-- [ ] Chatbox 修改某条方案：能跑通 `update_option_fields` 工具调用（说明 prompts/chat_edit.md 从新 SSOT 加载）
-- [ ] 浏览器右栏切到"运行态"tab：注意当前还是写死的 SkillInfoCard，**不是真实 sync 状态** — 这部分待下一窗口改
-
-## 下一窗口启动必读
-
-```bash
-cd /Users/luzhoua/MHSDC/DeliveryConsole/Director
-git branch --show-current        # 应返回 MHSDC-DC-director
-lsof -i :3005 -i :5178           # 应都在线
-tail -50 /tmp/director-dev.log   # 看最近一次启动日志
-```
-
-必读：
-- `docs/dev_logs/HANDOFF.md`（本文件）
+- `design.md`
+- `design.zh.md`
+- `docs/plans/2026-05-01_director-design-target-prd.md`
+- `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
+- `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md`
+- `docs/plans/2026-04-19-003-feat-context-drawer-plan.md`
+- `AGENTS.md`
+- `README.md`
 - `docs/04_progress/rules.md`
 - `docs/04_progress/dev_progress.md`
+- `docs/dev_logs/HANDOFF.md`
+- `docs/dev_logs/2026-05-01.md`
+- `testing/README.md`
+- `testing/director/README.md`
+- `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
+- `src/styles/delivery-shell.css`
+- `src/components/delivery-shell/DeliveryShellLayout.tsx`
+- `src/components/delivery-shell/WorkstationRail.tsx`
+- `src/components/delivery-shell/drawer/RuntimePanel.tsx`
+- `src/components/delivery-shell/drawer/ArtifactsPanel.tsx`
+- `src/components/delivery-shell/drawer/HandoffPanel.tsx`
 
-## 本轮文件清单
+非本轮 WIP 已清理或归档：
 
-| 文件 | 改动 |
-|---|---|
-| `.env` | `SKILLS_BASE` + `REMOTION_STUDIO_DIR` 切换到 Mindhikers |
-| `server/skill-loader.ts` | 删 SKILL_SEARCH_PATHS 常量 + 改 getSkillSearchPaths() lazy 函数 + 7 处引用替换 |
-| `/Users/luzhoua/Mindhikers/.claude/skills/Director/` | 新增（替换原 stub，stub 备份至 `Director.stub-bk-20260427/`） |
-| `/Users/luzhoua/Mindhikers/.claude/skills/RemotionStudio/` | 新增（610M，rsync 排除测试产物） |
-| `/Users/luzhoua/Mindhikers/.claude/skills/svg-architect/` | 新增 |
-| `/Users/luzhoua/Mindhikers/.claude/skills/remotion-best-practices/` | 新增 |
-| `/Users/luzhoua/Mindhikers/.claude/skills/remotion-visual-qa/` | 新增 |
-| `docs/04_progress/dev_progress.md` | 追加 v4.4.0 |
-| `docs/04_progress/rules.md` | 追加 SSOT 切换条目（rule #134-135） |
-| `docs/dev_logs/HANDOFF.md` | 覆盖写本文件 |
+- `server/director.ts.backup` 删除：已恢复到 HEAD
+- 已修改的已跟踪 `temp_images/*`：已恢复到 HEAD
+- `docs/governance/directory-map.md`、`src/components/director/ChapterCard.tsx.backup`、未跟踪 `temp_images/*`：已归档到 `/private/tmp/director-wip-archive-20260501-224222/`
