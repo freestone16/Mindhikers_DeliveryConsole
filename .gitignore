@@ -31,3 +31,5 @@ coverage/
 *.tmp
 .cache/
 .claude/skills/
+.claude/skills
+.agents/

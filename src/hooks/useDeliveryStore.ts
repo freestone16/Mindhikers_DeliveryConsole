@@ -63,7 +63,23 @@ export const useDeliveryStore = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ projectId, path: scriptPath })
             });
-            return res.ok;
+            if (!res.ok) return false;
+
+            const result = await res.json();
+            const selectedScript = result.selectedScript || {
+                filename: scriptPath.split('/').pop() || scriptPath,
+                path: scriptPath,
+                selectedAt: new Date().toISOString(),
+            };
+
+            setState(current => ({
+                ...current,
+                projectId,
+                selectedScript,
+                lastUpdated: new Date().toISOString(),
+            }));
+
+            return true;
         } catch (err) {
             console.error('Select script error:', err);
             return false;

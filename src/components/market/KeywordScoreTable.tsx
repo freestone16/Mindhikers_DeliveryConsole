@@ -33,10 +33,23 @@ function scoreBg(score: number): string {
     return 'bg-red-500/10';
 }
 
-function ScoreCell({ value }: { value: number | undefined }) {
-    if (value === undefined) return <span className="text-slate-600">—</span>;
+function ScoreCell({
+    value,
+    label,
+    pendingText = '—',
+}: {
+    value: number | undefined;
+    label?: string;
+    pendingText?: string;
+}) {
+    if (value === undefined) {
+        return <span className="text-xs text-slate-500">{label ?? pendingText}</span>;
+    }
     return (
-        <span className={`font-semibold ${scoreColor(value)}`}>{value}</span>
+        <span className="inline-flex flex-col items-end leading-tight">
+            <span className={`font-semibold ${scoreColor(value)}`}>{value}</span>
+            {label && <span className="text-[10px] text-slate-500">{label}</span>}
+        </span>
     );
 }
 
@@ -189,8 +202,8 @@ export const KeywordScoreTable: React.FC<KeywordScoreTableProps> = ({
                                 <th className="px-4 py-2.5 text-xs font-medium text-slate-500">语言</th>
                                 <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">综合评分</th>
                                 <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">搜索量</th>
-                                <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">竞争度</th>
-                                <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">优化度</th>
+                                <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">竞争机会</th>
+                                <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">优化机会</th>
                                 <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-right">相关度</th>
                                 <th className="px-4 py-2.5 text-xs font-medium text-slate-500 text-center">状态</th>
                             </tr>
@@ -237,16 +250,24 @@ export const KeywordScoreTable: React.FC<KeywordScoreTableProps> = ({
                                                 <ScoreCell value={score?.overall} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.searchVolume} />
+                                                <ScoreCell value={score?.searchVolume} label={score?.searchVolumeLabel} />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.competition} />
+                                                <ScoreCell
+                                                    value={score?.competition}
+                                                    label={score?.competitionLabel}
+                                                    pendingText="待校准"
+                                                />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.optimization} />
+                                                <ScoreCell
+                                                    value={score?.optimization}
+                                                    label={score?.optimizationLabel}
+                                                    pendingText="待校准"
+                                                />
                                             </td>
                                             <td className="px-4 py-2.5 text-right">
-                                                <ScoreCell value={score?.metrics?.relevance} />
+                                                <ScoreCell value={score?.relevance} />
                                             </td>
 
                                             {/* Status */}

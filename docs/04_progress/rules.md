@@ -218,6 +218,15 @@
 
 ## 项目特定
 
+80. TubeBuddy 关键词评分必须走 YouTube Studio 内的扩展入口：Studio 页面 → TubeBuddy 快捷入口/菜单 → `Keyword Explorer`。不要把 `www.tubebuddy.com/account` 登录态当成 Studio 扩展授权完成。
+81. TubeBuddy 授权验收看扩展 storage 和 `TBGlobal`：必须确认 `tubebuddyToken-<channelId>` 存在、`TBGlobal.Profile()` 非空、`TBGlobal.IsAuthenticated()` 为 `true`，不能只看 YouTube 已登录或 TubeBuddy account 页可打开。
+82. TubeBuddy 分数字段形如 `46/100` 时必须优先解析斜杠前的数值；不要简单删除非数字字符，否则会把 `46/100` 误读成 `46100`。
+83. TubeBuddy Keyword Explorer 副指标优先读图表 CSS 变量里的真实百分比；`Excellent/Poor/Good` 等等级只能作为 label 展示，不能硬映射成精确分。图表读不到时返回缺省并让 UI 显示“待校准”，不要伪装成 0。
+84. TubeBuddy 入口找不到时必须明确告知用户；不要擅自改走 `www.tubebuddy.com/account` 或其他非日常入口。
+85. MarketingMaster 借用 Director 设计语言时，左栏只能承载 Delivery 共用工作站入口；Marketing 内部 P1-P4 必须放中栏 header，运行态/Artifacts/Handoff 必须放右栏。
+86. 完整视频描述属于 P2 发布文案审阅，不属于 P3；P2 必须提供大文本编辑/全局预览，并保证预览顺序与导出描述一致。
+87. P3 的主语义是平台适配与 DT 交接准备度，不是人工审核 JSON；JSON/MD 只能作为 Artifact 或技术折叠视图出现。
+
 80. **DeliveryConsole 项目**：数据在 Obsidian_Antigravity 目录，代码在 DeliveryConsole 目录
 81. `PROJECTS_BASE` 环境变量指向数据目录，不是代码目录
 82. worktree 环境需要复制 `.env` 到 worktree 目录

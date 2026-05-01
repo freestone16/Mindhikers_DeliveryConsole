@@ -53,7 +53,9 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
     useEffect(() => {
         if (!scriptPath) return;
         const storedPath = data.selectedScript?.path;
+        const storedSelectedAt = data.selectedScript?.selectedAt;
         const scriptFilename = scriptPath.split('/').pop() || scriptPath;
+        const selectedScript = { filename: scriptFilename, path: scriptPath, selectedAt: scriptSelectedAt };
 
         // 首次挂载：记录 selectedAt，只做必要的 legacy 回填或 path 不同的 reset
         if (prevSelectedAtRef.current === undefined) {
@@ -65,7 +67,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
                     hasHandledScriptRef.current = true;
                     updateState(projectId, {
                         ...data,
-                        selectedScript: { filename: scriptFilename, path: scriptPath },
+                        selectedScript,
                     });
                 }
             } else if (storedPath !== scriptPath) {
@@ -73,7 +75,21 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
                 console.log(`[MarketingMaster] 文稿已切换: ${storedPath} → ${scriptPath}，重置状态`);
                 updateState(projectId, {
                     ...defaultMarketV3State,
-                    selectedScript: { filename: scriptFilename, path: scriptPath },
+                    selectedScript,
+                });
+            } else if (scriptSelectedAt && storedSelectedAt && storedSelectedAt !== scriptSelectedAt) {
+                // 重新打开页面时也能识别：delivery_store 的脚本选择时间比营销状态更新。
+                console.log(`[MarketingMaster] 文稿重新选择时间变化 → 重置状态回 Phase 1`);
+                updateState(projectId, {
+                    ...defaultMarketV3State,
+                    selectedScript,
+                });
+            } else if (scriptSelectedAt && !storedSelectedAt && data.candidates?.length > 0 && !hasHandledScriptRef.current) {
+                // 旧状态没有 selectedAt 时只补记，不重置，保证关闭窗口后能恢复历史进度。
+                hasHandledScriptRef.current = true;
+                updateState(projectId, {
+                    ...data,
+                    selectedScript,
                 });
             }
             return;
@@ -85,7 +101,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
             console.log(`[MarketingMaster] 文稿重新选择 → 重置状态回 Phase 1`);
             updateState(projectId, {
                 ...defaultMarketV3State,
-                selectedScript: { filename: scriptFilename, path: scriptPath },
+                selectedScript,
             });
             return;
         }
@@ -96,10 +112,10 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
             console.log(`[MarketingMaster] 文稿路径变化: ${storedPath} → ${scriptPath}，重置状态`);
             updateState(projectId, {
                 ...defaultMarketV3State,
-                selectedScript: { filename: scriptFilename, path: scriptPath },
+                selectedScript,
             });
         }
-    }, [scriptPath, scriptSelectedAt, data.selectedScript?.path]);
+    }, [scriptPath, scriptSelectedAt, data.selectedScript?.path, data.selectedScript?.selectedAt]);
 
     // 默认设置面板开关
     const [showSettings, setShowSettings] = useState(false);
@@ -109,7 +125,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
         const scriptFilename = scriptPath.split('/').pop() || scriptPath;
         updateState(projectId, {
             ...newData,
-            selectedScript: { filename: scriptFilename, path: scriptPath },
+            selectedScript: { filename: scriptFilename, path: scriptPath, selectedAt: scriptSelectedAt },
         });
     };
 

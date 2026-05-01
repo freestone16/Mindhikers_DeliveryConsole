@@ -184,6 +184,12 @@ async function scoreSingleVariant(
     return worker.scoreKeyword(variantText, variantScript);
 }
 
+function formatScoreMetric(value: number | undefined, label?: string): string {
+    if (value !== undefined && label) return `${value}(${label})`;
+    if (value !== undefined) return String(value);
+    return label || '未读取';
+}
+
 // ── V3: POST /api/market/v3/generate-candidates ──────────────────────────────
 router.post('/v3/generate-candidates', async (req: Request, res: Response) => {
     const { projectId, scriptPath } = req.body;
@@ -219,7 +225,8 @@ ${scriptContent}
 
         let llmResponse = '';
         try {
-            llmResponse = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            const llmResult = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            llmResponse = llmResult.content;
         } catch (e: any) {
             res.write(`data: ${JSON.stringify({ type: 'error', message: `LLM 调用失败: ${e.message}` })}\n\n`);
             res.end();
@@ -232,6 +239,15 @@ ${scriptContent}
             if (jsonMatch) keywords = JSON.parse(jsonMatch[0]);
         } catch {
             keywords = [];
+        }
+
+        if (keywords.length === 0) {
+            res.write(`data: ${JSON.stringify({
+                type: 'error',
+                message: 'LLM 返回了内容，但未能解析出候选关键词 JSON 数组，请重试或检查模型输出格式。',
+            })}\n\n`);
+            res.write(`data: [DONE]\n\n`);
+            return;
         }
 
         for (let i = 0; i < Math.min(keywords.length, 10); i++) {
@@ -381,7 +397,7 @@ router.post('/v3/analyze-keywords', async (req: Request, res: Response) => {
                 const topVariant = kw.variants?.find((v: any) => v.status === 'scored' && v.tubeBuddyScore);
                 const s = topVariant?.tubeBuddyScore;
                 return `${i + 1}. "${kw.keyword}" — 综合: ${kw.bestScore}${
-                    s ? `，搜索量: ${s.searchVolume}，竞争度: ${s.competition}，优化度: ${s.optimization}，相关度: ${s.relevance}` : ''
+                    s ? `，搜索量: ${formatScoreMetric(s.searchVolume, s.searchVolumeLabel)}，竞争机会: ${formatScoreMetric(s.competition, s.competitionLabel)}，优化机会: ${formatScoreMetric(s.optimization, s.optimizationLabel)}，相关度: ${formatScoreMetric(s.relevance)}` : ''
                 }`;
             })
             .join('\n');
@@ -405,7 +421,8 @@ ${scoredSummary}
 
         let analysis = '';
         try {
-            analysis = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            const llmResult = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            analysis = llmResult.content;
         } catch (e: any) {
             analysis = `（策略点评生成失败: ${e.message}）\n\n基于评分数据，推荐选择综合评分最高的前 1-3 个关键词进入 Phase 2。`;
         }
@@ -489,14 +506,14 @@ ${timelineContent ? `## 章节时间轴（来自SRT）\n${timelineContent}\n` : 
 {
   "title": "视频标题（必须包含黄金关键词，总长40-60字符，吸引点击）",
   "description_blocks": {
-    "hook": "开头钩子（1-2句激发好奇心的引导语，可含1-2个emoji，纯文本严禁Markdown）",
+    "hook": "前两行钩子（1-2句激发好奇心的引导语，必须自然包含黄金关键词，适合YouTube搜索摘要，可含1-2个emoji，纯文本严禁Markdown）",
+    "series": "价值说明（1-2句说明本视频解决什么问题、在系列中的位置和观看价值）",
     "geo_qa": "GEO结构化问答（2-3组问答，以问号结尾的问题+简洁答案，供AI引擎抓取）",
-    "series": "系列说明（1-2句介绍本视频在系列中的位置和价值）",
-    "action_plan": "行动号召（引导订阅点赞评论，含emoji，简洁有力）",
     "timeline": "${timelineContent ? '（使用上面的SRT章节时间轴，调整为YouTube格式：00:00 章节名）' : '视频章节时间轴（00:00 开场，格式每行一个章节）'}",
     "references": "参考资料（视频中提到的书籍、论文、工具名称，每行一条）",
+    "action_plan": "行动号召（引导订阅点赞评论，含emoji，简洁有力）",
     "pinned_comment": "置顶评论文字（资源链接说明，引导用户查看描述中的内容）",
-    "hashtags": "#Hashtag1 #Hashtag2（5-8个相关Hashtag，中英文混合，空格分隔）"
+    "hashtags": "#Hashtag1 #Hashtag2（2-4个最核心Hashtag，中英文混合，空格分隔，放在描述最后）"
   },
   "thumbnail": "缩略图关键词（英文设计提示词，供Midjourney/DALL-E生成，突出关键视觉元素）",
   "playlist": "推荐播放列表名称（与视频内容最匹配的系列名）",
@@ -516,30 +533,30 @@ function parsePlanFromLLM(llmOutput: string, keywordId: string, keyword: string)
     }
 
     const db = parsed.description_blocks || {};
-    const blockTypes = ['hook', 'geo_qa', 'series', 'action_plan', 'timeline', 'references', 'pinned_comment', 'hashtags'] as const;
+    const blockTypes = ['hook', 'series', 'geo_qa', 'timeline', 'references', 'action_plan', 'pinned_comment', 'hashtags'] as const;
     const blockLabels: Record<string, string> = {
-        hook: '开头钩子', geo_qa: 'GEO问答', series: '系列说明',
-        action_plan: '行动号召', timeline: '章节时间轴', references: '参考资料',
+        hook: '前两行钩子', series: '价值说明', geo_qa: 'GEO问答',
+        timeline: '章节时间轴', references: '参考资料', action_plan: '行动号召',
         pinned_comment: '置顶评论', hashtags: 'Hashtags',
     };
     const descriptionBlocks = blockTypes.map(type => ({
         id: `block-${type}`,
         type,
         label: blockLabels[type] || type,
-        content: db[type] || '',
-        isCollapsed: type !== 'hook', // Hook expanded by default
+        content: toPlainText(db[type]),
+        isCollapsed: !['hook', 'series'].includes(type), // 搜索摘要和价值说明默认展开
     }));
 
     // Combine description blocks into a single preview string
     const descPreview = descriptionBlocks.map(b => `[${b.label}] ${b.content}`).join('\n\n');
 
     return [
-        { id: `${keywordId}-title`,       rowType: 'title',       label: '标题',     content: parsed.title || '',     isConfirmed: false },
+        { id: `${keywordId}-title`,       rowType: 'title',       label: '标题',     content: toPlainText(parsed.title),     isConfirmed: false },
         { id: `${keywordId}-description`, rowType: 'description', label: '视频描述', content: descPreview,             isConfirmed: false, descriptionBlocks },
-        { id: `${keywordId}-thumbnail`,   rowType: 'thumbnail',   label: '缩略图',   content: parsed.thumbnail || '',  isConfirmed: false },
-        { id: `${keywordId}-playlist`,    rowType: 'playlist',    label: '播放列表', content: parsed.playlist || '',   isConfirmed: false },
-        { id: `${keywordId}-tags`,        rowType: 'tags',        label: '标签',     content: parsed.tags || '',       isConfirmed: false },
-        { id: `${keywordId}-other`,       rowType: 'other',       label: '其他设置', content: parsed.other || '',      isConfirmed: false },
+        { id: `${keywordId}-thumbnail`,   rowType: 'thumbnail',   label: '缩略图',   content: toPlainText(parsed.thumbnail),  isConfirmed: false },
+        { id: `${keywordId}-playlist`,    rowType: 'playlist',    label: '播放列表', content: toPlainText(parsed.playlist),   isConfirmed: false },
+        { id: `${keywordId}-tags`,        rowType: 'tags',        label: '标签',     content: Array.isArray(parsed.tags) ? parsed.tags.map(toPlainText).join(',') : toPlainText(parsed.tags),       isConfirmed: false },
+        { id: `${keywordId}-other`,       rowType: 'other',       label: '其他设置', content: toPlainText(parsed.other),      isConfirmed: false },
     ];
 }
 
@@ -586,7 +603,8 @@ router.post('/v3/generate-plan', async (req: Request, res: Response) => {
 
         let llmOutput = '';
         try {
-            llmOutput = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            const llmResult = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            llmOutput = llmResult.content;
         } catch (e: any) {
             res.write(`data: ${JSON.stringify({ type: 'error', keywordId, message: `LLM生成失败: ${e.message}` })}\n\n`);
             res.end();
@@ -635,7 +653,8 @@ ${rowType === 'description' ? `
 
         let result = '';
         try {
-            result = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            const llmResult = await callLLM([{ role: 'user', content: prompt }], provider, model);
+            result = llmResult.content;
         } catch (e: any) {
             res.write(`data: ${JSON.stringify({ type: 'error', keywordId, rowType, message: e.message })}\n\n`);
             res.end();
@@ -675,6 +694,18 @@ function stripMarkdown(text: string): string {
         .replace(/`([^`]+)`/g, '$1')     // Remove `code`
         .replace(/^\s*>\s+/gm, '')       // Remove blockquotes
         .trim();
+}
+
+function toPlainText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.map(toPlainText).filter(Boolean).join('\n');
+    if (typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>)
+            .map(([key, item]) => `${key}: ${toPlainText(item)}`)
+            .join('\n');
+    }
+    return String(value);
 }
 
 function generateMarkdownContent(plan: any, projectId: string): string {
@@ -887,6 +918,55 @@ router.get('/v3/session-status', async (_req: Request, res: Response) => {
         res.json(worker.getSessionStatus());
     } catch (e: any) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// ── V3: GET /api/market/v3/tubebuddy-debug ──────────────────────────────────
+router.get('/v3/tubebuddy-debug', async (_req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        const snapshot = await worker.getDebugPageSnapshot();
+        res.json({ snapshot, status: worker.getSessionStatus() });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, type: e.type });
+    }
+});
+
+// ── V3: GET /api/market/v3/tubebuddy-screenshot ─────────────────────────────
+router.get('/v3/tubebuddy-screenshot', async (_req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        const screenshot = await worker.takeDebugScreenshot();
+        if (!screenshot) {
+            res.status(404).json({ error: 'TubeBuddy browser page is not initialized' });
+            return;
+        }
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.send(screenshot);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, type: e.type });
+    }
+});
+
+// ── V3: POST /api/market/v3/tubebuddy-start-auth ────────────────────────────
+router.post('/v3/tubebuddy-start-auth', async (_req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        const result = await worker.startAuthorization();
+        res.json({ success: true, result, status: worker.getSessionStatus() });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, type: e.type });
+    }
+});
+
+// ── V3: POST /api/market/v3/tubebuddy-open-keyword-explorer ─────────────────
+router.post('/v3/tubebuddy-open-keyword-explorer', async (req: Request, res: Response) => {
+    try {
+        const worker = await getTubeBuddyWorker();
+        const result = await worker.openKeywordExplorerForDebug(req.body?.keyword || '黄金精神');
+        res.json({ success: true, result, status: worker.getSessionStatus() });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, type: e.type });
     }
 });
 

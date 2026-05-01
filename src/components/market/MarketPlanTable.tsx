@@ -13,10 +13,11 @@
 import React, { useState } from 'react';
 import {
     CheckCircle2, Circle, RefreshCw, ChevronDown, ChevronRight,
-    Loader2, Edit3, Tag, List, Image, Settings, FileText, Type
+    Loader2, Tag, List, Image, Settings, FileText, Type
 } from 'lucide-react';
 import type { MarketingPlan, MarketingPlanRow, DescriptionBlock } from '../../types';
 import { DescriptionEditor } from './DescriptionEditor';
+import { DescriptionReviewPanel } from './DescriptionReviewPanel';
 
 interface MarketPlanTableProps {
     plan: MarketingPlan;
@@ -42,6 +43,18 @@ const ROW_COLORS: Record<string, string> = {
     other:       'text-slate-400',
 };
 
+function toText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.map(toText).filter(Boolean).join(', ');
+    if (typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>)
+            .map(([key, item]) => `${key}: ${toText(item)}`)
+            .join('\n');
+    }
+    return String(value);
+}
+
 // ── Row Editor ────────────────────────────────────────────────────────────────
 interface RowEditorProps {
     row: MarketingPlanRow;
@@ -53,6 +66,7 @@ interface RowEditorProps {
 const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevise }) => {
     const [instruction, setInstruction] = useState('');
     const [showInstruction, setShowInstruction] = useState(false);
+    const content = toText(row.content);
 
     const handleDescriptionBlocksChange = (blocks: DescriptionBlock[]) => {
         onChange({ ...row, descriptionBlocks: blocks });
@@ -77,18 +91,18 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
                 ) : row.rowType === 'tags' ? (
                     <div>
                         <textarea
-                            value={row.content}
+                            value={content}
                             onChange={e => onChange({ ...row, content: e.target.value })}
                             rows={3}
                             placeholder="标签1,标签2,标签3,... (逗号分隔)"
                             className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-slate-500"
                         />
                         <div className="mt-1 text-xs text-slate-600">
-                            {row.content.split(',').filter(Boolean).length} 个标签
+                            {content.split(',').filter(Boolean).length} 个标签
                         </div>
                         {/* Tag chips preview */}
                         <div className="flex flex-wrap gap-1.5 mt-2">
-                            {row.content.split(',').filter(Boolean).slice(0, 20).map((tag, i) => (
+                            {content.split(',').filter(Boolean).slice(0, 20).map((tag, i) => (
                                 <span key={i} className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 rounded text-xs text-yellow-400">
                                     {tag.trim()}
                                 </span>
@@ -97,7 +111,7 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
                     </div>
                 ) : (
                     <textarea
-                        value={row.content}
+                        value={content}
                         onChange={e => onChange({ ...row, content: e.target.value })}
                         rows={row.rowType === 'thumbnail' || row.rowType === 'other' ? 3 : 2}
                         placeholder={`输入${row.label}...`}
@@ -107,9 +121,9 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
 
                 {/* Title char counter */}
                 {row.rowType === 'title' && (
-                    <div className={`mt-1 text-xs ${row.content.length > 60 ? 'text-red-400' : 'text-slate-600'}`}>
-                        {row.content.length} / 60 字符
-                        {row.content.length > 60 && ' — 超出建议长度'}
+                    <div className={`mt-1 text-xs ${content.length > 60 ? 'text-red-400' : 'text-slate-600'}`}>
+                        {content.length} / 60 字符
+                        {content.length > 60 && ' — 超出建议长度'}
                     </div>
                 )}
 
@@ -226,9 +240,24 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
     };
 
     const confirmedCount = plan.rows.filter(r => r.isConfirmed).length;
+    const descriptionRow = plan.rows.find(row => row.rowType === 'description');
+
+    const updateDescriptionBlocks = (blocks: DescriptionBlock[]) => {
+        if (!descriptionRow) return;
+        const content = blocks.map(block => `[${block.label}] ${toText(block.content)}`).join('\n\n');
+        updateRow(descriptionRow.id, { descriptionBlocks: blocks, content });
+    };
 
     return (
         <div className="space-y-0">
+            {descriptionRow?.descriptionBlocks && (
+                <DescriptionReviewPanel
+                    keyword={plan.keyword}
+                    blocks={descriptionRow.descriptionBlocks}
+                    onChange={updateDescriptionBlocks}
+                />
+            )}
+
             {/* Progress bar */}
             <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-xs text-slate-500">已确认 {confirmedCount} / {plan.rows.length} 项</span>
@@ -253,9 +282,10 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                     const iconColor = ROW_COLORS[row.rowType] || 'text-slate-400';
 
                     // Content preview (truncated)
+                    const content = toText(row.content);
                     const preview = row.rowType === 'description'
-                        ? (row.descriptionBlocks?.[0]?.content || row.content).slice(0, 80)
-                        : row.content.slice(0, 80);
+                        ? toText(row.descriptionBlocks?.[0]?.content || content).slice(0, 80)
+                        : content.slice(0, 80);
 
                     return (
                         <div key={row.id} className={`${row.isConfirmed ? 'bg-green-900/5' : 'bg-slate-800/40'}`}>
@@ -290,7 +320,7 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                                             AI 重新生成中...
                                         </span>
                                     ) : preview ? (
-                                        <span className="text-sm text-slate-400 truncate">{preview}{row.content.length > 80 ? '...' : ''}</span>
+                                        <span className="text-sm text-slate-400 truncate">{preview}{content.length > 80 ? '...' : ''}</span>
                                     ) : (
                                         <span className="text-sm text-slate-600 italic">点击展开编辑</span>
                                     )}

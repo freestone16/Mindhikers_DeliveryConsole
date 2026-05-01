@@ -461,9 +461,12 @@ export interface TitleTagSet {
 export interface TubeBuddyScore {
     overall: number;        // 综合评分 0-100
     searchVolume: number;   // 搜索量 0-100
-    competition: number;    // 竞争度 0-100
-    optimization: number;   // 优化度 0-100
-    relevance: number;      // 相关度 0-100
+    competition?: number;   // 竞争机会分 0-100；TubeBuddy 仅给等级/图表时可能缺省
+    optimization?: number;  // 优化机会分 0-100；TubeBuddy 仅给等级/图表时可能缺省
+    relevance?: number;     // TubeBuddy 当前页面无独立相关度字段，缺失时前端显示 —
+    searchVolumeLabel?: string;
+    competitionLabel?: string;
+    optimizationLabel?: string;
 }
 
 export interface MarketModule_V2 {
@@ -571,7 +574,7 @@ export interface MarketModule_V3 {
     plans: MarketingPlan[];     // 一个黄金词 = 一套方案
     srtChapters?: SRTChapter[];
     llmAnalysis?: string;       // LLM 策略点评全文
-    selectedScript?: { filename: string; path: string };
+    selectedScript?: { filename: string; path: string; selectedAt?: string };
     savedOutputs?: { paths: string[]; savedAt: string };
 }
 

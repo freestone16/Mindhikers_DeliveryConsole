@@ -163,8 +163,15 @@ const mockDescriptionBlocks: DescriptionBlock[] = [
     {
         id: 'block-hook',
         type: 'hook',
-        label: 'Hook 开场白',
+        label: '前两行钩子',
         content: '你是否担心AI会让孩子的学习变得毫无意义？✨ 当ChatGPT能在30秒内写出满分作文，我们的孩子还需要学写作吗？',
+        isCollapsed: false,
+    },
+    {
+        id: 'block-series',
+        type: 'series',
+        label: '价值说明',
+        content: '这是《碳硅进化论：AI时代教育指南》系列第1讲。关注@MindHikers，每周一深度科学洞察。',
         isCollapsed: false,
     },
     {
@@ -172,20 +179,6 @@ const mockDescriptionBlocks: DescriptionBlock[] = [
         type: 'geo_qa',
         label: 'GEO 问答锚点',
         content: 'Q: ChatGPT会影响孩子的逻辑思维吗？\nA: 根据维果茨基的最近发展区理论，AI工具的引入需要谨慎设计"脚手架"——它应该帮助孩子突破认知边界，而非替代思维过程本身。',
-        isCollapsed: true,
-    },
-    {
-        id: 'block-series',
-        type: 'series',
-        label: '系列定位语',
-        content: '这是《碳硅进化论：AI时代教育指南》系列第1讲。关注@MindHikers，每周一深度科学洞察。',
-        isCollapsed: true,
-    },
-    {
-        id: 'block-action_plan',
-        type: 'action_plan',
-        label: '行动计划',
-        content: '本期三个可执行行动：\n1. 具身认知实践：用身体感受替代屏幕学习20分钟\n2. 心流体验设计：找到孩子的最近发展区任务\n3. AI协同实验：让孩子与AI合作完成一个创作项目',
         isCollapsed: true,
     },
     {
@@ -203,6 +196,13 @@ const mockDescriptionBlocks: DescriptionBlock[] = [
         isCollapsed: true,
     },
     {
+        id: 'block-action_plan',
+        type: 'action_plan',
+        label: '行动计划',
+        content: '本期三个可执行行动：\n1. 具身认知实践：用身体感受替代屏幕学习20分钟\n2. 心流体验设计：找到孩子的最近发展区任务\n3. AI协同实验：让孩子与AI合作完成一个创作项目',
+        isCollapsed: true,
+    },
+    {
         id: 'block-pinned_comment',
         type: 'pinned_comment',
         label: '置顶评论 (Pinned Comment)',
@@ -213,7 +213,7 @@ const mockDescriptionBlocks: DescriptionBlock[] = [
         id: 'block-hashtags',
         type: 'hashtags',
         label: 'Hashtags',
-        content: '#AI教育 #MindHikers #脑科学 #碳硅进化论 #未来教育 #儿童教育 #ChatGPT育儿 #学习方法',
+        content: '#AI教育 #MindHikers #碳硅进化论',
         isCollapsed: true,
     },
 ];

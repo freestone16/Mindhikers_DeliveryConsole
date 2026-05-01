@@ -2,7 +2,7 @@
  * DescriptionEditor.tsx — Sprint 4: 视频描述 8 子区块编辑器
  *
  * 子区块：
- *   hook / geo_qa / series / action_plan / timeline / references / pinned_comment / hashtags
+ *   hook / series / geo_qa / timeline / references / action_plan / pinned_comment / hashtags
  *
  * 功能：
  * - 每个区块可折叠展开
@@ -21,15 +21,27 @@ interface DescriptionEditorProps {
 }
 
 const BLOCK_META: Record<string, { icon: string; hint: string }> = {
-    hook:          { icon: '🎣', hint: '激发好奇心的开场白，1-2句' },
+    hook:          { icon: '🎣', hint: '前两行搜索摘要，1-2句，自然包含主关键词' },
+    series:        { icon: '📚', hint: '视频价值说明：这期解决什么问题，为什么值得看' },
     geo_qa:        { icon: '🤖', hint: 'GEO问答，供AI引擎索引，格式：问？答。' },
-    series:        { icon: '📚', hint: '系列定位说明，1-2句' },
-    action_plan:   { icon: '📢', hint: '订阅/点赞/评论引导，含emoji' },
     timeline:      { icon: '⏱️', hint: '章节时间轴，每行：MM:SS 章节名' },
     references:    { icon: '📎', hint: '参考书目/工具，每行一条' },
+    action_plan:   { icon: '📢', hint: '订阅/点赞/评论引导，含emoji' },
     pinned_comment:{ icon: '📌', hint: '置顶评论文字，引导查看描述' },
-    hashtags:      { icon: '#️⃣', hint: 'Hashtags，空格分隔，5-8个' },
+    hashtags:      { icon: '#️⃣', hint: 'Hashtags，空格分隔，建议2-4个核心标签' },
 };
+
+function toText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.map(toText).filter(Boolean).join('\n');
+    if (typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>)
+            .map(([key, item]) => `${key}: ${toText(item)}`)
+            .join('\n');
+    }
+    return String(value);
+}
 
 function countChars(text: string): { chars: number; emojis: number; hasMarkdown: boolean } {
     const emojiRegex = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu;
@@ -47,7 +59,8 @@ const BlockItem: React.FC<{
     readOnly: boolean;
 }> = ({ block, onChange, readOnly }) => {
     const meta = BLOCK_META[block.type] || { icon: '📝', hint: '' };
-    const stats = countChars(block.content);
+    const content = toText(block.content);
+    const stats = countChars(content);
 
     return (
         <div className="border border-slate-700/50 rounded-lg overflow-hidden">
@@ -58,7 +71,7 @@ const BlockItem: React.FC<{
             >
                 <span className="text-base leading-none">{meta.icon}</span>
                 <span className="text-sm font-medium text-slate-300 flex-1">{block.label}</span>
-                {block.content && !block.isCollapsed && (
+                {content && !block.isCollapsed && (
                     <span className="text-xs text-slate-600">{stats.chars}字</span>
                 )}
                 {stats.hasMarkdown && (
@@ -77,15 +90,15 @@ const BlockItem: React.FC<{
                 <div className="bg-slate-900/40">
                     {readOnly ? (
                         <div className="px-3 py-2 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                            {block.content || <span className="text-slate-600 italic">（空）</span>}
+                            {content || <span className="text-slate-600 italic">（空）</span>}
                         </div>
                     ) : (
                         <div className="relative">
                             <textarea
-                                value={block.content}
+                                value={content}
                                 onChange={e => onChange({ ...block, content: e.target.value })}
                                 placeholder={meta.hint}
-                                rows={Math.max(3, Math.ceil(block.content.length / 60))}
+                                rows={Math.max(3, Math.ceil(content.length / 60))}
                                 className="w-full bg-transparent px-3 py-2 text-sm text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:bg-slate-800/30 leading-relaxed"
                             />
                             <div className="flex items-center justify-between px-3 pb-2 text-xs text-slate-600">
@@ -106,20 +119,28 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
     readOnly = false,
 }) => {
     const [allExpanded, setAllExpanded] = useState(false);
+    const normalizedBlocks = (Array.isArray(blocks) ? blocks : []).map((block, index) => ({
+        ...block,
+        id: block.id || `block-${index}`,
+        type: block.type || 'hook',
+        label: block.label || block.type || `区块 ${index + 1}`,
+        content: toText(block.content),
+        isCollapsed: Boolean(block.isCollapsed),
+    })) as DescriptionBlock[];
 
     const handleBlockChange = (index: number, block: DescriptionBlock) => {
-        const next = [...blocks];
+        const next = [...normalizedBlocks];
         next[index] = block;
         onChange(next);
     };
 
     const toggleAll = () => {
-        const next = blocks.map(b => ({ ...b, isCollapsed: allExpanded }));
+        const next = normalizedBlocks.map(b => ({ ...b, isCollapsed: allExpanded }));
         onChange(next);
         setAllExpanded(!allExpanded);
     };
 
-    const totalChars = blocks.reduce((sum, b) => sum + b.content.length, 0);
+    const totalChars = normalizedBlocks.reduce((sum, b) => sum + toText(b.content).length, 0);
 
     return (
         <div className="space-y-1.5">
@@ -140,7 +161,7 @@ export const DescriptionEditor: React.FC<DescriptionEditorProps> = ({
             </div>
 
             {/* Block List */}
-            {blocks.map((block, i) => (
+            {normalizedBlocks.map((block, i) => (
                 <BlockItem
                     key={block.id}
                     block={block}

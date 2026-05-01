@@ -1,6 +1,6 @@
 # Delivery Console — 开发进展 & 遗留问题
 
-> **更新日期**: 2026-04-02 CST
+> **更新日期**: 2026-05-01 CST
 
 ---
 
@@ -23,6 +23,8 @@
 | v3.9.0 | 2026-03-04 | **火山引擎配置修复** - 修复 API Key 格式（添加连字符）+ 使用模型名称而非 endpoint ID                 |
 | v4.0.0 | 2026-03-06 | **SD-207 V3 营销大师全量重构** - 5 Sprint 完成；TubeBuddy Playwright、SSE 生成、Phase 2 审阅、双格式导出 |
 | v4.1.0 | 2026-04-02 | **MHSDC 新家初验** - 端口红线建立、PROJECTS_BASE 路径迁移、scriptPath 变化检测修复 |
+| v4.1.1 | 2026-04-30 | **MarketingMaster TubeBuddy 真实评分修复** - Studio-first Keyword Explorer 路径确认；禁用假评分；主分与图表副指标真实读取；UI 显示数值+等级/待校准 |
+| v4.2.0 | 2026-05-01 | **MarketingMaster Delivery Shell UI 改版启动** - 新增 Director 设计系统对齐方案；P2 完整视频描述审阅台；P3 调整为平台适配与 DT 交接检查；demo 入口 `/marketing-redesign-demo` |
 
 ---
 

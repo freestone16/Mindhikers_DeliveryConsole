@@ -54,13 +54,15 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    const updatePlan = (keywordId: string, updates: Partial<MarketingPlan>) => {
+    const updatePlan = (keywordId: string, keyword: string, updates: Partial<MarketingPlan>) => {
         const current = dataRef.current;
-        const plans = current.plans.map(p =>
-            p.keywordId === keywordId ? { ...p, ...updates } : p
-        );
-        // Also fill any missing plans (shouldn't happen but guard)
-        onUpdate({ ...current, plans });
+        const existingPlan = current.plans.find(p => p.keywordId === keywordId);
+        const plans = existingPlan
+            ? current.plans.map(p => p.keywordId === keywordId ? { ...p, ...updates } : p)
+            : [...current.plans, { ...initPlan(keywordId, keyword), ...updates }];
+        const nextData = { ...current, plans };
+        dataRef.current = nextData;
+        onUpdate(nextData);
     };
 
     const updatePlanRows = (keywordId: string, rows: MarketingPlanRow[]) => {
@@ -68,7 +70,9 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
         const plans = current.plans.map(p =>
             p.keywordId === keywordId ? { ...p, rows } : p
         );
-        onUpdate({ ...current, plans });
+        const nextData = { ...current, plans };
+        dataRef.current = nextData;
+        onUpdate(nextData);
     };
 
     // ── SRT ───────────────────────────────────────────────────────────────────
@@ -91,7 +95,7 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
         const scriptPath = current.selectedScript?.path || '';
 
         // Mark as generating
-        updatePlan(keywordId, { generationStatus: 'generating', errorMessage: undefined, rows: [] });
+        updatePlan(keywordId, keyword, { generationStatus: 'generating', errorMessage: undefined, rows: [] });
 
         try {
             const res = await fetch('/api/market/v3/generate-plan', {
@@ -106,6 +110,11 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                     srtTimeline: timeline,
                 }),
             });
+
+            if (!res.ok) {
+                const message = await res.text();
+                throw new Error(message || `生成请求失败 (${res.status})`);
+            }
 
             const reader = res.body?.getReader();
             if (!reader) throw new Error('无法读取响应流');
@@ -125,13 +134,13 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                     try {
                         const event = JSON.parse(line.slice(6));
                         if (event.type === 'plan_ready' && event.keywordId === keywordId) {
-                            updatePlan(keywordId, {
+                            updatePlan(keywordId, keyword, {
                                 rows: event.rows,
                                 generationStatus: 'ready',
                                 generationDuration: Date.now(),
                             });
                         } else if (event.type === 'error' && event.keywordId === keywordId) {
-                            updatePlan(keywordId, {
+                            updatePlan(keywordId, keyword, {
                                 generationStatus: 'error',
                                 errorMessage: event.message,
                             });
@@ -140,7 +149,7 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                 }
             }
         } catch (e: any) {
-            updatePlan(keywordId, { generationStatus: 'error', errorMessage: e.message });
+            updatePlan(keywordId, keyword, { generationStatus: 'error', errorMessage: e.message });
         }
     };
 
@@ -154,7 +163,9 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                 newPlans.push(initPlan(kw.id, kw.keyword));
             }
         }
-        onUpdate({ ...current, plans: newPlans });
+        const nextData = { ...current, plans: newPlans };
+        dataRef.current = nextData;
+        onUpdate(nextData);
 
         // Launch all generations concurrently (each has its own SSE connection)
         for (const kw of goldenKWs) {

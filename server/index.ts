@@ -1034,6 +1034,9 @@ app.post('/api/scripts/select', (req, res) => {
         }
 
         let isStoreLocked = false;
+        const selectedAt = new Date().toISOString();
+        let selectedScript: { filename: string; path: string; selectedAt: string } | null = null;
+
         const tryUpdate = () => {
             if (isStoreLocked) {
                 setTimeout(tryUpdate, 50);
@@ -1042,11 +1045,12 @@ app.post('/api/scripts/select', (req, res) => {
             isStoreLocked = true;
             try {
                 const deliveryData = JSON.parse(fs.readFileSync(deliveryFile, 'utf-8'));
-                deliveryData.selectedScript = {
+                selectedScript = {
                     filename: path.basename(scriptPath),
                     path: scriptPath,
-                    selectedAt: new Date().toISOString()
+                    selectedAt
                 };
+                deliveryData.selectedScript = selectedScript;
                 deliveryData.lastUpdated = new Date().toISOString();
                 fs.writeFileSync(deliveryFile, JSON.stringify(deliveryData, null, 2));
                 io.to(currentProjectName).emit('delivery-data', deliveryData);
@@ -1056,7 +1060,7 @@ app.post('/api/scripts/select', (req, res) => {
         };
         tryUpdate();
 
-        res.json({ success: true, selectedScript: { path: scriptPath } });
+        res.json({ success: true, selectedScript });
     } catch (error: any) {
         console.error('Script Select Error:', error.message);
         res.status(500).json({ error: error.message });

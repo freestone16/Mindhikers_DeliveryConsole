@@ -5,6 +5,7 @@ import { ExpertPage } from './components/ExpertPage';
 import { DirectorSection } from './components/DirectorSection';
 import { ShortsSection } from './components/ShortsSection';
 import { MarketingSection } from './components/MarketingSection';
+import { MarketingRedesignDemo } from './components/market/MarketingRedesignDemo';
 import { VisualAuditPage } from './components/VisualAuditPage';
 import { AccountsHub } from './components/AccountsHub';
 import { PublishComposer } from './components/PublishComposer';
@@ -105,6 +106,10 @@ function App() {
 
     if (hashRoute === '/llm-config') {
         return <LLMConfigPage onClose={() => window.location.hash = '/'} />;
+    }
+
+    if (hashRoute === '/marketing-redesign-demo') {
+        return <MarketingRedesignDemo />;
     }
 
     if (!isConnected) {

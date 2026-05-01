@@ -48,6 +48,24 @@ function topCandidateIds(candidates: CandidateKeyword[], max = 3): string[] {
         .map((k) => k.id);
 }
 
+function markScoringAsError(data: MarketModule_V3, message: string): MarketModule_V3 {
+    return {
+        ...data,
+        candidates: data.candidates.map((kw) => ({
+            ...kw,
+            variants: kw.variants.map((v) =>
+                v.status === 'scoring' || v.status === 'pending'
+                    ? {
+                        ...v,
+                        status: 'error' as KeywordVariant['status'],
+                        errorMessage: message,
+                    }
+                    : v
+            ),
+        })),
+    };
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
@@ -186,9 +204,24 @@ export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
                             scoringDataRef.current = updated;
                             onUpdate(updated);
 
+                        } else if (event.type === 'session_expired') {
+                            const updated = markScoringAsError(
+                                current,
+                                event.message || 'TubeBuddy 未授权，请先在自动化窗口登录 TubeBuddy'
+                            );
+                            scoringDataRef.current = updated;
+                            onUpdate(updated);
+                            return;
+
                         } else if (event.type === 'complete') {
-                            // Scoring done — fetch LLM analysis
-                            await handleAnalyzeKeywords(scoringDataRef.current ?? current);
+                            const latest = scoringDataRef.current ?? current;
+                            const hasScored = latest.candidates.some((kw) =>
+                                kw.variants.some((v) => v.status === 'scored' && v.tubeBuddyScore)
+                            );
+                            if (hasScored) {
+                                // Scoring done — fetch LLM analysis
+                                await handleAnalyzeKeywords(latest);
+                            }
                         }
                     } catch {
                         // Ignore malformed JSON
@@ -327,6 +360,34 @@ export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
                                 };
                                 scoringDataRef.current = updated;
                                 onUpdate(updated);
+                            } else if (ev.type === 'session_expired') {
+                                const current = scoringDataRef.current ?? markedData;
+                                const updated = markScoringAsError(
+                                    current,
+                                    ev.message || 'TubeBuddy 未授权，请先在自动化窗口登录 TubeBuddy'
+                                );
+                                scoringDataRef.current = updated;
+                                onUpdate(updated);
+                                return;
+                            } else if (ev.type === 'error') {
+                                const current = scoringDataRef.current ?? markedData;
+                                const updated: MarketModule_V3 = {
+                                    ...current,
+                                    candidates: current.candidates.map((k) =>
+                                        k.id !== ev.keywordId ? k : {
+                                            ...k,
+                                            variants: k.variants.map((v) =>
+                                                v.script !== ev.variantScript ? v : {
+                                                    ...v,
+                                                    status: 'error' as KeywordVariant['status'],
+                                                    errorMessage: ev.message || 'TubeBuddy 评分失败',
+                                                }
+                                            ),
+                                        }
+                                    ),
+                                };
+                                scoringDataRef.current = updated;
+                                onUpdate(updated);
                             }
                         } catch { /* ignore */ }
                     }
@@ -439,6 +500,32 @@ export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
                                             .filter((s): s is number => s !== undefined);
                                         return { ...k, variants: updatedVariants, bestScore: scores.length ? Math.max(...scores) : k.bestScore };
                                     }),
+                                };
+                                currentData = updated;
+                                onUpdate(updated);
+                            } else if (ev.type === 'session_expired') {
+                                const updated = markScoringAsError(
+                                    currentData,
+                                    ev.message || 'TubeBuddy 未授权，请先在自动化窗口登录 TubeBuddy'
+                                );
+                                currentData = updated;
+                                onUpdate(updated);
+                                return;
+                            } else if (ev.type === 'error') {
+                                const updated: MarketModule_V3 = {
+                                    ...currentData,
+                                    candidates: currentData.candidates.map((k) =>
+                                        k.id !== newKeyword.id ? k : {
+                                            ...k,
+                                            variants: k.variants.map((v) =>
+                                                v.script !== ev.variantScript ? v : {
+                                                    ...v,
+                                                    status: 'error' as KeywordVariant['status'],
+                                                    errorMessage: ev.message || 'TubeBuddy 评分失败',
+                                                }
+                                            ),
+                                        }
+                                    ),
                                 };
                                 currentData = updated;
                                 onUpdate(updated);
