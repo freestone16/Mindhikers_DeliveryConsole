@@ -40,3 +40,16 @@
 5. 产物文件 `04_Visuals/phase1_视觉概念提案_<projectId>.md` 的时间戳刷新
 
 如果这些信号缺失，report 应标成 `failed` 或 `blocked`，不要因为“没有明显报错”就给 `passed`。
+
+## Director UI / 设计系统推荐验收信号
+
+涉及 `design.md` / `design.zh.md` 的 UI request，应优先验证：
+
+1. 首屏仍是 Director 工作台，不是落地页式 hero
+2. 左侧 rail、中央 workbench、右侧 drawer、底部 status 同屏稳定存在
+3. Chat / Runtime / Artifacts / Handoff 四 tab 能切换
+4. Runtime/Handoff 能表达当前状态或合理空态，不只是无意义占位
+5. 折叠/展开左 rail 和右 drawer 后，主区不遮挡、不重叠
+6. 关键命令有可见 disabled/loading/success/failure/retry 状态
+7. 页面没有装饰光斑、抽象圆球、bokeh 背景或卡片套卡片偏航
+8. 1440px 和 980px 两档截图没有明显文字溢出、按钮挤压或 drawer 破版

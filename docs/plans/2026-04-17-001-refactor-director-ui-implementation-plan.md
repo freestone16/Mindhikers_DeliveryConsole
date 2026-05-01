@@ -5,11 +5,33 @@ status: active
 date: 2026-04-17
 related:
   - docs/plans/2026-04-17_director-ui-revamp-plan.md
+  - docs/plans/2026-05-01_director-design-target-prd.md
+  - docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md
+  - design.md
+  - design.zh.md
   - docs/04_progress/rules.md
   - docs/dev_logs/HANDOFF.md
 ---
 
 # Director UI 深化实施计划（Shell 对齐 + Director 工作台落地）
+
+## 2026-05-01 Design Target Addendum
+
+本计划仍作为 2026-04-17 UI Shell 改造的历史 origin 使用；但当前实施事实源已经升级为：
+
+1. `design.md`
+2. `design.zh.md`
+3. `docs/plans/2026-05-01_director-design-target-prd.md`
+4. `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
+
+后续不要再按本文里的 greenfield `Create:*` 清单重开 Shell；`DeliveryShellLayout`、`WorkstationRail`、`ContextDrawer`、`RuntimePanel`、`ArtifactsPanel`、`HandoffPanel`、`PhasePanel` 等骨架已经存在。下一步应按 2026-05-01 续作计划处理：CSS token 清债、ProjectContextDock 接入、Drawer 四 tab 产品化、Phase 视觉一致化、状态透明和审计链路。
+
+新增设计目标映射：
+
+- R8. UI 变更必须符合 `design.md / design.zh.md` 的 design target tokens。
+- R9. 异步 / agent 动作必须有 visible state。
+- R10. 主要动作必须映射统一 command vocabulary。
+- R11. 重要状态变更必须进入 runtime / chat / artifacts / handoff 之一。
 
 ## Overview
 

@@ -277,6 +277,10 @@
 134. **Skills SSOT 已迁移到 Mindhikers**：自 2026-04-27 起，导演大师 5 个 skill（Director / RemotionStudio / svg-architect / remotion-best-practices / remotion-visual-qa）的唯一真相源是 `/Users/luzhoua/Mindhikers/.claude/skills/`，通过 `.env` 的 `SKILLS_BASE` 注入。旧 SSOT `~/.gemini/antigravity/skills/` 完整保留作 GoldenCrucibleLab 等其他消费方使用，但 DeliveryConsole/Director 不再读取
 135. **Skill 路径解析禁止硬编码 `.gemini/antigravity/skills`**：必须通过 `process.env.SKILLS_BASE` 获取；新增 fallback 时要意识到这是项目级配置，不是用户家目录约定。`skill-loader.ts` 已经清理，`svg-architect.ts / director.ts / skill-sync.ts` 暂留 fallback 但 SKILLS_BASE 优先级更高永远先命中
 136. **ESM 模块解析 SKILLS_BASE 必须走函数 lazy 求值**：不能在顶层 `const SKILL_SEARCH_PATHS = [process.env.SKILLS_BASE, ...]` 写死，因为 import 早于 dotenv.config()。正确做法是 `function getSkillSearchPaths() { return [process.env.SKILLS_BASE, ...]; }`，每次调用时读取（与 rules #7 一致）
+137. **Director UI 变更必须先读设计事实源**：涉及 Director UI、Delivery shell、视觉/交互/页面验证时，先读根目录 `design.md`；中文协作优先同时读 `design.zh.md`。后续 PRD/实施计划必须引用这两份文件
+138. **Director 新 UI 优先工作台 shell，不做落地页**：不要引入 hero 大屏、装饰光斑、抽象圆球、bokeh 背景或卡片套卡片；Director 要保留影视生产温度，但吸收 Claude Code 的克制和高信号密度
+139. **异步和 agent 动作必须状态透明**：生成、修订、批准、重试、渲染、导出、交接等命令必须有 disabled/loading/success/failure/retry 等可见状态；重要动作应进入 runtime/chat/artifacts/handoff 等审计面
+140. **Runtime/Handoff 是产品上下文面，不是临时调试角落**：Runtime 至少应承载模型、skill sync、生成状态、日志、错误、重试和 action/tool trace 占位；Handoff 应说明当前可继续状态
 
 ---
 
@@ -313,3 +317,4 @@
 |------|------|
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |
 | 2026-03-26 | #128-129: CSS paddingBottom 百分比陷阱 + 绝对定位不受 padding 约束 |
+| 2026-05-01 | #137-140: Director 设计事实源、工作台 shell、状态透明、Runtime/Handoff 产品化约束 |

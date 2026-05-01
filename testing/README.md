@@ -157,6 +157,26 @@ npm run test:status:director
 2. 若无法使用真正的 `agent browser`，应在 report 中标成 `blocked` 或 `failed`
 3. 任何 fallback 都必须明确标注为 fallback
 
+## UI / 设计系统验收 request
+
+涉及 Director UI、Delivery shell、视觉一致性或页面交互的 request，必须明确引用：
+
+1. `design.md`
+2. `design.zh.md`
+3. 相关 PRD / 实施计划
+
+这类 request 的验收不能只证明“页面能打开”。至少应覆盖：
+
+1. `agent-browser` 打开本地 Director 页面并截图
+2. 左侧 rail、中央 workbench、右侧 drawer、底部 status 不遮挡、不重叠
+3. Chat / Runtime / Artifacts / Handoff 四个 tab 可切换，并有明确空态、加载态、错误态或数据态
+4. 关键命令具备 disabled / loading / success / failure / retry 等可见状态
+5. 生成、上传、渲染、批准、导出等重要动作能在 runtime / chat / artifacts / handoff 中留下可追踪上下文
+6. 检查 1440px 和 980px 两档截图，确认文本、按钮、drawer、review rows 没有明显溢出
+7. 同步收集 console 和 network；Artifacts/Handoff API 失败不能写 `passed`
+
+UI request 不应把 Director 改成落地页式 hero，也不应引入装饰光斑、抽象圆球、bokeh 背景或卡片套卡片。
+
 ## 什么才算测试通过
 
 以后 `passed` 只表示“关键业务结果被证据证明”，不表示“页面没报错”。

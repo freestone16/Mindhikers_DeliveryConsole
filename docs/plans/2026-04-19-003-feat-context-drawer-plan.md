@@ -7,11 +7,28 @@ linear: MIN-150
 related:
   - docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md
   - docs/plans/2026-04-18-002-feat-session-list-context-dock-plan.md
+  - docs/plans/2026-05-01_director-design-target-prd.md
+  - docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md
+  - design.md
+  - design.zh.md
   - docs/04_progress/rules.md
   - docs/dev_logs/HANDOFF.md
 ---
 
 # Unit 2: Context Drawer — 四 Tab 内容接入
+
+## 2026-05-01 Design Target Addendum
+
+本计划仍保留为 Context Drawer 接入的历史 origin，但当前设计目标已经更新：Runtime / Artifacts / Handoff 不再是临时调试展示，而是 `design.md` 定义的一等产品上下文面。
+
+后续实施以 `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md` 为准，重点变化：
+
+1. **RuntimePanel**：从“轻量运行态面板（临时组件，上线后砍掉）”升级为动作 / 状态面，至少承载模型、skill sync、生成状态、日志、错误、重试入口和 action/tool trace 占位。
+2. **ArtifactsPanel**：不仅列文件，还要有刷新、空态、错误态、打开 / 下载入口；失败产物或待重试产物不能被当成普通完成文件。
+3. **HandoffPanel**：从只读阶段摘要升级为“当前可继续状态”说明，帮助用户和 agent 判断下一步。
+4. **Chat tab**：保持持久挂载原则，避免 tab 切换丢失 blob URL 或对话上下文。
+
+本 addendum 不要求回滚已完成实现；它只重定后续续作方向。
 
 ## Overview
 

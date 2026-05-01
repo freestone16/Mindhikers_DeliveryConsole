@@ -23,7 +23,7 @@
 | 维度 | 状态 |
 |------|------|
 | 分支 | `MHSDC-DC-director` |
-| 阶段 | Phase 2 系统性清理 |
+| 阶段 | Design System v0.2.0 target + UI 续作规划 |
 | 构建 | `npm run build` 通过 |
 | 测试 | 8 文件 / 45 测试通过 |
 | 运行时 | Dev server + smoke 验证通过 |
@@ -36,6 +36,24 @@
 - 测试口径修正
 
 本地领先 `origin/MHSDC-DC-director` 4 个 commit，有意保留未提交改动，等待验收后再 commit / 回灌。
+
+**设计系统更新（2026-05-01）**：
+- 根目录 `design.md` 已成为 Director UI 与交互英文事实源。
+- 根目录 `design.zh.md` 是中文协作镜像。
+- 后续 UI PRD、实施计划和页面验收必须引用这两份设计准绳。
+
+---
+
+## 设计系统
+
+Director 当前采用“温暖影视生产工作台”的设计方向：保留创意生产温度，同时吸收 Claude Code 的克制、状态透明、命令优先和审计感。
+
+| 文件 | 说明 |
+|------|------|
+| `design.md` | Director 视觉与交互目标事实源，兼容 Google Stitch 风格 `DESIGN.md` 约定 |
+| `design.zh.md` | 中文协作镜像 |
+| `docs/plans/2026-05-01_director-design-target-prd.md` | 设计目标 PRD |
+| `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md` | 设计系统 UI 续作实施计划 |
 
 ---
 
@@ -55,6 +73,9 @@ npm run dev
 | 文件 | 说明 |
 |------|------|
 | `server/expert-actions/director.ts` | Director adapter — 核心后端逻辑 |
+| `design.md` / `design.zh.md` | UI 与交互设计事实源 |
+| `src/styles/delivery-shell.css` | Delivery shell 视觉 token 与布局样式 |
+| `src/components/delivery-shell/*` | 共享 Shell、Rail、Drawer、StatusBar |
 | `src/components/director/*` | Phase 1–4 前端组件 |
 | `src/types.ts` | 类型契约 |
 | `docs/dev_logs/HANDOFF.md` | 当前交接状态 |
@@ -70,4 +91,4 @@ npm run dev
 
 ---
 
-*最后更新：2026-04-24*
+*最后更新：2026-05-01*
