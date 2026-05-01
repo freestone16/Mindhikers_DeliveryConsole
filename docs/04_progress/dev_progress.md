@@ -4,6 +4,42 @@
 
 ---
 
+## 1.35 2026-05-01（SSE / SaaS 最终治理验收完成）
+
+### 本轮主线
+
+按老卢最终三条原则完成收口：
+
+1. 不再用全量 diff 噪声描述 “SSE 不干净 / SaaS 有差距”。
+2. SaaS staging 吃到 SSE 当前已验证红利。
+3. SSE 保持干净，具备继续开发新功能的环境。
+
+### 已完成
+
+- SSE `MHSDC-GC-SSE` 对齐 `origin/MHSDC-GC-SSE`，工作区干净。
+- SaaS `MHSDC-GC-SAAS-staging` 对齐 `origin/MHSDC-GC-SAAS-staging`，工作区干净。
+- SaaS 已接收 shell/status polish：
+  - `3507aa6 refs MIN-136 fix: polish shell module and SkillSync status`
+- SaaS 已接收 Roundtable backend first pass：
+  - `48e9719 refs MIN-136 feat: accept SSE roundtable backend first pass`
+- Railway staging 最新 deployment：
+  - `1ac83320-3ad4-4995-b8be-5995086945d0`
+  - 状态：`SUCCESS`
+
+### 验证
+
+- SSE：`npm run typecheck:saas` ✅
+- SaaS staging `/health` ✅ HTTP 200
+- SaaS staging `/api/roundtable/turn/stream` ✅ 返回 selection / turn chunks / synthesis / awaiting
+
+### 当前状态
+
+- 本轮治理收口完成。
+- SSE 可作为新窗口新功能开发起点。
+- Roundtable LLM engine bridge 属于下一阶段新功能切片，不属于本轮治理未完成项。
+
+---
+
 ## 1.34 2026-04-30（SSE / SaaS shell-status 治理倒挂修复）
 
 ### 本轮主线
