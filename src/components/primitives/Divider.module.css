@@ -1,0 +1,14 @@
+/* P1.T2 · Divider — horizontal hairline separator */
+.root {
+  height: 1px;
+  background: var(--gc-line-hairline);
+  margin: var(--gc-s-4) 0;
+  border: 0;
+}
+
+.rootVertical {
+  width: 1px;
+  height: auto;
+  background: var(--gc-line-hairline);
+  margin: 0 var(--gc-s-4);
+}

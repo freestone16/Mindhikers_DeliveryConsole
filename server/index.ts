@@ -21,7 +21,10 @@ import * as pipeline from './pipeline_engine';
 import * as shorts from './shorts';
 import * as music from './music';
 import { generateCrucibleRemotionPreview } from './crucible-remotion';
+import { generateCrucibleThesis } from './crucible-thesiswriter';
 import { generateCrucibleTurn, generateSocraticQuestions, streamCrucibleTurn } from './crucible';
+import { getCrucibleThesisTrialStatus } from './crucible-trial';
+import roundtableRouter from './routes/roundtable';
 import { callLLMStream, loadExpertContext, loadChatHistory, saveChatHistory, clearChatHistory, formatMultimodalMessages } from './chat';
 import { materialUpload, handleMaterialUpload, checkMaterialExists } from './upload_handler';
 import { getAdapter, backupDeliveryStore, generateActionDescription } from './expert-actions';
@@ -39,6 +42,7 @@ import {
     clearCrucibleActiveConversation,
     getCrucibleConversationDetail,
     listCrucibleConversations,
+    saveCrucibleConversationSnapshot,
     updateCrucibleConversation,
 } from './crucible-persistence';
 import {
@@ -250,6 +254,19 @@ app.post('/api/crucible/turn', generateCrucibleTurn);
 app.post('/api/crucible/turn/stream', streamCrucibleTurn);
 app.post('/api/crucible/socratic-questions', generateSocraticQuestions);
 app.post('/api/crucible/remotion-preview', generateCrucibleRemotionPreview);
+app.post('/api/crucible/thesis/generate', generateCrucibleThesis);
+app.get('/api/crucible/thesis/trial-status', async (req, res) => {
+    try {
+        const status = await getCrucibleThesisTrialStatus(req, {
+            projectId: typeof req.query.projectId === 'string' ? req.query.projectId : undefined,
+            scriptPath: typeof req.query.scriptPath === 'string' ? req.query.scriptPath : undefined,
+        });
+        res.json(status);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: 'Failed to read thesis trial status' });
+    }
+});
 app.get('/api/crucible/trial-status', async (req, res) => {
     try {
         const status = await getCrucibleTrialStatus(req, {
@@ -386,6 +403,36 @@ app.post('/api/crucible/conversations/:conversationId/activate', async (req, res
         res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to activate conversation' });
     }
 });
+app.post('/api/crucible/conversations/save', async (req, res) => {
+    try {
+        const snapshot = typeof req.body?.snapshot === 'object' && req.body.snapshot ? req.body.snapshot : null;
+        if (!snapshot) {
+            return res.status(400).json({ error: 'snapshot is required' });
+        }
+
+        const detail = await saveCrucibleConversationSnapshot(req, {
+            conversationId: typeof req.body?.conversationId === 'string' ? req.body.conversationId : undefined,
+            topicTitle: typeof req.body?.topicTitle === 'string' ? req.body.topicTitle : undefined,
+            status: req.body?.status === 'active' || req.body?.status === 'archived' ? req.body.status : undefined,
+            snapshot,
+            projectId: typeof req.body?.projectId === 'string'
+                ? req.body.projectId
+                : typeof req.query.projectId === 'string'
+                    ? req.query.projectId
+                    : undefined,
+            scriptPath: typeof req.body?.scriptPath === 'string'
+                ? req.body.scriptPath
+                : typeof req.query.scriptPath === 'string'
+                    ? req.query.scriptPath
+                    : undefined,
+        });
+
+        res.json(detail);
+    } catch (error) {
+        const statusCode = (error as Error & { statusCode?: number }).statusCode || 500;
+        res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to save conversation snapshot' });
+    }
+});
 app.patch('/api/crucible/conversations/:conversationId', async (req, res) => {
     try {
         const detail = await updateCrucibleConversation(req, {
@@ -510,6 +557,7 @@ app.delete('/api/crucible/autosave', async (req, res) => {
         res.status(statusCode).json({ error: statusCode === 401 ? 'Authentication required' : 'Failed to clear autosave' });
     }
 });
+app.use('/api/roundtable', roundtableRouter);
 
 function normalizeFilename(filename: string): string {
     return filename.toLowerCase().replace(/-/g, '_');

@@ -35,3 +35,14 @@ coverage/
 runtime/crucible/autosave.json
 runtime/crucible/projects/
 runtime/crucible/sessions/
+.gstack/
+
+# Local agent / AI workspace metadata
+.agent/
+.claude/Projects/
+.claude/worktrees/
+.codepilot-uploads/
+.npm_local_cache/
+node_modules_bad/
+.codex-tmp-*
+*.orig

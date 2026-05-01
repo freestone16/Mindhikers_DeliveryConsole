@@ -1,0 +1,46 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-s-2);
+  padding: var(--gc-s-1) var(--gc-s-2);
+  flex-wrap: wrap;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gc-s-2);
+}
+
+.crumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: var(--gc-font-serif);
+  font-size: var(--gc-size-sm);
+  color: var(--gc-text-secondary);
+  line-height: var(--gc-leading-snug);
+  cursor: pointer;
+  transition: color var(--gc-dur-fast) var(--gc-ease);
+}
+
+.crumb:hover {
+  color: var(--gc-accent);
+}
+
+.crumbArchived {
+  color: var(--gc-text-quiet);
+}
+
+.crumbArchived:hover {
+  color: var(--gc-text-quiet);
+}
+
+.crumbArchived::after {
+  content: ' (历史只读)';
+}
+
+.separator {
+  color: var(--gc-text-quiet);
+  font-size: var(--gc-size-xs);
+}

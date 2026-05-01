@@ -1,0 +1,33 @@
+.root {
+  background: var(--gc-bg-sunken);
+  border-radius: var(--gc-radius-sm);
+  position: relative;
+  overflow: hidden;
+  flex: none;
+}
+
+.variantText {
+  height: 14px;
+  border-radius: var(--gc-radius-sm);
+}
+
+.variantCircle {
+  border-radius: var(--gc-radius-pill);
+}
+
+.variantRect {
+  border-radius: var(--gc-radius-md);
+}
+
+.root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--gc-bg-quiet), transparent);
+  animation: shimmer 1.5s var(--gc-ease) infinite;
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}

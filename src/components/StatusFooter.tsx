@@ -98,7 +98,7 @@ export const StatusFooter = ({
                             </button>
                             {showSkills && (
                                 <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-3 shadow-[0_16px_40px_rgba(117,88,55,0.14)]">
-                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Loaded Skills</div>
+                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Skills Available</div>
                                     <div className="flex flex-wrap gap-2">
                                         {syncedSkills.map((skill: string) => (
                                             <span key={skill} className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-1)] px-2 py-1 text-[11px] text-[var(--ink-2)]">
@@ -129,7 +129,7 @@ export const StatusFooter = ({
                             </button>
                             {showSkills && (
                                 <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl border border-[var(--line-soft)] bg-[var(--surface-0)] p-3 shadow-[0_16px_40px_rgba(117,88,55,0.14)]">
-                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Loaded Skills</div>
+                                    <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">Skills Available</div>
                                     <div className="flex flex-wrap gap-2">
                                         {syncedSkills.map((skill: string) => (
                                             <span key={skill} className="rounded-full border border-[var(--line-soft)] bg-[var(--surface-1)] px-2 py-1 text-[11px] text-[var(--ink-2)]">

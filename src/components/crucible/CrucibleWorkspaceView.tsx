@@ -7,12 +7,24 @@ import { readSseStream } from './sse';
 import type {
     CanvasAsset,
     CrucibleDialogue,
-    CrucibleEngineMode,
     CrucibleRemotionPreviewResponse,
     CrucibleTurnResponse,
     RoundAnchor,
 } from './types';
 import { CRUCIBLE_DEFAULT_PAIR } from './soulRegistry';
+
+export interface CrucibleWorkspaceArtifactState {
+    conversationId?: string;
+    topicTitle?: string;
+    presentables: CanvasAsset[];
+    crystallizedQuotes: CanvasAsset[];
+    roundAnchors: RoundAnchor[];
+    roundIndex: number;
+    thesisReady: boolean;
+    stageLabel?: string;
+    toolTraces: NonNullable<CrucibleTurnResponse['toolTraces']>;
+    lastDialogue?: CrucibleDialogue | null;
+}
 
 const ASSET_META = {
     ascii: { icon: Boxes, label: '结构' },
@@ -43,6 +55,7 @@ interface CrucibleWorkspaceProps {
     onTurnSettled?: () => void;
     onConversationStateChange?: (payload: { conversationId?: string; roundIndex: number }) => void;
     onTurnError?: (payload: { message: string; code?: string }) => void;
+    onArtifactStateChange?: (payload: CrucibleWorkspaceArtifactState) => void;
 }
 
 const toCanvasAsset = (asset: HostRoutedAsset): CanvasAsset => ({
@@ -93,6 +106,12 @@ const normalizeComparableText = (value: string) => value
     .replace(/\s+/g, '')
     .replace(/[，。！？；、“”"'`()（）【】\[\]\-—,!.?:;：]/g, '')
     .trim();
+
+const TOOL_STATUS_COPY: Record<'success' | 'failed' | 'skipped', string> = {
+    success: '已执行',
+    failed: '执行失败',
+    skipped: '已跳过',
+};
 
 const truncateText = (value: string, maxLength: number) => (
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
@@ -171,6 +190,7 @@ export const CrucibleWorkspace = ({
     onTurnSettled,
     onConversationStateChange,
     onTurnError,
+    onArtifactStateChange,
 }: CrucibleWorkspaceProps) => {
     const snapshot = useMemo(() => readScopedCrucibleSnapshot(workspaceId), [workspaceId]);
     const [presentables, setPresentables] = useState<CanvasAsset[]>(() => snapshot?.presentables?.length ? snapshot.presentables : []);
@@ -183,9 +203,10 @@ export const CrucibleWorkspace = ({
     ));
     const [roundIndex, setRoundIndex] = useState<number>(() => snapshot?.roundIndex || 1);
     const [isThinking, setIsThinking] = useState<boolean>(() => snapshot?.isThinking || false);
-    const [questionSource, setQuestionSource] = useState<'static' | 'socrates' | 'fallback'>(() => snapshot?.questionSource || 'static');
-    const [engineMode, setEngineMode] = useState<CrucibleEngineMode>(() => snapshot?.engineMode || 'socratic_refinement');
     const [lastDialogue, setLastDialogue] = useState<CrucibleDialogue | null>(() => snapshot?.lastDialogue || null);
+    const [toolTraces, setToolTraces] = useState<NonNullable<CrucibleTurnResponse['toolTraces']>>(() => snapshot?.toolTraces || []);
+    const [stageLabel, setStageLabel] = useState<string>(() => snapshot?.decisionSummary?.stageLabel || '');
+    const [thesisReady, setThesisReady] = useState<boolean>(() => snapshot?.thesisReady || false);
     // Chat messages are managed by ChatPanel/App.tsx; preserve whatever was in the snapshot
     const snapshotMessagesRef = useRef(snapshot?.messages || []);
     const routedIdsRef = useRef<Set<string>>(new Set());
@@ -242,6 +263,33 @@ export const CrucibleWorkspace = ({
     }, [conversationId, roundIndex, onConversationStateChange]);
 
     useEffect(() => {
+        onArtifactStateChange?.({
+            conversationId: conversationId || undefined,
+            topicTitle,
+            presentables,
+            crystallizedQuotes,
+            roundAnchors,
+            roundIndex,
+            thesisReady,
+            stageLabel: stageLabel || undefined,
+            toolTraces,
+            lastDialogue,
+        });
+    }, [
+        conversationId,
+        topicTitle,
+        presentables,
+        crystallizedQuotes,
+        roundAnchors,
+        roundIndex,
+        thesisReady,
+        stageLabel,
+        toolTraces,
+        lastDialogue,
+        onArtifactStateChange,
+    ]);
+
+    useEffect(() => {
         const snapshotPayload = {
             conversationId: conversationId || undefined,
             messages: snapshotMessagesRef.current,
@@ -254,8 +302,17 @@ export const CrucibleWorkspace = ({
             lastDialogue: lastDialogue || undefined,
             roundIndex,
             isThinking,
-            questionSource,
-            engineMode,
+            thesisReady,
+            toolTraces,
+            decisionSummary: {
+                stageLabel: stageLabel || undefined,
+                needsResearch: toolTraces.some((trace) => trace.tool === 'Researcher'),
+                needsFactCheck: toolTraces.some((trace) => trace.tool === 'FactChecker'),
+                requestedTools: toolTraces.map((trace) => ({
+                    tool: trace.tool,
+                    mode: trace.mode,
+                })),
+            },
         };
 
         if (persistenceTimerRef.current) {
@@ -264,7 +321,7 @@ export const CrucibleWorkspace = ({
         persistenceTimerRef.current = window.setTimeout(() => {
             void persistCrucibleSnapshot(snapshotPayload, { workspaceId });
         }, 250);
-    }, [conversationId, activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, questionSource, engineMode, workspaceId]);
+    }, [conversationId, activePresentableId, presentables, crystallizedQuotes, roundAnchors, lastDialogue, openingPrompt, topicTitle, roundIndex, isThinking, thesisReady, toolTraces, stageLabel, workspaceId]);
 
     useEffect(() => {
         const normalizedTopic = normalizeTopic(topicTitle);
@@ -287,9 +344,9 @@ export const CrucibleWorkspace = ({
         setRoundAnchors([]);
         setRoundIndex(1);
         setIsThinking(false);
-        setQuestionSource('static');
-        setEngineMode('socratic_refinement');
         setLastDialogue(null);
+        setToolTraces([]);
+        setStageLabel('');
         previousSeedVersionRef.current = seedPromptVersion;
         setPreviewImageUrl(null);
         setPreviewStatus('idle');
@@ -335,8 +392,12 @@ export const CrucibleWorkspace = ({
         if (data.topicSuggestion) {
             setSuggestedTitle(data.topicSuggestion);
         }
-        setQuestionSource(data.source === 'socrates' ? 'socrates' : 'fallback');
         setLastDialogue(dialogue);
+        setToolTraces(data.toolTraces || []);
+        setStageLabel(data.decision?.stageLabel || '');
+        if (data.thesisReady) {
+            setThesisReady(true);
+        }
         onRoundGenerated?.({
             speaker: dialogue.speaker,
             reflection: dialogue.utterance,
@@ -358,7 +419,6 @@ export const CrucibleWorkspace = ({
         const controller = new AbortController();
         requestAbortRef.current = controller;
         const timeoutId = window.setTimeout(() => controller.abort(), 45000);
-        setEngineMode(nextRoundIndex === 1 && previousAnchors.length === 0 ? 'roundtable_discovery' : 'socratic_refinement');
         setIsThinking(true);
         mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -481,7 +541,7 @@ export const CrucibleWorkspace = ({
         if (incomingAssets.length === 0) {
             return;
         }
-        if (openingPrompt || questionSource !== 'static' || roundAnchors.length > 0 || presentables.length > 0) {
+        if (openingPrompt || conversationId || roundAnchors.length > 0 || presentables.length > 0) {
             return;
         }
 
@@ -503,7 +563,7 @@ export const CrucibleWorkspace = ({
             return Array.from(nextBySlot.values()).slice(0, 12);
         });
         setActivePresentableId(freshAssets[0].id);
-    }, [incomingAssets, openingPrompt, questionSource, roundAnchors.length, presentables.length]);
+    }, [incomingAssets, openingPrompt, conversationId, roundAnchors.length, presentables.length]);
 
     useEffect(() => {
         const container = mainScrollRef.current;
@@ -684,12 +744,35 @@ export const CrucibleWorkspace = ({
                     >
                         <section className="rounded-[12px] border border-[var(--line-soft)] bg-[rgba(255,251,245,0.84)] px-4 py-3 shadow-[0_14px_32px_rgba(131,103,70,0.04)]">
                         <div className="mh-display text-[24px] font-semibold tracking-tight text-[var(--ink-1)] md:text-[26px]">{suggestedTitle || normalizeTopic(topicTitle)}</div>
+                        {(stageLabel || toolTraces.length > 0) && (
+                            <div className="mt-4 space-y-2">
+                                {stageLabel && (
+                                    <div className="inline-flex rounded-full border border-[rgba(166,117,64,0.16)] bg-[rgba(255,248,238,0.76)] px-3 py-1 text-[11px] tracking-[0.08em] text-[var(--ink-2)]">
+                                        当前阶段：{stageLabel}
+                                    </div>
+                                )}
+                                {toolTraces.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {toolTraces.map((trace) => (
+                                            <div
+                                                key={`${trace.tool}-${trace.startedAt}`}
+                                                className="rounded-[10px] border border-[rgba(146,118,82,0.14)] bg-[rgba(255,252,247,0.92)] px-3 py-2 text-[11px] leading-5 text-[var(--ink-2)]"
+                                            >
+                                                <div className="font-medium text-[var(--ink-1)]">{trace.tool}</div>
+                                                <div>{TOOL_STATUS_COPY[trace.status]}</div>
+                                                <div className="text-[var(--ink-3)]">{trace.mode === 'primary' ? '主执行位' : '支援位'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         {isThinking && (
                             <div className="mt-4 rounded-[8px] border border-[rgba(166,117,64,0.14)] bg-[rgba(255,248,238,0.7)] px-4 py-3">
                                 <div className="text-[12px] leading-6 text-[var(--ink-2)]">
-                                    {engineMode === 'roundtable_discovery'
-                                        ? '正在整理这一轮最值得挂上黑板的冲突。'
-                                        : '正在继续收紧这一轮黑板焦点。'}
+                                    {stageLabel
+                                        ? `正在推进：${stageLabel}`
+                                        : '正在根据本轮决策整理黑板焦点。'}
                                 </div>
                             </div>
                         )}

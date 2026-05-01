@@ -1,8 +1,19 @@
 {
   "module": "golden-crucible",
-  "latest_request": "TREQ-2026-03-20-GC-003-crucible-contextual-search-request",
+  "latest_request": "GC-SAAS-STAGING-2026-04-30-roundtable-backend-first-pass",
   "latest_status": "passed",
-  "latest_claim": "testing/golden-crucible/claims/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.claim.md",
-  "latest_report": "testing/golden-crucible/reports/TREQ-2026-03-20-GC-003-crucible-contextual-search-request.report.md",
-  "updated_at": "2026-03-20T03:18:58.472Z"
+  "latest_claim": null,
+  "latest_report": "docs/dev_logs/2026-04-30.md",
+  "updated_at": "2026-04-30T22:19:00+08:00",
+  "summary": {
+    "staging_shell_smoke": "done",
+    "staging_roundtable_visible": "done",
+    "railway_snapshot_fix": "done",
+    "unexpected_localhost_check": "done",
+    "skill_sync_indicator": "done",
+    "skill_sync_popover": "done",
+    "module_glyph_alignment": "done",
+    "roundtable_backend_api_first_pass": "done_saas_local",
+    "roundtable_llm_engine": "not_done"
+  }
 }

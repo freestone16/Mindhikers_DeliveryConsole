@@ -11,7 +11,15 @@ let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
-export const isAuthEnabled = () => Boolean(process.env.DATABASE_URL?.trim());
+const resolveDatabaseUrl = () => {
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    if (!databaseUrl || databaseUrl === '...') {
+        return '';
+    }
+    return databaseUrl;
+};
+
+export const isAuthEnabled = () => Boolean(resolveDatabaseUrl());
 
 export const resolveAuthBaseUrl = () => {
     const explicitBaseUrl = process.env.BETTER_AUTH_URL?.trim()
@@ -32,6 +40,13 @@ export const resolveAuthSecret = () => process.env.BETTER_AUTH_SECRET?.trim()
 
 export const isUsingDefaultAuthSecret = () => resolveAuthSecret() === DEFAULT_SECRET;
 
+const resolveTrustedOrigins = () => Array.from(new Set([
+    process.env.APP_BASE_URL?.trim(),
+    process.env.CORS_ORIGIN?.trim(),
+    process.env.VITE_API_BASE_URL?.trim(),
+    resolveAuthBaseUrl(),
+].filter((origin): origin is string => Boolean(origin))));
+
 export const isGoogleAuthEnabled = () => Boolean(
     process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim(),
 );
@@ -41,13 +56,15 @@ export const isWeChatAuthEnabled = () => Boolean(
 );
 
 export const getAuthPool = () => {
-    if (!process.env.DATABASE_URL?.trim()) {
+    const databaseUrl = resolveDatabaseUrl();
+
+    if (!databaseUrl) {
         throw new Error('DATABASE_URL is required for auth');
     }
 
     if (!authPool) {
         authPool = new Pool({
-            connectionString: process.env.DATABASE_URL,
+            connectionString: databaseUrl,
         });
     }
 
@@ -84,6 +101,7 @@ export const getAuth = () => {
             baseURL: resolveAuthBaseUrl(),
             basePath: AUTH_BASE_PATH,
             secret: resolveAuthSecret(),
+            trustedOrigins: resolveTrustedOrigins(),
             database: getAuthPool(),
             emailAndPassword: {
                 enabled: true,
@@ -92,6 +110,7 @@ export const getAuth = () => {
             socialProviders,
             advanced: {
                 useSecureCookies: process.env.NODE_ENV === 'production',
+                databaseMigration: true,
             },
         });
     }

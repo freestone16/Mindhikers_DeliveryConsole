@@ -3,7 +3,7 @@
 当前黄金坩埚的测试执行链路统一为：
 
 ```text
-Codex -> opencode run -> OpenCode -> agent-browser -> report/artifacts/status
+Agent -> opencode run -> OpenCode -> agent-browser -> report/artifacts/status
 ```
 
 目标不是“有人帮忙点一下页面”，而是让测试具备：

@@ -1,49 +1,95 @@
 import { describe, expect, it } from 'vitest';
-import { createCrucibleOrchestratorPlan } from '../../server/crucible-orchestrator';
+import {
+    buildSocratesCompositionPrompt,
+    buildSocratesDecisionPrompt,
+    type SocratesDecision,
+    type ToolExecutionTrace,
+} from '../../server/crucible-orchestrator';
 
-describe('createCrucibleOrchestratorPlan', () => {
-    it('keeps searchRequested false before the user asks to search', () => {
-        const plan = createCrucibleOrchestratorPlan({
-            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-            previousCards: [
-                {
-                    prompt: '价值到底指什么',
-                    answer: '我更关心思想启发和真实经验',
-                },
-                {
-                    prompt: '你当前的直觉是什么',
-                    answer: '真实经验、判断力、穿透力结构可能更稀缺',
-                },
-            ],
-            roundIndex: 2,
-            seedPrompt: 'AI 让很多人都能比较快地做出 70 分的内容',
-            latestUserReply: '我现在的直觉是，稀缺的可能不是写作技巧本身。',
-        });
+const pair = {
+    challengerSlug: 'oldzhang',
+    synthesizerSlug: 'oldlu',
+    challengerName: '老张',
+    synthesizerName: '老卢',
+};
 
-        expect(plan.searchRequested).toBe(false);
-        expect(plan.toolRoutes.find((route) => route.tool === 'Researcher')?.mode).toBe('hold');
+describe('crucible orchestrator prompts', () => {
+    it('asks Socrates to output a structured decision instead of host-side search flags', () => {
+        const prompt = buildSocratesDecisionPrompt(
+            {
+                topicTitle: 'AI 时代创作的主体性',
+                previousCards: [],
+                roundIndex: 3,
+                seedPrompt: 'AI 正在逼近内容生产主链',
+                latestUserReply: '我希望你通过互联网给我一些新的输入，然后我们继续讨论。',
+            },
+            pair,
+            '保持追问定义、真实困惑与边界。',
+            '老张：冷静、锐利、不讨好。',
+        );
+
+        expect(prompt).toContain('是否联网、是否查证、调哪些工具，必须由你决定');
+        expect(prompt).toContain('"toolRequests"');
+        expect(prompt).not.toContain('searchRequested');
     });
 
-    it('detects a contextual search request from the latest user reply', () => {
-        const plan = createCrucibleOrchestratorPlan({
-            topicTitle: 'AI 时代高质量内容真正稀缺的东西是什么',
-            previousCards: [
+    it('injects real tool traces into the composition prompt', () => {
+        const decision: SocratesDecision = {
+            version: 'decision-v1',
+            speaker: 'oldzhang',
+            reflectionIntent: '先补一刀外部材料，再继续压边界。',
+            focus: '外部讨论到底补充了什么新约束',
+            needsResearch: true,
+            needsFactCheck: false,
+            toolRequests: [
                 {
-                    prompt: '价值到底指什么',
-                    answer: '我更关心思想启发和真实经验',
-                },
-                {
-                    prompt: '你当前的直觉是什么',
-                    answer: '真实经验、判断力、穿透力结构可能更稀缺',
+                    tool: 'Researcher',
+                    mode: 'support',
+                    reason: '用户明确要求补充外部材料',
+                    query: 'AI时代创作的主体性 最新研究',
+                    goal: '补近两年外部讨论与研究线索',
                 },
             ],
-            roundIndex: 3,
-            seedPrompt: 'AI 让很多人都能比较快地做出 70 分的内容',
-            latestUserReply: '基于我们刚才这个问题，我想先联网搜索一下最近一两年的研究或讨论，再继续往下聊。',
-        });
+            stageLabel: '外部补线',
+        };
+        const traces: ToolExecutionTrace[] = [
+            {
+                tool: 'Researcher',
+                requestedBy: 'Socrates',
+                mode: 'support',
+                status: 'success',
+                reason: '用户明确要求补充外部材料',
+                input: {
+                    query: 'AI时代创作的主体性 最新研究',
+                    goal: '补近两年外部讨论与研究线索',
+                },
+                output: {
+                    query: 'AI时代创作的主体性 最新研究',
+                    connected: true,
+                    sources: [{ title: 'Result A', url: 'https://example.com/a', snippet: 'Snippet A' }],
+                },
+                startedAt: '2026-04-02T10:00:00.000Z',
+                finishedAt: '2026-04-02T10:00:01.000Z',
+            },
+        ];
 
-        expect(plan.searchRequested).toBe(true);
-        expect(plan.phase).toBe('deep_dialogue');
-        expect(plan.toolRoutes.find((route) => route.tool === 'Researcher')?.mode).toBe('support');
+        const prompt = buildSocratesCompositionPrompt(
+            {
+                topicTitle: 'AI 时代创作的主体性',
+                previousCards: [],
+                roundIndex: 3,
+                seedPrompt: 'AI 正在逼近内容生产主链',
+                latestUserReply: '我希望你通过互联网给我一些新的输入，然后我们继续讨论。',
+            },
+            pair,
+            '保持追问定义、真实困惑与边界。',
+            '老张：冷静、锐利、不讨好。',
+            decision,
+            traces,
+        );
+
+        expect(prompt).toContain('工具执行结果（真实 runtime trace）');
+        expect(prompt).toContain('https://example.com/a');
+        expect(prompt).toContain('不能假装某工具成功执行过');
     });
 });

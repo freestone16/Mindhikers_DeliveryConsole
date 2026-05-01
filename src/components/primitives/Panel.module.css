@@ -1,0 +1,27 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  padding: var(--gc-s-4);
+  background: var(--gc-bg-raised);
+  border: 1px solid var(--gc-line-subtle);
+  border-radius: var(--gc-radius-md);
+  min-height: 0;
+}
+
+.header {
+  margin-bottom: var(--gc-s-3);
+  padding-bottom: var(--gc-s-3);
+  border-bottom: 1px solid var(--gc-line-hairline);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.footer {
+  margin-top: var(--gc-s-3);
+  padding-top: var(--gc-s-3);
+  border-top: 1px solid var(--gc-line-hairline);
+}

@@ -1,0 +1,11 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gc-s-6);
+  min-width: 0;
+}
+
+.rootLoading {
+  opacity: 0.6;
+  pointer-events: none;
+}

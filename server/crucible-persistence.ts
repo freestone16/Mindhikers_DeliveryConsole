@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { getAuthPool, getSessionFromRequest, isAuthEnabled } from './auth';
 import { ensurePersonalWorkspace } from './auth/workspace-store';
+import type { SocratesDecision, ToolExecutionTrace } from './crucible-orchestrator';
 
 const CRUCIBLE_RUNTIME_ROOT = path.resolve(process.cwd(), 'runtime', 'crucible');
 
@@ -30,6 +31,8 @@ export interface CrucibleConversationSummary {
     status: 'active' | 'archived';
     accessMode?: 'platform' | 'byok';
     isActive?: boolean;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    hasDraftInput?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -78,6 +81,7 @@ export interface CrucibleConversationSnapshot {
     activePresentableId?: string;
     topicTitle: string;
     openingPrompt?: string;
+    draftInputText?: string;
     roundAnchors: Array<{
         id: string;
         title: string;
@@ -89,11 +93,23 @@ export interface CrucibleConversationSnapshot {
         utterance: string;
         focus: string;
     };
-    updatedAt: string;
+    updatedAt?: string;
     roundIndex: number;
     isThinking: false;
     questionSource: 'static' | 'socrates' | 'fallback';
     engineMode: 'roundtable_discovery' | 'socratic_refinement';
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    toolTraces?: ToolExecutionTrace[];
+    decisionSummary?: {
+        stageLabel?: string;
+        needsResearch: boolean;
+        needsFactCheck: boolean;
+        requestedTools: Array<{
+            tool: string;
+            mode: string;
+        }>;
+    };
+    thesisReady?: boolean;
 }
 
 export interface CrucibleConversationDetail {
@@ -156,9 +172,12 @@ interface StoredCrucibleTurn {
         presentables: MaterializedCruciblePresentable[];
     };
     meta: {
+        decisionVersion?: string;
         searchRequested: boolean;
         searchConnected: boolean;
     };
+    decision?: SocratesDecision;
+    toolTraces?: ToolExecutionTrace[];
     research?: unknown;
 }
 
@@ -178,6 +197,7 @@ interface StoredCrucibleConversation {
     messages: StoredCrucibleMessage[];
     turns: StoredCrucibleTurn[];
     artifacts: CrucibleConversationArtifact[];
+    snapshot?: CrucibleConversationSnapshot;
 }
 
 const sanitizePathSegment = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -346,11 +366,69 @@ const toSnapshotPresentableType = (type: CrucibleConversationArtifact['type']) =
     type === 'asset' ? 'mindmap' : type
 );
 
+const normalizeSnapshotTopicTitle = (value?: string, fallback = '标题待定') => {
+    const normalized = value?.trim();
+    if (!normalized) {
+        return fallback;
+    }
+    if (normalized === '标题待定' || normalized === '标题待收敛...' || normalized.toUpperCase() === 'TBD') {
+        return fallback;
+    }
+    return normalized;
+};
+
+const normalizeConversationSnapshot = (
+    snapshot: Partial<CrucibleConversationSnapshot> | null | undefined,
+    options: {
+        conversationId: string;
+        topicTitle: string;
+        roundIndex?: number;
+        updatedAt?: string;
+        saveMode?: 'autosave' | 'manual' | 'conversation';
+    },
+): CrucibleConversationSnapshot => {
+    const presentables = Array.isArray(snapshot?.presentables) ? snapshot.presentables : [];
+    const crystallizedQuotes = Array.isArray(snapshot?.crystallizedQuotes) ? snapshot.crystallizedQuotes : [];
+    const roundAnchors = Array.isArray(snapshot?.roundAnchors) ? snapshot.roundAnchors : [];
+    const messages = Array.isArray(snapshot?.messages) ? snapshot.messages.filter((item) => item?.id && item?.createdAt) : [];
+    const roundIndex = Number.isFinite(snapshot?.roundIndex) ? Number(snapshot?.roundIndex) : (options.roundIndex || 0);
+
+    return {
+        conversationId: options.conversationId,
+        messages,
+        presentables,
+        crystallizedQuotes,
+        activePresentableId: snapshot?.activePresentableId || presentables[0]?.id,
+        topicTitle: normalizeSnapshotTopicTitle(snapshot?.topicTitle, options.topicTitle),
+        openingPrompt: snapshot?.openingPrompt?.trim() || undefined,
+        draftInputText: snapshot?.draftInputText?.trim() || undefined,
+        roundAnchors,
+        lastDialogue: snapshot?.lastDialogue || undefined,
+        updatedAt: snapshot?.updatedAt || options.updatedAt,
+        roundIndex,
+        isThinking: false,
+        questionSource: snapshot?.questionSource === 'socrates' || snapshot?.questionSource === 'fallback'
+            ? snapshot.questionSource
+            : 'static',
+        engineMode: snapshot?.engineMode === 'roundtable_discovery' || snapshot?.engineMode === 'socratic_refinement'
+            ? snapshot.engineMode
+            : (roundIndex <= 1 ? 'roundtable_discovery' : 'socratic_refinement'),
+        saveMode: snapshot?.saveMode || options.saveMode || 'conversation',
+        toolTraces: Array.isArray(snapshot?.toolTraces) ? snapshot.toolTraces : undefined,
+        decisionSummary: snapshot?.decisionSummary,
+    };
+};
+
+const countSnapshotArtifacts = (snapshot?: CrucibleConversationSnapshot) => (
+    (snapshot?.presentables?.length || 0) + (snapshot?.crystallizedQuotes?.length || 0)
+);
+
 const buildConversationSummary = (
     conversation: StoredCrucibleConversation,
     fallback?: Partial<CrucibleConversationSummary>,
 ): CrucibleConversationSummary => {
     const lastTurn = conversation.turns[conversation.turns.length - 1];
+    const snapshot = conversation.snapshot;
     return {
         id: conversation.id,
         workspaceId: conversation.workspaceId,
@@ -358,17 +436,19 @@ const buildConversationSummary = (
         status: conversation.status,
         accessMode: conversation.accessMode || 'platform',
         isActive: fallback?.isActive,
+        saveMode: snapshot?.saveMode || 'conversation',
+        hasDraftInput: Boolean(snapshot?.draftInputText?.trim()),
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
         roundIndex: conversation.roundIndex,
         lastSpeaker: lastTurn?.bridgeOutput.dialogue.speaker || fallback?.lastSpeaker || 'assistant',
         lastFocus: lastTurn?.bridgeOutput.dialogue.focus || fallback?.lastFocus || '',
         messageCount: conversation.messages.length || fallback?.messageCount || 0,
-        artifactCount: conversation.artifacts.length || fallback?.artifactCount || 0,
+        artifactCount: Math.max(conversation.artifacts.length, countSnapshotArtifacts(snapshot), fallback?.artifactCount || 0),
     };
 };
 
-const buildConversationSnapshot = (conversation: StoredCrucibleConversation): CrucibleConversationSnapshot => {
+const buildDerivedConversationSnapshot = (conversation: StoredCrucibleConversation): CrucibleConversationSnapshot => {
     const lastTurn = conversation.turns[conversation.turns.length - 1];
     const openingPrompt = conversation.turns.find((turn) => turn.userInput.openingPrompt.trim())?.userInput.openingPrompt || '';
     const latestArtifacts = conversation.artifacts.filter((artifact) => artifact.roundIndex === conversation.roundIndex);
@@ -391,7 +471,7 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
             summary: artifact.summary,
         }));
 
-    return {
+    return normalizeConversationSnapshot({
         conversationId: conversation.id,
         messages: conversation.messages.map((message) => ({
             id: message.id,
@@ -413,13 +493,46 @@ const buildConversationSnapshot = (conversation: StoredCrucibleConversation): Cr
             content: artifact.content,
         })),
         lastDialogue: lastTurn?.bridgeOutput.dialogue,
-        updatedAt: conversation.updatedAt,
         roundIndex: conversation.roundIndex,
         isThinking: false,
         questionSource: lastTurn ? (lastTurn.source === 'socrates' ? 'socrates' : 'fallback') : 'static',
         engineMode: conversation.roundIndex <= 1 ? 'roundtable_discovery' : 'socratic_refinement',
-    };
+        toolTraces: lastTurn?.toolTraces,
+        decisionSummary: lastTurn?.decision ? {
+            stageLabel: lastTurn.decision.stageLabel,
+            needsResearch: lastTurn.decision.needsResearch,
+            needsFactCheck: lastTurn.decision.needsFactCheck,
+            requestedTools: lastTurn.decision.toolRequests.map((request) => ({
+                tool: request.tool,
+                mode: request.mode,
+            })),
+        } : undefined,
+        thesisReady: conversation.turns.some(
+            (turn) => turn.roundIndex >= 5
+                && turn.source === 'socrates'
+                && turn.decision?.stageLabel === 'crystallization',
+        ) || undefined,
+    }, {
+        conversationId: conversation.id,
+        topicTitle: conversation.topicTitle,
+        roundIndex: conversation.roundIndex,
+        updatedAt: conversation.updatedAt,
+        saveMode: 'conversation',
+    });
 };
+
+const buildConversationSnapshot = (conversation: StoredCrucibleConversation): CrucibleConversationSnapshot => (
+    normalizeConversationSnapshot(
+        conversation.snapshot || buildDerivedConversationSnapshot(conversation),
+        {
+            conversationId: conversation.id,
+            topicTitle: conversation.topicTitle,
+            roundIndex: conversation.roundIndex,
+            updatedAt: conversation.updatedAt,
+            saveMode: conversation.snapshot?.saveMode || 'conversation',
+        },
+    )
+);
 
 const readStoredConversation = (workspaceDir: string, conversationId: string) => (
     readJsonFile<StoredCrucibleConversation | null>(getConversationFile(workspaceDir, conversationId), null)
@@ -502,6 +615,8 @@ export const appendTurnToCrucibleConversation = (
         accessMode: 'platform' | 'byok';
         seedPrompt: string;
         latestUserReply: string;
+        decision?: SocratesDecision;
+        toolTraces?: ToolExecutionTrace[];
         searchRequested: boolean;
         searchConnected: boolean;
         research?: unknown;
@@ -567,9 +682,12 @@ export const appendTurnToCrucibleConversation = (
             presentables: params.presentables,
         },
         meta: {
+            decisionVersion: params.decision?.version,
             searchRequested: params.searchRequested,
             searchConnected: params.searchConnected,
         },
+        decision: params.decision,
+        toolTraces: params.toolTraces,
         research: params.research,
     });
 
@@ -601,6 +719,7 @@ export const appendTurnToCrucibleConversation = (
         createdAt: now,
     }));
     conversation.artifacts.push(...artifacts);
+    conversation.snapshot = buildDerivedConversationSnapshot(conversation);
 
     fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
     writeActiveConversationPointer(context.workspaceDir, context.conversationId, params.topicTitle);
@@ -617,6 +736,124 @@ export const appendTurnToCrucibleConversation = (
     }, null, 2), 'utf-8');
 
     return conversation;
+};
+
+export const appendCrucibleThesisArtifact = async (
+    req: Request,
+    options: {
+        conversationId: string;
+        title: string;
+        summary: string;
+        content: string;
+        projectId?: string;
+        scriptPath?: string;
+    },
+): Promise<{ artifactId: string; conversation: StoredCrucibleConversation }> => {
+    const context = await resolveCruciblePersistenceContext(req, {
+        conversationId: options.conversationId,
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const conversation = readStoredConversation(context.workspaceDir, context.conversationId);
+    if (!conversation) {
+        throw new Error('对话不存在');
+    }
+    const now = new Date().toISOString();
+    const artifactId = `thesis_${Date.now()}`;
+    const artifact: CrucibleConversationArtifact = {
+        id: artifactId,
+        type: 'asset',
+        title: options.title,
+        summary: options.summary,
+        content: options.content,
+        roundIndex: conversation.roundIndex,
+        createdAt: now,
+    };
+    conversation.artifacts.push(artifact);
+    conversation.updatedAt = now;
+    conversation.snapshot = buildDerivedConversationSnapshot(conversation);
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation));
+
+    return { artifactId, conversation };
+};
+
+export const saveCrucibleConversationSnapshot = async (
+    req: Request,
+    options: {
+        conversationId?: string;
+        topicTitle?: string;
+        status?: 'active' | 'archived';
+        snapshot: Partial<CrucibleConversationSnapshot>;
+        projectId?: string;
+        scriptPath?: string;
+    },
+): Promise<CrucibleConversationDetail> => {
+    const requestedConversationId = options.conversationId?.trim()
+        || options.snapshot.conversationId?.trim();
+    const context = await resolveCruciblePersistenceContext(req, {
+        conversationId: requestedConversationId,
+        projectId: options.projectId,
+        scriptPath: options.scriptPath,
+    });
+    const conversationFile = getConversationFile(context.workspaceDir, context.conversationId);
+    const existing = readJsonFile<StoredCrucibleConversation | null>(conversationFile, null);
+    const now = new Date().toISOString();
+    const topicTitle = normalizeSnapshotTopicTitle(
+        options.topicTitle || options.snapshot.topicTitle || existing?.topicTitle,
+        '未命名议题',
+    );
+
+    const conversation: StoredCrucibleConversation = existing || {
+        id: context.conversationId,
+        workspaceId: context.workspaceId,
+        topicTitle,
+        status: options.status || 'active',
+        accessMode: existing?.accessMode || 'platform',
+        sourceContext: {
+            projectId: context.projectId,
+            scriptPath: context.scriptPath,
+        },
+        createdAt: now,
+        updatedAt: now,
+        roundIndex: 0,
+        messages: [],
+        turns: [],
+        artifacts: [],
+    };
+
+    conversation.topicTitle = topicTitle;
+    conversation.status = options.status || conversation.status || 'active';
+    conversation.sourceContext = {
+        projectId: context.projectId,
+        scriptPath: context.scriptPath,
+    };
+    conversation.snapshot = normalizeConversationSnapshot(options.snapshot, {
+        conversationId: conversation.id,
+        topicTitle,
+        roundIndex: Math.max(conversation.roundIndex, Number(options.snapshot.roundIndex || 0)),
+        updatedAt: now,
+        saveMode: 'manual',
+    });
+    conversation.roundIndex = Math.max(conversation.roundIndex, conversation.snapshot.roundIndex || 0);
+    conversation.updatedAt = now;
+
+    fs.writeFileSync(conversationFile, JSON.stringify(conversation, null, 2), 'utf-8');
+    writeActiveConversationPointer(context.workspaceDir, conversation.id, conversation.topicTitle);
+    updateConversationIndex(context.workspaceDir, buildConversationSummary(conversation, {
+        isActive: true,
+    }));
+
+    return {
+        summary: buildConversationSummary(conversation, {
+            isActive: true,
+        }),
+        snapshot: buildConversationSnapshot(conversation),
+        artifacts: conversation.artifacts,
+        sourceContext: conversation.sourceContext,
+    };
 };
 
 export const listCrucibleConversations = async (

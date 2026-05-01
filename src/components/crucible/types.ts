@@ -16,6 +16,37 @@ export interface CrucibleTurnResponse {
     dialogue?: CrucibleDialogue;
     presentables?: Array<{ type?: 'reference' | 'quote' | 'asset'; title?: string; summary?: string; content?: string }>;
     topicSuggestion?: string;
+    decision?: {
+        stageLabel?: string;
+        needsResearch: boolean;
+        needsFactCheck: boolean;
+        toolRequests: Array<{
+            tool: 'Researcher' | 'FactChecker';
+            mode: 'primary' | 'support';
+            reason: string;
+            query?: string;
+            goal?: string;
+            scope?: string;
+        }>;
+    };
+    toolTraces?: Array<{
+        tool: 'Researcher' | 'FactChecker';
+        requestedBy: 'Socrates';
+        mode: 'primary' | 'support';
+        status: 'success' | 'failed' | 'skipped';
+        reason: string;
+        input: {
+            query?: string;
+            goal?: string;
+            scope?: string;
+        };
+        output?: unknown;
+        error?: string;
+        startedAt: string;
+        finishedAt: string;
+    }>;
+    engineMode?: CrucibleEngineMode;
+    thesisReady?: boolean;
 }
 
 export interface CrucibleConversationSummary {
@@ -24,6 +55,8 @@ export interface CrucibleConversationSummary {
     topicTitle: string;
     status: 'active' | 'archived';
     isActive?: boolean;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    hasDraftInput?: boolean;
     createdAt: string;
     updatedAt: string;
     roundIndex: number;
@@ -56,6 +89,15 @@ export interface CrucibleConversationDetail {
 export interface UpdateCrucibleConversationPayload {
     topicTitle?: string;
     status?: 'active' | 'archived';
+}
+
+export interface SaveCrucibleConversationPayload {
+    conversationId?: string;
+    topicTitle?: string;
+    status?: 'active' | 'archived';
+    projectId?: string;
+    scriptPath?: string;
+    snapshot: CrucibleSnapshot;
 }
 
 export type CrucibleSseEventName = 'turn' | 'error' | 'done';
@@ -107,6 +149,19 @@ export interface CrucibleSnapshot {
     isThinking?: boolean;
     questionSource?: 'static' | 'socrates' | 'fallback';
     engineMode?: CrucibleEngineMode;
+    draftInputText?: string;
+    saveMode?: 'autosave' | 'manual' | 'conversation';
+    toolTraces?: CrucibleTurnResponse['toolTraces'];
+    decisionSummary?: {
+        stageLabel?: string;
+        needsResearch: boolean;
+        needsFactCheck: boolean;
+        requestedTools: Array<{
+            tool: string;
+            mode: string;
+        }>;
+    };
+    thesisReady?: boolean;
 }
 
 export interface CrucibleRound {

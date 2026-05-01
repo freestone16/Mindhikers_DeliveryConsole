@@ -1,0 +1,81 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--gc-s-3);
+  min-height: 36px;
+  padding: 6px var(--gc-s-3);
+  border-radius: var(--gc-radius-md);
+  color: var(--gc-text-secondary);
+  transition: background var(--gc-dur-fast) var(--gc-ease),
+              color var(--gc-dur-fast) var(--gc-ease);
+  text-align: left;
+  width: 100%;
+  border: 1px solid transparent;
+  background: none;
+}
+
+.root:hover {
+  background: var(--gc-bg-sunken);
+  color: var(--gc-text-primary);
+}
+
+.rootActive {
+  background: var(--gc-bg-base);
+  color: var(--gc-text-primary);
+  box-shadow: inset 0 0 0 1px var(--gc-line-subtle);
+  border-color: var(--gc-line-subtle);
+}
+
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  color: var(--gc-text-tertiary);
+  font-family: var(--gc-font-serif);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.rootActive .glyph {
+  color: var(--gc-accent);
+}
+
+.name {
+  font-size: var(--gc-size-base);
+  font-weight: var(--gc-weight-medium);
+  flex: 1;
+  min-width: 0;
+}
+
+.kbd {
+  font-family: var(--gc-font-mono);
+  font-size: 10px;
+  color: var(--gc-text-quiet);
+}
+
+.rootSlot {
+  border: 1px dashed var(--gc-line-default);
+  background: transparent;
+  color: var(--gc-text-tertiary);
+  font-style: italic;
+  font-family: var(--gc-font-serif);
+  font-weight: var(--gc-weight-regular);
+  justify-content: center;
+  padding: 10px;
+  margin-top: var(--gc-s-2);
+}
+
+.rootSlot:hover {
+  color: var(--gc-text-secondary);
+  border-color: var(--gc-line-strong);
+  background: transparent;
+}
+
+.rootCollapsed {
+  justify-content: center;
+  gap: 0;
+  min-height: 40px;
+  padding: 8px;
+}

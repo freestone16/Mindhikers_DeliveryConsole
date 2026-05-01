@@ -1,0 +1,27 @@
+.root {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--gc-accent);
+}
+
+.arrow {
+  width: 48px;
+  height: 24px;
+}
+
+.line {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--gc-accent) 0 4px,
+    transparent 4px 10px
+  );
+  opacity: 0.6;
+  transform: translateY(-0.5px);
+  animation: gcDash 1.4s linear infinite;
+}

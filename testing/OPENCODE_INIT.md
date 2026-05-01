@@ -5,7 +5,7 @@
 进入项目根目录：
 
 ```bash
-cd /Users/luzhoua/MHSDC/GoldenCrucible
+cd /Users/luzhoua/MHSDC/GoldenCrucible-SaaS
 ```
 
 确认两个 CLI 可用：

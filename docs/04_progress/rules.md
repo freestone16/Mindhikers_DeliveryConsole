@@ -1,10 +1,55 @@
-# Rules - 精炼规则
+# Rules - GoldenCrucible SaaS Current Rules
 
 > **每次会话开始时读取此文件**
-> **控制在 50-80 条，只保留"下次一定有用"的规则**
+> **先读 2026-04-30 当前权威规则区；下方 Legacy Archive 仅作历史参考**
 > **详细案例见 `lessons/` 目录**
 
 ---
+
+## 2026-04-30 当前权威规则区
+
+### 分支与发布线
+
+1. `MHSDC-GC-SSE` 是研发前线，新功能和小修先落 SSE。
+2. `MHSDC-GC-SAAS-staging` 是预发验收线，只接收验证过的 SSE 切片或 release hotfix。
+3. `main` 是生产线，只接收 staging 验证后的版本。
+4. 正常发布流是 `SSE -> SaaS staging -> production`。
+5. SaaS staging 禁止整枝 merge SSE；跨线同步默认 cherry-pick 小切片。
+6. SaaS staging release hotfix 完成后必须回灌 SSE。
+
+### 2026-04-30 shell migration 事实
+
+7. SaaS staging 已接收 SSE shell migration，不再把“迁移 SaaS”描述为未来待办。
+8. `14a7a3e` 已修复 Railway snapshot 元数据问题。
+9. 后续 shell/status polish 从 SSE 开始，SaaS staging 只负责接收验证后切片。
+10. Roundtable 入口已在 SaaS staging 可见，但 backend API completion 仍是独立后续工作。
+
+### SkillSync 与 Roundtable
+
+11. 当前 synced skill 集合是 `Writer`、`ThesisWriter`、`Researcher`、`FactChecker`、`Socrates`。
+12. Roundtable 当前是 module/runtime capability，不是 synced standalone skill。
+13. UI 若展示 SkillSync 状态，必须同时能展示 SSOT source root、target root 和 synced skill names。
+14. SkillSync lower-right indicator 与 source popover 未完成前，不要把 SkillSync 可视状态写成已验收。
+
+### Staging 验收
+
+15. 页面查看、UI 验证、截图、交互检查、线上页面核验优先用 `agent-browser`。
+16. SaaS staging 验证必须明确网络请求是否走 staging origin，不能出现非预期 localhost 直连。
+17. ShellErrorBoundary / Hooks error 是壳层验收硬红线，出现即暂停接收。
+18. testing board 必须记录日期、环境、已完成项和未完成项，不得拿旧 smoke 当最新状态。
+
+### 治理文档
+
+19. `AGENTS.md -> HANDOFF.md -> rules.md -> plans/ -> testing/` 必须可导航。
+20. `HANDOFF.md` 只写当前真实接手状态，不保留已过期“下一步”口径。
+21. `dev_progress.md` 写里程碑事实，不把计划或理解写成已完成。
+22. 提交前遵守分类提交：治理文档与产品代码分开；commit / push 必须先经老卢确认。
+
+---
+
+## Legacy Archive（历史规则，仅供查证）
+
+以下规则来自旧 DeliveryConsole / GC 多阶段开发记录，编号存在重复和漂移。保留它们是为了零损失追溯；当前执行优先级低于上方 2026-04-30 当前权威规则区。
 
 ## 通用开发
 
@@ -218,6 +263,7 @@
 
 84. API Key 不要硬编码在代码里，使用环境变量
 85. `.env` 文件要在 `.gitignore` 中
+86. **历史项目文档治理默认走“零损失”策略**：先编目、再映射、后接线，最后才考虑归档或整理；没有完成归宿判断和用户确认前，禁止因治理而删除、覆盖、搬空或重写历史正文
 86. 敏感日志输出前脱敏处理
 
 ---
@@ -237,6 +283,31 @@
 94. **讨论线上问题时先问“这是本地、staging、还是 production”**：凡是用户提到 `gc.mindhikers.com`，默认指 Railway `production` 已部署版本；没有确认环境前，不能把本地修复当成线上结果
 95. **日常上线优先走 Git 分支驱动，不走本地直推 production**：本地 `railway up` 只用于调试或临时验证；正式发布默认通过 `MHSDC-GC-SAAS-staging -> main -> Railway production` 完成
 96. **当前阶段 Google 登录可作为 staging / production 的验收基线，微信登录不是本轮上线阻塞项**：不要因为微信未完成而阻塞已经通过 Google 登录验收的 SaaS 发布
+97. **GoldenCrucible-SaaS 主 worktree 默认必须停在 `MHSDC-GC-SAAS-staging`**：除非用户明确要求检查本地 `main` 历史，否则不要为了发布、比对或排障把主 SaaS worktree 临时切到本地 `main`；若必须查看其他分支，优先用 `git show`、独立 worktree 或临时目录完成
+98. **任何一次发布/排障结束前，都必须执行“主 worktree 复位验收”**：至少核对 `git branch --show-current` 必须回到 `MHSDC-GC-SAAS-staging`，再核对 `git status --short` 必须干净；未完成这两步，不得把现场视为收尾完成
+99. **黄金坩埚的业务判断必须交给 Socrates，不得由宿主硬编码替代**：是否需要 Researcher / FactChecker、何时联网、搜什么、校验什么，都应由 Socrates 先产出结构化决策；SaaS 宿主只负责传递上下文、执行工具、持久化证据链和回传错误
+100. **黄金坩埚宿主允许保留的越界只能是“确定性执行职责”**：允许留在宿主的只有账号登录、workspace/conversation 权限边界、HTTP/SSE/stream 生命周期、持久化与恢复、工具执行器接驳、最小证据链落盘、技术层错误回传、配额/会员/BYOK/访问控制；不允许留在宿主的包括是否联网、搜索 query、toolRoutes、phase/engineMode 的业务判定、对话结构、fallback 业务内容、虚假的 skill 执行展示
+101. **宿主边界治理必须先出“根治型 implementation plan”再开发，禁止边改边补**：像搜索正则、query fallback、host fallback 文案、静态 skill 展示这类补丁式修法，一律不算完成；必须先明确目标契约、迁移顺序、废弃字段和验收口径，再进入实现
+
+---
+
+102. **SaaS 不是 SSE 的子集，是独立的预发阵地**：SaaS 是经过生产级验收的 staging 空间；SSE 是研发前线，最新功能可能尚未进入 SaaS，但 SaaS 验收中产生的底座修复必须回灌 SSE
+103. **当用户明确要求"先拉齐 SaaS 再继续 SSE 开发"时，必须先完成 SSE → SaaS 内容同步、发布与线上核验，再回到 SSE 继续迭代**：不能只同步本地代码或只写治理文档后就默认生产已追平
+104. **恢复对话/恢复话题默认优先恢复到 `runtime/crucible` 后端持久化层**：先改 `conversation / index / active pointer / autosave`，不要先去操作浏览器本地状态；浏览器只用于核验，不是恢复主路径
+105. **文档链路可导航性是硬性验收标准**：AGENTS.md → HANDOFF → rules.md → plans/ 必须全链路可访问
+
+---
+
+## 底座同步（SaaS → SSE）
+
+106. **底座同步触发时机**：SaaS staging 每次验收收口（准备推 main 之前），必须做一次底座回灌到 SSE
+107. **底座同步范围**：服务启动与路由骨架（`server/index.ts`）、认证与账户体系（`server/auth/*`）、构建配置（`package.json` / `vite.config` / `tsconfig`）、前端主壳（`SaaSApp.tsx` / 路由壳 / 主题 CSS token）、共享类型与 Schema、通用工具函数（SSE 客户端 / LLM connector 基座 / `callConfiguredLlm`）
+108. **底座同步不同步功能模块**：`crucible-thesiswriter` / `crucible-trial` / `crucible-byok` / `crucible-factcheck` / `crucible-orchestrator` 的业务逻辑跟随发布流 SSE → SaaS，不走底座回灌
+109. **冲突原则**：底座代码以 SaaS staging 版为准（经过生产验收），业务功能代码以 SSE 版为准（研发前沿），判断不了时暂停问老卢
+110. **底座同步操作方式**：优先 `git cherry-pick` 单个底座修复 commit；冲突太大时手动 diff 同步（逐文件搬运）
+111. **SSE 侧回灌前必须备份原版**：`cp file.ts file.ts.sse-backup`，备份文件不提交到 git
+112. **底座同步后 SSE 侧健康校验**：`npm run build` 通过 + `npm run dev` 启动无报错 + 至少一条冒烟测试通过
+113. **SaaS 验收过程中产生的底座修复，必须在推生产前回灌到 SSE**：确保研发前线在健全底座上继续开发；遗漏回灌会导致两边底座分叉
 
 ---
 
@@ -266,4 +337,6 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-04-30 | 新增当前权威规则区（22 条），旧重复编号区保留为 Legacy Archive |
+| 2026-04-14 | 新增底座同步规则 102-113 + 同步 SSE 规则 103/104/105（MIN-94 治理同步） |
 | 2026-03-04 | 初始创建，从 lessons.md 提取 82 条规则 |

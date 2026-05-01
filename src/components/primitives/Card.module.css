@@ -1,0 +1,31 @@
+.root {
+  padding: var(--gc-s-4);
+  border-radius: var(--gc-radius-md);
+  transition: border-color var(--gc-dur-fast) var(--gc-ease);
+}
+
+.variantDefault {
+  background: var(--gc-bg-base);
+  border: 1px solid var(--gc-line-subtle);
+}
+.variantDefault:hover {
+  border-color: var(--gc-line-default);
+}
+
+.variantRaised {
+  background: var(--gc-bg-raised);
+  border: 1px solid var(--gc-line-subtle);
+  box-shadow: var(--gc-shadow-sm);
+}
+.variantRaised:hover {
+  border-color: var(--gc-line-default);
+}
+
+.variantOchre {
+  border: 1px solid var(--gc-accent-hairline);
+  background: linear-gradient(180deg, var(--gc-bg-base) 0%, var(--gc-accent-tint) 200%);
+}
+
+.paddingCompact {
+  padding: var(--gc-s-3);
+}
