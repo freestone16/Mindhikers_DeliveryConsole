@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Play, Maximize2, X, Loader2, CheckCircle, AlertCircle, Check,
-  Video, BarChart3, Layers,
+  Video, BarChart3, Layers, ArrowRight,
   Film, Code
 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
@@ -282,7 +282,7 @@ const Phase3OptionRow = ({
             ) : itemStatus === 'processing' ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
                 <Loader2 className="w-5 h-5 text-[#c97545] animate-spin" />
-                <span className="text-[10px] text-[#c97545] mt-2">渲染中...</span>
+                <span className="text-[10px] text-[#c97545] mt-2">正在渲染</span>
                 {taskStatus?.progress != null && (
                   <div className="mt-2 w-24 bg-[#e4dbcc] rounded-full h-1">
                     <div
@@ -316,7 +316,7 @@ const Phase3OptionRow = ({
                 <div className="w-10 h-10 rounded-full bg-[#c97545]/15 group-hover:bg-[#c97545]/25 flex items-center justify-center transition-colors">
                   <Play className="w-5 h-5 text-[#c97545] group-hover:text-[#b26135]" />
                 </div>
-                <span className="text-[10px] text-[#8f8372] group-hover:text-[#c97545] font-medium mt-1">单条渲染</span>
+                <span className="text-[10px] text-[#8f8372] group-hover:text-[#c97545] font-medium mt-1">渲染此条</span>
               </button>
             )}
           </div>
@@ -367,7 +367,7 @@ const Phase3OptionRow = ({
               disabled={isRevising || !feedbackText.trim()}
               className="px-3 py-1.5 bg-[#f4efe5] hover:bg-[#e4dbcc] text-[#342d24] rounded text-xs border border-[#e4dbcc] disabled:opacity-50"
             >
-              {isRevising ? '生成中...' : '生成修订'}
+              {isRevising ? '正在生成' : '生成修订'}
             </button>
             {revisedPrompt && (
               <button
@@ -800,9 +800,9 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
             className="px-4 py-2 bg-[#c97545] hover:bg-[#b26135] disabled:opacity-50 text-white text-sm rounded-lg flex items-center gap-2 transition-colors"
           >
             {isSubmitting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> 触发中...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> 正在触发</>
             ) : pendingTaskKeys.size > 0 ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> 渲染中...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> 正在渲染</>
             ) : (
               <><Play className="w-4 h-4" /> 渲染当前筛选 ({visibleUnrenderedCount}条)</>
             )}
@@ -813,7 +813,8 @@ export const Phase3View = ({ projectId, chapters, onApproveOption, onUpdateOptio
             className={`px-4 py-2 ${allApproved ? 'bg-[#62835c] hover:bg-[#4d6b5f]' : 'bg-[#c97545] hover:bg-[#b26135]'} text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm`}
           >
             <CheckCircle className="w-4 h-4" />
-            {allApproved ? '提交 → Phase 4' : `进入 Phase 4 (${totalApproved}/${totalCount})`}
+            <span>{allApproved ? '提交到 Phase 4' : `进入 Phase 4 (${totalApproved}/${totalCount})`}</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>

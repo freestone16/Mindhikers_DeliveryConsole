@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, Play, Loader2 } from 'lucide-react';
+import { ArrowRight, CheckCircle, Play, Loader2 } from 'lucide-react';
 import { BRollSelector } from './BRollSelector';
 import { ChapterCard } from './ChapterCard';
 import { StoryboardSummaryStrip } from './phase-layouts/StoryboardSummaryStrip';
 import { ChapterRail } from './phase-layouts/ChapterRail';
 import { PhasePanel, PhasePanelHeader, PhasePanelBody, PhaseLoadingState } from './phase-layouts/PhasePanel';
-import type { DirectorChapter, BRollType, SceneOption } from '../../types';
+import type { DirectorChapter, BRollType, SceneOption, RuntimeActionEvent } from '../../types';
 
 interface Phase2ViewProps {
   projectId: string;
@@ -17,6 +17,7 @@ interface Phase2ViewProps {
   onBatchSetCheck: (filterFn: (opt: SceneOption) => boolean, checked: boolean) => void;
   onProceed: () => void;
   pendingTaskKeys?: Set<string>;
+  onRuntimeAction?: (action: Omit<RuntimeActionEvent, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) => void;
 }
 
 export const Phase2View = ({
@@ -29,6 +30,7 @@ export const Phase2View = ({
   onBatchSetCheck,
   onProceed,
   pendingTaskKeys,
+  onRuntimeAction,
 }: Phase2ViewProps) => {
   const [brollConfirmed, setBrollConfirmed] = useState(chapters.length > 0);
   const [brollSelections, setBrollSelections] = useState<BRollType[]>(
@@ -123,7 +125,7 @@ export const Phase2View = ({
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> 生成中...
+                <Loader2 className="w-4 h-4 animate-spin" /> 正在生成
               </span>
             ) : (
               <span className="flex items-center gap-2">
@@ -233,7 +235,8 @@ export const Phase2View = ({
                     className="px-5 py-2.5 bg-[#5b7c6f] hover:bg-[#4d6b5f] text-white font-medium rounded-lg flex items-center gap-2 transition-colors text-sm"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    提交 → Phase 3
+                    提交到 Phase 3
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -247,6 +250,7 @@ export const Phase2View = ({
                   onToggleCheck={onToggleCheck}
                   pendingTaskKeys={pendingTaskKeys}
                   isActive={chapter.chapterId === activeChapterId}
+                  onRuntimeAction={onRuntimeAction}
                 />
               ))}
             </div>

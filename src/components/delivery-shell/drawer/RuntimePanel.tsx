@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Info, ChevronDown, ChevronUp, Loader2, Cpu, Zap, CheckCircle2, AlertCircle, ListChecks, Wrench } from 'lucide-react';
+import type { RuntimeActionEvent } from '../../../types';
 
 interface LogEntry {
   timestamp: number;
@@ -18,6 +19,8 @@ interface SkillSyncStatus {
 interface RuntimePanelProps {
   currentModel?: { provider: string; model: string } | null;
   logs?: LogEntry[];
+  actions?: RuntimeActionEvent[];
+  activeAction?: RuntimeActionEvent | null;
   isLoading?: boolean;
   startTime?: number | null;
   socket?: any;
@@ -78,7 +81,7 @@ function SyncedSkillsCard({ socket }: { socket?: any }) {
   );
 }
 
-export function RuntimePanel({ currentModel, logs = [], isLoading = false, startTime, socket }: RuntimePanelProps) {
+export function RuntimePanel({ currentModel, logs = [], actions = [], activeAction, isLoading = false, startTime, socket }: RuntimePanelProps) {
   const [isLogsCollapsed, setIsLogsCollapsed] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [version, setVersion] = useState<string>('');
@@ -126,14 +129,34 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
     }
   };
 
-  const actionTrace = logs
+  const logActionTrace: RuntimeActionEvent[] = logs
     .filter(log => /generate|生成|revise|修订|approve|批准|retry|重试|render|渲染|export|导出|handoff|交接/i.test(log.message))
-    .slice(-5)
-    .reverse();
+    .map((log, index) => ({
+      id: `log-${log.timestamp}-${index}`,
+      timestamp: log.timestamp,
+      type: getActionType(log.message),
+      label: getActionLabel(log.message),
+      message: log.message,
+      status: log.type === 'error' ? 'error' : 'info',
+    }));
+  const actionTrace = (actions.length > 0 ? actions : logActionTrace).slice(-7).reverse();
   const errorLogs = logs.filter(log => log.type === 'error').slice(-3).reverse();
+  const errorActions = actions.filter(action => action.status === 'error').slice(-3).reverse();
   const latestLog = logs[logs.length - 1];
 
-  const getActionLabel = (message: string) => {
+  function getActionType(message: string): RuntimeActionEvent['type'] {
+    if (/revise|修订/i.test(message)) return 'revise';
+    if (/approve|批准/i.test(message)) return 'approve';
+    if (/retry|重试/i.test(message)) return 'retry';
+    if (/render|渲染/i.test(message)) return 'render';
+    if (/export|导出/i.test(message)) return 'export';
+    if (/handoff|交接/i.test(message)) return 'handoff';
+    if (/upload|上传/i.test(message)) return 'upload';
+    if (/select|选择/i.test(message)) return 'select';
+    return 'generate';
+  }
+
+  function getActionLabel(message: string) {
     if (/revise|修订/i.test(message)) return '修订';
     if (/approve|批准/i.test(message)) return '批准';
     if (/retry|重试/i.test(message)) return '重试';
@@ -141,6 +164,15 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
     if (/export|导出/i.test(message)) return '导出';
     if (/handoff|交接/i.test(message)) return '交接';
     return '生成';
+  }
+
+  const getActionStatusClass = (status: RuntimeActionEvent['status']) => {
+    switch (status) {
+      case 'pending': return 'text-[#c97545] bg-[rgba(201,117,69,0.12)]';
+      case 'success': return 'text-[#5b7c6f] bg-[#dce9d8]';
+      case 'error': return 'text-red-600 bg-red-50';
+      default: return 'text-[#8f8372] bg-[#f4efe5]';
+    }
   };
 
   const providerLabel = (provider?: string) => {
@@ -213,6 +245,12 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
             最近事件：<span className="text-[#342d24]">{latestLog.message}</span>
           </div>
         )}
+
+        {activeAction && (
+          <div className="pt-2 mt-1 border-t border-[#e4dbcc] text-[11px] text-[#8f8372] leading-relaxed">
+            当前动作：<span className="text-[#342d24]">{activeAction.message}</span>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-[#e4dbcc] p-3 bg-[rgba(255,252,247,0.78)]">
@@ -226,10 +264,10 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
         {actionTrace.length > 0 ? (
           <div className="space-y-1">
             {actionTrace.map((log, i) => (
-              <div key={`${log.timestamp}-${i}`} className="text-[11px] text-[#342d24] bg-[#f8f4ec] border border-[#e4dbcc] rounded px-2 py-1.5">
+              <div key={`${log.id}-${i}`} className="text-[11px] text-[#342d24] bg-[#f8f4ec] border border-[#e4dbcc] rounded px-2 py-1.5">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[9px] text-[#c97545] bg-[rgba(201,117,69,0.12)] px-1 rounded">
-                    {getActionLabel(log.message)}
+                  <span className={`text-[9px] px-1 rounded ${getActionStatusClass(log.status)}`}>
+                    {log.label}
                   </span>
                   <span className="text-[#8f8372]">{new Date(log.timestamp).toLocaleTimeString()}</span>
                 </div>
@@ -250,10 +288,16 @@ export function RuntimePanel({ currentModel, logs = [], isLoading = false, start
             <Wrench className="w-3.5 h-3.5" />
             工具反馈
           </h3>
-          <span className="text-[10px] text-[#8f8372]">{errorLogs.length ? `${errorLogs.length} 个错误` : '正常'}</span>
+          <span className="text-[10px] text-[#8f8372]">{errorLogs.length + errorActions.length ? `${errorLogs.length + errorActions.length} 个错误` : '正常'}</span>
         </div>
-        {errorLogs.length > 0 ? (
+        {errorLogs.length + errorActions.length > 0 ? (
           <div className="space-y-1">
+            {errorActions.map((action, i) => (
+              <div key={`${action.id}-error-${i}`} className="text-[11px] text-red-700 bg-red-50 border border-red-100 rounded px-2 py-1">
+                <span className="text-red-400 mr-1">{new Date(action.timestamp).toLocaleTimeString()}</span>
+                {action.message}
+              </div>
+            ))}
             {errorLogs.map((log, i) => (
               <div key={`${log.timestamp}-error-${i}`} className="text-[11px] text-red-700 bg-red-50 border border-red-100 rounded px-2 py-1">
                 <span className="text-red-400 mr-1">{new Date(log.timestamp).toLocaleTimeString()}</span>

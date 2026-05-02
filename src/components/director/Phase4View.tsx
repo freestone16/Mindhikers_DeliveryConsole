@@ -222,8 +222,8 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
             const isActive = i === stepIndex;
             const isDone = i < stepIndex;
             return (
-              <>
-                <div key={step.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+              <div key={step.label} className="contents">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
                   isActive ? 'bg-[#c97545]/10 text-[#c97545]' : isDone ? 'text-[#62835c]' : 'text-[#8f8372]'
                 }`}>
                   <Icon className="w-4 h-4" />
@@ -233,7 +233,7 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
                 {i < STEPS.length - 1 && (
                   <ArrowRight className={`w-3 h-3 ${isDone ? 'text-[#62835c]' : 'text-[#e4dbcc]'}`} />
                 )}
-              </>
+              </div>
             );
           })}
         </div>
@@ -279,7 +279,7 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
             {isScanningDir ? (
               <div className="flex items-center gap-2 text-[#8f8372] text-sm">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                正在扫描项目目录寻找 SRT 文件...
+                正在扫描项目目录寻找 SRT 文件
               </div>
             ) : foundSrtFiles.length > 0 ? (
               <div className="rounded-lg border border-[#e4dbcc] p-4" style={{ background: 'rgba(249, 244, 236, 0.6)' }}>
@@ -353,7 +353,7 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
                 className="px-8 py-3 bg-[#c97545] hover:bg-[#b26135] disabled:opacity-50 text-white font-medium rounded-lg flex items-center gap-2 transition-colors"
               >
                 {isAnalyzing ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> 分析中...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> 正在分析</>
                 ) : (
                   <><Upload className="w-5 h-5" /> 开始比照</>
                 )}
@@ -408,7 +408,7 @@ export const Phase4View = ({ projectId, chapters }: Phase4ViewProps) => {
                   <thead className="bg-[#f4efe5] text-xs uppercase font-semibold text-[#8f8372]">
                     <tr>
                       <th className="px-4 py-3">B-Roll 条目</th>
-                      <th className="px-4 py-3 w-1/4">Key Sentence</th>
+                      <th className="px-4 py-3 w-1/4">关键句</th>
                       <th className="px-4 py-3 w-1/4">匹配 SRT 文本</th>
                       <th className="px-4 py-3">时间码</th>
                     </tr>

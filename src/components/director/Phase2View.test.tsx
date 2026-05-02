@@ -85,7 +85,7 @@ describe('Phase2View', () => {
     chapters.forEach(ch => ch.options.forEach(o => (o.isChecked = true)));
     const handleProceed = vi.fn();
     render(<Phase2View {...baseProps} chapters={chapters} onProceed={handleProceed} />);
-    fireEvent.click(screen.getByText('提交 → Phase 3'));
+    fireEvent.click(screen.getByRole('button', { name: /提交到 Phase 3/ }));
     expect(handleProceed).toHaveBeenCalled();
   });
 

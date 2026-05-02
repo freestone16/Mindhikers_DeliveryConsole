@@ -1,11 +1,11 @@
-**时间**: 2026-05-01 22:48 CST
+**时间**: 2026-05-02 13:19 CST
 **分支**: `MHSDC-DC-director`
 
 # HANDOFF — Director 模块
 
 ## 一句话接力
 
-本窗口完成 Director 设计系统目标化并继续推进主线 Unit 3：根目录新增 `design.md` / `design.zh.md`，补齐设计目标 PRD、UI 续作实施计划、测试验收 request；已落地左栏 `ProjectContextDock`、CSS token 修复、Runtime 状态/动作/错误反馈、Artifacts 刷新/错误/空态/操作 affordance、Handoff 当前可继续状态。下一步按新实施计划继续做 Phase 视觉一致化和更深的状态/审计链路。
+本窗口完成 Director design-system UI 闭环：Unit 4 视觉一致化首段、Unit 5 runtime action trace foundation、Unit 6 agent-browser 设计系统验收均已完成。验收 request `TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE` 已判定 `passed`，报告、状态板和截图证据都已落盘。下一步建议进入提交前 review / commit 收口。
 
 ## 当前事实
 
@@ -14,167 +14,109 @@
 - 设计事实源：
   - `design.md`
   - `design.zh.md`
+- 当前主线计划：
+  - `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
 - 主 PRD：
   - `docs/plans/2026-05-01_director-design-target-prd.md`
-- 续作实施计划：
-  - `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
 - 设计验收 request：
   - `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
-- 进度已保存：
-  - 里程碑：`docs/04_progress/dev_progress.md` 已追加 `v4.4.1` / `v4.4.2`
-  - 当日日志：`docs/dev_logs/2026-05-01.md`
-- 当前服务：独立 Terminal 启动的 Director 前后端仍应在 `http://localhost:5178/` 与 `127.0.0.1:3005`
+- Unit 6 报告：
+  - `testing/director/reports/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.report.md`
+- 当前服务：
+  - 前端：`http://localhost:5178/`
+  - 后端：`http://127.0.0.1:3005`
 
-## 本窗口已完成（未 commit）
+## 本窗口完成
 
-### 1. 设计系统目标文档
+### 1. Unit 4 首段延续收口
 
-- 新增 `design.md`
-  - Google Stitch / `DESIGN.md` 风格 front matter
-  - 机器可读 tokens
-  - Claude Code 校准原则：不完全 Claude-Code-ify，保留影视创作温度，同时吸收克制、状态透明、命令优先和审计感
-  - 组件、交互、命令、审计、复用和实施优先级
-- 新增 `design.zh.md`
-  - 中文协作镜像
-  - 保留 token key，正文中文化
+- P2 review row 去 emoji-like 类型/上传/意图标签，统一为 lucide icon + text。
+- P2/P3/P4 主命令文案统一。
+- `DirectorSection` 的 runtime model 对象用 `useMemo` 稳定，避免页面 update-depth 循环。
 
-### 2. 过程资产更新
+### 2. Unit 5 Runtime Action Trace Foundation
 
-- 新增 `docs/plans/2026-05-01_director-design-target-prd.md`
-- 新增 `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
-- 更新 `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md`
-  - 加 2026-05-01 design target addendum
-  - 明确旧计划作为 origin/history，不再 greenfield 重建 shell
-- 更新 `docs/plans/2026-04-19-003-feat-context-drawer-plan.md`
-  - Runtime / Artifacts / Handoff 从临时展示升级为产品上下文面
-- 更新 `AGENTS.md`
-  - UI / 视觉 / 页面验证前置读取 `design.md` / `design.zh.md`
-- 更新 `README.md`
-  - 增加设计系统入口与当前状态
-- 更新 `docs/04_progress/rules.md`
-  - 新增 #137-140：设计事实源、工作台 shell、状态透明、Runtime/Handoff 产品化
-- 更新 `testing/README.md`、`testing/director/README.md`
-  - 加 UI / 设计系统验收口径
-- 新增 `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
-- 更新 `docs/04_progress/dev_progress.md`
-  - 追加 `v4.4.1 Director Design System Target`
-- 新增 `docs/dev_logs/2026-05-01.md`
-  - 详细记录外部调研、CE 专家结论、过程资产变更、代码实现、验证结果、未完成项和工作区归因
+- 新增 `RuntimeActionEvent`、`RuntimeActionType`、`RuntimeActionStatus`、`RuntimeData`。
+- P1/P2/P3 主动作、P2 预览/上传/确认动作进入结构化 action trace。
+- Runtime drawer 优先展示结构化 actions；没有 actions 时回退日志关键词。
+- Delivery status bar pending 时显示当前动作，空闲时显示最近动作。
+- 新增 `RuntimePanel.test.tsx` 覆盖结构化 actions 和日志回退路径。
 
-### 3. 第一段实现
+### 3. Unit 6 Design-System Acceptance
 
-- `src/styles/delivery-shell.css`
-  - 补齐 `--shell-surface`、`--shell-hover`，修掉既有未定义 token
-- `src/components/delivery-shell/DeliveryShellLayout.tsx`
-  - 传递当前模型显示名给左栏
-- `src/components/delivery-shell/WorkstationRail.tsx`
-  - 接入 `ProjectContextDock`
-  - 展示当前项目、当前文稿、全局模型、输出目录
-- `src/components/delivery-shell/drawer/RuntimePanel.tsx`
-  - 增加“动作追踪”占位
-  - 从日志中过滤 generate / revise / approve / retry / render / export / handoff 等动作线索
-  - 修复 Console 版本号重复 `v` 的显示问题
-
-### 4. Unit 3 Drawer 产品化首段
-
-- WIP 清理：
-  - `server/director.ts.backup` 与已修改的已跟踪 `temp_images/*` 已恢复到 HEAD
-  - 非本轮未跟踪项已归档到 `/private/tmp/director-wip-archive-20260501-224222/`
-- `src/components/delivery-shell/drawer/RuntimePanel.tsx`
-  - 增加“当前状态”行：待命 / 处理中 / 最近有错误
-  - 增加最近事件展示
-  - 动作追踪增加动作类型标签
-  - 增加“工具反馈”卡片，集中显示最近错误或正常状态
-- `src/components/delivery-shell/drawer/ArtifactsPanel.tsx`
-  - 增加产出物摘要与刷新按钮
-  - 增加 loading / error / empty 的产品态与重试
-  - 文件行展示相对路径
-  - 增加打开 / 下载 affordance；当前 API 暂未提供端点，因此按钮禁用并标注原因
-- `src/components/delivery-shell/drawer/HandoffPanel.tsx`
-  - 增加“当前可继续状态”摘要
-  - 增加下一步建议
-  - 增加刷新、错误重试和空态
+- 使用 agent-browser 执行正式验收 request。
+- 结果：`passed`
+- 覆盖：
+  - first screen
+  - Chat / Runtime / Artifacts / Handoff 四 tab
+  - rail / drawer collapse
+  - 状态透明
+  - visual guardrails
+  - `1440x900` 与 `980x800`
+  - console/errors/network diagnostics
+- 状态文件已更新：
+  - `testing/director/status/latest.json`
+  - `testing/director/status/BOARD.md`
 
 ## 验证结果
 
 - `npm run build`：通过
-  - 仅保留既有 CSS minify 警告和 chunk size 警告，非阻断
-- `agent-browser`：
-  - 打开 `http://localhost:5178/`
-  - 确认首屏为 Director 工作台
-  - 确认左栏出现：
-    - 当前项目
-    - 当前文稿
-    - 全局模型
-    - 输出目录
-  - 切到 Runtime tab，确认出现：
-    - 已同步 Skills
-    - LLM
-    - Remotion
-    - Console `v3.8.0`
-    - 动作追踪
-    - 当前状态
-    - 工具反馈
-  - 切到 Artifacts tab，确认出现：
-    - 产出物清单
-    - 刷新按钮
-    - 文件路径
-    - 打开 / 下载禁用 affordance
-  - 切到 Handoff tab，确认出现：
-    - 当前可继续状态
-    - 下一步建议
-    - 阶段状态
-    - 跨模块交接
-  - 980px 视口复查：未发现明显遮挡或重叠
-  - console：无报错
-- 截图：
-  - `/private/tmp/director-shots/screenshot-1777643251203.png`
-  - `/private/tmp/director-shots/screenshot-1777643267758.png`
-  - `/private/tmp/director-shots/screenshot-1777643300087.png`
-  - `/private/tmp/director-shots/unit3-handoff-1440.png`
-  - `/private/tmp/director-shots/unit3-handoff-980.png`
+  - 保留既有 CSS minify `file` unsupported property 警告
+  - 保留既有 chunk size 警告
+- `npm run test:run -- src/components/delivery-shell/drawer/RuntimePanel.test.tsx src/components/director/Phase2View.test.tsx src/components/director/Phase3View.test.tsx src/components/director/ChapterCard.test.tsx`：通过
+  - 4 个 test files
+  - 18 tests
+- agent-browser Unit 5 主动作验证：通过
+  - 点击 P2 第一条方案确认，Runtime 可见 `P2 确认方案 ch1/ch1-opt1`
+  - 随后取消确认，项目状态回到 `0/28`
+- agent-browser Unit 6 设计系统验收：通过
+  - 详见 `testing/director/reports/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.report.md`
+
+截图证据：
+
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/01-first-screen-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/02-runtime-tab-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/03-artifacts-tab-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/04-handoff-tab-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/05-rail-collapsed-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/06-rail-and-drawer-collapsed-1440.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/07-responsive-980.png`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/08-runtime-action-after-confirm-1440.png`
 
 ## 下一步
 
-按 `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md` 继续：
+建议进入提交前收口：
 
-1. Unit 4：Director Phase 视觉一致化
-   - emoji-like badge 逐步改为 lucide icon + text 或纯文本
-   - 统一按钮命令文案与状态
-   - 确保 P2/P3 review rows 不被动态文本撑破
-2. Unit 5：状态透明与审计链路
-   - 关键动作进入 runtime/chat/artifacts/handoff
-3. Unit 6：执行设计系统验收 request
-   - `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
+1. 先做一次 `git diff` review，确认 Unit 4/5/6 属于同一个 design-system UI 闭环。
+2. 如老卢确认提交，则按老杨规则先请示 commit 口径；建议 commit message：
+   - `refs MIN-xx complete director design-system acceptance`
+   - 若暂无 Linear issue，可用无 issue 版本并在提交前说明。
+3. commit 前不自动 push；push 必须再单独确认。
 
-## 工作区注意
+## 当前工作区归因
 
-本窗口只应归因于以下新增/修改：
+本轮应归因为同一个 design-system UI 闭环的文件：
 
-- `design.md`
-- `design.zh.md`
-- `docs/plans/2026-05-01_director-design-target-prd.md`
-- `docs/plans/2026-05-01-director-design-system-ui-implementation-plan.md`
-- `docs/plans/2026-04-17-001-refactor-director-ui-implementation-plan.md`
-- `docs/plans/2026-04-19-003-feat-context-drawer-plan.md`
-- `AGENTS.md`
-- `README.md`
-- `docs/04_progress/rules.md`
 - `docs/04_progress/dev_progress.md`
-- `docs/dev_logs/HANDOFF.md`
 - `docs/dev_logs/2026-05-01.md`
-- `testing/README.md`
-- `testing/director/README.md`
-- `testing/director/requests/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.md`
-- `src/styles/delivery-shell.css`
+- `docs/dev_logs/2026-05-02.md`
+- `docs/dev_logs/HANDOFF.md`
+- `src/App.tsx`
+- `src/types.ts`
+- `src/components/DirectorSection.tsx`
+- `src/components/director/ChapterCard.tsx`
+- `src/components/director/Phase2View.tsx`
+- `src/components/director/Phase2View.test.tsx`
+- `src/components/director/Phase3View.tsx`
+- `src/components/director/Phase4View.tsx`
+- `src/components/delivery-shell/ContextDrawer.tsx`
 - `src/components/delivery-shell/DeliveryShellLayout.tsx`
-- `src/components/delivery-shell/WorkstationRail.tsx`
+- `src/components/delivery-shell/DeliveryStatusBar.tsx`
 - `src/components/delivery-shell/drawer/RuntimePanel.tsx`
-- `src/components/delivery-shell/drawer/ArtifactsPanel.tsx`
-- `src/components/delivery-shell/drawer/HandoffPanel.tsx`
+- `src/components/delivery-shell/drawer/RuntimePanel.test.tsx`
+- `testing/director/reports/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.report.md`
+- `testing/director/status/BOARD.md`
+- `testing/director/status/latest.json`
+- `testing/director/artifacts/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE/*.png`
 
-非本轮 WIP 已清理或归档：
-
-- `server/director.ts.backup` 删除：已恢复到 HEAD
-- 已修改的已跟踪 `temp_images/*`：已恢复到 HEAD
-- `docs/governance/directory-map.md`、`src/components/director/ChapterCard.tsx.backup`、未跟踪 `temp_images/*`：已归档到 `/private/tmp/director-wip-archive-20260501-224222/`
+非代码临时截图 `/private/tmp/director-shots/` 不应提交；Unit 6 正式截图已在 `testing/director/artifacts/`。

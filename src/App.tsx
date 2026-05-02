@@ -15,6 +15,7 @@ import { StatusFooter } from './components/StatusFooter';
 import { CrucibleHome } from './components/CrucibleHome';
 import { LLMConfigPage } from './components/LLMConfigPage';
 import { DirectorUIDemoPage } from './components/DirectorUIDemoPage';
+import type { RuntimeData } from './types';
 
 type ModuleType = 'crucible' | 'delivery' | 'distribution';
 type DistributionPage = 'accounts' | 'composer' | 'queue';
@@ -37,12 +38,14 @@ function App() {
     const [activeModule, setActiveModule] = useState<ModuleType>('delivery');
     const [activeDistributionPage, setActiveDistributionPage] = useState<DistributionPage>('composer');
 
-    const [runtimeData, setRuntimeData] = useState<{
-        currentModel: { provider: string; model: string } | null;
-        logs: { timestamp: number; type: string; message: string }[];
-        isLoading: boolean;
-        startTime: number | null;
-    }>({ currentModel: null, logs: [], isLoading: false, startTime: null });
+    const [runtimeData, setRuntimeData] = useState<RuntimeData>({
+        currentModel: null,
+        logs: [],
+        actions: [],
+        activeAction: null,
+        isLoading: false,
+        startTime: null,
+    });
 
     const handleSelectProject = (projectId: string) => {
         (window as any).__currentProjectId = projectId;

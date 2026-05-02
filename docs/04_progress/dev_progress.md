@@ -45,6 +45,9 @@
 | v4.4.0 | 2026-04-27 | **SSOT 迁移到 Mindhikers** - 导演大师 5 个 skill（Director / RemotionStudio / svg-architect / remotion-best-practices / remotion-visual-qa）从 `~/.gemini/antigravity/skills/` copy 到 `/Users/luzhoua/Mindhikers/.claude/skills/`；`.env` 与 `skill-loader.ts` 切到新 SSOT；旧 SSOT 完整保留不动；RemotionStudio 精简至 610M（排除 out/renders/payloads/test_*） |
 | v4.4.1 | 2026-05-01 | **Director Design System Target** - 根目录新增 `design.md` / `design.zh.md` 作为 Google Stitch 风格设计事实源；补齐设计目标 PRD、UI 续作实施计划、设计验收 request；更新 AGENTS/README/rules/testing/HANDOFF；落地首段 UI 实施（左栏 ProjectContextDock 接入、CSS token 清债、Runtime 动作追踪占位、版本号显示修正），并经 `npm run build` 与 agent-browser 页面验证通过 |
 | v4.4.2 | 2026-05-01 | **Drawer Product Surface First Pass** - 清理非主线 WIP 后推进 Unit 3：Runtime 增加当前状态、最近事件、动作类型标签和工具反馈；Artifacts 增加刷新、loading/error/empty 状态、路径与打开/下载 affordance；Handoff 增加当前可继续状态、下一步建议和刷新/重试；经 `npm run build` 与 agent-browser 1440/980 验证通过 |
+| v4.4.3 | 2026-05-02 | **Director Phase Visual Consistency First Pass** - 收口 Unit 4 首段：P2 review row 去 emoji-like 类型/上传标签，改为 lucide icon + text；统一 P2/P3/P4 命令文案；修复 `DirectorSection` runtime model 对象每次 render 重建导致的页面 update-depth 循环；经 `npm run build`、Phase2/Phase3 组件测试与浏览器 1512/980 验证通过 |
+| v4.4.4 | 2026-05-02 | **Runtime Action Trace Foundation** - 收口 Unit 5 首段：新增结构化 `RuntimeActionEvent/RuntimeData`，Director P1/P2/P3 主动作、P2 预览/上传/确认动作进入 runtime action trace；Runtime drawer 与底部状态栏共用同一份动作数据；新增 RuntimePanel 组件测试，并经 `npm run build`、18 个 targeted tests 与 agent-browser P2 动作验证通过 |
+| v4.4.5 | 2026-05-02 | **Director Design-System Acceptance Passed** - 执行 Unit 6：使用 agent-browser 完成 `TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE`；覆盖 first screen、Chat/Runtime/Artifacts/Handoff 四 tab、rail/drawer collapse、状态透明、1440/980 响应式、console/errors/network；报告写入 `testing/director/reports/`，截图证据写入 `testing/director/artifacts/`，状态板更新为 `passed` |
 
 ---
 

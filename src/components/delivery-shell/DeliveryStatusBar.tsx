@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import type { RuntimeData } from '../../types';
 
 interface DeliveryStatusBarProps {
-  runtimeData?: {
-    currentModel: { provider: string; model: string } | null;
-    logs: { timestamp: number; type: string; message: string }[];
-    isLoading: boolean;
-    startTime: number | null;
-  };
+  runtimeData?: RuntimeData;
   socket?: any;
 }
 
 export function DeliveryStatusBar({ runtimeData, socket }: DeliveryStatusBarProps) {
   const [elapsed, setElapsed] = useState<number>(0);
   const isConnected = socket?.connected ?? false;
+  const latestAction = runtimeData?.actions?.[runtimeData.actions.length - 1] ?? null;
+  const activeAction = runtimeData?.activeAction;
 
   useEffect(() => {
     if (!runtimeData?.isLoading || !runtimeData?.startTime) {
@@ -40,7 +38,22 @@ export function DeliveryStatusBar({ runtimeData, socket }: DeliveryStatusBarProp
       {runtimeData?.isLoading && (
         <div className="flex items-center gap-1.5">
           <Loader2 className="w-3 h-3 text-[#c97545] animate-spin" />
-          <span className="text-[#c97545]">生成中 {formatElapsed(elapsed)}</span>
+          <span className="text-[#c97545]">
+            {activeAction?.label || '处理中'} {formatElapsed(elapsed)}
+          </span>
+        </div>
+      )}
+
+      {!runtimeData?.isLoading && latestAction && (
+        <div className="flex items-center gap-1.5 min-w-0 max-w-[420px]">
+          {latestAction.status === 'error' ? (
+            <XCircle className="w-3 h-3 text-red-500 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-3 h-3 text-[#62835c] shrink-0" />
+          )}
+          <span className="text-[#8f8372] truncate">
+            {latestAction.label}: {latestAction.message}
+          </span>
         </div>
       )}
 

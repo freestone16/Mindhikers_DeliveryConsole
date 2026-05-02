@@ -2,12 +2,12 @@
 
 ## 当前状态
 
-- latest_request: `TREQ-2026-04-21-DIRECTOR-UI-ACCEPTANCE`
-- latest_status: `ready_for_acceptance`
-- claimed_by: `OldYang (Sisyphus)`
-- latest_claim: `N/A`
-- latest_report: `N/A`
-- updated_at: `2026-04-21T12:50:00+08:00`
+- latest_request: `TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE`
+- latest_status: `passed`
+- claimed_by: `Codex / OldYang`
+- latest_claim: `N/A - executed directly by Codex with agent-browser`
+- latest_report: `testing/director/reports/TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE.report.md`
+- updated_at: `2026-05-02T13:17:20+08:00`
 
 ## 状态说明
 
@@ -26,31 +26,28 @@
 |------|------|------|
 | 2026-03-17 | `blocked` | TREQ-2026-03-16-DIRECTOR-007-phase3-business-acceptance 被环境阻塞 |
 | 2026-04-21 | `ready_for_acceptance` | UI 改造 Unit 1-6 全部完成，Bridge 测试修复，进入验收阶段 |
+| 2026-05-02 | `passed` | TREQ-2026-05-01-DIRECTOR-UI-DESIGN-SYSTEM-ACCEPTANCE 使用 agent-browser 通过；覆盖 first screen、四 drawer tabs、rail/drawer collapse、状态透明、1440/980 响应式、console/network |
 
-## 验收范围
+## 最新验收范围
 
-### 已完成 ✅
-- Unit 1: 共享壳层（DeliveryShellLayout + WorkstationRail + SessionListPanel + ContextDock）
-- Unit 2: Context Drawer（Chat/Runtime/Artifacts/Handoff 四 tab）
-- Unit 3: Director 工作台（DirectorWorkbenchShell + StageHeader + PhaseStepper）
-- Unit 4: P1/P2 重做（双区工作台 + SummaryStrip + ChapterRail）
-- Unit 5: P3/P4 重做（RenderPipelineBoard + 交付序列 Stepper）
-- Unit 6: 浏览器验收 + 测试通过
-- 追加: 左栏一键折叠/展开
-- 修复: Bridge Fast Path 测试（12/12 通过）
+### 已验证
 
-### 待验收 🔍
-- P1-P4 主链路功能完整性
-- 共享壳层与其他模块入口占位
-- 视觉 token 一致性
-- 响应式布局稳定性
+- First screen 是 Director 工作台，不是落地页式 hero
+- 左 rail、中心 workbench、右 drawer、底部 status 稳定存在
+- Chat / Runtime / Artifacts / Handoff 四 tab 可切换
+- Runtime 能显示结构化 action trace
+- Artifacts 显示产物数据与明确 disabled affordances
+- Handoff 显示当前可继续状态、下一步、阶段状态和跨模块交接
+- Rail / drawer 折叠后主工作区无明显遮挡
+- 1440px 和 980px 两档截图无阻断级布局问题
+- agent-browser console/errors 无阻断错误
 
 ## 已知限制
 
-1. 其他模块（Shorts/Music/Thumbnail/Marketing）仅接入壳层占位，业务页面未重做
-2. 真实后端 session 化未实现，当前为前端轻量 session 感
-3. `MIN-122` Security Hotfix 已包含在分支历史中
+1. Artifacts open/download 端点尚未实现，当前 UI 明确禁用并提示 `当前 API 尚未提供...端点`
+2. 本次 request 不覆盖真实长链路 LLM 生成、视频渲染和 XML 导出写盘
+3. 其他模块（Shorts/Music/Thumbnail/Marketing）不在本次 Director 设计系统验收范围内
 
 ## 下一步
 
-等待老卢验收确认，或创建正式验收测试请求（TREQ）。
+等待老卢确认是否进入提交收口，或继续补 Unit 5 后续增强（Handoff/Artifacts 动作也接入 runtime action trace）。

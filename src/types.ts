@@ -268,6 +268,41 @@ export interface DirectorAction {
     selectedOptions?: BRollType[];
 }
 
+export type RuntimeActionType =
+    | 'generate'
+    | 'revise'
+    | 'approve'
+    | 'select'
+    | 'retry'
+    | 'render'
+    | 'export'
+    | 'handoff'
+    | 'upload'
+    | 'sync';
+
+export type RuntimeActionStatus = 'pending' | 'success' | 'error' | 'info';
+
+export interface RuntimeActionEvent {
+    id: string;
+    timestamp: number;
+    type: RuntimeActionType;
+    label: string;
+    message: string;
+    status: RuntimeActionStatus;
+    phase?: Phase;
+    target?: string;
+}
+
+export interface RuntimeData {
+    currentModel: { provider: string; model: string } | null;
+    logs: { timestamp: number; type: string; message: string }[];
+    actions: RuntimeActionEvent[];
+    activeAction: RuntimeActionEvent | null;
+    isLoading: boolean;
+    startTime: number | null;
+    phase?: Phase;
+}
+
 export interface Phase1Concept {
     projectId: string;
     createdAt: string;

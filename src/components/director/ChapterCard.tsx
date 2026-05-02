@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { Check, Loader2, Image, Upload, FileVideo, ZoomIn, X } from 'lucide-react';
-import type { DirectorChapter, SceneOption } from '../../types';
+import {
+  BarChart3,
+  Check,
+  Clapperboard,
+  FileVideo,
+  Globe2,
+  Image,
+  Loader2,
+  MonitorUp,
+  Upload,
+  UserRound,
+  Video,
+  ZoomIn,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import type { DirectorChapter, RuntimeActionEvent, SceneOption } from '../../types';
 
 interface ChapterCardProps {
   chapter: DirectorChapter;
@@ -9,6 +24,7 @@ interface ChapterCardProps {
   onToggleCheck: (chapterId: string, optionId: string) => void;
   pendingTaskKeys?: Set<string>;
   isActive?: boolean;
+  onRuntimeAction?: (action: Omit<RuntimeActionEvent, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -26,9 +42,19 @@ const TYPE_LABELS: Record<string, string> = {
   seedance: '文生视频',
   generative: 'AI生成',
   artlist: 'Artlist实拍',
-  'internet-clip': '🌐 互联网素材',
-  'user-capture': '📸 用户截图/录屏',
-  infographic: '📊 信息图',
+  'internet-clip': '互联网素材',
+  'user-capture': '用户截图/录屏',
+  infographic: '信息图',
+};
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  remotion: MonitorUp,
+  seedance: Video,
+  generative: Video,
+  artlist: Clapperboard,
+  'internet-clip': Globe2,
+  'user-capture': UserRound,
+  infographic: BarChart3,
 };
 
 // Types that require manual upload (non-AI sources)
@@ -51,9 +77,10 @@ interface OptionRowProps {
   onToggleCheck: (chapterId: string, optionId: string) => void;
   isPendingBatch?: boolean;
   onShowLightbox: (url: string) => void;
+  onRuntimeAction?: (action: Omit<RuntimeActionEvent, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) => void;
 }
 
-const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck, isPendingBatch, onShowLightbox }: OptionRowProps) => {
+const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck, isPendingBatch, onShowLightbox, onRuntimeAction }: OptionRowProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(option.previewUrl || null);
   const [thumbStatus, setThumbStatus] = useState<'idle' | 'generating' | 'processing' | 'completed' | 'failed'>('idle');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'completed' | 'failed'>('idle');
@@ -65,6 +92,17 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
   const quoteText = option.quote || getScriptPreview(chapter.scriptText);
   const taskKey = `${chapter.chapterId}-${option.id}`;
   const requiresUpload = UPLOAD_REQUIRED_TYPES.includes(option.type);
+  const TypeIcon = TYPE_ICONS[option.type] || Image;
+  const materialLabel = option.type === 'internet-clip'
+    ? '上传网络素材'
+    : option.type === 'artlist'
+      ? '上传实拍素材'
+      : '上传录屏/截图';
+  const materialIconClass = option.type === 'internet-clip'
+    ? 'text-[#b5653a]'
+    : option.type === 'artlist'
+      ? 'text-[#5b7c6f]'
+      : 'text-[#5b8a9b]';
 
   useEffect(() => {
     return () => {
@@ -80,7 +118,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
       setPreviewUrl(option.previewUrl);
       setThumbStatus('completed');
     } else if (option.previewUrl === null || option.previewUrl === undefined) {
-      // Expert action cleared previewUrl → thumbnail is stale, reset to idle
+      // Expert action cleared previewUrl, so the thumbnail is stale; reset to idle.
       if (thumbStatus === 'completed') {
         setPreviewUrl(null);
         setThumbStatus('idle');
@@ -124,11 +162,27 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
     // Validate file type
     if (!file.type.startsWith('video/')) {
+      onRuntimeAction?.({
+        type: 'upload',
+        label: '上传',
+        message: `P2 ${rowId} 上传失败：请选择视频文件`,
+        status: 'error',
+        phase: 2,
+        target: `${chapter.chapterId}/${option.id}`,
+      });
       alert('请选择视频文件 (MP4, WebM, MOV 等)');
       return;
     }
 
     setUploadStatus('uploading');
+    onRuntimeAction?.({
+      type: 'upload',
+      label: '上传',
+      message: `P2 ${rowId} 开始上传素材`,
+      status: 'pending',
+      phase: 2,
+      target: `${chapter.chapterId}/${option.id}`,
+    });
 
     try {
       const formData = new FormData();
@@ -147,6 +201,14 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
       if (data.success) {
         setUploadStatus('completed');
         setUploadedFile(data.data.filename);
+        onRuntimeAction?.({
+          type: 'upload',
+          label: '上传',
+          message: `P2 ${rowId} 素材上传完成：${data.data.filename}`,
+          status: 'success',
+          phase: 2,
+          target: `${chapter.chapterId}/${option.id}`,
+        });
         console.log('[Upload] Success:', data.message);
       } else {
         throw new Error(data.error || '上传失败');
@@ -154,6 +216,14 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
     } catch (error: any) {
       console.error('Upload failed:', error);
       setUploadStatus('failed');
+      onRuntimeAction?.({
+        type: 'upload',
+        label: '上传',
+        message: `P2 ${rowId} 素材上传失败：${error.message}`,
+        status: 'error',
+        phase: 2,
+        target: `${chapter.chapterId}/${option.id}`,
+      });
       alert(`上传失败: ${error.message}`);
     }
   };
@@ -169,6 +239,14 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
     if (!effectivePrompt) return;
 
     setThumbStatus('generating');
+    onRuntimeAction?.({
+      type: previewUrl || thumbStatus === 'failed' ? 'retry' : 'generate',
+      label: previewUrl || thumbStatus === 'failed' ? '重试' : '生成',
+      message: `P2 ${rowId} 开始生成预览图`,
+      status: 'pending',
+      phase: 2,
+      target: `${chapter.chapterId}/${option.id}`,
+    });
 
     try {
       const res = await fetch('/api/director/phase2/thumbnail', {
@@ -196,13 +274,45 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
       if (data.success && data.imageUrl) {
         setPreviewUrl(data.imageUrl);
         setThumbStatus('completed');
+        onRuntimeAction?.({
+          type: 'generate',
+          label: '生成',
+          message: `P2 ${rowId} 预览图生成完成`,
+          status: 'success',
+          phase: 2,
+          target: `${chapter.chapterId}/${option.id}`,
+        });
       } else if (data.success && data.taskId) {
+        onRuntimeAction?.({
+          type: 'generate',
+          label: '生成',
+          message: `P2 ${rowId} 预览图任务已提交，等待处理`,
+          status: 'info',
+          phase: 2,
+          target: `${chapter.chapterId}/${option.id}`,
+        });
         pollThumbnail(taskKey);
       } else {
         setThumbStatus('failed');
+        onRuntimeAction?.({
+          type: 'generate',
+          label: '生成',
+          message: `P2 ${rowId} 预览图生成失败`,
+          status: 'error',
+          phase: 2,
+          target: `${chapter.chapterId}/${option.id}`,
+        });
       }
-    } catch {
+    } catch (error: any) {
       setThumbStatus('failed');
+      onRuntimeAction?.({
+        type: 'generate',
+        label: '生成',
+        message: `P2 ${rowId} 预览图生成失败：${error.message || '未知错误'}`,
+        status: 'error',
+        phase: 2,
+        target: `${chapter.chapterId}/${option.id}`,
+      });
     }
   };
 
@@ -221,13 +331,37 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
         if (data.status === 'completed' && data.imageUrl) {
           setPreviewUrl(data.imageUrl);
           setThumbStatus('completed');
+          onRuntimeAction?.({
+            type: 'generate',
+            label: '生成',
+            message: `P2 ${rowId} 预览图处理完成`,
+            status: 'success',
+            phase: 2,
+            target: `${chapter.chapterId}/${option.id}`,
+          });
         } else if (data.status === 'failed') {
           setThumbStatus('failed');
+          onRuntimeAction?.({
+            type: 'generate',
+            label: '生成',
+            message: `P2 ${rowId} 预览图处理失败`,
+            status: 'error',
+            phase: 2,
+            target: `${chapter.chapterId}/${option.id}`,
+          });
         } else if (data.status === 'processing' || data.status === 'pending') {
           timeoutRef.current = setTimeout(poll, 2000);
         }
       } catch (error) {
         setThumbStatus('failed');
+        onRuntimeAction?.({
+          type: 'generate',
+          label: '生成',
+          message: `P2 ${rowId} 预览图状态读取失败`,
+          status: 'error',
+          phase: 2,
+          target: `${chapter.chapterId}/${option.id}`,
+        });
       }
     };
 
@@ -247,7 +381,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
       </div>
 
       {/* 原文一句话 (col 2 instead of 3 - ~70% width) */}
-      <div className="col-span-2 flex items-center">
+      <div className="col-span-2 flex items-center min-w-0">
         <p className="text-[#342d24] text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap">
           {quoteText}
         </p>
@@ -255,25 +389,27 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 
       {/* 设计方案/提示词 (col 4 instead of 3 - more space) */}
       <div
-        className="col-span-4 flex flex-col justify-center gap-1 hover:bg-[#e4dbcc]/30 rounded px-2 -mx-2 transition-colors"
+        className="col-span-4 flex flex-col justify-center gap-1 hover:bg-[#e4dbcc]/30 rounded px-2 -mx-2 transition-colors min-w-0"
         title="点击选中此方案"
       >
         <div className="flex items-center gap-2 mb-1">
           <span
-            className={`inline-block px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${TYPE_COLORS[option.type]} ${isSelected ? 'ring-1 ring-[#c97545]' : ''}`}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${TYPE_COLORS[option.type]} ${isSelected ? 'ring-1 ring-[#c97545]' : ''}`}
             onClick={() => onSelect(chapter.chapterId, option.id)}
             title={isSelected ? '已选中' : '点击选中此方案'}
           >
+            <TypeIcon className="w-3 h-3 shrink-0" />
             {TYPE_LABELS[option.type] || option.type}
-            {isSelected && ' ✓'}
+            {isSelected && <Check className="w-3 h-3 shrink-0" />}
           </span>
         </div>
-        <p className="text-[#342d24] text-xs leading-relaxed">
+        <p className="text-[#342d24] text-xs leading-relaxed line-clamp-3">
           {option.prompt || '暂无方案描述'}
         </p>
         {(option as any).rationale && (
-          <p className="text-[#8f8372] text-[10px] italic mt-1">
-            💡 {(option as any).rationale}
+          <p className="text-[#8f8372] text-[10px] italic mt-1 line-clamp-2 flex gap-1">
+            <span className="text-[#a68b4b] shrink-0">意图</span>
+            <span>{(option as any).rationale}</span>
           </p>
         )}
       </div>
@@ -301,7 +437,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
           ) : thumbStatus === 'generating' || thumbStatus === 'processing' ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
               <Loader2 className="w-5 h-5 text-[#c97545] animate-spin" />
-              <span className="text-[10px] text-[#c97545] mt-2">{thumbStatus === 'generating' ? '生成中...' : '处理中...'}</span>
+              <span className="text-[10px] text-[#c97545] mt-2">{thumbStatus === 'generating' ? '正在生成' : '正在处理'}</span>
             </div>
           ) : thumbStatus === 'failed' ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-[#f4efe5]">
@@ -336,7 +472,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               ) : uploadStatus === 'uploading' ? (
                 <div className="flex flex-col items-center">
                   <Loader2 className="w-6 h-6 text-[#c97545] animate-spin mb-1" />
-                  <span className="text-[#c97545] text-[10px]">上传中...</span>
+                  <span className="text-[#c97545] text-[10px]">正在上传</span>
                 </div>
               ) : (
                 <button
@@ -346,9 +482,9 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
                   }}
                   className="flex flex-col items-center hover:bg-[#e4dbcc]/50 p-3 rounded-lg transition-colors"
                 >
-                  <Upload className={`w-6 h-6 mb-1 ${option.type === 'internet-clip' ? 'text-[#b5653a]' : option.type === 'artlist' ? 'text-[#5b7c6f]' : 'text-[#5b8a9b]'}`} />
-                  <span className={`text-xs font-medium ${option.type === 'internet-clip' ? 'text-[#b5653a]' : option.type === 'artlist' ? 'text-[#5b7c6f]' : 'text-[#5b8a9b]'}`}>
-                    {option.type === 'internet-clip' ? '🌐 上传网络素材' : option.type === 'artlist' ? '🎬 上传实拍素材' : '📸 上传录屏/截图'}
+                  <Upload className={`w-6 h-6 mb-1 ${materialIconClass}`} />
+                  <span className={`text-xs font-medium ${materialIconClass}`}>
+                    {materialLabel}
                   </span>
                   <span className="text-[9px] text-[#8f8372] mt-1">点击选择视频文件</span>
                 </button>
@@ -364,7 +500,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
               disabled={!option.imagePrompt && !option.prompt}
               className="w-full h-full flex flex-col items-center justify-center hover:bg-[#e4dbcc]/50 transition-colors disabled:opacity-50"
             >
-              <span className="text-[#a68b4b] text-lg mb-1">📊</span>
+              <BarChart3 className="w-6 h-6 text-[#a68b4b] mb-1" />
               <span className="text-[10px] text-[#a68b4b] font-medium">静态信息图</span>
               <span className="text-[9px] text-[#8f8372] mt-0.5">点击生成预览</span>
             </button>
@@ -410,7 +546,7 @@ const OptionRow = ({ chapter, option, index, projectId, onSelect, onToggleCheck,
 const cleanChapterName = (name: string) =>
   name.replace(/^(?:[\d\-\.]+\s+)?第[一二三四五六七八九十百\d\s]+章[：:\s]*/u, '').trim();
 
-export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendingTaskKeys, isActive }: ChapterCardProps) => {
+export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendingTaskKeys, isActive, onRuntimeAction }: ChapterCardProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const isAnyOptionChecked = chapter.options.length > 0 && chapter.options.every(opt => opt.isChecked);
   const displayName = cleanChapterName(chapter.chapterName);
@@ -447,24 +583,20 @@ export const ChapterCard = ({ chapter, projectId, onSelect, onToggleCheck, pendi
         </div>
 
         <div className="flex flex-col gap-2">
-          {chapter.options.map((option, idx) => {
-            // Content-based key: when expert action changes imagePrompt/props, OptionRow remounts
-            // with fresh thumbStatus='idle', clearing the stale preview automatically
-            const contentKey = `${option.type}|${(option.imagePrompt || option.prompt || '').slice(0, 60)}|${JSON.stringify(option.props || {}).slice(0, 60)}`;
-            return (
-              <OptionRow
-                key={`${option.id}::${contentKey}`}
-                chapter={chapter}
-                option={option}
-                index={idx}
-                projectId={projectId}
-                onSelect={onSelect}
-                onToggleCheck={onToggleCheck}
-                isPendingBatch={pendingTaskKeys?.has(`${chapter.chapterId}-${option.id}`) ?? false}
-                onShowLightbox={setLightboxUrl}
-              />
-            );
-          })}
+          {chapter.options.map((option, idx) => (
+            <OptionRow
+              key={option.id}
+              chapter={chapter}
+              option={option}
+              index={idx}
+              projectId={projectId}
+              onSelect={onSelect}
+              onToggleCheck={onToggleCheck}
+              isPendingBatch={pendingTaskKeys?.has(`${chapter.chapterId}-${option.id}`) ?? false}
+              onShowLightbox={setLightboxUrl}
+              onRuntimeAction={onRuntimeAction}
+            />
+          ))}
         </div>
       </div>
 

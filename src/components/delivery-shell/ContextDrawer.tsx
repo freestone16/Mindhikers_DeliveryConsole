@@ -3,6 +3,7 @@ import { ChatPanel } from '../ChatPanel';
 import { RuntimePanel } from './drawer/RuntimePanel';
 import { ArtifactsPanel } from './drawer/ArtifactsPanel';
 import { HandoffPanel } from './drawer/HandoffPanel';
+import type { RuntimeData } from '../../types';
 
 const DRAWER_TABS = [
   { id: 'chat', label: '对话' },
@@ -19,12 +20,7 @@ interface ContextDrawerProps {
   socket: any;
   projectId: string;
   activeExpertId: string;
-  runtimeData?: {
-    currentModel: { provider: string; model: string } | null;
-    logs: { timestamp: number; type: string; message: string }[];
-    isLoading: boolean;
-    startTime: number | null;
-  };
+  runtimeData?: RuntimeData;
 }
 
 export function ContextDrawer({
@@ -95,6 +91,8 @@ export function ContextDrawer({
             <RuntimePanel
               currentModel={runtimeData?.currentModel}
               logs={runtimeData?.logs}
+              actions={runtimeData?.actions}
+              activeAction={runtimeData?.activeAction}
               isLoading={runtimeData?.isLoading}
               startTime={runtimeData?.startTime}
               socket={socket}

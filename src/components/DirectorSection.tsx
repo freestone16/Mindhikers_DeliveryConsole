@@ -1,22 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Phase1View } from './director/Phase1View';
 import { Phase2View } from './director/Phase2View';
 import { Phase3View } from './director/Phase3View';
 import { Phase4View } from './director/Phase4View';
 import { DirectorWorkbenchShell } from './director/DirectorWorkbenchShell';
-import type { DirectorModule, DirectorChapter, SceneOption, BRollType } from '../types';
+import type { DirectorModule, DirectorChapter, SceneOption, BRollType, RuntimeActionEvent, RuntimeData } from '../types';
 import { useLLMConfig } from '../hooks/useLLMConfig';
 
 interface DirectorSectionProps {
   projectId: string;
   scriptPath: string;
   socket: any;
-  onRuntimeDataChange?: (data: {
-    currentModel: { provider: string; model: string } | null;
-    logs: { timestamp: number; type: string; message: string }[];
-    isLoading: boolean;
-    startTime: number | null;
-  }) => void;
+  onRuntimeDataChange?: (data: RuntimeData) => void;
 }
 
 type Phase = 1 | 2 | 3 | 4;
@@ -57,6 +52,18 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
 
   // Phase2 logs for debug panel
   const [phase2Logs, setPhase2Logs] = useState<{ timestamp: number; type: string; message: string }[]>([]);
+  const [runtimeActions, setRuntimeActions] = useState<RuntimeActionEvent[]>([]);
+  const pushRuntimeAction = useCallback((action: Omit<RuntimeActionEvent, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) => {
+    setRuntimeActions(prev => {
+      const timestamp = action.timestamp ?? Date.now();
+      const nextAction: RuntimeActionEvent = {
+        ...action,
+        id: action.id ?? `${timestamp}-${prev.length}`,
+        timestamp,
+      };
+      return [...prev, nextAction].slice(-30);
+    });
+  }, []);
 
   // ── 重置：切换项目或脚本时，自动回到 Phase 1 ──────────────────
   // 只在「真实项目切换」时重置，不在「初始加载」时重置
@@ -93,6 +100,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       setLocalChapters(null);
       setStartTime(null);
       setPhase2Logs([]);
+      setRuntimeActions([]);
       setPendingBatchTaskKeys(new Set());
       console.log('[Director] 🔄 项目/脚本切换，已重置到 Phase 1');
     }
@@ -100,18 +108,31 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
   // ────────────────────────────────────────────────────────────
 
   const { status } = useLLMConfig();
-  const currentModel = status?.global?.provider
-    ? { provider: status.global.provider, model: status.global.model || 'default' }
-    : undefined;
+  const currentModel = useMemo(
+    () => status?.global?.provider
+      ? { provider: status.global.provider, model: status.global.model || 'default' }
+      : undefined,
+    [status?.global?.provider, status?.global?.model]
+  );
+
+  const activeAction = useMemo(
+    () => runtimeActions[runtimeActions.length - 1]?.status === 'pending'
+      ? runtimeActions[runtimeActions.length - 1]
+      : null,
+    [runtimeActions]
+  );
 
   useEffect(() => {
     onRuntimeDataChange?.({
       currentModel: currentModel || null,
       logs: phase2Logs,
-      isLoading,
+      actions: runtimeActions,
+      activeAction,
+      isLoading: isLoading || isGeneratingConcept,
       startTime,
+      phase,
     });
-  }, [currentModel, phase2Logs, isLoading, startTime, onRuntimeDataChange]);
+  }, [activeAction, currentModel, isGeneratingConcept, isLoading, onRuntimeDataChange, phase, phase2Logs, runtimeActions, startTime]);
 
   const getGlobalLLMConfigError = () => {
     if (!status?.global?.provider) return null;
@@ -139,6 +160,14 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
     setIsGeneratingConcept(true);
     setStreamingConcept('');
     const phase1StartTime = Date.now();
+    setStartTime(phase1StartTime);
+    pushRuntimeAction({
+      type: 'generate',
+      label: '生成',
+      message: 'P1 开始生成视觉概念',
+      status: 'pending',
+      phase: 1,
+    });
     console.log('[Phase1] 🚀 开始生成概念提案...');
 
     try {
@@ -178,6 +207,13 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
                 } else if (jsonData.type === 'done') {
                   const elapsed = ((Date.now() - phase1StartTime) / 1000).toFixed(1);
                   console.log(`[Phase1] ✅ 概念提案生成完成，耗时 ${elapsed} 秒`);
+                  pushRuntimeAction({
+                    type: 'generate',
+                    label: '生成',
+                    message: `P1 视觉概念生成完成，用时 ${elapsed} 秒`,
+                    status: 'success',
+                    phase: 1,
+                  });
                   onUpdate({ ...data, conceptProposal: fullContent });
                   setStreamingConcept(null);
                 }
@@ -190,9 +226,17 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       }
     } catch (e: any) {
       console.error(e);
+      pushRuntimeAction({
+        type: 'generate',
+        label: '生成',
+        message: `P1 视觉概念生成失败：${e.message}`,
+        status: 'error',
+        phase: 1,
+      });
       alert('Generation failed: ' + e.message);
     } finally {
       setIsGeneratingConcept(false);
+      setStartTime(null);
     }
   };
 
@@ -206,6 +250,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
     }
 
     setIsGeneratingConcept(true);
+    const phase1ReviseStartTime = Date.now();
+    setStartTime(phase1ReviseStartTime);
+    pushRuntimeAction({
+      type: 'revise',
+      label: '修订',
+      message: 'P1 开始按反馈修订视觉概念',
+      status: 'pending',
+      phase: 1,
+    });
     try {
       const res = await fetch('/api/director/phase1/revise', {
         method: 'POST',
@@ -215,17 +268,46 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       const result = await res.json();
       if (result.success) {
         onUpdate({ ...data, conceptProposal: result.data.content });
+        pushRuntimeAction({
+          type: 'revise',
+          label: '修订',
+          message: `P1 视觉概念修订完成，用时 ${((Date.now() - phase1ReviseStartTime) / 1000).toFixed(1)} 秒`,
+          status: 'success',
+          phase: 1,
+        });
       } else {
         console.error('Failed to revise concept:', result.error);
+        pushRuntimeAction({
+          type: 'revise',
+          label: '修订',
+          message: `P1 视觉概念修订失败：${result.error || '未知错误'}`,
+          status: 'error',
+          phase: 1,
+        });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      pushRuntimeAction({
+        type: 'revise',
+        label: '修订',
+        message: `P1 视觉概念修订失败：${e.message || '未知错误'}`,
+        status: 'error',
+        phase: 1,
+      });
     } finally {
       setIsGeneratingConcept(false);
+      setStartTime(null);
     }
   };
 
   const handleApproveConcept = () => {
+    pushRuntimeAction({
+      type: 'approve',
+      label: '批准',
+      message: 'P1 视觉概念已批准，进入 Phase 2',
+      status: 'success',
+      phase: 1,
+    });
     onUpdate({ ...data, isConceptApproved: true, phase: 2 });
   };
 
@@ -242,9 +324,17 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
     }
 
     setIsLoading(true);
-    setStartTime(Date.now());
+    const phase2StartTime = Date.now();
+    setStartTime(phase2StartTime);
     setLocalChapters([]);
     setPhase2Logs([]);
+    pushRuntimeAction({
+      type: 'generate',
+      label: '生成',
+      message: `P2 开始生成视觉执行方案（${types.length} 类 B-Roll）`,
+      status: 'pending',
+      phase: 2,
+    });
 
     try {
       // Feature 1: Clear chat history when regenerating Phase 2
@@ -298,8 +388,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
                 allChapters.push(jsonData.chapter);
                 setLocalChapters([...allChapters]);
               } else if (jsonData.type === 'done') {
-                const elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : 'N/A';
+                const elapsed = ((Date.now() - phase2StartTime) / 1000).toFixed(1);
                 console.log(`[Phase2] ✅ 视频方案生成完成，耗时 ${elapsed} 秒`);
+                pushRuntimeAction({
+                  type: 'generate',
+                  label: '生成',
+                  message: `P2 视觉执行方案生成完成，用时 ${elapsed} 秒`,
+                  status: 'success',
+                  phase: 2,
+                });
                 onUpdate({ ...data, items: jsonData.chapters || allChapters, phase: 2 });
                 setLocalChapters(null);
                 setStartTime(null);
@@ -319,9 +416,17 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       }
     } catch (e: any) {
       console.error(e);
+      pushRuntimeAction({
+        type: 'generate',
+        label: '生成',
+        message: `P2 视觉执行方案生成失败：${e.message}`,
+        status: 'error',
+        phase: 2,
+      });
       alert('Generation failed: ' + e.message);
     } finally {
       setIsLoading(false);
+      setStartTime(null);
     }
   };
 
@@ -330,6 +435,14 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       ch.chapterId === chapterId ? { ...ch, selectedOptionId: optionId, isChecked: false } : ch
     );
     setLocalChapters(null); // switch to data.items source
+    pushRuntimeAction({
+      type: 'select',
+      label: '选择',
+      message: `P2 已选中方案 ${chapterId}/${optionId}`,
+      status: 'info',
+      phase: 2,
+      target: `${chapterId}/${optionId}`,
+    });
     onUpdate({ ...data, items: updated });
   };
 
@@ -346,6 +459,15 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       return ch;
     });
     setLocalChapters(null); // switch to data.items source
+    const option = displayedChapters.flatMap(ch => ch.options).find(opt => opt.id === optionId);
+    pushRuntimeAction({
+      type: 'approve',
+      label: option?.isChecked ? '取消确认' : '确认',
+      message: `P2 ${option?.isChecked ? '取消确认' : '确认'}方案 ${chapterId}/${optionId}`,
+      status: 'success',
+      phase: 2,
+      target: `${chapterId}/${optionId}`,
+    });
     onUpdate({ ...data, items: updated });
   };
 
@@ -357,6 +479,13 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       )
     }));
     setLocalChapters(null);
+    pushRuntimeAction({
+      type: 'approve',
+      label: checked ? '批量确认' : '批量取消',
+      message: `P2 ${checked ? '批量确认' : '批量取消'}当前筛选方案`,
+      status: 'success',
+      phase: 2,
+    });
     onUpdate({ ...data, items: updated });
   };
 
@@ -369,6 +498,14 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
         : c
     );
     setLocalChapters(null);
+    pushRuntimeAction({
+      type: 'approve',
+      label: '渲染审阅',
+      message: `P3 切换方案批准状态 ${chapterId}/${optionId}`,
+      status: 'success',
+      phase: 3,
+      target: `${chapterId}/${optionId}`,
+    });
     onUpdate({ ...data, items: updated });
   };
 
@@ -379,6 +516,14 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
         : c
     );
     setLocalChapters(null);
+    pushRuntimeAction({
+      type: 'revise',
+      label: '修订',
+      message: `P3 更新方案 ${chapterId}/${optionId}`,
+      status: 'success',
+      phase: 3,
+      target: `${chapterId}/${optionId}`,
+    });
     onUpdate({ ...data, items: updated });
   };
 
@@ -391,16 +536,37 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
       })
     }));
     setLocalChapters(null);
+    pushRuntimeAction({
+      type: 'approve',
+      label: approved ? '批量批准' : '批量取消',
+      message: `P3 ${approved ? '批量批准' : '批量取消'}渲染方案`,
+      status: 'success',
+      phase: 3,
+    });
     onUpdate({ ...data, items: updated });
   };
 
   // Phase 2 → 3
   const handleProceedToPhase3 = () => {
+    pushRuntimeAction({
+      type: 'handoff',
+      label: '交接',
+      message: 'P2 已提交到 Phase 3 渲染审阅',
+      status: 'success',
+      phase: 2,
+    });
     onUpdate({ ...data, phase: 3 });
   };
 
   // Phase 3 → 4
   const handleProceedToPhase4 = () => {
+    pushRuntimeAction({
+      type: 'handoff',
+      label: '交接',
+      message: 'P3 已提交到 Phase 4 交付检查',
+      status: 'success',
+      phase: 3,
+    });
     onUpdate({ ...data, phase: 4 });
   };
 
@@ -418,10 +584,24 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
         id: opt.id || `${ch.chapterId}-opt-${j}`,
       })),
     }));
+    pushRuntimeAction({
+      type: 'sync',
+      label: '导入',
+      message: `P2 导入 ${normalized.length} 个章节方案`,
+      status: 'success',
+      phase: 2,
+    });
     onUpdate({ ...data, items: normalized, phase: 2 });
   };
 
   const handlePhaseChange = (newPhase: Phase) => {
+    pushRuntimeAction({
+      type: 'handoff',
+      label: '阶段切换',
+      message: `切换到 Phase ${newPhase}`,
+      status: 'info',
+      phase: newPhase,
+    });
     onUpdate({ ...data, phase: newPhase });
   };
 
@@ -458,6 +638,7 @@ export const DirectorSection = ({ projectId, scriptPath, socket, onRuntimeDataCh
           onBatchSetCheck={handleBatchSetCheck}
           onProceed={handleProceed}
           pendingTaskKeys={pendingBatchTaskKeys}
+          onRuntimeAction={pushRuntimeAction}
         />
       )}
 

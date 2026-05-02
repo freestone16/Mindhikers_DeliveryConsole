@@ -4,6 +4,7 @@ import { WorkstationRail } from './WorkstationRail';
 import { ContextDrawer } from './ContextDrawer';
 import { DeliveryStatusBar } from './DeliveryStatusBar';
 import '../../styles/delivery-shell.css';
+import type { RuntimeData } from '../../types';
 
 export interface ScriptFile {
   name: string;
@@ -20,12 +21,7 @@ interface DeliveryShellLayoutProps {
   onSelectProject: (id: string) => void;
   onSelectScript: (projectId: string, path: string) => Promise<boolean>;
   socket: any;
-  runtimeData?: {
-    currentModel: { provider: string; model: string } | null;
-    logs: { timestamp: number; type: string; message: string }[];
-    isLoading: boolean;
-    startTime: number | null;
-  };
+  runtimeData?: RuntimeData;
   children: React.ReactNode;
 }
 
