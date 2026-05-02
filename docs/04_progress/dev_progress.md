@@ -26,6 +26,8 @@
 | v4.1.1 | 2026-04-30 | **MarketingMaster TubeBuddy 真实评分修复** - Studio-first Keyword Explorer 路径确认；禁用假评分；主分与图表副指标真实读取；UI 显示数值+等级/待校准 |
 | v4.2.0 | 2026-05-01 | **MarketingMaster Delivery Shell UI 改版启动** - 新增 Director 设计系统对齐方案；P2 完整视频描述审阅台；P3 调整为平台适配与 DT 交接检查；demo 入口 `/marketing-redesign-demo` |
 | v4.2.1 | 2026-05-01 | **MarketingMaster build 修绿与正式 Shell 第一版** - 清理旧类型债，`npm run build` 恢复通过；正式 Marketing 页面接入 Delivery Shell 左栏、P1-P4 header 与右栏 Artifacts |
+| v4.2.2 | 2026-05-02 | **MarketingMaster P2 发布文案审阅台正式化** - P2 改为左侧方案选择 + 中央完整描述审阅 + 右侧 SEO/GEO 检查；描述区块与最终导出内容事实源同步；1366 宽度默认收起 Artifacts 保证长文本编辑空间 |
+| v4.2.3 | 2026-05-02 | **MarketingMaster P3 平台适配与 DT 交接检查** - P3 正式改为 YouTube 主包检查、平台适配矩阵、DT Contract 与技术产物视图；P3 采用 UI-only phase，不扩展旧持久化状态；P2 导出正文与全局预览顺序进一步对齐 |
 
 ---
 

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { MarketingPlan, MarketingPlanRow, DescriptionBlock } from '../../types';
 import { DescriptionEditor } from './DescriptionEditor';
-import { DescriptionReviewPanel } from './DescriptionReviewPanel';
+import { DescriptionReviewPanel, composeDescriptionPreview } from './DescriptionReviewPanel';
 
 interface MarketPlanTableProps {
     plan: MarketingPlan;
@@ -55,6 +55,50 @@ function toText(value: unknown): string {
     return String(value);
 }
 
+const DESCRIPTION_BLOCK_TYPES: DescriptionBlock['type'][] = [
+    'hook',
+    'series',
+    'geo_qa',
+    'timeline',
+    'references',
+    'action_plan',
+    'pinned_comment',
+    'hashtags',
+];
+
+function composeDescriptionContent(blocks: DescriptionBlock[]): string {
+    return composeDescriptionPreview(blocks);
+}
+
+function extractJsonObject(text: string): string {
+    const trimmed = text.trim();
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced?.[1]) return fenced[1].trim();
+    const first = trimmed.indexOf('{');
+    const last = trimmed.lastIndexOf('}');
+    if (first >= 0 && last > first) return trimmed.slice(first, last + 1);
+    return trimmed;
+}
+
+function parseDescriptionRevision(text: string, previousBlocks: DescriptionBlock[]): DescriptionBlock[] | null {
+    try {
+        const parsed = JSON.parse(extractJsonObject(text));
+        const payload = parsed.description_blocks || parsed;
+        if (!payload || typeof payload !== 'object') return null;
+
+        return previousBlocks.map((block, index) => {
+            const raw = payload[block.type] ?? payload[block.label] ?? payload[DESCRIPTION_BLOCK_TYPES[index]];
+            return {
+                ...block,
+                content: raw == null ? block.content : toText(raw),
+                isCollapsed: false,
+            };
+        });
+    } catch {
+        return null;
+    }
+}
+
 // ── Row Editor ────────────────────────────────────────────────────────────────
 interface RowEditorProps {
     row: MarketingPlanRow;
@@ -69,7 +113,12 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
     const content = toText(row.content);
 
     const handleDescriptionBlocksChange = (blocks: DescriptionBlock[]) => {
-        onChange({ ...row, descriptionBlocks: blocks });
+        onChange({
+            ...row,
+            descriptionBlocks: blocks,
+            content: composeDescriptionContent(blocks),
+            isConfirmed: false,
+        });
     };
 
     const submitRevise = () => {
@@ -92,7 +141,7 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
                     <div>
                         <textarea
                             value={content}
-                            onChange={e => onChange({ ...row, content: e.target.value })}
+                            onChange={e => onChange({ ...row, content: e.target.value, isConfirmed: false })}
                             rows={3}
                             placeholder="标签1,标签2,标签3,... (逗号分隔)"
                             className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-slate-500"
@@ -112,7 +161,7 @@ const RowEditor: React.FC<RowEditorProps> = ({ row, onChange, isRevising, onRevi
                 ) : (
                     <textarea
                         value={content}
-                        onChange={e => onChange({ ...row, content: e.target.value })}
+                        onChange={e => onChange({ ...row, content: e.target.value, isConfirmed: false })}
                         rows={row.rowType === 'thumbnail' || row.rowType === 'other' ? 3 : 2}
                         placeholder={`输入${row.label}...`}
                         className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-slate-500"
@@ -203,6 +252,7 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                     rowLabel: row.label,
                     instruction,
                     currentContent: row.content,
+                    descriptionBlocks: row.descriptionBlocks,
                     keyword: plan.keyword,
                     keywordId: plan.keywordId,
                     projectId,
@@ -227,7 +277,20 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                     try {
                         const event = JSON.parse(line.slice(6));
                         if (event.type === 'row_ready') {
-                            updateRow(row.id, { content: event.content, isConfirmed: false });
+                            if (row.rowType === 'description') {
+                                const blocks = parseDescriptionRevision(event.content, row.descriptionBlocks || []);
+                                if (blocks) {
+                                    updateRow(row.id, {
+                                        descriptionBlocks: blocks,
+                                        content: composeDescriptionContent(blocks),
+                                        isConfirmed: false,
+                                    });
+                                } else {
+                                    updateRow(row.id, { content: toText(event.content), isConfirmed: false });
+                                }
+                            } else {
+                                updateRow(row.id, { content: toText(event.content), isConfirmed: false });
+                            }
                         }
                     } catch { /* ignore parse errors */ }
                 }
@@ -244,12 +307,15 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
 
     const updateDescriptionBlocks = (blocks: DescriptionBlock[]) => {
         if (!descriptionRow) return;
-        const content = blocks.map(block => `[${block.label}] ${toText(block.content)}`).join('\n\n');
-        updateRow(descriptionRow.id, { descriptionBlocks: blocks, content });
+        updateRow(descriptionRow.id, {
+            descriptionBlocks: blocks,
+            content: composeDescriptionContent(blocks),
+            isConfirmed: false,
+        });
     };
 
     return (
-        <div className="space-y-0">
+        <div className="space-y-4">
             {descriptionRow?.descriptionBlocks && (
                 <DescriptionReviewPanel
                     keyword={plan.keyword}
@@ -259,8 +325,8 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
             )}
 
             {/* Progress bar */}
-            <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-xs text-slate-500">已确认 {confirmedCount} / {plan.rows.length} 项</span>
+            <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-medium text-slate-500">字段确认 {confirmedCount} / {plan.rows.length}</span>
                 <div className="flex-1 mx-3 h-1 bg-slate-700 rounded-full overflow-hidden">
                     <div
                         className="h-full bg-green-500/70 rounded-full transition-all duration-500"
@@ -275,7 +341,12 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
             </div>
 
             {/* Rows */}
-            <div className="border border-slate-700/50 rounded-xl overflow-hidden divide-y divide-slate-700/50">
+            <div className="overflow-hidden rounded-lg border border-slate-700/50">
+                <div className="border-b border-slate-700/50 bg-slate-900/40 px-4 py-3">
+                    <div className="text-sm font-semibold text-slate-200">发布字段确认清单</div>
+                    <div className="text-xs text-slate-500">标题、描述、标签和默认设置需要逐项确认后再导出</div>
+                </div>
+                <div className="divide-y divide-slate-700/50">
                 {plan.rows.map(row => {
                     const isExpanded = expandedRowId === row.id;
                     const isRevising = revisingRowId === row.id;
@@ -284,7 +355,7 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                     // Content preview (truncated)
                     const content = toText(row.content);
                     const preview = row.rowType === 'description'
-                        ? toText(row.descriptionBlocks?.[0]?.content || content).slice(0, 80)
+                        ? composeDescriptionPreview(row.descriptionBlocks || []).slice(0, 80) || content.slice(0, 80)
                         : content.slice(0, 80);
 
                     return (
@@ -350,6 +421,7 @@ export const MarketPlanTable: React.FC<MarketPlanTableProps> = ({
                         </div>
                     );
                 })}
+                </div>
             </div>
         </div>
     );

@@ -5,7 +5,7 @@
  * 左侧编辑结构化区块，右侧全局预览最终 YouTube 描述顺序。
  */
 import React from 'react';
-import { CheckCircle2, FileText, Search, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Search, Sparkles } from 'lucide-react';
 import type { DescriptionBlock } from '../../types';
 import { DescriptionEditor } from './DescriptionEditor';
 
@@ -44,8 +44,9 @@ function orderedBlocks(blocks: DescriptionBlock[]) {
         .filter(Boolean) as DescriptionBlock[];
 }
 
-function composePreview(blocks: DescriptionBlock[]) {
+export function composeDescriptionPreview(blocks: DescriptionBlock[]) {
     return orderedBlocks(blocks)
+        .filter(block => block.type !== 'pinned_comment')
         .filter(block => toText(block.content).trim())
         .map(block => toText(block.content).trim())
         .join('\n\n');
@@ -56,10 +57,11 @@ export const DescriptionReviewPanel: React.FC<DescriptionReviewPanelProps> = ({
     blocks,
     onChange,
 }) => {
-    const preview = composePreview(blocks);
     const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
+    const preview = composeDescriptionPreview(normalizedBlocks);
     const blockTypes = new Set(normalizedBlocks.map(block => block.type));
-    const hasKeyword = preview.includes(keyword);
+    const firstLines = preview.split('\n').slice(0, 2).join(' ');
+    const hasKeyword = firstLines.includes(keyword);
     const hasQuestion = /[?？]/.test(toText(normalizedBlocks.find(block => block.type === 'geo_qa')?.content));
     const hasTimeline = /\b\d{1,2}:\d{2}\b/.test(toText(normalizedBlocks.find(block => block.type === 'timeline')?.content));
     const hashtagCount = (toText(normalizedBlocks.find(block => block.type === 'hashtags')?.content).match(/#[^\s#]+/g) || []).length;
@@ -72,22 +74,22 @@ export const DescriptionReviewPanel: React.FC<DescriptionReviewPanelProps> = ({
     ];
 
     return (
-        <section className="mb-4 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-900/35">
-            <div className="flex items-center justify-between border-b border-slate-700/50 bg-slate-900/50 px-4 py-3">
-                <div className="flex items-center gap-2">
+        <section className="mb-4 overflow-hidden rounded-lg border border-slate-700/50 bg-slate-900/35">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/50 bg-slate-900/50 px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2">
                     <FileText className="h-4 w-4 text-purple-400" />
-                    <div>
+                    <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-slate-200">完整视频描述审阅台</h3>
                         <p className="text-xs text-slate-500">按 SEO/GEO 顺序编辑并预览最终 YouTube 描述</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex shrink-0 items-center gap-2 rounded-md border border-slate-700/50 bg-slate-950/30 px-2.5 py-1.5 text-xs text-slate-500">
                     <Search className="h-3.5 w-3.5" />
                     <span>主关键词：{keyword}</span>
                 </div>
             </div>
 
-            <div className="grid gap-4 p-4 xl:grid-cols-[minmax(360px,0.92fr)_minmax(380px,1.08fr)]">
+            <div className="grid gap-3 p-3 xl:grid-cols-[minmax(220px,0.82fr)_minmax(300px,1fr)_minmax(220px,0.78fr)]">
                 <div className="min-w-0">
                     <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
                         <Sparkles className="h-3.5 w-3.5" />
@@ -105,30 +107,36 @@ export const DescriptionReviewPanel: React.FC<DescriptionReviewPanelProps> = ({
                         value={preview}
                         readOnly
                         rows={18}
-                        className="h-[430px] w-full resize-none rounded-lg border border-slate-700/50 bg-slate-950/40 px-4 py-3 text-sm leading-7 text-slate-300 outline-none"
+                        className="h-[520px] w-full resize-none rounded-md border border-slate-700/50 bg-slate-950/40 px-4 py-3 text-sm leading-7 text-slate-300 outline-none"
                     />
+                </div>
 
-                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                <aside className="min-w-0">
+                    <div className="mb-2 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">SEO/GEO 检查</div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                         {checks.map(check => (
                             <div
                                 key={check.label}
-                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${
                                     check.ok
                                         ? 'border-green-500/20 bg-green-500/10 text-green-300'
                                         : 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300'
                                 }`}
                             >
-                                <CheckCircle2 className={`h-3.5 w-3.5 ${check.ok ? 'text-green-400' : 'text-yellow-500/60'}`} />
+                                {check.ok
+                                    ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                                    : <AlertCircle className="h-3.5 w-3.5 text-yellow-500/70" />
+                                }
                                 <span>{check.label}</span>
                             </div>
                         ))}
                     </div>
 
-                    <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-950/30 p-3">
+                    <div className="mt-3 rounded-md border border-slate-700/50 bg-slate-950/30 p-3">
                         <div className="mb-2 text-xs font-medium text-slate-400">推荐顺序</div>
                         <div className="space-y-1.5">
                             {SEO_GEO_SEQUENCE.map((item, index) => (
-                                <div key={item.type} className="grid grid-cols-[22px_96px_1fr] gap-2 text-xs">
+                                <div key={item.type} className="grid grid-cols-[22px_minmax(74px,96px)_1fr] gap-2 text-xs">
                                     <span className="font-mono text-slate-600">{index + 1}</span>
                                     <span className={blockTypes.has(item.type as any) ? 'text-slate-300' : 'text-slate-600'}>{item.label}</span>
                                     <span className="text-slate-600">{item.reason}</span>
@@ -136,7 +144,7 @@ export const DescriptionReviewPanel: React.FC<DescriptionReviewPanelProps> = ({
                             ))}
                         </div>
                     </div>
-                </div>
+                </aside>
             </div>
         </section>
     );

@@ -14,8 +14,10 @@ import type { MarketModule_V3 } from '../types';
 import { useExpertState } from '../hooks/useExpertState';
 import { MarketPhase1New } from './market/MarketPhase1New';
 import { MarketPhase2New } from './market/MarketPhase2New';
+import { MarketPhase3 } from './market/MarketPhase3';
 import { MarketDefaultSettings } from './market/MarketDefaultSettings';
 import { MarketingWorkbenchShell } from './market/MarketingWorkbenchShell';
+import type { ProductionPhase } from './market/MarketingWorkbenchShell';
 import { defaultMarketV3State } from '../mocks/marketMockDataV3';
 
 // ─────────────────────────────────────────────────────────────
@@ -47,6 +49,16 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
     // （旧 V2 state 有 phase 字段但缺少 phase1SubStep / candidates 等 V3 字段）
     const data: MarketModule_V3 = { ...defaultMarketV3State, ...(rawData as Partial<MarketModule_V3>) };
 
+    // 默认设置面板与 UI-only phase。P3/P4 不写入持久化 phase，避免旧状态迁移风险。
+    const [showSettings, setShowSettings] = useState(false);
+    const [uiPhase, setUiPhase] = useState<ProductionPhase>(data.phase);
+
+    useEffect(() => {
+        if ((uiPhase === 1 || uiPhase === 2) && data.phase !== uiPhase) {
+            setUiPhase(data.phase);
+        }
+    }, [data.phase, uiPhase]);
+
     // ── 文稿变化检测：选了文稿（含重新选同一个）则 Reset 全部营销状态 ──
     const prevSelectedAtRef = useRef<string | undefined>(undefined);
     const hasHandledScriptRef = useRef(false);
@@ -73,6 +85,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
             } else if (storedPath !== scriptPath) {
                 // 挂载时发现路径已不同 → Reset
                 console.log(`[MarketingMaster] 文稿已切换: ${storedPath} → ${scriptPath}，重置状态`);
+                setUiPhase(1);
                 updateState(projectId, {
                     ...defaultMarketV3State,
                     selectedScript,
@@ -80,6 +93,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
             } else if (scriptSelectedAt && storedSelectedAt && storedSelectedAt !== scriptSelectedAt) {
                 // 重新打开页面时也能识别：delivery_store 的脚本选择时间比营销状态更新。
                 console.log(`[MarketingMaster] 文稿重新选择时间变化 → 重置状态回 Phase 1`);
+                setUiPhase(1);
                 updateState(projectId, {
                     ...defaultMarketV3State,
                     selectedScript,
@@ -99,6 +113,7 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
         if (scriptSelectedAt && scriptSelectedAt !== prevSelectedAtRef.current) {
             prevSelectedAtRef.current = scriptSelectedAt;
             console.log(`[MarketingMaster] 文稿重新选择 → 重置状态回 Phase 1`);
+            setUiPhase(1);
             updateState(projectId, {
                 ...defaultMarketV3State,
                 selectedScript,
@@ -110,15 +125,13 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
         if (storedPath && storedPath !== scriptPath) {
             prevSelectedAtRef.current = scriptSelectedAt;
             console.log(`[MarketingMaster] 文稿路径变化: ${storedPath} → ${scriptPath}，重置状态`);
+            setUiPhase(1);
             updateState(projectId, {
                 ...defaultMarketV3State,
                 selectedScript,
             });
         }
     }, [scriptPath, scriptSelectedAt, data.selectedScript?.path, data.selectedScript?.selectedAt]);
-
-    // 默认设置面板开关
-    const [showSettings, setShowSettings] = useState(false);
 
     // ── 核心 update 函数：自动附带当前 scriptPath ──
     const onUpdate = (newData: MarketModule_V3) => {
@@ -130,8 +143,11 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
     };
 
     // ── Phase 切换 ──
-    const handleGoToPhase = (phase: 1 | 2) => {
-        onUpdate({ ...data, phase });
+    const handleGoToPhase = (phase: ProductionPhase) => {
+        setUiPhase(phase);
+        if (phase === 1 || phase === 2) {
+            onUpdate({ ...data, phase });
+        }
     };
 
     return (
@@ -139,11 +155,11 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
             data={data}
             projectId={projectId}
             scriptPath={scriptPath}
-            currentPhase={data.phase}
+            currentPhase={uiPhase}
             onPhaseChange={handleGoToPhase}
             onOpenSettings={() => setShowSettings(true)}
         >
-            {data.phase === 1 ? (
+            {uiPhase === 1 ? (
                 <MarketPhase1New
                     data={data}
                     projectId={projectId}
@@ -151,12 +167,17 @@ export const MarketingSection: React.FC<MarketingSectionProps> = ({
                     onUpdate={onUpdate}
                     onGoToPhase2={() => handleGoToPhase(2)}
                 />
-            ) : (
+            ) : uiPhase === 2 ? (
                 <MarketPhase2New
                     data={data}
                     projectId={projectId}
                     onUpdate={onUpdate}
                     onGoToPhase1={() => handleGoToPhase(1)}
+                />
+            ) : (
+                <MarketPhase3
+                    data={data}
+                    onBackToReview={() => handleGoToPhase(2)}
                 />
             )}
 

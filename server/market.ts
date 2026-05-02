@@ -547,8 +547,8 @@ function parsePlanFromLLM(llmOutput: string, keywordId: string, keyword: string)
         isCollapsed: !['hook', 'series'].includes(type), // 搜索摘要和价值说明默认展开
     }));
 
-    // Combine description blocks into a single preview string
-    const descPreview = descriptionBlocks.map(b => `[${b.label}] ${b.content}`).join('\n\n');
+    // Keep row content aligned with the YouTube description preview/export body.
+    const descPreview = renderYoutubeDescription(descriptionBlocks);
 
     return [
         { id: `${keywordId}-title`,       rowType: 'title',       label: '标题',     content: toPlainText(parsed.title),     isConfirmed: false },
@@ -627,7 +627,7 @@ router.post('/v3/generate-plan', async (req: Request, res: Response) => {
 
 // ── V3: POST /api/market/v3/revise-row ───────────────────────────────────────
 router.post('/v3/revise-row', async (req: Request, res: Response) => {
-    const { rowType, rowLabel, instruction, currentContent, keyword, keywordId } = req.body;
+    const { rowType, rowLabel, instruction, currentContent, descriptionBlocks, keyword, keywordId } = req.body;
     setupSSE(res);
 
     try {
@@ -638,13 +638,17 @@ router.post('/v3/revise-row', async (req: Request, res: Response) => {
 目标关键词：${keyword}
 
 当前内容：
-${currentContent}
+${rowType === 'description' && Array.isArray(descriptionBlocks)
+    ? JSON.stringify({
+        description_blocks: Object.fromEntries(descriptionBlocks.map((block: any) => [block.type, block.content || ''])),
+    }, null, 2)
+    : currentContent}
 
 修改指令：${instruction}
 
 ${rowType === 'description' ? `
 请只修改描述内容，保持与原格式一致（纯文本，禁止Markdown符号 ## ** - 等）。
-请以JSON格式返回修改后的description_blocks对象。` : `
+请只返回JSON对象，格式为 {"description_blocks":{"hook":"...","series":"...","geo_qa":"...","timeline":"...","references":"...","action_plan":"...","pinned_comment":"...","hashtags":"..."}}。` : `
 请直接返回修改后的${rowLabel}文本，不要任何解释。`}`;
 
         const config = loadConfig();
@@ -706,6 +710,24 @@ function toPlainText(value: unknown): string {
             .join('\n');
     }
     return String(value);
+}
+
+const DESCRIPTION_EXPORT_ORDER = [
+    'hook',
+    'series',
+    'geo_qa',
+    'timeline',
+    'references',
+    'action_plan',
+    'hashtags',
+];
+
+function renderYoutubeDescription(blocks: any[]): string {
+    return DESCRIPTION_EXPORT_ORDER
+        .map(type => blocks.find((block: any) => block.type === type))
+        .filter((block: any) => block?.content?.trim())
+        .map((block: any) => stripMarkdown(toPlainText(block.content)))
+        .join('\n\n');
 }
 
 function generateMarkdownContent(plan: any, projectId: string): string {
@@ -774,19 +796,12 @@ function generatePlainTxtContent(plan: any): string {
     const otherRow   = plan.rows.find((r: any) => r.rowType === 'other');
 
     let pinnedComment = '';
-    let hashtags = '';
     let descPlain = '';
 
     if (descRow?.descriptionBlocks?.length) {
-        const mainBlocks = descRow.descriptionBlocks.filter((b: any) =>
-            !['pinned_comment', 'hashtags'].includes(b.type) && b.content?.trim()
-        );
-        descPlain = mainBlocks.map((b: any) => stripMarkdown(b.content)).join('\n\n');
-
         const pinnedBlock  = descRow.descriptionBlocks.find((b: any) => b.type === 'pinned_comment');
-        const hashtagBlock = descRow.descriptionBlocks.find((b: any) => b.type === 'hashtags');
+        descPlain = renderYoutubeDescription(descRow.descriptionBlocks);
         pinnedComment = pinnedBlock?.content || '';
-        hashtags      = hashtagBlock?.content || '';
     } else {
         descPlain = stripMarkdown(descRow?.content || '');
     }
@@ -797,7 +812,6 @@ function generatePlainTxtContent(plan: any): string {
     out += `=== TAGS ===\n${tagsRow?.content || ''}\n\n`;
 
     if (pinnedComment) out += `=== PINNED_COMMENT ===\n${stripMarkdown(pinnedComment)}\n\n`;
-    if (hashtags)      out += `=== HASHTAGS ===\n${hashtags}\n\n`;
 
     if (otherRow?.otherItems?.length) {
         out += `=== OTHER ===\n`;

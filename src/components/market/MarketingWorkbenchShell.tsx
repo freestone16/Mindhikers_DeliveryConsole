@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     BarChart3,
     CheckCircle2,
@@ -21,14 +21,14 @@ import {
 import type { MarketModule_V3 } from '../../types';
 import '../../styles/marketing-workbench.css';
 
-type ProductionPhase = 1 | 2 | 3 | 4;
+export type ProductionPhase = 1 | 2 | 3 | 4;
 
 interface MarketingWorkbenchShellProps {
     data: MarketModule_V3;
     projectId: string;
     scriptPath: string;
-    currentPhase: 1 | 2;
-    onPhaseChange: (phase: 1 | 2) => void;
+    currentPhase: ProductionPhase;
+    onPhaseChange: (phase: ProductionPhase) => void;
     onOpenSettings: () => void;
     children: React.ReactNode;
 }
@@ -40,13 +40,6 @@ const deliveryModules = [
     { label: '音乐', icon: Music },
     { label: '营销', icon: Megaphone, active: true },
     { label: '视觉审计', icon: Eye },
-];
-
-const phases: Array<{ phase: ProductionPhase; code: string; label: string; enabled: boolean }> = [
-    { phase: 1, code: 'P1', label: '关键词与定位', enabled: true },
-    { phase: 2, code: 'P2', label: '发布文案审阅', enabled: true },
-    { phase: 3, code: 'P3', label: '平台适配', enabled: false },
-    { phase: 4, code: 'P4', label: '导出与交接', enabled: false },
 ];
 
 function shortName(path: string) {
@@ -79,13 +72,27 @@ export function MarketingWorkbenchShell({
     children,
 }: MarketingWorkbenchShellProps) {
     const [leftCollapsed, setLeftCollapsed] = useState(false);
-    const [rightCollapsed, setRightCollapsed] = useState(false);
+    const [rightCollapsed, setRightCollapsed] = useState(currentPhase === 2);
+    const [rightTouched, setRightTouched] = useState(false);
+
+    useEffect(() => {
+        if (!rightTouched) {
+            setRightCollapsed(currentPhase === 2);
+        }
+    }, [currentPhase, rightTouched]);
 
     const scriptName = data.selectedScript?.filename || shortName(scriptPath);
     const scoredVariants = data.candidates.flatMap(candidate => candidate.variants).filter(variant => variant.status === 'scored').length;
     const totalVariants = data.candidates.flatMap(candidate => candidate.variants).length;
     const readyPlans = data.plans.filter(plan => plan.generationStatus === 'ready').length;
     const generatingPlans = data.plans.filter(plan => plan.generationStatus === 'generating').length;
+    const hasReadyPlans = readyPlans > 0;
+    const phases: Array<{ phase: ProductionPhase; code: string; label: string; enabled: boolean }> = [
+        { phase: 1, code: 'P1', label: '关键词与定位', enabled: true },
+        { phase: 2, code: 'P2', label: '发布文案审阅', enabled: true },
+        { phase: 3, code: 'P3', label: '平台适配', enabled: hasReadyPlans },
+        { phase: 4, code: 'P4', label: '导出与交接', enabled: false },
+    ];
 
     return (
         <div className="marketing-workbench-shell min-h-[calc(100vh-180px)] overflow-hidden rounded-lg border border-[#e4dbcc] bg-[#f4efe5] text-[#342d24] shadow-[0_8px_24px_rgba(88,67,42,0.06)]">
@@ -166,7 +173,7 @@ export function MarketingWorkbenchShell({
                                 return (
                                     <div key={item.code} className="flex items-center gap-2">
                                         <button
-                                            onClick={() => item.enabled && onPhaseChange(item.phase as 1 | 2)}
+                                            onClick={() => item.enabled && onPhaseChange(item.phase)}
                                             disabled={!item.enabled}
                                             className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                                                 isActive
@@ -197,7 +204,10 @@ export function MarketingWorkbenchShell({
                     {rightCollapsed ? (
                         <div className="flex h-full flex-col items-center py-3">
                             <button
-                                onClick={() => setRightCollapsed(false)}
+                                onClick={() => {
+                                    setRightTouched(true);
+                                    setRightCollapsed(false);
+                                }}
                                 className="rounded-md border border-[#dfd5c8] bg-[#fffcf7] p-2 text-[#8f8372] hover:text-[#342d24]"
                                 title="展开右栏"
                             >
@@ -213,7 +223,10 @@ export function MarketingWorkbenchShell({
                                     <div className="text-xs text-[#8f8372]">运行态、健康度与交接准备</div>
                                 </div>
                                 <button
-                                    onClick={() => setRightCollapsed(true)}
+                                    onClick={() => {
+                                        setRightTouched(true);
+                                        setRightCollapsed(true);
+                                    }}
                                     className="rounded-md p-1.5 text-[#8f8372] hover:bg-[#e4dbcc]/45 hover:text-[#342d24]"
                                     title="收起右栏"
                                 >

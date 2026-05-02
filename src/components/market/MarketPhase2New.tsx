@@ -8,7 +8,7 @@
  *   MarketModule_V3.plans[] 存所有方案（每个黄金词一套）
  *   plan.generationStatus: 'pending' | 'generating' | 'ready' | 'error'
  */
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     Sparkles, Loader2, ArrowLeft, AlertCircle, CheckCircle2,
     LayoutList, RefreshCw
@@ -50,7 +50,18 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
     dataRef.current = data;
 
     const goldenKWs = data.candidates.filter(c => data.goldenKeywords.includes(c.id));
-    const activePlan = data.plans[data.activeTabIndex] ?? null;
+    const activeKW = goldenKWs[data.activeTabIndex] ?? goldenKWs[0] ?? null;
+    const activePlan = activeKW
+        ? data.plans.find(plan => plan.keywordId === activeKW.id) ?? null
+        : null;
+
+    useEffect(() => {
+        if (goldenKWs.length === 0) return;
+        if (data.activeTabIndex >= 0 && data.activeTabIndex < goldenKWs.length) return;
+        const nextData = { ...dataRef.current, activeTabIndex: 0 };
+        dataRef.current = nextData;
+        onUpdate(nextData);
+    }, [data.activeTabIndex, goldenKWs.length, onUpdate]);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -263,58 +274,101 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                 </div>
             )}
 
-            {/* ── Tab + 方案内容 ── */}
+            {/* ── 方案选择 + 方案内容 ── */}
             {(hasAnyPlan || anyGenerating) && (
-                <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+                    <aside className="rounded-lg border border-slate-700 bg-slate-800">
+                        <div className="border-b border-slate-700/50 px-4 py-3">
+                            <div className="text-sm font-semibold text-slate-200">方案选择</div>
+                            <div className="text-xs text-slate-500">一套黄金关键词对应一套发布包</div>
+                        </div>
+                        <div className="space-y-2 p-3">
+                            {goldenKWs.map((kw, idx) => {
+                                const plan = data.plans.find(p => p.keywordId === kw.id);
+                                const isActive = data.activeTabIndex === idx;
+                                const status = plan?.generationStatus || 'pending';
+                                const confirmedRows = plan?.rows.filter(row => row.isConfirmed).length || 0;
+                                const totalRows = plan?.rows.length || 0;
 
-                    {/* Tab Bar */}
-                    <div className="flex border-b border-slate-700 bg-slate-900/40">
-                        {goldenKWs.map((kw, idx) => {
-                            const plan = data.plans.find(p => p.keywordId === kw.id);
-                            const isActive = data.activeTabIndex === idx;
-                            const status = plan?.generationStatus;
-
-                            return (
-                                <button
-                                    key={kw.id}
-                                    onClick={() => onUpdate({ ...data, activeTabIndex: idx })}
-                                    className={`flex items-center gap-2 px-4 py-3 text-sm border-r border-slate-700/50 transition-colors ${
-                                        isActive
-                                            ? 'bg-orange-500/10 text-orange-300 border-b-2 border-b-orange-500'
-                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
-                                    }`}
-                                >
-                                    <span>🔑</span>
-                                    <span className="font-medium">{kw.keyword}</span>
-                                    {kw.bestScore !== undefined && (
-                                        <span className="text-xs opacity-50">({kw.bestScore})</span>
-                                    )}
-                                    {status === 'generating' && <Loader2 className="w-3 h-3 animate-spin text-orange-400" />}
-                                    {status === 'ready' && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
-                                    {status === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-                                </button>
-                            );
-                        })}
-
-                        {/* Re-generate all button */}
-                        <div className="ml-auto flex items-center pr-3">
+                                return (
+                                    <button
+                                        key={kw.id}
+                                        onClick={() => onUpdate({ ...data, activeTabIndex: idx })}
+                                        className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
+                                            isActive
+                                                ? 'border-orange-500/50 bg-orange-500/10 text-orange-300'
+                                                : 'border-slate-700/50 bg-slate-900/35 text-slate-400 hover:bg-slate-700/30 hover:text-slate-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-start gap-2">
+                                            <span className="mt-0.5 text-xs font-mono">P2</span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="truncate text-sm font-semibold">{kw.keyword}</div>
+                                                <div className="mt-1 flex items-center gap-1.5 text-xs opacity-75">
+                                                    {status === 'generating' && <Loader2 className="h-3 w-3 animate-spin" />}
+                                                    {status === 'ready' && <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />}
+                                                    {status === 'error' && <AlertCircle className="h-3.5 w-3.5 text-red-400" />}
+                                                    <span>
+                                                        {status === 'generating'
+                                                            ? '生成中'
+                                                            : status === 'ready'
+                                                            ? `已确认 ${confirmedRows}/${totalRows}`
+                                                            : status === 'error'
+                                                            ? '生成失败'
+                                                            : '等待生成'}
+                                                    </span>
+                                                </div>
+                                                {kw.bestScore !== undefined && (
+                                                    <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-700">
+                                                        <div
+                                                            className="h-full rounded-full bg-orange-500/70"
+                                                            style={{ width: `${Math.max(0, Math.min(100, kw.bestScore))}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="border-t border-slate-700/50 p-3">
                             <button
                                 onClick={handleGenerateAll}
                                 disabled={anyGenerating}
                                 title="重新生成所有方案"
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40 transition-colors"
+                                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-700/50 px-3 py-2 text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
                             >
-                                <RefreshCw className={`w-3 h-3 ${anyGenerating ? 'animate-spin' : ''}`} />
-                                重新生成
+                                <RefreshCw className={`h-3 w-3 ${anyGenerating ? 'animate-spin' : ''}`} />
+                                重新生成全部
                             </button>
                         </div>
-                    </div>
+                    </aside>
 
-                    {/* Tab Content */}
-                    <div className="p-4">
+                    <div className="min-w-0 rounded-lg border border-slate-700 bg-slate-800">
+                        <div className="border-b border-slate-700/50 bg-slate-900/40 px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-200">
+                                        {activeKW ? `发布文案审阅：${activeKW.keyword}` : '发布文案审阅'}
+                                    </div>
+                                    <div className="text-xs text-slate-500">中间审完整描述，右侧检查 SEO/GEO 顺序</div>
+                                </div>
+                                {activePlan?.generationStatus === 'ready' && (
+                                    <button
+                                        onClick={() => handleRegeneratePlan(activePlan.keywordId)}
+                                        disabled={anyGenerating}
+                                        className="flex items-center gap-1.5 rounded-md border border-slate-700/50 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
+                                    >
+                                        <RefreshCw className="h-3 w-3" />
+                                        重写当前方案
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4">
                         {(() => {
                             if (!activePlan) {
-                                const activeKW = goldenKWs[data.activeTabIndex];
                                 if (!activeKW) return null;
                                 return (
                                     <div className="text-center py-8">
@@ -374,6 +428,7 @@ export const MarketPhase2New: React.FC<MarketPhase2NewProps> = ({
                                 </div>
                             );
                         })()}
+                        </div>
                     </div>
                 </div>
             )}
