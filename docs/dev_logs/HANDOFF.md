@@ -1,5 +1,30 @@
-🕐 Last updated: 2026-05-01 23:14 CST
+🕐 Last updated: 2026-05-02 08:46 CST
 🌿 Branch: MHSDC-DC-MKT
+
+## 2026-05-02 08:46 保存点：已 commit & push
+
+- 用户要求：确认不用 commit 号，清理开发现场；随后要求 `commit & push`，并在 push 后更新 HANDOFF。
+- 当前分支：`MHSDC-DC-MKT`。
+- 已提交并推送：
+  - commit：`a7efb61 feat(marketing): restore build and add delivery shell`
+  - remote：`origin/MHSDC-DC-MKT`
+- 该 commit 包含：
+  - `npm run build` 修绿。
+  - 正式 `MarketingWorkbenchShell`。
+  - MarketingMaster 专用 warm paper bridge 样式。
+  - 正式页面宽度约束调整。
+  - 相关 README / dev_progress / dev_log / HANDOFF 过程资产。
+- 推送说明：
+  - 首次 `git push` 因 sandbox 网络限制失败：`github.com port 22: Operation not permitted`。
+  - 经用户授权后重新执行 `git push` 成功。
+- 当前未纳入提交的本地 WIP：
+  - `.agent/config/llm_config.json`：本地配置变化。
+  - `.vibedir/skill_drafts/Codex_OldYang_20260430.md`：技能备案草稿。
+  - `.vibedir/skill_registry.yml`：技能备案草稿。
+- 下一窗口建议：
+  1. 若要完全清空工作区，先由用户确认是否保留或处理上述本地配置/备案草稿。
+  2. 开新窗口推进 P2 原生三段式布局：方案选择 / 完整描述编辑 / SEO-GEO 检查。
+  3. 做 1366 宽度截图验证，再讨论是否扩展持久化 phase 到 `1 | 2 | 3 | 4`。
 
 ## 2026-05-01 23:14 保存点：收口待提交
 
