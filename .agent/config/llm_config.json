@@ -1,25 +1,27 @@
 {
   "global": {
-    "provider": "kimi",
-    "model": "kimi-k2.5",
-    "baseUrl": null
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "baseUrl": "https://api.deepseek.com/v1"
   },
   "generation": {
-    "imageModel": "doubao-seedream-4-5-251128",
-    "videoModel": "doubao-video-01"
+    "image": {
+      "provider": "volcengine",
+      "model": "doubao-seedream-4-5-251128"
+    },
+    "video": {
+      "provider": "volcengine",
+      "model": "doubao-seedance-1-5-pro"
+    }
   },
   "experts": {
     "crucible": {
       "enabled": true,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "writer": {
       "enabled": true,
-      "llm": null,
-      "imageModel": null,
-      "videoModel": null
+      "llm": null
     },
     "director": {
       "enabled": true,
@@ -27,9 +29,7 @@
         "provider": "siliconflow",
         "model": null,
         "baseUrl": null
-      },
-      "imageModel": "doubao-image-01",
-      "videoModel": "doubao-video-01"
+      }
     },
     "music": null,
     "thumbnail": null,

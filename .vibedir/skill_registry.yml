@@ -1,0 +1,7 @@
+skills:
+  - name: OldYang
+    source: /Users/luzhoua/.codex/skills/OldYang/SKILL.md
+    updated_at: "2026-04-30"
+    updated_by: Codex
+    change: "Added default WIP/document/commit classification best practice."
+    snapshot: .vibedir/skill_drafts/Codex_OldYang_20260430.md
