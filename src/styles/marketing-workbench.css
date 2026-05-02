@@ -1,0 +1,154 @@
+.marketing-workbench-shell {
+  --mkt-bg: #f4efe5;
+  --mkt-bg-soft: #f8f4ec;
+  --mkt-panel: #fffcf7;
+  --mkt-panel-soft: #fbf7ef;
+  --mkt-border: #e4dbcc;
+  --mkt-border-strong: #d8c8ae;
+  --mkt-text: #342d24;
+  --mkt-ink: #2c2823;
+  --mkt-muted: #8f8372;
+  --mkt-faint: #b8ac9c;
+  --mkt-accent: #c97545;
+  --mkt-accent-deep: #b26135;
+  --mkt-success: #62835c;
+  --mkt-success-bg: #eef2df;
+}
+
+.marketing-workbench-shell * {
+  letter-spacing: 0;
+}
+
+.marketing-workbench-shell .bg-slate-800,
+.marketing-workbench-shell .bg-slate-800\/40 {
+  background-color: var(--mkt-panel) !important;
+}
+
+.marketing-workbench-shell .bg-slate-900\/30,
+.marketing-workbench-shell .bg-slate-900\/35,
+.marketing-workbench-shell .bg-slate-900\/40,
+.marketing-workbench-shell .bg-slate-900\/50,
+.marketing-workbench-shell .bg-slate-900\/60,
+.marketing-workbench-shell .bg-slate-950\/30,
+.marketing-workbench-shell .bg-slate-950\/40,
+.marketing-workbench-shell .bg-slate-700\/30,
+.marketing-workbench-shell .bg-slate-700\/40,
+.marketing-workbench-shell .bg-slate-700\/50,
+.marketing-workbench-shell .bg-slate-700\/60 {
+  background-color: var(--mkt-panel-soft) !important;
+}
+
+.marketing-workbench-shell .bg-slate-700,
+.marketing-workbench-shell .bg-slate-600 {
+  background-color: #efe7dc !important;
+}
+
+.marketing-workbench-shell .hover\:bg-slate-700:hover,
+.marketing-workbench-shell .hover\:bg-slate-700\/30:hover,
+.marketing-workbench-shell .hover\:bg-slate-700\/60:hover,
+.marketing-workbench-shell .hover\:bg-slate-800:hover,
+.marketing-workbench-shell .hover\:bg-slate-600:hover {
+  background-color: #f2eadf !important;
+}
+
+.marketing-workbench-shell .border-slate-700,
+.marketing-workbench-shell .border-slate-700\/50,
+.marketing-workbench-shell .border-slate-600,
+.marketing-workbench-shell .border-slate-600\/30,
+.marketing-workbench-shell .border-slate-600\/50 {
+  border-color: var(--mkt-border) !important;
+}
+
+.marketing-workbench-shell .divide-slate-700\/50 > :not([hidden]) ~ :not([hidden]),
+.marketing-workbench-shell .divide-slate-700 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--mkt-border) !important;
+}
+
+.marketing-workbench-shell .text-white,
+.marketing-workbench-shell .text-slate-100,
+.marketing-workbench-shell .text-slate-200,
+.marketing-workbench-shell .text-slate-300 {
+  color: var(--mkt-text) !important;
+}
+
+.marketing-workbench-shell .text-slate-400 {
+  color: #6f6458 !important;
+}
+
+.marketing-workbench-shell .text-slate-500 {
+  color: var(--mkt-muted) !important;
+}
+
+.marketing-workbench-shell .text-slate-600 {
+  color: var(--mkt-faint) !important;
+}
+
+.marketing-workbench-shell .placeholder-slate-500::placeholder,
+.marketing-workbench-shell .placeholder-slate-600::placeholder {
+  color: #b8ac9c !important;
+}
+
+.marketing-workbench-shell .text-orange-300,
+.marketing-workbench-shell .text-orange-400 {
+  color: var(--mkt-accent) !important;
+}
+
+.marketing-workbench-shell .bg-orange-500,
+.marketing-workbench-shell .bg-orange-600 {
+  background-color: var(--mkt-accent) !important;
+}
+
+.marketing-workbench-shell .hover\:bg-orange-600:hover,
+.marketing-workbench-shell .hover\:bg-orange-500:hover {
+  background-color: var(--mkt-accent-deep) !important;
+}
+
+.marketing-workbench-shell .border-orange-500,
+.marketing-workbench-shell .border-orange-500\/30,
+.marketing-workbench-shell .border-orange-500\/50 {
+  border-color: rgba(201, 117, 69, 0.55) !important;
+}
+
+.marketing-workbench-shell .bg-orange-500\/10,
+.marketing-workbench-shell .bg-orange-500\/15,
+.marketing-workbench-shell .bg-orange-500\/20,
+.marketing-workbench-shell .bg-orange-600\/50 {
+  background-color: rgba(201, 117, 69, 0.13) !important;
+}
+
+.marketing-workbench-shell textarea,
+.marketing-workbench-shell input {
+  caret-color: var(--mkt-accent);
+}
+
+.marketing-workbench-shell textarea:not([readonly]),
+.marketing-workbench-shell input:not([readonly]) {
+  background-color: #fffaf2 !important;
+  border-color: var(--mkt-border) !important;
+  color: var(--mkt-text) !important;
+}
+
+.marketing-workbench-shell textarea[readonly] {
+  background-color: #fffaf2 !important;
+  color: #4d443a !important;
+}
+
+.marketing-workbench-shell table {
+  color: var(--mkt-text);
+}
+
+.marketing-workbench-shell th {
+  background-color: #fbf7ef;
+}
+
+.marketing-workbench-shell tr:hover {
+  background-color: rgba(247, 239, 227, 0.72) !important;
+}
+
+.marketing-workbench-shell .rounded-xl {
+  border-radius: 8px !important;
+}
+
+.marketing-workbench-shell .rounded-lg {
+  border-radius: 6px !important;
+}

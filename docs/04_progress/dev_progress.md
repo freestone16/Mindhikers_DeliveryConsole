@@ -25,6 +25,7 @@
 | v4.1.0 | 2026-04-02 | **MHSDC 新家初验** - 端口红线建立、PROJECTS_BASE 路径迁移、scriptPath 变化检测修复 |
 | v4.1.1 | 2026-04-30 | **MarketingMaster TubeBuddy 真实评分修复** - Studio-first Keyword Explorer 路径确认；禁用假评分；主分与图表副指标真实读取；UI 显示数值+等级/待校准 |
 | v4.2.0 | 2026-05-01 | **MarketingMaster Delivery Shell UI 改版启动** - 新增 Director 设计系统对齐方案；P2 完整视频描述审阅台；P3 调整为平台适配与 DT 交接检查；demo 入口 `/marketing-redesign-demo` |
+| v4.2.1 | 2026-05-01 | **MarketingMaster build 修绿与正式 Shell 第一版** - 清理旧类型债，`npm run build` 恢复通过；正式 Marketing 页面接入 Delivery Shell 左栏、P1-P4 header 与右栏 Artifacts |
 
 ---
 

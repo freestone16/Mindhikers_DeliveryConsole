@@ -25,10 +25,14 @@ export const defaultMarketV3State: MarketModule_V3 = {
 // Mock TubeBuddy Score（开发用）
 // ─────────────────────────────────────────────────────────────
 const mockTBScore = (overall: number, search: number, comp: number, opt: number, rel: number, monthly: number): TubeBuddyScore => ({
-    overallScore: overall,
-    weightedScore: Math.round(overall * 0.95),
-    metrics: { searchVolume: search, competition: comp, optimization: opt, relevance: rel },
-    rawMetrics: { monthlySearches: monthly, competitionLevel: comp < 50 ? 'low' : comp < 70 ? 'medium' : 'high' },
+    overall,
+    searchVolume: search,
+    competition: comp,
+    optimization: opt,
+    relevance: rel,
+    searchVolumeLabel: monthly > 50000 ? 'Good' : 'Fair',
+    competitionLabel: comp < 50 ? 'Fair' : comp < 70 ? 'Good' : 'Excellent',
+    optimizationLabel: opt >= 80 ? 'Excellent' : 'Good',
 });
 
 // ─────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ export const SRTUploader: React.FC<SRTUploaderProps> = ({
         try {
             const formData = new FormData();
             formData.append('srt', file);
+            formData.append('projectId', projectId);
 
             const res = await fetch('/api/market/v3/upload-srt', {
                 method: 'POST',

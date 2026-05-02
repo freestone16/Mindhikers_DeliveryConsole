@@ -23,7 +23,7 @@
 | 维度 | 状态 |
 |------|------|
 | 分支 | `MHSDC-DC-MKT` |
-| 阶段 | TubeBuddy 真实评分链路可用；Delivery Shell UI 改版进入 demo/实施规划阶段 |
+| 阶段 | TubeBuddy 真实评分链路可用；Delivery Shell UI 改版进入正式壳层第一版 |
 | 前端 | `http://localhost:5174` |
 | 后端 | `http://localhost:3002` |
 | UI Demo | `http://localhost:5174/#/marketing-redesign-demo` |
@@ -33,6 +33,9 @@
 - Phase 2 增加完整视频描述审阅台，支持 SEO/GEO 顺序全局预览
 - 新版 Delivery Shell UI demo 已落地：左栏对齐 Director，P1-P4 放中栏 header，运行态放右栏 Artifacts
 - P3 从“审核 JSON”调整为“平台适配与 DT 交接检查”
+- `npm run build` 已恢复通过
+- 正式 Marketing 页面已接入 Delivery Shell 第一版：左栏工作站、P1-P4 header、右栏 Artifacts
+- Phase 1 / Phase 2 旧深色组件已通过正式工作台局部样式初步 warm paper 化
 
 ---
 

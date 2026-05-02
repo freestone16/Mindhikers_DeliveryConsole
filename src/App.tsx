@@ -150,8 +150,8 @@ function App() {
                         />
 
                         <div className="flex-1 flex overflow-hidden">
-                            <main className="flex-1 overflow-y-auto px-6 py-8 transition-all duration-300">
-                                <div className="max-w-7xl mx-auto">
+                            <main className={`flex-1 overflow-y-auto transition-all duration-300 ${activeExpertId === 'MarketingMaster' ? 'px-3 py-4' : 'px-6 py-8'}`}>
+                                <div className={activeExpertId === 'MarketingMaster' ? 'w-full' : 'max-w-7xl mx-auto'}>
                                     {activeExpertId === 'VisualAudit' ? (
                                         <VisualAuditPage />
                                     ) : activeExpertId === 'Director' ? (

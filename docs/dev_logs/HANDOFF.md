@@ -1,5 +1,102 @@
-🕐 Last updated: 2026-05-01 22:35 CST
+🕐 Last updated: 2026-05-01 23:14 CST
 🌿 Branch: MHSDC-DC-MKT
+
+## 2026-05-01 23:14 保存点：收口待提交
+
+- 用户要求：停止继续大改 UI，进入收口。
+- 当前分支：`MHSDC-DC-MKT`。
+- 收口结论：
+  - 本窗口工作可以作为一个逻辑提交：build 修绿 + 正式 Marketing Delivery Shell 第一版 + warm paper 桥接 + 对应过程文档。
+  - 不再继续推进 P2 三段式原生布局；下一窗口单独开。
+- 最终验证：
+  - `npm run build` 通过；仅剩 Vite chunk size warning。
+  - `npx tsc --noEmit` 通过。
+  - `git diff --check` 通过。
+  - agent-browser 正式页面验证截图：`/Users/luzhoua/.agent-browser/tmp/screenshots/screenshot-1777648171631.png`。
+- 建议纳入提交的文件：
+  - `README.md`
+  - `docs/04_progress/dev_progress.md`
+  - `docs/dev_logs/HANDOFF.md`
+  - `docs/dev_logs/2026-05-01_MarketingMaster_Build_and_Shell.md`
+  - `src/App.tsx`
+  - `src/components/MarketingSection.tsx`
+  - `src/components/ScheduleModal.tsx`
+  - `src/components/StatusDashboard.tsx`
+  - `src/components/director/Phase3View.tsx`
+  - `src/components/market/MarketPhase1New.tsx`
+  - `src/components/market/MarketPhase2.tsx`
+  - `src/components/market/MarketPhase2New.tsx`
+  - `src/components/market/MarketPhase3.tsx`
+  - `src/components/market/SRTUploader.tsx`
+  - `src/components/market/MarketingWorkbenchShell.tsx`
+  - `src/styles/marketing-workbench.css`
+  - `src/mocks/marketMockData.ts`
+  - `src/mocks/marketMockDataV3.ts`
+  - `src/types.ts`
+- 明确不纳入提交：
+  - `.agent/config/llm_config.json`
+  - `.vibedir/skill_drafts/Codex_OldYang_20260430.md`
+  - `.vibedir/skill_registry.yml`
+- 下一窗口建议：
+  1. P2 原生三段式布局：方案选择 / 完整描述编辑 / SEO-GEO 检查。
+  2. 1366 宽度截图验证。
+  3. 再讨论是否扩展持久化 phase 到 `1 | 2 | 3 | 4`。
+
+## 2026-05-01 23:09 保存点：正式 Shell warm paper 化第二刀
+
+- 用户要求：上下文窗口还有，继续按计划推进 UI。
+- 当前分支：`MHSDC-DC-MKT`。
+- 本轮继续完成：
+  - 新增 `src/styles/marketing-workbench.css`，只在 `.marketing-workbench-shell` 作用域内覆盖旧深色 Tailwind slate 样式。
+  - `MarketingWorkbenchShell.tsx` 引入正式工作台局部样式，不污染 Director / Shorts / 全局页面。
+  - `App.tsx` 对 MarketingMaster 放开旧 `max-w-7xl` 宽度约束，并把页面 padding 从 `px-6 py-8` 调整为 Marketing 专用 `px-3 py-4`。
+  - Phase 1 / Phase 2 旧组件已初步接入 warm paper 色系：面板、表格、输入框、按钮 hover、边框、文字层级不再大面积深蓝黑。
+- 已验证：
+  - `npm run build` 通过；仍只有 Vite chunk 大小 warning。
+  - agent-browser 打开正式入口并切到 `营销大师`，确认正式页面横向空间改善、旧深色块已暖色化。
+  - 截图：`/Users/luzhoua/.agent-browser/tmp/screenshots/screenshot-1777648171631.png`。
+  - `agent-browser errors` 仍返回空内容但退出码为 1，无实际错误文本；继续以 snapshot、build、console 为依据。
+- 当前 UI 状态：
+  - 正式壳层已经可用。
+  - Phase 内部样式现在是局部 bridge 方案，适合快速统一视觉；后续若要更精细，仍建议逐步把 `CandidateKeywordList`、`KeywordScoreTable`、`MarketPlanTable` 改成原生 warm paper class，而不是长期只靠 CSS override。
+- 下一步建议：
+  1. 针对 P2 做原生布局改造：左侧方案/字段，中央完整描述，右侧 SEO/GEO 检查，减少对 override 的依赖。
+  2. 做 1366 宽度截图检查，确认右栏与 P2 大文本区不会挤压。
+  3. 再处理 P3/P4 正式生产语义与状态迁移。
+
+## 2026-05-01 22:54 保存点：build 修绿 + 正式 Marketing Shell 第一版
+
+- 用户要求：按老杨计划开展工作，先修 `npm run build`，再做 UI。
+- 当前分支：`MHSDC-DC-MKT`。
+- 本轮已完成：
+  - `npm run build` 已从失败修到通过。
+  - 修复旧类型债：
+    - Director `Phase3View.tsx` 补齐 `Sparkles` 导入，并移除未使用 `onProceed` 解构。
+    - 旧 `MarketPhase2.tsx` / `MarketPhase3.tsx` 改用新的 flat `TubeBuddyScore.overall/searchVolume/competition/relevance`。
+    - `ScheduleModal.tsx` / `StatusDashboard.tsx` 对旧 `DeliveryState.modules` 做可选兼容，避免新状态结构下 build 失败。
+    - mock TubeBuddy 数据更新为真实 flat 结构。
+    - 清理 `MarketPhase1New.tsx`、`MarketPhase2New.tsx` 未使用变量。
+  - 正式 Marketing 页面已接入第一版 Delivery Shell：
+    - 新增 `src/components/market/MarketingWorkbenchShell.tsx`。
+    - `MarketingSection.tsx` 改为使用正式壳层包住现有 Phase 1 / Phase 2 业务组件。
+    - 左栏加入 Delivery 共用工作站入口，支持收起/展开。
+    - 中栏加入 P1/P2/P3/P4 header；P1/P2 保持现有业务状态，P3/P4 先作为禁用语义位。
+    - 右栏加入 Artifacts / Runtime / Handoff Notes，支持收起/展开。
+- 已验证：
+  - `npm run build` 通过；仅剩 Vite chunk 大小 warning，不是失败项。
+  - `npx tsc --noEmit` 通过。
+  - `git diff --check` 通过。
+  - agent-browser 打开 `http://localhost:5174`，切到 `营销大师`，正式壳层已渲染。
+  - agent-browser 已验证左右栏收起状态可见。
+  - 截图：`/Users/luzhoua/.agent-browser/tmp/screenshots/screenshot-1777647220210.png`。
+  - `agent-browser errors` 返回空内容但退出码为 1，无实际错误文本；以 snapshot、console、build 为本轮验证依据。
+- 当前 WIP 注意：
+  - `.agent/config/llm_config.json` 仍是本地配置变化，不默认纳入提交。
+  - `.vibedir/` 仍是未跟踪技能备案草稿，不默认纳入提交。
+- 下一步建议：
+  1. 把正式壳层里的 Phase 1 / Phase 2 内部深色旧组件逐步改成 warm paper 工作台样式。
+  2. 为正式 P2 做更完整的左右布局，保证描述编辑器在新壳层内拥有足够阅读空间。
+  3. 再决定是否把持久化 `MarketModule_V3.phase` 从 `1 | 2` 扩到 `1 | 2 | 3 | 4`。
 
 ## 2026-05-01 22:35 保存点：提交前收口
 

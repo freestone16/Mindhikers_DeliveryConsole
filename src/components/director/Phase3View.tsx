@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Loader2, Download, CheckCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Loader2, Download, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import type { DirectorChapter } from '../../types';
 
 interface AlignResult {
@@ -18,7 +18,7 @@ interface Phase3ViewProps {
   onProceed: () => void;
 }
 
-export const Phase3View = ({ projectId, chapters, onProceed }: Phase3ViewProps) => {
+export const Phase3View = ({ projectId, chapters }: Phase3ViewProps) => {
   const [srtFile, setSrtFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [alignResults, setAlignResults] = useState<AlignResult[]>([]);

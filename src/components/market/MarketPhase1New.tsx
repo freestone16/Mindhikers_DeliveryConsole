@@ -83,10 +83,6 @@ export const MarketPhase1New: React.FC<MarketPhase1NewProps> = ({
 
     // ── Sub-step navigation helpers ──────────────────────────────────────
 
-    const goToSubStep = (step: MarketModule_V3['phase1SubStep']) => {
-        onUpdate({ ...data, phase1SubStep: step });
-    };
-
     // ── 1.1 → 1.2: go to scoring ────────────────────────────────────────
 
     const handleGoToScoring = useCallback(() => {
